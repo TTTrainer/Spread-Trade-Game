@@ -43,7 +43,12 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
     stg.app.getState().updateSettings((s) => ({
       ...(s as object),
       // This test also covers the optional confirm box.
-      game: { ...(s as { game: object }).game, ffSecondsPerDay: 0.06, confirmOrders: true },
+      game: {
+        ...(s as { game: object }).game,
+        ffSecondsPerDay: 0.06,
+        confirmOrders: true,
+        pauseOnTest: false,
+      },
     }));
   });
   await page.getByTestId('menu-sandboxSetup').click();

@@ -50,9 +50,20 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   start_clock: {
     title: 'Start the clock (Space)',
-    body: 'Fast-forward day by day. Once it runs, no new trades this round. It pauses only for the decisions that matter.',
+    body: 'Play the days out, one forming candle at a time. Once it runs, no new trades this round. Space pauses; in Day by day it plays one day per press.',
   },
-  step_day: { title: 'Step one day', body: 'Advance the clock by a single trading day.' },
+  step_day: {
+    title: 'Next day (N)',
+    body: 'Play exactly one trading day, then wait, so you can study the candle and decide.',
+  },
+  pace: {
+    title: 'Clock pace (, and .)',
+    body: 'DAY BY DAY waits for you after every candle. 1×, 2× and 4× play on their own, but still stop for real decisions and once when price tests your short strike.',
+  },
+  tug_meter: {
+    title: 'Stop vs target',
+    body: "Where today's P/L sits between your stop (left) and your profit target (right). The dot glows as it nears either one.",
+  },
   cartridge_rail: {
     title: 'Cartridges',
     body: 'Your powerups. They score left to right, so order matters: an adder before a multiplier is worth more. Drag with ◀ ▶ in the shop.',
@@ -151,7 +162,28 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     title: 'Width',
     body: 'Distance between the short and long strikes. Wider collects more but risks more.',
   },
-  contracts: { title: 'Contracts', body: 'How many spreads. Max loss scales with it.' },
+  contracts: { title: 'Contracts (- and =)', body: 'How many spreads. Max loss scales with it.' },
+  size_to_risk: {
+    title: 'Size to risk',
+    body: 'Sets the contracts so the max loss is about 1%, 2% or 3% of your equity, or as much as the risk cap allows.',
+    real: 'Position sizing by account risk, the way most traders size.',
+  },
+  preset_weekly: {
+    title: 'Weekly setup (W)',
+    body: 'The nearest weekly expiration (3-10 days) with a 0.20-delta short strike. Fast and swingy.',
+  },
+  preset_swing: {
+    title: 'Swing setup (M)',
+    body: 'A 30-45 day expiration with a 0.30-delta short strike: the classic premium-selling window.',
+  },
+  preset_mine: {
+    title: 'My setup (Y)',
+    body: 'Your saved setup: structure, days to expiration, delta, width, plan and risk size, applied in one key.',
+  },
+  preset_save: {
+    title: 'Save as my setup',
+    body: 'Remembers the trade you have built (structure, days, delta, width, plan, risk) as MY SETUP.',
+  },
   risk_cap: {
     title: 'Risk used / cap',
     body: 'Max loss of this trade as a share of equity, against the per-trade cap. Trades over the cap are refused.',

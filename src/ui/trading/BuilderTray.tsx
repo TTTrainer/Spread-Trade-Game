@@ -15,6 +15,7 @@ import { money, pct, price } from '../format';
 import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useTrading } from '../store/trading';
+import { useApp } from '../store/app';
 
 export function CallCards() {
   const session = useTrading((s) => s.session);
@@ -179,9 +180,61 @@ export function ExpiryChips() {
   );
 }
 
+const DELTAS = [0.1, 0.16, 0.2, 0.25, 0.3, 0.4];
+
+/** One-key setups: a weekly, a 30-45 day swing, and the player's own saved setup. */
+export function SetupPresets() {
+  const applyPreset = useTrading((s) => s.applyPreset);
+  const saveMySetup = useTrading((s) => s.saveMySetup);
+  const ff = useTrading((s) => s.ff);
+  const mine = useApp((s) => s.settings.game.mySetup);
+  const off = ff !== 'idle';
+  return (
+    <div className="presets num" data-testid="presets">
+      <button
+        className="preset"
+        disabled={off}
+        onClick={() => applyPreset('weekly')}
+        data-tip="g:preset_weekly"
+        data-testid="preset-weekly"
+      >
+        WEEKLY <span className="kbd">W</span>
+      </button>
+      <button
+        className="preset"
+        disabled={off}
+        onClick={() => applyPreset('swing')}
+        data-tip="g:preset_swing"
+        data-testid="preset-swing"
+      >
+        SWING <span className="kbd">M</span>
+      </button>
+      <button
+        className={`preset ${mine ? '' : 'unset'}`}
+        disabled={off}
+        onClick={() => applyPreset('mine')}
+        data-tip="g:preset_mine"
+        data-testid="preset-mine"
+      >
+        MINE <span className="kbd">Y</span>
+      </button>
+      <button
+        className="preset save"
+        disabled={off}
+        onClick={() => saveMySetup()}
+        data-tip="g:preset_save"
+        data-testid="preset-save"
+      >
+        SAVE
+      </button>
+    </div>
+  );
+}
+
 export function SizeControls() {
   const builder = useTrading((s) => s.builder);
   const setBuilder = useTrading((s) => s.setBuilder);
+  const sizeToRisk = useTrading((s) => s.sizeToRisk);
   const session = useTrading((s) => s.session);
   const plan = useTrading((s) => s.plan)();
   const hasWidth = ![
@@ -198,16 +251,28 @@ export function SizeControls() {
     <div className="tray-section size" data-testid="size-controls">
       <div className="ctl-grid num">
         <label data-tip="g:delta">Δ short</label>
-        <input
-          type="range"
-          min={0.1}
-          max={0.5}
-          step={0.01}
-          value={builder.delta}
-          onChange={(e) => setBuilder({ delta: Number(e.target.value), anchor: null, legs: null })}
-          data-testid="delta-slider"
-        />
-        <span>{builder.anchor !== null ? `K ${builder.anchor}` : builder.delta.toFixed(2)}</span>
+        <div className="delta-chips" data-testid="delta-chips">
+          {DELTAS.map((d) => (
+            <button
+              key={d}
+              className={`dchip ${builder.anchor === null && Math.abs(builder.delta - d) < 0.005 ? 'sel' : ''} ${d >= 0.4 ? 'wide-only' : ''}`}
+              onClick={() => {
+                sfx('click', 0.8 + d);
+                setBuilder({ delta: d, anchor: null, legs: null });
+              }}
+              data-testid={`delta-${Math.round(d * 100)}`}
+            >
+              .{Math.round(d * 100)}
+            </button>
+          ))}
+        </div>
+        <span
+          data-tip-title="Short strike"
+          data-tip-body="Pick a delta, press ↑/↓ to move one strike, or drag the S handle on the chart."
+        >
+          {builder.anchor !== null ? `K ${builder.anchor}` : builder.delta.toFixed(2)}{' '}
+          <span className="kbd wide-only">↑↓</span>
+        </span>
         {hasWidth && (
           <>
             <label data-tip="g:width">Width</label>
@@ -252,6 +317,24 @@ export function SizeControls() {
           data-tip="g:risk_cap"
         >
           {pct(risk)} / {pct(cap, 0)}
+        </span>
+        <label data-tip="g:size_to_risk">Size to</label>
+        <div className="delta-chips">
+          {([0.01, 0.02, 0.03, 'max'] as const).map((r) => (
+            <button
+              key={r}
+              className="dchip"
+              onClick={() => sizeToRisk(r)}
+              disabled={!plan?.ok}
+              data-testid={`risk-${r}`}
+            >
+              {r === 'max' ? 'MAX' : `${r * 100}%`}
+            </button>
+          ))}
+        </div>
+        <span className="dim wide-only">
+          <span className="kbd">-</span>
+          <span className="kbd">=</span>
         </span>
       </div>
       {plan && !plan.ok && plan.reason && (

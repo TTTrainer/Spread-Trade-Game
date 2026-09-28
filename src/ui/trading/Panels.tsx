@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { diffDays } from '../../engine/calendar';
-import { closeQuote, lastMark, optionLegsOf, stockRatio } from '../../engine/lifecycle/position';
+import { lastMark, optionLegsOf, stockRatio } from '../../engine/lifecycle/position';
 import { BUCKET_GLYPHS } from '../../engine/scoring/calls';
-import { expirationsOf, quotesFor, stepStrike, STRUCTURES, mid } from '../../engine/strategies/structures';
+import { quotesFor, STRUCTURES } from '../../engine/strategies/structures';
 import { payoffNow, type PricingEnv } from '../../engine/strategies/metrics';
 import type { DecisionAction, DecisionPoint, Position } from '../../engine/lifecycle/types';
-import type { OptionLeg } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
@@ -15,13 +14,34 @@ import { useApp } from '../store/app';
 import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
 import { briefFor, StreetChip } from './NewsBrief';
+import { LivePnl, PaceControls, useDayProgress } from './DayPlayer';
+import { priceAt } from './dayPath';
 import type { BriefAccess } from '../../engine/news/brief';
+import { RollDialog } from './RollDialog';
+
+export { RollDialog };
 
 /** What a lineup card may show. Sandbox shows everything; Career earns badges through analysts. */
 export interface CardBadges {
   ivr: boolean;
   earnings: boolean;
   extra?: React.ReactNode;
+}
+
+/** The card's price, ticking with the candle while a day plays. */
+function LivePx({ cardId, settled }: { cardId: string; settled: number }) {
+  const p = useDayProgress();
+  const c = p?.anim.cards[cardId];
+  const px = c ? priceAt(c.path, p.t) : settled;
+  const dir = c ? (px >= c.prevClose ? 'up' : 'down') : '';
+  return <span className={`lc-px num ${c ? `live ${dir}` : ''}`}>{px.toFixed(2)}</span>;
+}
+
+/** The sparkline's last point follows the forming candle. */
+function LiveSpark({ cardId, closes }: { cardId: string; closes: number[] }) {
+  const p = useDayProgress();
+  const c = p?.anim.cards[cardId];
+  return <Sparkline closes={c ? [...closes.slice(0, -1), priceAt(c.path, p.t)] : closes} />;
 }
 
 export function LineupColumn({
@@ -83,12 +103,12 @@ export function LineupColumn({
             />
             <div className="lc-top" data-tip="g:lineup_card">
               <span className="lc-sym">{c.displaySymbol}</span>
-              <span className="lc-px num">{view.spot().toFixed(2)}</span>
+              <LivePx cardId={c.id} settled={view.spot()} />
             </div>
             {!session.config.blind && c.realSymbol !== c.displaySymbol && (
               <div className="lc-name">{c.realSymbol}</div>
             )}
-            <Sparkline closes={bars.slice(-60).map((b) => b.close)} />
+            <LiveSpark cardId={c.id} closes={bars.slice(-60).map((b) => b.close)} />
             <div className="lc-badges">
               {/* Blind cards all share the same "Day N" (the clock shows it), so only real dates earn a chip. */}
               {!view.transform.hideDates && (
@@ -131,7 +151,7 @@ export function LineupColumn({
               ) : (
                 <span className="dim">no call</span>
               )}
-              {(pos || closed.length > 0) && <Pnl cents={pl} />}
+              {pos ? <LivePnl pos={pos} /> : closed.length > 0 && <Pnl cents={pl} />}
             </div>
           </TiltCard>
         );
@@ -219,9 +239,7 @@ export function PositionsDock() {
                 <td>{p.qty}</td>
                 <td>{price(Math.abs(p.openNet))}</td>
                 <td>{p.status === 'open' ? price(Math.abs(m?.value ?? 0)) : p.exitReason}</td>
-                <td>
-                  <Pnl cents={pl} />
-                </td>
+                <td>{p.status === 'open' ? <LivePnl pos={p} /> : <Pnl cents={pl} />}</td>
                 <td>{pct(pl / Math.max(1, p.entry.maxLossCents), 0)}</td>
                 <td>{p.status === 'open' ? (dte ?? '—') : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.delta ?? 0).toFixed(0) : '—'}</td>
@@ -286,134 +304,6 @@ export function PositionsDock() {
       </table>
       {rolling && <RollDialog pos={rolling} onClose={() => setRolling(null)} />}
     </div>
-  );
-}
-
-/** Pick a new expiration and strikes; shows the net credit or debit of the roll. */
-export function RollDialog({
-  pos,
-  onClose,
-  onRoll,
-}: {
-  pos: Position;
-  onClose: () => void;
-  onRoll?: (legs: OptionLeg[]) => void;
-}) {
-  const session = useTrading((s) => s.session);
-  const rollPosition = useTrading((s) => s.rollPosition);
-  const [exp, setExp] = useState<string | null>(null);
-  const [shift, setShift] = useState(0);
-  const view = session?.view(pos.cardId);
-  const [chain, setChain] = useState<Awaited<ReturnType<NonNullable<typeof view>['loadChain']>> | null>(null);
-  useEffect(() => {
-    if (!view) return;
-    // Rolling needs today's full chain, fetched on demand (today is the clock, so it's allowed).
-    void view.loadChain().then((c) => {
-      setChain(c);
-      const current = optionLegsOf(pos.legs)[0]?.expiration;
-      setExp(
-        expirationsOf(c).find((e) => current && diffDays(current, e) >= 7) ?? expirationsOf(c).at(-1) ?? null,
-      );
-    });
-  }, [view, pos.id]);
-  const legs = useMemo(() => {
-    if (!chain || !exp) return null;
-    const out: OptionLeg[] = [];
-    for (const l of optionLegsOf(pos.legs)) {
-      const listed = quotesFor(chain, exp, l.right).map((q) => q.strike);
-      if (!listed.length) return null;
-      let k = listed.reduce(
-        (best, x) => (Math.abs(x - l.strike) < Math.abs(best - l.strike) ? x : best),
-        listed[0],
-      );
-      if (shift) k = stepStrike(chain, exp, l.right, k, shift) ?? k;
-      out.push({ ...l, expiration: exp, strike: k });
-    }
-    return out;
-  }, [chain, exp, shift]);
-  const net = useMemo(() => {
-    if (!chain || !legs || !view) return null;
-    const find = (l: OptionLeg) =>
-      chain.quotes.find(
-        (q) => q.expiration === l.expiration && q.right === l.right && Math.abs(q.strike - l.strike) < 1e-6,
-      );
-    let open = 0;
-    for (const l of legs) {
-      const q = find(l);
-      if (!q) return null;
-      open += l.ratio * mid(q);
-    }
-    const close = closeQuote(
-      pos.legs,
-      {
-        date: view.now,
-        spot: view.spot(),
-        open: view.spot(),
-        rate: view.rate(),
-        divYield: 0,
-        quote: (k) => view.quote(k),
-        earningsTomorrow: false,
-        exDivToday: null,
-        exDivTomorrow: null,
-        gapDay: false,
-        atr: null,
-      },
-      pos.lastLegs,
-    ).mid;
-    return close + open;
-  }, [chain, legs]);
-  const exps = chain ? expirationsOf(chain).filter((e) => view && diffDays(view.now, e) >= 1) : [];
-  return (
-    <Modal onClose={onClose} testId="roll-dialog">
-      <h2>Roll {pos.symbol}</h2>
-      <div className="section-title">New expiration</div>
-      <div className="chip-row">
-        {exps.map((e) => (
-          <button key={e} className={`exp-chip num ${exp === e ? 'sel' : ''}`} onClick={() => setExp(e)}>
-            {view ? diffDays(view.now, e) : 0}d
-          </button>
-        ))}
-      </div>
-      <div className="section-title">Move strikes</div>
-      <div className="stepper num">
-        <button onClick={() => setShift(shift - 1)}>−</button>
-        <span>{shift > 0 ? `+${shift}` : shift} strikes</span>
-        <button onClick={() => setShift(shift + 1)}>+</button>
-      </div>
-      <div className="num roll-legs">
-        {legs?.map((l, i) => (
-          <div key={i}>
-            {l.ratio < 0 ? 'SELL' : 'BUY'} {l.strike} {l.right === 'C' ? 'call' : 'put'}{' '}
-            {view ? `${diffDays(view.now, l.expiration)}d` : ''}
-          </div>
-        ))}
-        <div className={net !== null && net < 0 ? 'up' : 'down'}>
-          {net === null
-            ? '—'
-            : net < 0
-              ? `Net credit ${price(-net)}`
-              : `Net debit ${price(net)} (rolling for a debit)`}
-        </div>
-      </div>
-      <div className="modal-actions">
-        <button
-          className="pixel-btn primary"
-          disabled={!legs}
-          data-testid="roll-confirm"
-          onClick={() => {
-            if (!legs) return;
-            if (onRoll) onRoll(legs);
-            else void rollPosition(pos.id, legs);
-            onClose();
-          }}
-        >
-          ROLL
-        </button>
-        <button className="pixel-btn" onClick={onClose}>
-          CANCEL
-        </button>
-      </div>
-    </Modal>
   );
 }
 
@@ -512,8 +402,17 @@ export function FastForwardBar() {
   const session = useTrading((s) => s.session);
   useTrading((s) => s.version);
   const toggle = useTrading((s) => s.toggle);
-  const step = useTrading((s) => s.step);
+  const pace = useTrading((s) => s.pace);
   useHotkeys({ playPause: () => toggle() });
+  const started = !!session?.clockStarted;
+  const label =
+    ff === 'running'
+      ? '❚❚ PAUSE'
+      : pace === 'step' && started
+        ? '▶ NEXT DAY'
+        : started
+          ? '▶ RESUME'
+          : '▶ START CLOCK';
   return (
     <div className="ffbar num" data-testid="ff-bar">
       <button
@@ -523,16 +422,9 @@ export function FastForwardBar() {
         data-testid="play-button"
         data-tip="g:start_clock"
       >
-        {ff === 'running' ? '❚❚ PAUSE' : '▶ START CLOCK'} <span className="kbd">Space</span>
+        {label} <span className="kbd">Space</span>
       </button>
-      <button
-        className="pixel-btn"
-        onClick={() => void step()}
-        disabled={ff === 'running' || ff === 'decision' || ff === 'done' || !session?.clockStarted}
-        data-tip="g:step_day"
-      >
-        STEP 1 DAY
-      </button>
+      <PaceControls />
       <span className="ff-state" data-testid="ff-state">
         {ff.toUpperCase()} · day {session?.dayIndex ?? 0}
       </span>

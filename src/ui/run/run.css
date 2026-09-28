@@ -924,3 +924,10 @@
   font-size: 22px;
   color: var(--amber);
 }
+
+/* Family badges and the tag picture on the SKIP button. */
+.fam .fam-art,
+.skip-tag-art {
+  vertical-align: -3px;
+  margin-right: 3px;
+}

@@ -106,6 +106,14 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
       <div className="fam-counters num">
         {ALL_FAMILIES.filter((f) => fam[f] > 0).map((f) => (
           <span key={f} className={`fam ${fam[f] >= 2 ? 'on' : ''}`} data-tip={`family:${f}`}>
+            <ArtIcon
+              category="family"
+              id={f}
+              name={FAMILY_NAMES[f]}
+              onlyIfUploaded
+              className="fam-art"
+              style={{ width: 16, height: 16 }}
+            />
             {FAMILY_NAMES[f].toUpperCase()} {fam[f]}
           </span>
         ))}
@@ -458,7 +466,18 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
             data-tip-title="Skip the round (K)"
             data-tip-body={`Skip before trading: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a skip; Reviews can't be skipped.`}
           >
-            SKIP → {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
+            SKIP →{' '}
+            {r.skipTag && (
+              <ArtIcon
+                category="tag"
+                id={r.skipTag}
+                name={TAGS[r.skipTag].name}
+                onlyIfUploaded
+                className="skip-tag-art"
+                style={{ width: 18, height: 18 }}
+              />
+            )}
+            {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
           </button>
         )}
         {noPositions && (session?.positions.length ?? 0) > 0 && (

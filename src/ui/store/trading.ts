@@ -9,17 +9,22 @@ import type {
 import type { TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
 import { computeFacts } from '../../engine/run/facts';
-import { STRUCTURES, expirationsOf, reverseOf } from '../../engine/strategies/structures';
+import { STRUCTURES, expirationsOf, reverseOf, stepStrike } from '../../engine/strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../../engine/strategies/types';
 import type { Bucket } from '../../engine/scoring/calls';
 import type { DecisionAction } from '../../engine/lifecycle/types';
 import { brier } from '../../engine/scoring/calls';
 import { diffDays } from '../../engine/calendar';
 import { sfx } from '../../audio/sfx';
+import { burstAt } from '../../fx/overlay';
+import { fitStructure } from '../../engine/strategies/fit';
 import { bridge, hasBridge } from '../bridge';
 import { useApp } from './app';
 import { checkAchievements } from '../achievements';
 import type { TradeRow } from '../../shared/userData';
+import type { DayPace } from '../../shared/settings';
+import { lastMark, optionLegsOf } from '../../engine/lifecycle/position';
+import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
 
 export interface BuilderState {
   structureId: StructureId;
@@ -41,6 +46,38 @@ export interface BuilderState {
 }
 
 export type FFState = 'idle' | 'running' | 'paused' | 'decision' | 'done';
+
+/** One trading day being played back on screen (the engine has already settled it). */
+export interface DayAnim {
+  id: number;
+  startedAt: number;
+  /** Playback length; 0 shows the finished day at once. */
+  ms: number;
+  /** The day's highest strike tension (1 = traded through a short strike). */
+  tension: number;
+  cards: Record<string, { date: string; bar: OHLC; prevClose: number; path: number[]; tension: number }>;
+  positions: Record<
+    string,
+    {
+      cardId: string;
+      prevCents: number;
+      finalCents: number;
+      deltaDollars: number;
+      thetaDollars: number;
+      prevClose: number;
+    }
+  >;
+}
+
+/** "+$18" rising off a position when its day settles. */
+export interface DayFloat {
+  id: number;
+  positionId: string;
+  cents: number;
+  thetaCents: number;
+}
+
+const PACES: DayPace[] = ['step', '1', '2', '4'];
 export type Panel = 'builder' | 'positions' | 'analyze' | 'lineup';
 
 export interface FeedItem {
@@ -107,6 +144,27 @@ interface TradingState {
   maxPositions: number | null;
   /** Called after every session action (Live mode saves its log). */
   onChange: (() => void) | null;
+  pace: DayPace;
+  dayAnim: DayAnim | null;
+  floats: DayFloat[];
+  /** Why the clock paused itself (a short strike being tested), shown on the chart. */
+  testNote: string | null;
+  setPace: (p: DayPace) => void;
+  /** The order stamp slammed onto the chart after a fill. */
+  stamp: { id: number; title: string; text: string; credit: boolean } | null;
+  /** The structures this screen allows (a desk's playbook); null = all. */
+  allowed: StructureId[] | null;
+  setAllowed: (ids: StructureId[] | null) => void;
+  /** Move the anchor strike one listed strike up (+1) or down (-1). */
+  nudgeStrike: (dir: 1 | -1) => void;
+  /** Move to the next (+1) or previous (-1) listed expiration. */
+  nudgeExpiration: (dir: 1 | -1) => void;
+  /** Size the trade so its max loss is about this share of equity ('max' = the risk cap). */
+  sizeToRisk: (pct: number | 'max') => void;
+  applyPreset: (p: 'weekly' | 'swing' | 'mine') => void;
+  saveMySetup: () => void;
+  /** Play exactly one day, then wait. */
+  nextDay: () => void;
   init: (
     s: TradingSession,
     opts?: {
@@ -254,6 +312,78 @@ export const useTrading = create<TradingState>((set, get) => {
     return r;
   };
 
+  /** Run an action but hold its events (fills, closes, headlines) until the day has played out. */
+  const dispatchHeld = async (a: SessionAction): Promise<SessionEvent[]> => {
+    const s = get().session;
+    if (!s) return [];
+    const ext = get().external;
+    if (ext) return (await ext(a)).events;
+    await s.dispatch(a);
+    const events = s.lastEvents.slice();
+    get().onChange?.();
+    return events;
+  };
+
+  /** How long a day takes at the current pace (the candle plays for most of it). */
+  const dayMs = (): number => {
+    const base = useApp.getState().settings.game.ffSecondsPerDay * 1000;
+    const p = get().pace;
+    return p === '4' ? base / 4 : p === '2' ? base / 2 : base;
+  };
+
+  /** Strike tension already reported per position, so a test pauses the clock once, not daily. */
+  let tested: Record<string, boolean> = {};
+
+  /** Snapshot before a day, then build its playback from what the engine settled. */
+  const buildDay = (
+    s: TradingSession,
+    before: Map<string, { cents: number; delta: number; theta: number; cardId: string }>,
+    prevClose: Map<string, number>,
+  ): DayAnim => {
+    const cards: DayAnim['cards'] = {};
+    let tension = 0;
+    for (const [cardId, pc] of prevClose) {
+      const view = s.view(cardId);
+      const bar = view.lastBar();
+      if (!bar || view.now === undefined) continue;
+      const shorts = s.positions
+        .filter((p) => p.cardId === cardId && before.has(p.id))
+        .flatMap((p) =>
+          optionLegsOf(p.legs)
+            .filter((l) => l.ratio < 0)
+            .map((l) => l.strike),
+        );
+      const t = strikeTension(shorts, bar);
+      tension = Math.max(tension, t);
+      cards[cardId] = {
+        date: view.now,
+        bar,
+        prevClose: pc,
+        path: intradayPath(bar, `${cardId}:${view.now}`),
+        tension: t,
+      };
+    }
+    const positions: DayAnim['positions'] = {};
+    for (const [id, b] of before) {
+      const p = s.position(id);
+      if (!p || !cards[b.cardId]) continue;
+      positions[id] = {
+        cardId: b.cardId,
+        prevCents: b.cents,
+        finalCents: p.status === 'open' ? (lastMark(p)?.plCents ?? b.cents) : (p.realizedCents ?? b.cents),
+        deltaDollars: b.delta,
+        thetaDollars: b.theta,
+        prevClose: cards[b.cardId].prevClose,
+      };
+    }
+    const reduced = useApp.getState().settings.display.reducedMotion;
+    const pace = get().pace;
+    // Near a short strike the day plays in slow motion (except at 4x).
+    const slow = tension >= 0.7 && pace !== '4' ? 1.7 : 1;
+    const ms = reduced || get().timeframe === 'W' ? 0 : Math.round(dayMs() * 0.8 * slow);
+    return { id: ++feedId, startedAt: performance.now(), ms, tension, cards, positions };
+  };
+
   const handleEvents = (events: SessionEvent[]) => {
     const s = get().session;
     const day = s?.dayIndex ?? 0;
@@ -341,14 +471,94 @@ export const useTrading = create<TradingState>((set, get) => {
     if (row) await bridge().invoke('user.recordTrade', row);
   };
 
+  let stepping = false;
+
+  /** Settle one day in the engine, play it back as a candle, then finish it. */
+  const playDay = async (s: TradingSession): Promise<void> => {
+    if (!s.inDay && s.atLiveEdge()) {
+      // Live mode: nothing after the latest close until the next sync.
+      loopToken++;
+      set({ ff: 'idle' });
+      useApp.getState().toast('Caught up to the latest close. Sync data for new days.', 'info');
+      return;
+    }
+    if (!s.inDay) {
+      // Remember where every open trade stood, settle the day, then play it back as a candle.
+      const before = new Map<string, { cents: number; delta: number; theta: number; cardId: string }>();
+      for (const p of s.openPositions()) {
+        const m = lastMark(p);
+        before.set(p.id, {
+          cents: m?.plCents ?? 0,
+          delta: (m?.greeks.delta ?? 0) * p.qty,
+          theta: (m?.greeks.theta ?? 0) * p.qty,
+          cardId: p.cardId,
+        });
+      }
+      const prevClose = new Map(s.runningCardIds().map((id) => [id, s.view(id).spot()] as const));
+      const events = await dispatchHeld({ t: 'begin' });
+      const anim = buildDay(s, before, prevClose);
+      set({ dayAnim: anim, version: get().version + 1 });
+      if (anim.ms > 0) {
+        sfx('tick', 1 + Math.min(0.5, s.dayIndex / 60), 0.6);
+        if (anim.tension >= 0.7) {
+          // A heartbeat while price leans on a short strike.
+          for (let k = 0; k < 3; k++)
+            for (const beat of [0, 170])
+              setTimeout(() => sfx('heartbeat', beat ? 0.9 : 1), (anim.ms * k) / 3 + beat);
+        }
+        await sleep(anim.ms);
+      }
+      // The day is done: reveal it, its news and what it did to each trade.
+      const floats: DayFloat[] = Object.entries(anim.positions).map(([positionId, x]) => ({
+        id: ++feedId,
+        positionId,
+        cents: x.finalCents - x.prevCents,
+        thetaCents: Math.round(x.thetaDollars * 100),
+      }));
+      const total = floats.reduce((a, f) => a + f.cents, 0);
+      let note: string | null = null;
+      if (useApp.getState().settings.game.pauseOnTest && get().pace !== 'step')
+        for (const [id, x] of Object.entries(anim.positions)) {
+          const c = anim.cards[x.cardId];
+          const open = s.position(id)?.status === 'open';
+          if (open && c.tension >= 0.8 && !tested[id]) {
+            tested[id] = true;
+            note = `${s.card(x.cardId).displaySymbol} ${c.tension >= 1 ? 'traded through' : 'is testing'} your short strike.`;
+          } else if (c.tension < 0.5) tested[id] = false;
+        }
+      set({
+        dayAnim: null,
+        floats: floats.filter((f) => f.cents !== 0),
+        testNote: note,
+        version: get().version + 1,
+      });
+      handleEvents(events);
+      if (anim.ms > 0 && floats.length) sfx(total >= 0 ? 'coin' : 'tick', total >= 0 ? 1.4 : 0.6, 0.35);
+      if (note) sfx('decision', 0.9, 0.6);
+    }
+    if (s.decisions.length > 0) {
+      loopToken++;
+      sfx('decision');
+      set({ ff: 'decision' });
+      return;
+    }
+    await dispatch({ t: 'end' });
+    await finishIfDone();
+  };
+
   const loop = async (token: number) => {
     while (token === loopToken && get().ff === 'running') {
       const t0 = performance.now();
       await get().step();
-      if (get().ff !== 'running') return;
-      // Keep the pace the setting asks for: the time spent stepping and drawing counts.
-      const secs = useApp.getState().settings.game.ffSecondsPerDay;
-      await sleep(Math.max(16, secs * 1000 - (performance.now() - t0)));
+      if (token !== loopToken || get().ff !== 'running') return;
+      // Day by day: wait for the player after each day. A tested strike also waits (once).
+      if (get().pace === 'step' || get().testNote) {
+        loopToken++;
+        set({ ff: 'paused' });
+        return;
+      }
+      // Keep the pace: the time spent playing the day counts.
+      await sleep(Math.max(16, dayMs() - (performance.now() - t0)));
     }
   };
 
@@ -379,6 +589,12 @@ export const useTrading = create<TradingState>((set, get) => {
     external: null,
     maxPositions: null,
     onChange: null,
+    pace: useApp.getState().settings.game.dayPace,
+    dayAnim: null,
+    floats: [],
+    testNote: null,
+    allowed: null,
+    stamp: null,
 
     init: (s, opts = {}) => {
       loopToken++;
@@ -404,7 +620,12 @@ export const useTrading = create<TradingState>((set, get) => {
         external: opts.external ?? null,
         maxPositions: opts.maxPositions ?? null,
         onChange: opts.onChange ?? null,
+        pace: useApp.getState().settings.game.dayPace,
+        dayAnim: null,
+        floats: [],
+        testNote: null,
       });
+      tested = {};
       if (first) get().select(first);
     },
     reset: () => {
@@ -507,6 +728,125 @@ export const useTrading = create<TradingState>((set, get) => {
       if (!selectedCardId) return;
       sfx('select', 0.8 + bucket * 0.1);
       await dispatch({ t: 'call', cardId: selectedCardId, bucket, confidence });
+      if (useApp.getState().settings.game.callPicksStructure) {
+        const fit = fitStructure(get().builder.structureId, bucket, get().allowed);
+        if (fit !== get().builder.structureId) get().setStructure(fit);
+      }
+    },
+    setAllowed: (ids) => set({ allowed: ids }),
+    nudgeStrike: (dir) => {
+      const { session, selectedCardId, builder } = get();
+      const plan = get().plan();
+      const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
+      if (!chain || !builder.expiration || get().ff !== 'idle') return;
+      // Condors build both sides from delta; everything else moves its anchor strike.
+      if (['iron_condor', 'bwb_condor'].includes(builder.structureId)) {
+        get().setBuilder({ delta: Math.max(0.05, Math.min(0.5, builder.delta - dir * 0.02)), legs: null });
+        sfx('tick', 1 + dir * 0.1);
+        return;
+      }
+      const lead = plan?.legs.find((l): l is OptionLeg => l.kind === 'option');
+      if (!lead) return;
+      const from = builder.anchor ?? lead.strike;
+      const next = stepStrike(chain, lead.expiration, lead.right, from, dir);
+      if (next === null) return;
+      sfx('tick', 1 + dir * 0.1);
+      get().setBuilder({ anchor: next, legs: null });
+    },
+    nudgeExpiration: (dir) => {
+      const { session, selectedCardId, builder } = get();
+      const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
+      if (!chain || get().ff !== 'idle') return;
+      const now = session!.view(selectedCardId!).now;
+      const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
+      const i = builder.expiration ? exps.indexOf(builder.expiration) : -1;
+      const e = exps[Math.max(0, Math.min(exps.length - 1, i + dir))];
+      if (!e || e === builder.expiration) return;
+      sfx('click');
+      get().setBuilder({
+        expiration: e,
+        legs: null,
+        backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
+      });
+    },
+    sizeToRisk: (target) => {
+      const { session, builder } = get();
+      const plan = get().plan();
+      if (!session || !plan?.ok || plan.maxLossCents <= 0) return;
+      const perContract = plan.maxLossCents / builder.qty;
+      const cap = session.config.riskCapPct;
+      const pct = target === 'max' ? cap : Math.min(cap, target);
+      const qty = Math.max(1, Math.min(50, Math.floor((session.markedEquityCents() * pct) / perContract)));
+      sfx('multPop', 0.9 + Math.min(0.6, qty * 0.05));
+      get().setBuilder({ qty });
+    },
+    applyPreset: (p) => {
+      const { session, selectedCardId, builder } = get();
+      const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
+      if (!chain || !session || get().ff !== 'idle') return;
+      const now = session.view(selectedCardId!).now;
+      const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
+      const near = (lo: number, hi: number, aim: number) =>
+        exps.find((e) => diffDays(now, e) >= lo && diffDays(now, e) <= hi) ??
+        exps.reduce(
+          (a, e) => (Math.abs(diffDays(now, e) - aim) < Math.abs(diffDays(now, a) - aim) ? e : a),
+          exps[0],
+        );
+      const mine = useApp.getState().settings.game.mySetup;
+      if (p === 'mine' && !mine) {
+        useApp
+          .getState()
+          .toast('Save a setup first: build a trade the way you like it, then SAVE MINE.', 'info');
+        sfx('error');
+        return;
+      }
+      const allowed = get().allowed;
+      const sid =
+        p === 'mine' && mine && (!allowed || allowed.includes(mine.structureId as StructureId))
+          ? (mine.structureId as StructureId)
+          : builder.structureId;
+      const setup =
+        p === 'weekly'
+          ? { dte: 7, lo: 3, hi: 10, delta: 0.2 }
+          : p === 'swing'
+            ? { dte: 38, lo: 30, hi: 45, delta: 0.3 }
+            : { dte: mine!.dte, lo: mine!.dte - 5, hi: mine!.dte + 5, delta: mine!.delta };
+      const e = near(setup.lo, setup.hi, setup.dte);
+      if (sid !== builder.structureId) get().setStructure(sid);
+      sfx('deal', 1.2);
+      get().setBuilder({
+        expiration: e,
+        backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
+        delta: setup.delta,
+        anchor: null,
+        legs: null,
+        ...(p === 'mine' && mine
+          ? { width: mine.width, targetPct: mine.targetPct, stopMult: mine.stopMult }
+          : {}),
+      });
+      if (p === 'mine' && mine) setTimeout(() => get().sizeToRisk(mine.riskPct), 0);
+    },
+    saveMySetup: () => {
+      const { session, selectedCardId, builder } = get();
+      const plan = get().plan();
+      if (!session || !selectedCardId || !builder.expiration) return;
+      const setup = {
+        structureId: builder.structureId,
+        dte: diffDays(session.view(selectedCardId).now, builder.expiration),
+        delta: builder.delta,
+        width: builder.width,
+        riskPct: plan?.riskPct ?? 0.02,
+        targetPct: builder.targetPct,
+        stopMult: builder.stopMult,
+      };
+      useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, mySetup: setup } }));
+      sfx('coin');
+      useApp
+        .getState()
+        .toast(
+          `Saved MY SETUP: ${STRUCTURES[builder.structureId].short}, ~${setup.dte} days, ${Math.round(setup.delta * 100)}Δ, risk ${(setup.riskPct * 100).toFixed(1)}%. Press Y to use it.`,
+          'good',
+        );
     },
     setConfidence: async (c) => {
       set({ confidence: c });
@@ -583,7 +923,26 @@ export const useTrading = create<TradingState>((set, get) => {
         brackets,
         earningsAck: builder.earningsAck,
       });
-      if (r?.filled) sfx(isCredit ? 'fill' : 'buy');
+      if (r?.filled) {
+        sfx(isCredit ? 'fill' : 'buy');
+        // The ticket slams onto the chart and coins fly off the button.
+        const st = STRUCTURES[builder.structureId];
+        const net = Math.abs(plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit);
+        set({
+          stamp: {
+            id: ++feedId,
+            title: isCredit ? 'SOLD' : 'BOUGHT',
+            text: `${builder.qty > 1 ? `${builder.qty}× ` : ''}${st.short} ${isCredit ? '+' : '−'}${net.toFixed(2)}`,
+            credit: isCredit,
+          },
+        });
+        burstAt(
+          document.querySelector(isCredit ? '[data-testid="sell-button"]' : '[data-testid="buy-button"]'),
+          'coins',
+          isCredit ? 26 : 14,
+        );
+        setTimeout(() => set({ stamp: null }), 1300);
+      }
       return !!r?.ok;
     },
     cancelOrder: async (id) => {
@@ -599,8 +958,9 @@ export const useTrading = create<TradingState>((set, get) => {
         return;
       }
       if (get().ff === 'decision' || get().ff === 'done') return;
+      if (get().ff === 'running') return;
       sfx('whoosh');
-      set({ ff: 'running', panel: 'positions' });
+      set({ ff: 'running', panel: 'positions', testNote: null });
       const token = ++loopToken;
       void loop(token);
     },
@@ -611,29 +971,40 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     },
     toggle: () => (get().ff === 'running' ? get().pause() : get().start()),
-    step: async () => {
+    nextDay: () => {
+      const ff = get().ff;
+      if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;
       if (!s) return;
-      if (!s.inDay && s.atLiveEdge()) {
-        // Live mode: nothing after the latest close until the next sync.
-        loopToken++;
-        set({ ff: 'idle' });
-        useApp.getState().toast('Caught up to the latest close. Sync data for new days.', 'info');
+      if (!s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
+        useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
+        sfx('error');
         return;
       }
-      if (!s.inDay) {
-        // One redraw per day: the begin only redraws by itself when a decision stops the clock.
-        await dispatch({ t: 'begin' }, true);
-        sfx('tick', 1 + Math.min(0.5, s.dayIndex / 60));
+      set({ ff: 'running', panel: 'positions', testNote: null });
+      const token = ++loopToken;
+      void (async () => {
+        await get().step();
+        if (token === loopToken && get().ff === 'running') {
+          loopToken++;
+          set({ ff: 'paused' });
+        }
+      })();
+    },
+    setPace: (p) => {
+      set({ pace: p });
+      sfx('select', p === 'step' ? 0.8 : 1 + PACES.indexOf(p) * 0.15);
+      useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, dayPace: p } }));
+    },
+    step: async () => {
+      const s = get().session;
+      if (!s || stepping) return;
+      stepping = true;
+      try {
+        await playDay(s);
+      } finally {
+        stepping = false;
       }
-      if (s.decisions.length > 0) {
-        loopToken++;
-        sfx('decision');
-        set({ ff: 'decision' });
-        return;
-      }
-      await dispatch({ t: 'end' });
-      await finishIfDone();
     },
     decide: async (dpId, action, legs) => {
       const s = get().session;
@@ -645,6 +1016,11 @@ export const useTrading = create<TradingState>((set, get) => {
       if (s.decisions.length === 0) {
         await dispatch({ t: 'end' });
         if (await finishIfDone()) return;
+        // Day by day waits for the next press; otherwise the clock picks up where it stopped.
+        if (get().pace === 'step') {
+          set({ ff: 'paused' });
+          return;
+        }
         set({ ff: 'running' });
         const token = ++loopToken;
         void loop(token);

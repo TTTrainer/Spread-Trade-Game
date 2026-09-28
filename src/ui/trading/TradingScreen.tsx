@@ -10,7 +10,14 @@ import { useTrading, type Panel, type StudyId } from '../store/trading';
 import { BUCKET_NAMES, CONFIDENCES } from '../../engine/scoring/calls';
 import { ChartPanel } from './ChartPanel';
 import { NewsTicker } from './NewsTicker';
-import { CallCards, ExpiryChips, OrderTicket, SizeControls, StructureCards } from './BuilderTray';
+import {
+  CallCards,
+  ExpiryChips,
+  OrderTicket,
+  SetupPresets,
+  SizeControls,
+  StructureCards,
+} from './BuilderTray';
 import {
   AnalyzePanel,
   DecisionModal,
@@ -294,7 +301,26 @@ export function TradingLayout({
     conf3: () => void setConfidence(0.7),
     conf4: () => void setConfidence(0.8),
     conf5: () => void setConfidence(0.9),
+    strikeUp: () => useTrading.getState().nudgeStrike(1),
+    strikeDown: () => useTrading.getState().nudgeStrike(-1),
+    expNext: () => useTrading.getState().nudgeExpiration(1),
+    expPrev: () => useTrading.getState().nudgeExpiration(-1),
+    qtyUp: () => {
+      const b = useTrading.getState().builder;
+      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.min(50, b.qty + 1) });
+    },
+    qtyDown: () => {
+      const b = useTrading.getState().builder;
+      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.max(1, b.qty - 1) });
+    },
+    presetWeekly: () => useTrading.getState().applyPreset('weekly'),
+    presetSwing: () => useTrading.getState().applyPreset('swing'),
+    presetMine: () => useTrading.getState().applyPreset('mine'),
   });
+  const allowedKey = allowedStructures?.join(',') ?? '';
+  useEffect(() => {
+    useTrading.getState().setAllowed(allowedStructures ?? null);
+  }, [allowedKey]);
 
   if (ff === 'done' && onDone) {
     return (
@@ -377,6 +403,7 @@ export function TradingLayout({
               <CallCards />
               <StructureCards allowed={allowedStructures} levels={levels} />
               <div className="tray-col">
+                <SetupPresets />
                 <ExpiryChips />
                 <SizeControls />
               </div>

@@ -46,7 +46,7 @@ async function fastClock(page: Page): Promise<void> {
     const s = (window as unknown as { __stg: Stg }).__stg;
     s.app.getState().updateSettings((x) => ({
       ...(x as object),
-      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06 },
+      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06, pauseOnTest: false },
     }));
   });
 }
@@ -181,7 +181,7 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
 
   // Round 2: trade, run a few days, then quit mid-round.
   await sellBullPut(page);
-  await page.getByRole('button', { name: 'STEP 1 DAY' }).isVisible();
+  await expect(page.getByTestId('pace')).toBeVisible();
   await page.keyboard.press('Space');
   await page.waitForTimeout(400);
   await page.keyboard.press('Space');

@@ -117,8 +117,19 @@ export function ArtIcon({
   );
 }
 
-/** An uploaded card back as a background (the code-drawn pattern stays when there is none). */
+/**
+ * An uploaded card back as a background (the code-drawn pattern stays when there is none). The art
+ * is a tall strip, so it repeats sideways at full height instead of stretching.
+ */
 export function cardBackImage(value: string): CSSProperties {
   const url = artUrl('cardback', value);
-  return url ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', imageRendering: 'pixelated' } : {};
+  return url
+    ? {
+        backgroundImage: `url(${url})`,
+        backgroundSize: 'auto 100%',
+        backgroundRepeat: 'repeat-x',
+        backgroundPosition: 'center',
+        imageRendering: 'pixelated',
+      }
+    : {};
 }

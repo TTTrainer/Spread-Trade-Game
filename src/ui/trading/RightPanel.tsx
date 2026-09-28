@@ -11,8 +11,9 @@ import { optionLegsOf } from '../../engine/lifecycle/position';
 import type { Leg, OptionLeg } from '../../engine/strategies/types';
 import { RR_RULES } from '../../content/structureRules';
 import { money, pct, price } from '../format';
-import { Pnl } from '../components/ui';
+
 import { useTrading } from '../store/trading';
+import { LivePnl } from './DayPlayer';
 
 interface Curve {
   legs: Leg[];
@@ -235,7 +236,7 @@ export function StatsBlock() {
     return (
       <div className="stats" data-testid="stats-block">
         <div className="key-stats">
-          <Stat k="OPEN P/L" v={<Pnl cents={pl} />} tip="g:pl_open" testId="stat-pl" />
+          <Stat k="OPEN P/L" v={<LivePnl pos={pos} />} tip="g:pl_open" testId="stat-pl" />
           <Stat k="% OF RISK" v={pct(pl / Math.max(1, pos.entry.maxLossCents))} tip="g:pct_risk" />
           <Stat k="MAX LOSS" v={money(pos.entry.maxLossCents)} tip="g:max_loss_trade" tone="down" />
           <Stat k="DTE" v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)} tip="g:dte" />

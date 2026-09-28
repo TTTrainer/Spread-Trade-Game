@@ -36,11 +36,13 @@ function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName;
+  // Arrow keys belong to a focused slider or dropdown, not to the game.
+  const arrow = e.key.startsWith('Arrow');
   return (
     (tag === 'INPUT' &&
-      (t as HTMLInputElement).type !== 'range' &&
-      (t as HTMLInputElement).type !== 'checkbox') ||
+      (((t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox') || arrow)) ||
     tag === 'TEXTAREA' ||
+    (tag === 'SELECT' && arrow) ||
     t.isContentEditable
   );
 }

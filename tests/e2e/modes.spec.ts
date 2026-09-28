@@ -11,7 +11,7 @@ async function fastClock(page: Page): Promise<void> {
   await page.evaluate(() => {
     (window as Any).__stg.app.getState().updateSettings((x: Any) => ({
       ...x,
-      game: { ...x.game, ffSecondsPerDay: 0.06 },
+      game: { ...x.game, ffSecondsPerDay: 0.06, pauseOnTest: false },
     }));
   });
 }

@@ -46,7 +46,19 @@ export type HotkeyAction =
   | 'select6'
   | 'select7'
   | 'select8'
-  | 'select9';
+  | 'select9'
+  | 'nextDay'
+  | 'slower'
+  | 'faster'
+  | 'strikeUp'
+  | 'strikeDown'
+  | 'expNext'
+  | 'expPrev'
+  | 'qtyUp'
+  | 'qtyDown'
+  | 'presetWeekly'
+  | 'presetSwing'
+  | 'presetMine';
 
 /** thinkorswim defaults (plus game-only keys). Remappable in Settings. */
 export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
@@ -96,6 +108,18 @@ export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
   select7: 'Alt+7',
   select8: 'Alt+8',
   select9: 'Alt+9',
+  nextDay: 'N',
+  slower: ',',
+  faster: '.',
+  strikeUp: 'ArrowUp',
+  strikeDown: 'ArrowDown',
+  expNext: 'ArrowRight',
+  expPrev: 'ArrowLeft',
+  qtyUp: '=',
+  qtyDown: '-',
+  presetWeekly: 'W',
+  presetSwing: 'M',
+  presetMine: 'Y',
 };
 
 export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
@@ -145,7 +169,34 @@ export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
   select7: 'Select card/position 7',
   select8: 'Select card/position 8',
   select9: 'Select card/position 9',
+  nextDay: 'Play the next day',
+  slower: 'Slower clock',
+  faster: 'Faster clock',
+  strikeUp: 'Short strike up one',
+  strikeDown: 'Short strike down one',
+  expNext: 'Later expiration',
+  expPrev: 'Earlier expiration',
+  qtyUp: 'One more contract',
+  qtyDown: 'One fewer contract',
+  presetWeekly: 'Setup: weekly',
+  presetSwing: 'Setup: 30-45 day swing',
+  presetMine: 'Setup: my saved setup',
 };
+
+export type DayPace = 'step' | '1' | '2' | '4';
+
+export interface SavedSetup {
+  structureId: string;
+  /** Aim for this many days to expiration (the closest listed date wins). */
+  dte: number;
+  delta: number;
+  /** Width in strike steps. */
+  width: number;
+  /** Risk per trade as a share of equity (sizes the contracts). */
+  riskPct: number;
+  targetPct: number;
+  stopMult: number;
+}
 
 export interface Settings {
   /** Bumped when defaults change in a way saved settings should pick up. */
@@ -154,7 +205,16 @@ export interface Settings {
     startingCapitalCents: number;
     shortDelta: number;
     bucketMode: 'em' | 'fixed';
+    /** Seconds per trading day at 1x (the candle plays for most of it). */
     ffSecondsPerDay: number;
+    /** How the clock runs: one day per press, or continuously at 1x, 2x or 4x. */
+    dayPace: DayPace;
+    /** Pause the clock (no pop-up) the first time a day trades near or through a short strike. */
+    pauseOnTest: boolean;
+    /** The player's own saved builder setup (the MY SETUP preset). */
+    mySetup: SavedSetup | null;
+    /** Calling a direction switches to a structure that fits it (up: bull put, down: bear call). */
+    callPicksStructure: boolean;
     pause: Record<DecisionKind, boolean>;
     pureMarket: boolean;
     tutorialDone: boolean;
@@ -188,7 +248,7 @@ export interface Settings {
   data: { gameDbPath: string | null };
 }
 
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
@@ -196,7 +256,11 @@ export const DEFAULT_SETTINGS: Settings = {
     startingCapitalCents: 500_000,
     shortDelta: 0.3,
     bucketMode: 'em',
-    ffSecondsPerDay: 0.35,
+    ffSecondsPerDay: 1.4,
+    dayPace: '1',
+    pauseOnTest: true,
+    mySetup: null,
+    callPicksStructure: true,
     // Only the moments that need a real decision stop the clock. Targets close at plan by
     // themselves; a touched short strike and 21 DTE show up as notices.
     pause: {
@@ -245,11 +309,14 @@ export function mergeSettings(saved: unknown): Settings {
   const s = (saved ?? {}) as Partial<Settings>;
   // Version 2 (playtest feedback): fewer clock stops. Older saves take the new pause defaults.
   const old = (s.version ?? 1) < 2;
+  // Version 3: days play out as forming candles, so the old fast default (0.35 s) becomes 1.4 s.
+  const v3 = (s.version ?? 1) < 3 && s.game?.ffSecondsPerDay === 0.35 ? { ffSecondsPerDay: 1.4 } : {};
   return {
     version: SETTINGS_VERSION,
     game: {
       ...DEFAULT_SETTINGS.game,
       ...s.game,
+      ...v3,
       pause: old ? { ...DEFAULT_SETTINGS.game.pause } : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
     },
     realism: { ...DEFAULT_SETTINGS.realism, ...s.realism },

@@ -63,7 +63,13 @@ test('fast-forward stays smooth: frame times and main-thread stalls', async () =
   await page.evaluate(() =>
     (window as Any).__stg.app.getState().updateSettings((s: Any) => ({
       ...s,
-      game: { ...s.game, pause: Object.fromEntries(Object.keys(s.game.pause).map((k) => [k, false])) },
+      game: {
+        ...s.game,
+        // Measure the busiest pace: candles forming at 4x, back to back.
+        dayPace: '4',
+        pauseOnTest: false,
+        pause: Object.fromEntries(Object.keys(s.game.pause).map((k) => [k, false])),
+      },
     })),
   );
   await page.getByTestId('menu-sandboxSetup').click();
@@ -114,8 +120,8 @@ test('fast-forward stays smooth: frame times and main-thread stalls', async () =
   // The main thread must never stall long enough to drop a run of frames.
   expect(ff.longestTask).toBeLessThan(250);
   expect(ff.p50).toBeLessThan(20);
-  // The clock keeps its pace: at least 70% of the days per second the speed setting asks for.
+  // The clock keeps its pace: at least 70% of the days per second 4x asks for.
   expect(days).toBeGreaterThan(3);
-  expect(pace.days / pace.seconds).toBeGreaterThanOrEqual((1 / secsPerDay) * 0.7);
+  expect(pace.days / pace.seconds).toBeGreaterThanOrEqual((4 / secsPerDay) * 0.7);
   await app.close();
 });

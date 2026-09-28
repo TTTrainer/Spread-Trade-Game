@@ -143,13 +143,43 @@ export function SettingsScreen() {
                 fmt={(v) => `${Math.round(v * 100)}Δ`}
               />
               <Slider
-                label="Fast-forward speed (seconds per day)"
+                label="Seconds per day at 1× (the candle plays for most of it)"
                 value={settings.game.ffSecondsPerDay}
-                min={0.15}
-                max={1}
-                step={0.05}
+                min={0.4}
+                max={3}
+                step={0.1}
                 onChange={(v) => set((s) => ({ ...s, game: { ...s.game, ffSecondsPerDay: v } }))}
-                fmt={(v) => v.toFixed(2)}
+                fmt={(v) => v.toFixed(1)}
+              />
+              <div className="set-row">
+                <span>Clock pace</span>
+                <div className="seg num" data-tip="g:pace">
+                  {(
+                    [
+                      ['step', 'DAY BY DAY'],
+                      ['1', '1×'],
+                      ['2', '2×'],
+                      ['4', '4×'],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      className={settings.game.dayPace === v ? 'sel' : ''}
+                      onClick={() => {
+                        set((s) => ({ ...s, game: { ...s.game, dayPace: v } }));
+                        useTrading.setState({ pace: v });
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Toggle
+                label="Pause (no pop-up) when price first tests my short strike"
+                value={settings.game.pauseOnTest}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, pauseOnTest: v } }))}
+                testId="set-pause-test"
               />
               <div className="set-row">
                 <span>Call buckets</span>
@@ -184,6 +214,13 @@ export function SettingsScreen() {
                 }}
                 hint="Off: Sell and Buy send the order at once (Alt+A switches during a round)"
                 testId="set-confirm"
+              />
+              <Toggle
+                label="Calling a direction picks a matching structure"
+                value={settings.game.callPicksStructure}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, callPicksStructure: v } }))}
+                hint="Up: bull put. Down: bear call. Flat: iron condor (when your playbook has one)."
+                testId="set-call-picks"
               />
               <div className="section-title">Decision points that pause the fast-forward</div>
               <p className="dim small">

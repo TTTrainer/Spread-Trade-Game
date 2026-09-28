@@ -31,6 +31,10 @@ import type { Leg } from '../../engine/strategies/types';
 import { useTrading, type StudyId } from '../store/trading';
 import { chartBridge } from './chartBridge';
 import { PriceLadder } from './PriceLadder';
+import { PositionHud } from './DayPlayer';
+import { StrikeHandle } from './StrikeHandle';
+import { formingBar } from './dayPath';
+import { AnimatePresence, motion } from 'motion/react';
 
 const toTs = (d: string) => (Date.parse(d) / 1000) as UTCTimestamp;
 const toDate = (t: Time) => new Date((t as number) * 1000).toISOString().slice(0, 10);
@@ -96,6 +100,7 @@ export function ChartPanel() {
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const extraRef = useRef<{ key: StudyId | 'volume'; series: ISeriesApi<'Line' | 'Histogram'> }[]>([]);
   const linesRef = useRef<IPriceLine[]>([]);
+  const shortLinesRef = useRef<IPriceLine[]>([]);
   const drawRef = useRef<ISeriesApi<'Line'>[]>([]);
   const pendingRef = useRef<{ time: number; price: number } | null>(null);
   const [legend, setLegend] = useState<string>('');
@@ -123,6 +128,8 @@ export function ChartPanel() {
       timeScale: {
         borderColor: '#3b2f86',
         rightOffset: 6,
+        // Wider candles once the clock runs, so each new day is big enough to watch form.
+        barSpacing: useTrading.getState().ff === 'idle' ? 7 : 15,
         tickMarkFormatter: (t: Time) =>
           blind ? view.dayLabel(toDate(t)).replace('Day ', 'D') : toDate(t).slice(5),
       },
@@ -250,20 +257,31 @@ export function ChartPanel() {
     const b = session.view(cardId).bars();
     return timeframe === 'W' ? weekly(b) : b;
   }, [session, cardId, now, timeframe]);
+  // A day being played back: the newest candle forms on screen instead of appearing whole.
+  const anim = useTrading((s) => s.dayAnim);
+  const stamp = useTrading((s) => s.stamp);
+  const cardAnim = anim && cardId ? anim.cards[cardId] : undefined;
+  const animKey =
+    anim && cardAnim && anim.ms > 0 && timeframe === 'D' && bars[bars.length - 1]?.date === cardAnim.date
+      ? anim.id
+      : 0;
 
   useEffect(() => {
     const chart = chartRef.current;
     const candles = candleRef.current;
     if (!chart || !candles || bars.length === 0) return;
+    const full = bars;
+    // While the day plays, everything (studies too) shows yesterday; the new candle is drawn live.
+    const shown = animKey ? full.slice(0, -1) : full;
     candles.setData(
-      bars.map((b) => ({ time: toTs(b.date), open: b.open, high: b.high, low: b.low, close: b.close })),
+      shown.map((b) => ({ time: toTs(b.date), open: b.open, high: b.high, low: b.low, close: b.close })),
     );
-    const closes = bars.map((b) => b.close);
+    const closes = shown.map((b) => b.close);
     const byKey = (k: string) => extraRef.current.filter((e) => e.key === k).map((e) => e.series);
     const vol = byKey('volume')[0];
     if (vol)
       vol.setData(
-        bars.map((b) => ({
+        shown.map((b) => ({
           time: toTs(b.date),
           value: b.volume,
           color: b.close >= b.open ? 'rgba(77,255,154,0.28)' : 'rgba(255,79,109,0.28)',
@@ -275,23 +293,23 @@ export function ChartPanel() {
       bb[0].setData(
         line(
           band.map((x) => x.upper),
-          bars,
+          shown,
         ),
       );
       bb[1].setData(
         line(
           band.map((x) => x.mid),
-          bars,
+          shown,
         ),
       );
       bb[2].setData(
         line(
           band.map((x) => x.lower),
-          bars,
+          shown,
         ),
       );
     }
-    const setOne = (k: StudyId, data: (number | null)[]) => byKey(k)[0]?.setData(line(data, bars));
+    const setOne = (k: StudyId, data: (number | null)[]) => byKey(k)[0]?.setData(line(data, shown));
     setOne('sma20', sma(closes, 20));
     setOne('sma50', sma(closes, 50));
     setOne('sma200', sma(closes, 200));
@@ -299,17 +317,17 @@ export function ChartPanel() {
     setOne('ema21', ema(closes, 21));
     const kc = byKey('keltner');
     if (kc.length === 2) {
-      const k = keltner(bars);
+      const k = keltner(shown);
       kc[0].setData(
         line(
           k.map((x) => x.upper),
-          bars,
+          shown,
         ),
       );
       kc[1].setData(
         line(
           k.map((x) => x.lower),
-          bars,
+          shown,
         ),
       );
     }
@@ -322,7 +340,7 @@ export function ChartPanel() {
           .map((x, i) => ({ x, i }))
           .filter(({ x }) => x.hist !== null)
           .map(({ x, i }) => ({
-            time: toTs(bars[i].date),
+            time: toTs(shown[i].date),
             value: x.hist as number,
             color: (x.hist as number) >= 0 ? 'rgba(77,255,154,0.5)' : 'rgba(255,79,109,0.5)',
           })),
@@ -330,20 +348,55 @@ export function ChartPanel() {
       m[1].setData(
         line(
           mm.map((x) => x.macd),
-          bars,
+          shown,
         ),
       );
       m[2].setData(
         line(
           mm.map((x) => x.signal),
-          bars,
+          shown,
         ),
       );
     }
-    setOne('atr', atr(bars));
+    setOne('atr', atr(shown));
     const rv = byKey('relvol')[0];
-    if (rv) rv.setData(line(relativeVolume(bars), bars));
-  }, [bars]);
+    if (rv) rv.setData(line(relativeVolume(shown), shown));
+    if (!animKey || !anim || !cardAnim) return;
+    const a = anim;
+    const c = cardAnim;
+    const time = toTs(c.date);
+    const vTotal = full[full.length - 1].volume;
+    let raf = 0;
+    const tick = (nowMs: number) => {
+      const t = Math.min(1, Math.max(0, (nowMs - a.startedAt) / a.ms));
+      const fb = formingBar(c.path, t);
+      candles.update({ time, ...fb });
+      vol?.update({
+        time,
+        value: vTotal * t,
+        color: fb.close >= fb.open ? 'rgba(77,255,154,0.28)' : 'rgba(255,79,109,0.28)',
+      });
+      // Price leaning on a short strike: the strike line flashes.
+      if (c.tension >= 0.7)
+        for (const l of shortLinesRef.current)
+          l.applyOptions({ color: Math.floor(nowMs / 110) % 2 ? '#ffffff' : COLORS.magenta, lineWidth: 3 });
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const l of shortLinesRef.current) l.applyOptions({ color: COLORS.magenta, lineWidth: 2 });
+    };
+  }, [bars, animKey]);
+
+  // Zoom in on the recent candles while the clock runs; zoom back out to build the next trade.
+  const clockOn = ff !== 'idle';
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.timeScale().applyOptions({ barSpacing: clockOn ? 15 : 7 });
+    chart.timeScale().scrollToRealTime();
+  }, [clockOn]);
 
   // Overlays: strikes, breakevens, expected move, support/resistance, drawings.
   const plan = useTrading((s) => s.plan)();
@@ -358,6 +411,7 @@ export function ChartPanel() {
     if (!candles || !session || !cardId) return;
     for (const l of linesRef.current) candles.removePriceLine(l);
     linesRef.current = [];
+    shortLinesRef.current = [];
     const add = (
       price: number,
       color: string,
@@ -375,7 +429,7 @@ export function ChartPanel() {
           title,
         }),
       );
-    for (const l of optionLegsOf(legs))
+    for (const l of optionLegsOf(legs)) {
       add(
         l.strike,
         l.ratio < 0 ? COLORS.magenta : COLORS.cyan,
@@ -383,6 +437,8 @@ export function ChartPanel() {
         l.ratio < 0 ? LineStyle.Solid : LineStyle.Dashed,
         2,
       );
+      if (l.ratio < 0) shortLinesRef.current.push(linesRef.current[linesRef.current.length - 1]);
+    }
     for (const b of breakevens) add(b, COLORS.amber, 'BE', LineStyle.Dotted);
     const spot = session.view(cardId).spot();
     if (studies.includes('em') && em) {
@@ -462,6 +518,38 @@ export function ChartPanel() {
         </div>
       )}
       <PriceLadder expiration={builder.expiration} legs={legs} />
+      <StrikeHandle />
+      <PositionHud />
+      <AnimatePresence>
+        {stamp && (
+          <motion.div
+            key={stamp.id}
+            className={`fill-stamp ${stamp.credit ? 'credit' : 'debit'}`}
+            data-testid="fill-stamp"
+            initial={{ scale: 2.4, opacity: 0, rotate: -16 }}
+            animate={{ scale: 1, opacity: 1, rotate: -8 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 17 }}
+          >
+            <div className="fs-title">{stamp.title}</div>
+            <div className="fs-text num">{stamp.text}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {anim && anim.ms > 0 && (
+          <motion.div
+            key={anim.id}
+            className={`day-flash num ${anim.tension >= 0.7 ? 'tense' : ''}`}
+            initial={{ opacity: 0, scale: 1.4 }}
+            animate={{ opacity: [0, 0.9, 0.9, 0], scale: 1 }}
+            transition={{ duration: Math.min(1.2, anim.ms / 1000), times: [0, 0.15, 0.6, 1] }}
+          >
+            DAY {session?.dayIndex ?? 0}
+            {anim.tension >= 1 ? ' · STRIKE HIT' : anim.tension >= 0.7 ? ' · TESTING' : ''}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

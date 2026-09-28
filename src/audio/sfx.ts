@@ -41,7 +41,8 @@ export type SfxName =
   | 'decision'
   | 'boom'
   | 'reveal'
-  | 'buy';
+  | 'buy'
+  | 'heartbeat';
 
 const DEFS: Record<SfxName, SfxDef> = {
   click: { wave: 'square', freq: 900, sustain: 0.012, decay: 0.03, volume: 0.25, duty: 0.3 },
@@ -157,6 +158,16 @@ const DEFS: Record<SfxName, SfxDef> = {
     layer: { wave: 'sine', freq: 60, slide: 0.5, sustain: 0.05, decay: 0.35, volume: 0.5 },
   },
   reveal: { wave: 'triangle', freq: 392, slide: 1.8, sustain: 0.1, decay: 0.2, volume: 0.3 },
+  // One low thump; played in pairs while price leans on a short strike.
+  heartbeat: {
+    wave: 'sine',
+    freq: 72,
+    slide: 0.45,
+    sustain: 0.04,
+    decay: 0.16,
+    volume: 0.6,
+    layer: { wave: 'noise', freq: 150, sustain: 0.01, decay: 0.06, volume: 0.2, lowpass: 0.1 },
+  },
   buy: {
     wave: 'square',
     freq: 392,

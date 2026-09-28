@@ -1136,3 +1136,372 @@
     white-space: nowrap;
   }
 }
+
+/* ---------- The day player ---------- */
+.pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pace .seg button {
+  padding: 1px 7px;
+  font-size: 15px;
+}
+.lc-px.live {
+  transition: color 0.1s;
+}
+.lc-px.live.up {
+  color: var(--up);
+}
+.lc-px.live.down {
+  color: var(--down);
+}
+
+/* The trade card over the chart while the clock runs (bottom-left, over older candles). */
+.pos-hud {
+  position: absolute;
+  left: 8px;
+  bottom: 34px;
+  z-index: 5;
+  width: min(360px, 46%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}
+.hud-row {
+  background: rgba(7, 5, 26, 0.9);
+  border: 1px solid var(--line-bright);
+  box-shadow: 3px 3px 0 #000;
+  padding: 4px 8px 5px;
+  position: relative;
+}
+.hud-row.sel {
+  border-color: var(--cyan);
+}
+.hud-row.closed {
+  opacity: 0.75;
+}
+.pos-hud.tense .hud-row.sel {
+  animation: hud-tense 0.5s steps(2) infinite;
+}
+@keyframes hud-tense {
+  50% {
+    border-color: var(--down);
+    box-shadow:
+      3px 3px 0 #000,
+      0 0 14px rgba(255, 79, 109, 0.45);
+  }
+}
+.hud-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  position: relative;
+}
+.hud-sym {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--cyan);
+}
+.hud-struct {
+  font-size: 15px;
+}
+.hud-pl {
+  margin-left: auto;
+  font-size: 22px;
+}
+.hud-float {
+  position: absolute;
+  right: 0;
+  top: -6px;
+  font-size: 20px;
+  pointer-events: none;
+  text-shadow: 2px 2px 0 #000;
+}
+.hud-float.up {
+  color: var(--up);
+}
+.hud-float.down {
+  color: var(--down);
+}
+.hud-facts {
+  display: flex;
+  gap: 10px;
+  font-size: 15px;
+  margin-top: 2px;
+}
+.hud-facts .up {
+  color: var(--up);
+}
+.hud-facts .down {
+  color: var(--down);
+}
+.hud-actions {
+  display: flex;
+  gap: 6px;
+}
+.hud-actions .pixel-btn {
+  font-size: 15px;
+  padding: 3px 10px;
+}
+.hud-actions .pixel-btn.danger {
+  border-color: var(--down);
+  color: var(--down);
+}
+.hud-note {
+  background: rgba(40, 8, 20, 0.95);
+  border: 2px solid var(--down);
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 15px;
+  animation: hud-tense 0.6s steps(2) 3;
+}
+
+/* Stop on the left, target on the right, today's P/L riding between them. */
+.tug {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+.tug-end {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tug-end.down {
+  color: var(--down);
+}
+.tug-end.up {
+  color: var(--up);
+}
+.tug-track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  display: flex;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+}
+.tug-half {
+  flex: 1;
+}
+.tug-half.loss {
+  background: linear-gradient(90deg, rgba(255, 79, 109, 0.55), rgba(255, 79, 109, 0.08));
+}
+.tug-half.gain {
+  background: linear-gradient(90deg, rgba(77, 255, 154, 0.08), rgba(77, 255, 154, 0.55));
+}
+.tug-mid {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--text-faint);
+}
+.tug-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--text);
+  border: 2px solid #000;
+  box-shadow: 0 0 6px rgba(236, 233, 255, 0.7);
+}
+.tug.near-stop .tug-dot {
+  background: var(--down);
+  box-shadow: 0 0 10px var(--down);
+}
+.tug.near-target .tug-dot {
+  background: var(--up);
+  box-shadow: 0 0 10px var(--up);
+}
+
+/* "DAY 7" as each new day starts. */
+.day-flash {
+  position: absolute;
+  top: 34%;
+  left: 0;
+  right: 60px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 44px;
+  color: rgba(236, 233, 255, 0.35);
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 3;
+}
+.day-flash.tense {
+  color: rgba(255, 79, 109, 0.65);
+}
+
+/* ---------- Fast trade entry ---------- */
+.delta-chips {
+  display: flex;
+  gap: 2px;
+}
+.dchip {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 0 5px;
+  cursor: pointer;
+}
+.dchip.sel {
+  border-color: var(--magenta);
+  color: var(--magenta);
+  box-shadow: 0 0 6px rgba(255, 62, 165, 0.4);
+}
+.dchip:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--line-bright);
+}
+.dchip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.presets {
+  display: flex;
+  gap: 3px;
+}
+.preset {
+  background: var(--bg-2);
+  border: 1px solid var(--line-bright);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.preset:hover:not(:disabled) {
+  background: var(--bg-3);
+  box-shadow: var(--glow-cyan);
+}
+.preset.unset {
+  color: var(--text-faint);
+}
+.preset.save {
+  color: var(--amber);
+  margin-left: auto;
+}
+.preset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The draggable strike on the chart. */
+.strike-handle {
+  position: absolute;
+  left: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 4px;
+  background: rgba(40, 6, 30, 0.92);
+  border: 2px solid var(--magenta);
+  color: var(--text);
+  font-size: 16px;
+  cursor: ns-resize;
+  user-select: none;
+  touch-action: none;
+  box-shadow: 2px 2px 0 #000;
+}
+.strike-handle.long {
+  border-color: var(--cyan);
+  background: rgba(6, 30, 40, 0.92);
+}
+.strike-handle:hover,
+.strike-handle.drag {
+  box-shadow:
+    2px 2px 0 #000,
+    var(--glow-magenta);
+}
+.strike-handle.drag {
+  transform: scale(1.08);
+}
+.sh-grip {
+  color: var(--magenta);
+}
+.sh-k {
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+.sh-read {
+  color: var(--up);
+}
+
+/* The order ticket slammed onto the chart after a fill. */
+.fill-stamp {
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  margin-left: -130px;
+  width: 260px;
+  z-index: 7;
+  text-align: center;
+  padding: 8px 12px 10px;
+  border: 4px double var(--up);
+  color: var(--up);
+  background: rgba(7, 26, 18, 0.85);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 24px rgba(77, 255, 154, 0.35);
+  pointer-events: none;
+}
+.fill-stamp.debit {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(30, 20, 4, 0.85);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 24px rgba(255, 191, 62, 0.35);
+}
+.fs-title {
+  font-family: var(--font-display);
+  font-size: 40px;
+  letter-spacing: 4px;
+  line-height: 1;
+}
+.fs-text {
+  font-size: 22px;
+  color: var(--text);
+}
+
+.preset {
+  white-space: nowrap;
+}
+.tray-col {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+/* Laptop screens: presets drop their key hints (the hover text has them). */
+@media (max-width: 1500px) {
+  .preset {
+    font-size: 13px;
+    padding: 0 4px;
+  }
+  .preset .kbd {
+    display: none;
+  }
+  .dchip {
+    font-size: 13px;
+    padding: 0 3px;
+  }
+}
+@media (max-width: 1500px) {
+  .ctl-grid {
+    grid-template-columns: 58px 1fr auto;
+    gap: 1px 4px;
+    font-size: 15px;
+  }
+  .ctl-grid .wide-only,
+  .delta-chips .wide-only {
+    display: none;
+  }
+}

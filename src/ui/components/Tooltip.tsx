@@ -126,7 +126,13 @@ export function resolveTip(key: string): TipContent | null {
         .filter(Boolean)
         .join(' ');
       return FAMILY_NAMES[f]
-        ? { title: `${FAMILY_NAMES[f]} family`, body: lines || '', meta: 'Family bonus', tone: 'info' }
+        ? {
+            title: `${FAMILY_NAMES[f]} family`,
+            body: lines || '',
+            meta: 'Family bonus',
+            tone: 'info',
+            art: { category: 'family', id: f },
+          }
         : null;
     }
     case 'desk': {

@@ -46,7 +46,8 @@ export const ART_SIZES: Record<ArtCategory, ArtSize> = {
   desk: { w: 256, h: 96 },
   client: { w: 64, h: 64 },
   family: { w: 32, h: 32 },
-  cardback: { w: 96, h: 128 },
+  // A tall card strip; it repeats across the (wider) lineup card as it deals in.
+  cardback: { w: 48, h: 128 },
   achievement: { w: 32, h: 32 },
 };
 
@@ -95,7 +96,7 @@ export const ART_CATEGORY_TEXT: Record<ArtCategory, { title: string; where: stri
   },
   cardback: {
     title: 'Card backs (cosmetics)',
-    where: 'Lineup cards as they deal in, and the Settings preview',
+    where: 'Lineup cards as they deal in (the strip repeats across the card), and the Settings preview',
     priority: 3,
   },
   achievement: { title: 'Achievement badges', where: 'The Achievements screen', priority: 3 },

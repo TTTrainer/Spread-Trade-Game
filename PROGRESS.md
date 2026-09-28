@@ -4,15 +4,43 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus the fixes from your playtest notes (part 1). Version 1.1.0. Next: upload art (`ASSETS_NEEDED.md`) and keep playtesting.
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1 and 2. Version 1.2.0. Next: the last 38 pictures (`ASSETS_NEEDED.md`) and more playtesting.
 
 ## How to run (on your PC)
 
-- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.1.0.exe`, or run `SpreadTradingGame-Portable-1.1.0.exe` directly.
+- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.2.0.exe`, or run `SpreadTradingGame-Portable-1.2.0.exe` directly.
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Playtest round 2: your art, candles you can watch, faster trade entry
+From your notes: the loop after placing a trade felt like a simulation; you wanted candle animations, anticipation, time and control day to day, easier or more fun trade input, and your asset sheet in the game.
+
+- **Your art is in: 155 of 193 pictures.** I cut your sheet into individual pictures, removed the icons' tile backgrounds, scaled each to its slot, and matched every picture to the item it fits best.
+  - The first 16 cartridges followed the checklist order exactly. The rest I matched by meaning, for example: phoenix → Golden Parachute, crown → Pin Master, book → Stop Discipline, speedometer → RSI Radar, infinity → The Wheel.
+  - They show on shop cards, the cartridge rail, analysts, memos, the client card, desk banners, boss intros, achievements, hover panels, family counts (new), and the tag picture on the SKIP button (new).
+  - The card backs on your sheet are tall, thin strips, so a card back now repeats across the card instead of being stretched.
+  - `tools/assets/sheet-import/` holds the cutting script and the exact mapping. Your sheet is saved as `assets/source/sheet-1.webp`, so a future sheet goes in the same way.
+- **Candles you can watch (the day player).** The engine still settles each day from the real data exactly as before; the screen now plays it back:
+  - Each day's candle forms on the chart, from its open through its real high and low to its close, with the volume bar growing alongside. The chart zooms in on recent candles while the clock runs.
+  - Your P/L ticks live with the price, in the new trade card on the chart, on the stock card and in the positions table. When the day settles, a "+$18" or "−$30" floats off the trade.
+  - The trade card shows a **stop ◄──●──► target** meter, days left, what time decay pays per day, and how far price is from your short strike.
+  - Near your short strike the day plays in slow motion: the strike line flashes, a heartbeat plays and "TESTING" flashes on the chart.
+- **More control, day to day.**
+  - Pace chips next to the clock: **DAY BY DAY** (one candle per Space press, then it waits for you), 1×, 2× and 4×. N plays one day; `,` and `.` change the pace.
+  - At 1×, 2× and 4× the clock stops on its own, without a pop-up, the first time price tests your short strike. You can then keep going (Space) or close (Alt+F, or the CLOSE button on the trade card). This can be switched off in Settings.
+  - While paused, CLOSE and ROLL sit right on the trade card.
+- **Faster trade entry.**
+  - **Your call picks the structure.** Call up and you get a bull put; call down, a bear call; flat, an iron condor, always within your desk's playbook. This can be switched off in Settings.
+  - **Setups in one key:** WEEKLY (W: 3-10 days, 0.20 delta), SWING (M: 30-45 days, 0.30 delta) and MINE (Y).
+  - **SAVE** remembers your own setup: structure, days, delta, width, plan and risk size.
+  - **Delta chips** (.10 to .40) replace the slider.
+  - **Drag the strike handle** on the chart to move your short strike. It snaps to listed strikes, ticks as it moves, and shows the credit and POP live. The mouse wheel and the ↑/↓ keys move it one strike at a time; ←/→ change the expiration.
+  - **Size to 1%, 2%, 3% or MAX** of your equity in one click; - and = change contracts.
+  - **Selling or buying slams a SOLD/BOUGHT stamp** onto the chart, with coins flying off the button.
+- **Two more bugs found by the screenshots:** two style names were shared across screens, and one of them stretched the MINE button to three times its height. Both are fixed.
+- **Settings update once for older saves:** 1× now means 1.4 seconds per day, so each candle is watchable.
 
 ### Playtest round 1: art slots, hover help, fewer clicks, the news brief
 From your notes: assets need work; too cluttered and too many needy clicks; hover explanations like Balatro; more news for predictions.
@@ -265,6 +293,8 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Decisions and deviations (why things differ from the plan)
 
+- **The forming candle's intraday route is a guess.** Daily data records open, high, low and close, not which extreme came first. Up days replay as dip-then-rally, down days as pop-then-drop. Every replay touches the real high and low and ends exactly on the real close, and the live P/L lands exactly on the settled P/L. Nothing about the trade's outcome depends on the replay.
+
 - **Live mode on the SIM market.** Live is meant for this week's real market. Until you build real data there's nothing new to download, so on the SIM market the Sync button moves a simulated "today" forward one week through the SIM history. Everything else works the same way, and the screen labels it plainly.
 - **The Pad's perks.** The plan's example perk, "−5 starting stress", would do nothing because runs already start at 0 stress. The Orbital Suite instead takes 5 stress off at every new quarter. The other perks are +$2 starting cash (Loft) and +1 reroll in each Month 1 (Penthouse). All are small and none touch the market.
 - **Some cartridges start locked.** 12 of the 50 cartridges are in three packs that open by rank or for Bonus. That gives the ladder something to unlock without cutting content. The balance report is measured with all 50 in the pool, as a long-time player has them.
@@ -309,4 +339,4 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-Upload art whenever you like (`ASSETS_NEEDED.md`), then say "I uploaded art" and I'll pull it in and rebuild. Keep playtesting with the 1.1.0 exe files and send part 2 of your notes. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
+The last 38 pictures (8 cartridges, 1 voucher, 2 playbook pages, 27 achievement badges; see `ASSETS_NEEDED.md`) whenever you like: upload a sheet like the first one and I'll cut it in. Keep playtesting with the 1.2.0 exe files, and try DAY BY DAY and the strike handle. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
