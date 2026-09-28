@@ -68,7 +68,20 @@ export function DebriefCard({ d, index, blind }: { d: TradeDebrief; index: numbe
         </div>
         <div className={`grade grade-${d.grade.grade}`}>{d.grade.grade}</div>
       </button>
-      {!open && <Stamp text={win ? 'PROFIT' : 'LOSS'} tone={win ? 'good' : 'bad'} />}
+      {!open && (
+        <Stamp
+          text={
+            win
+              ? 'PROFIT'
+              : d.exitReason === 'stop'
+                ? 'STOPPED OUT'
+                : d.exitReason === 'liquidated'
+                  ? 'LIQUIDATED'
+                  : 'LOSS'
+          }
+          tone={win ? 'good' : 'bad'}
+        />
+      )}
       {open && (
         <div className="receipt-body">
           <div className="receipt-col">

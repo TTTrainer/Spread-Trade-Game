@@ -124,3 +124,14 @@
 .title-data {
   color: var(--cyan);
 }
+
+/* Drifting candles on the horizon (PixiJS), between the sun and the grid. */
+.backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 26%;
+  height: 28%;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, transparent 0%, black 14%, black 58%, transparent 76%);
+}

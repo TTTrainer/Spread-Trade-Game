@@ -769,8 +769,11 @@
   color: var(--down);
 }
 .receipt .stamp {
-  right: 110px;
+  /* Left of the P/L and the grade, so the numbers stay readable. */
+  right: 300px;
   top: 12px;
+  font-size: 30px;
+  opacity: 0.85;
 }
 .receipt-body {
   display: grid;

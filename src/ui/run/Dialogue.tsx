@@ -10,6 +10,8 @@ export function DialogueBox() {
   const speech = useRun((s) => s.speech);
   const clear = useRun((s) => s.clearSpeech);
   const reduced = useApp((s) => s.settings.display.reducedMotion);
+  // Over the chart during a round; at the bottom elsewhere, clear of stamps and shop cards.
+  const bottom = useRun((s) => s.engine?.state.phase !== 'round') || useApp.getState().screen !== 'run';
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {
@@ -28,7 +30,7 @@ export function DialogueBox() {
       {speech && (
         <motion.div
           key={speech.n}
-          className={`dialogue who-${speech.line.who}`}
+          className={`dialogue who-${speech.line.who} ${bottom ? 'at-bottom' : ''}`}
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -10, opacity: 0 }}

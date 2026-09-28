@@ -687,11 +687,17 @@
   image-rendering: pixelated;
   display: block;
 }
+.dialogue.at-bottom {
+  top: auto;
+  bottom: 24px;
+}
 .dialogue {
   position: fixed;
   top: 104px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Centered with margins: the entrance animation owns the transform. */
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   z-index: 60;
   display: flex;
   gap: 12px;

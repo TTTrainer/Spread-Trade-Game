@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { burstAt } from '../../fx/overlay';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { ALL_FAMILIES, FAMILY_NAMES, FAMILY_TEXT } from '../../content/families';
@@ -171,6 +172,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           <span className="amber-text">{quarterLabel(st.quarter)}</span> {ROUND_NAMES[r.index].toUpperCase()}
           {review && <span className="chip magenta">{review.name.toUpperCase()}</span>}
           <ModeChips e={e} />
+          <MeterJuice meter={r.meter} target={r.target} />
           {r.memo.waiver && <span className="chip warn">WAIVER</span>}
         </div>
         <div className="rtb-meter" title="Round meter: points from closed trades against the target">
@@ -297,6 +299,20 @@ export function careerBadges(
     }
     return { ivr: quant, earnings: whisper, extra: extra.length ? <>{extra}</> : undefined };
   };
+}
+
+/** Confetti the moment the meter crosses the target during the round. */
+function MeterJuice({ meter, target }: { meter: number; target: number }) {
+  const was = useRef(meter >= target);
+  useEffect(() => {
+    const now = meter >= target && target > 0;
+    if (now && !was.current) {
+      burstAt(document.querySelector('[data-testid="round-meter"]'), 'confetti', 60);
+      sfx('win');
+    }
+    was.current = now;
+  }, [meter, target]);
+  return null;
 }
 
 /** Small badges for the kind of run: Daily (with Bradley's score this round), tutorial, Endless, Tier, Heat. */

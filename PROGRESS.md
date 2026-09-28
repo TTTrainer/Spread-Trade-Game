@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 10 (juice and polish) is next.
+**Current phase:** Phase 11 (packaging and hand-off) is next.
 
 ## How to run (on your PC)
 
@@ -12,6 +12,42 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 10: Juice and polish
+- **Adaptive music** (Tone.js, MIT), composed live in code in three styles:
+  - Synthwave, darkwave and chiptune. Pick one in Settings; darkwave unlocks at Associate, and chiptune costs 25 Bonus.
+  - Four layers (pad, bass, arpeggio, drums with hats) fade in as things heat up. The intensity mixes how much your stocks are moving, your stress, and how far the meter is from the target as the round runs.
+  - Menus stay calm, and the shop has a mellow groove. Reviews speed up and shift into a darker key. A victory brightens, and a defeat thins out.
+  - A new section (key, chords, arpeggio, bass line and drum pattern) is written every eight bars and at every scene change, so a run never sits on one loop.
+  - Music starts on your first click or key press, the way every browser engine requires. The Music slider at 0 stops it entirely.
+- **Particles and celebrations** (PixiJS, MIT) on an overlay above the UI, in square pixels:
+  - confetti when a round's target is met (during the round and at the tally);
+  - coins for winning receipts and shop purchases, and embers for losers;
+  - sparkles when you buy a Legendary or unlock an achievement;
+  - fireworks for a victory.
+  - The overlay sleeps when nothing is flying, so it costs nothing during a quiet fast-forward.
+- **Animated backdrop** on the title screen: pixel candlesticks drift along the horizon over the synth grid, fading out before the menu.
+- **Card motion:**
+  - Lineup cards deal face down showing your chosen card back, then flip up.
+  - Lineup and shop cards bob gently while they wait, and still tilt on hover.
+  - Legendaries get a light band sweeping across them.
+- **Juice:**
+  - The screen shakes on gaps (as before) and on any single trade that scores more than the round's target.
+  - Tally count-ups rise in pitch.
+  - Debrief receipts now stamp STOPPED OUT or LIQUIDATED, not just PROFIT and LOSS.
+- **Accessibility:**
+  - Every button, card and input shows a dashed amber outline when reached by keyboard.
+  - Dialogs are announced as dialogs, and toasts and Ines's tips are read out by screen readers.
+  - Reduced motion turns off the card wobble, deal flips, shine, backdrop drift and all particles.
+- **Performance:**
+  - During fast-forward the chart now recomputes once per new day instead of on every click, and each day redraws the screen once instead of twice.
+  - The pause between days now subtracts the time spent drawing, so the speed setting is the real pace.
+  - Measured in this cloud box (no graphics card, software rendering): about 55 frames per second, median frame 16.7 ms (the 60 fps mark), no main-thread stalls at all, and the clock holds its 0.35 s/day pace. A new E2E test measures this every run.
+  - A mid-range PC with a real graphics card should do better. I can't measure that here; it's on the playtest list.
+- **Fixes from the screenshot review:**
+  - Speech boxes move to the bottom outside a round (they were covering the TARGET MET stamp and three shop cards) and are properly centered.
+  - The debrief's PROFIT stamp no longer sits on top of the P/L.
+- Tests: composer tests (seeded, keeps changing, styles differ, Reviews faster and darker, layers build with intensity). New E2E tests: polish (backdrop canvas, music starts and follows scenes, particles spawn, reduced motion blocks them) and performance (frame times, stalls, pace).
 
 ### Phase 9: Meta-progression and every mode
 - **Career ladder.** Every run pays career XP, failed runs included. Eight ranks:
@@ -222,7 +258,8 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 ## Known issues
 
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
-- **Card backs are chosen in Settings but only show in previews so far.** Phase 10 adds the card-flip animation that uses them in play. Music styles likewise wait for Phase 10's music.
+- **Frame rate was measured in a cloud box without a graphics card** (about 55 fps, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
+- **Music needs a first click or key press to start.** That's a rule of the browser engine inside the app, not a choice.
 - The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
 
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
@@ -231,4 +268,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 10: juice and polish. The animated backdrop and particles, card motion (deal, flip with your card back, shine on Legendaries), screen shake, adaptive music in three styles, more sound effects, accessibility, and a smooth 60 fps on the chart and fast-forward.
+Phase 11: package and hand off. The Windows installer and portable exe, Credits updated (Tone.js, PixiJS), `README_PLAY.md`, `PLAYTEST.md`, and a final plain-language message.

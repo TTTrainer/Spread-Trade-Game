@@ -242,12 +242,14 @@ export function ChartPanel() {
     };
   }, [session, cardId, studiesKey, timeframe]);
 
-  // Feed data (new bars arrive every simulated day).
+  // Feed data only when a new simulated day arrives (not on every click), so the chart and its
+  // studies recompute once per day during the fast-forward.
+  const now = session && cardId ? session.view(cardId).now : '';
   const bars = useMemo(() => {
     if (!session || !cardId) return [] as Bar[];
     const b = session.view(cardId).bars();
     return timeframe === 'W' ? weekly(b) : b;
-  }, [session, cardId, version, timeframe]);
+  }, [session, cardId, now, timeframe]);
 
   useEffect(() => {
     const chart = chartRef.current;

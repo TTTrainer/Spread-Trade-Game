@@ -11,6 +11,7 @@ import { money, pct, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useTrading } from '../store/trading';
+import { useApp } from '../store/app';
 import { Sparkline } from '../components/Sparkline';
 
 /** What a lineup card may show. Sandbox shows everything; Career earns badges through analysts. */
@@ -31,6 +32,7 @@ export function LineupColumn({
   useTrading((s) => s.version);
   const selected = useTrading((s) => s.selectedCardId);
   const select = useTrading((s) => s.select);
+  const cardBack = useApp((s) => s.settings.display.cardBack);
   useHotkeys(
     Object.fromEntries(
       [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [
@@ -67,6 +69,12 @@ export function LineupColumn({
             className="lineup-card"
             testId={`card-${i}`}
           >
+            <div
+              key={`deal-${c.id}`}
+              className={`deal-back cardback cardback-${cardBack}`}
+              style={{ animationDelay: `${i * 90}ms` }}
+              aria-hidden="true"
+            />
             <div className="lc-top">
               <span className="lc-sym">{c.displaySymbol}</span>
               <span className="lc-px num">{view.spot().toFixed(2)}</span>

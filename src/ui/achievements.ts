@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx';
 import { bridge, hasBridge } from './bridge';
 import { useApp } from './store/app';
 import { useProfile } from './store/profile';
+import { fx } from '../fx/overlay';
 
 export type Unlocked = Record<string, string>; // id -> ISO date
 
@@ -41,6 +42,7 @@ export async function checkAchievements(announce = true): Promise<Unlocked> {
   await pay();
   if (announce) {
     sfx('win');
+    void fx.burst('sparkle', window.innerWidth - 220, window.innerHeight - 60, 40);
     for (const a of fresh)
       useApp.getState().toast(`ACHIEVEMENT: ${a.def.name} (+${a.def.bonus} Bonus)`, 'good');
   }

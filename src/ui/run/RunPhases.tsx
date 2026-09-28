@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { motion, useAnimationControls } from 'motion/react';
+import { burstAt, fx } from '../../fx/overlay';
 import { useEffect, useMemo, useState } from 'react';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
@@ -85,6 +86,8 @@ function Receipt({ t, shown, index }: { t: TradeTally; shown: number; index: num
 export function TallyView({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   const reduced = useApp((s) => s.settings.display.reducedMotion);
+  const shakeOn = useApp((s) => s.settings.display.shake);
+  const shake = useAnimationControls();
   const r = e.state.round;
   const tallies = r.tallies;
   const totalSteps = tallies.reduce((a, t) => a + t.trace.length + 1, 0);
@@ -110,8 +113,22 @@ export function TallyView({ e }: { e: RunEngine }) {
     let left = step - 1;
     for (const t of tallies) {
       if (left < t.trace.length + 1) {
-        if (left === t.trace.length) sfx(t.points >= 0 ? 'coin' : 'loss');
-        else {
+        if (left === t.trace.length) {
+          sfx(t.points >= 0 ? 'coin' : 'loss');
+          // Juice: coins for a winner, embers for a loser, and a shake for a hit bigger than the target.
+          const el = document.querySelector(`[data-testid="tally-receipt-${tallies.indexOf(t)}"]`);
+          burstAt(
+            el,
+            t.points >= 0 ? 'coins' : 'embers',
+            t.points >= 0 ? 18 + Math.min(40, Math.round(t.points / 50)) : 24,
+          );
+          if (t.points >= r.target && shakeOn)
+            void shake.start({
+              x: [0, -9, 8, -5, 3, 0],
+              y: [0, 4, -3, 2, 0, 0],
+              transition: { duration: 0.35 },
+            });
+        } else {
           const row = t.trace[left];
           sfx(row.op === 'chips' ? 'tick' : 'multPop', 0.8 + Math.min(0.9, left * 0.06));
         }
@@ -124,10 +141,14 @@ export function TallyView({ e }: { e: RunEngine }) {
   const finished = step >= totalSteps;
   useHotkeys({ confirm: () => (finished ? void act({ t: 'finishTally' }) : setStep(totalSteps)) });
   useEffect(() => {
-    if (finished && !reduced) sfx(r.status === 'passed' ? 'win' : 'stop');
+    if (!finished) return;
+    if (!reduced) sfx(r.status === 'passed' ? 'win' : 'stop');
+    const meter = document.querySelector('[data-testid="tally-meter"]');
+    if (r.status === 'passed') burstAt(meter, 'confetti');
+    else burstAt(meter, 'embers', 40);
   }, [finished]);
   return (
-    <div className="screen run-tally" data-testid="tally-screen">
+    <motion.div className="screen run-tally" data-testid="tally-screen" animate={shake}>
       <div className="tally-head">
         <h1 className="screen-title">
           {quarterLabel(e.state.quarter)} {ROUND_NAMES[r.index].toUpperCase()} · TALLY
@@ -179,7 +200,7 @@ export function TallyView({ e }: { e: RunEngine }) {
           SKIP ANIMATION <Kbd>Enter</Kbd>
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -284,6 +305,8 @@ function ItemCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number 
             onClick={(ev) => {
               ev.stopPropagation();
               sfx(cash >= it.price ? 'buy' : 'error');
+              if (cash >= it.price)
+                burstAt(ev.currentTarget, rarity === 'L' ? 'sparkle' : 'coins', rarity === 'L' ? 50 : 14);
               void act({ t: 'buy', index });
             }}
             data-testid={`buy-${index}`}
@@ -521,6 +544,9 @@ export function RunEnd({
   const canEndless = res?.outcome === 'victory' && cfg.mode === 'career' && !cfg.practice && !endless;
   useEffect(() => {
     sfx(res?.outcome === 'victory' ? 'win' : res?.outcome === 'survived' ? 'coin' : 'loss');
+    if (res?.outcome === 'victory') void fx.celebrate();
+    else if (res?.outcome === 'survived')
+      void fx.burst('confetti', window.innerWidth / 2, window.innerHeight * 0.25, 50);
   }, []);
   if (!res) return null;
   const title = e.state.config.practice

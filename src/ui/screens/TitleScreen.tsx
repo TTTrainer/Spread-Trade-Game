@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { sfx } from '../../audio/sfx';
 import { useApp, type Screen } from '../store/app';
+import { Backdrop } from '../../fx/Backdrop';
 import './title.css';
 
 const MENU: { label: string; screen: Screen }[] = [
@@ -48,6 +49,7 @@ export function TitleScreen() {
     <div className="title-screen" data-testid="title-screen">
       <div className="synth-grid" aria-hidden="true" />
       <div className="title-sun" aria-hidden="true" />
+      <Backdrop opacity={0.45} testId="backdrop" />
       <div className="title-block">
         <div className="title-kicker">FY-CYCLE // DESK TERMINAL</div>
         <h1 className="title-logo">

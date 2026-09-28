@@ -101,7 +101,13 @@ export function TutorialCoach({ e }: { e: RunEngine }) {
       </button>
     );
   return (
-    <div className="panel coach" data-testid="tutorial-coach" data-step={tip.key}>
+    <div
+      className="panel coach"
+      data-testid="tutorial-coach"
+      data-step={tip.key}
+      role="note"
+      aria-live="polite"
+    >
       <Portrait id="ines" mood="happy" scale={1} />
       <div>
         <div className="coach-step">INES · TUTORIAL · {tip.title.toUpperCase()}</div>

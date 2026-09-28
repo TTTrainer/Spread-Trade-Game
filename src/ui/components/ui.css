@@ -213,3 +213,93 @@
   text-transform: uppercase;
   margin-bottom: 4px;
 }
+
+/* Legendary shine: a light band sweeps across the card. */
+.tilt-card.rar-L::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 240, 190, 0.28) 48%, transparent 60%);
+  background-size: 300% 100%;
+  animation: shine-sweep 2.6s ease-in-out infinite;
+}
+@keyframes shine-sweep {
+  0% {
+    background-position: 120% 0;
+  }
+  60%,
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+/* Idle wobble: cards breathe a little while they wait (individual transform properties, so the
+   tilt on hover still works). */
+.lineup-card:not(.selected),
+.shop-item:not(.sold) {
+  animation: card-idle 3.6s ease-in-out infinite;
+}
+.lineup-card:nth-child(2n),
+.shop-item:nth-child(2n) {
+  animation-delay: -1.2s;
+}
+.lineup-card:nth-child(3n),
+.shop-item:nth-child(3n) {
+  animation-delay: -2.3s;
+}
+@keyframes card-idle {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -0.25deg;
+  }
+  50% {
+    translate: 0 -2px;
+    rotate: 0.25deg;
+  }
+}
+
+/* Dealing: each lineup card shows its back, then flips face up. */
+.deal-back {
+  position: absolute;
+  inset: -2px;
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  animation: deal-flip 0.55s steps(6) forwards;
+}
+@keyframes deal-flip {
+  0% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  55% {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+:root[data-reduced-motion='true'] .tilt-card.rar-L::after,
+:root[data-reduced-motion='true'] .lineup-card,
+:root[data-reduced-motion='true'] .shop-item {
+  animation: none;
+}
+:root[data-reduced-motion='true'] .deal-back {
+  display: none;
+}
+
+/* Keyboard focus is always visible. */
+button:focus-visible,
+.pixel-btn:focus-visible,
+.tilt-card:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px dashed var(--amber);
+  outline-offset: 2px;
+}

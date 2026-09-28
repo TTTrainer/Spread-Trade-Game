@@ -153,6 +153,14 @@ button {
   color: var(--flat);
 }
 
+/* Particles and celebrations (PixiJS), above the UI and under the CRT glass. */
+.fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8500;
+  pointer-events: none;
+}
+
 /* CRT: scanlines + vignette + faint flicker. Intensity comes from settings. */
 .crt-overlay {
   pointer-events: none;

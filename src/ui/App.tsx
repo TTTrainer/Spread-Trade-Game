@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Toasts } from './components/ui';
 import { useHotkeys } from './hotkeys';
+import { useMusicDirector } from './musicDirector';
 import { useApp, type Screen } from './store/app';
 import { TitleScreen } from './screens/TitleScreen';
 import { SandboxSetup, SandboxTrading } from './screens/Sandbox';
@@ -51,6 +52,8 @@ export function App() {
     void loadSettings();
     void refreshData();
   }, []);
+
+  useMusicDirector();
 
   useHotkeys({
     home: () => home(),

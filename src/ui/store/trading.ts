@@ -231,19 +231,22 @@ function sleep(ms: number): Promise<void> {
 }
 
 export const useTrading = create<TradingState>((set, get) => {
-  const dispatch = async (a: SessionAction) => {
+  const dispatch = async (a: SessionAction, quiet = false) => {
     const s = get().session;
     if (!s) return null;
     const ext = get().external;
+    const bump = () => {
+      if (!quiet || s.decisions.length > 0) set({ version: get().version + 1 });
+    };
     if (ext) {
       const { result, events } = await ext(a);
       handleEvents(events);
-      set({ version: get().version + 1 });
+      bump();
       return result;
     }
     const r = await s.dispatch(a);
     handleEvents(s.lastEvents);
-    set({ version: get().version + 1 });
+    bump();
     get().onChange?.();
     return r;
   };
@@ -333,10 +336,12 @@ export const useTrading = create<TradingState>((set, get) => {
 
   const loop = async (token: number) => {
     while (token === loopToken && get().ff === 'running') {
+      const t0 = performance.now();
       await get().step();
       if (get().ff !== 'running') return;
+      // Keep the pace the setting asks for: the time spent stepping and drawing counts.
       const secs = useApp.getState().settings.game.ffSecondsPerDay;
-      await sleep(Math.max(60, secs * 1000));
+      await sleep(Math.max(16, secs * 1000 - (performance.now() - t0)));
     }
   };
 
@@ -606,7 +611,8 @@ export const useTrading = create<TradingState>((set, get) => {
         return;
       }
       if (!s.inDay) {
-        await dispatch({ t: 'begin' });
+        // One redraw per day: the begin only redraws by itself when a decision stops the clock.
+        await dispatch({ t: 'begin' }, true);
         sfx('tick', 1 + Math.min(0.5, s.dayIndex / 60));
       }
       if (s.decisions.length > 0) {

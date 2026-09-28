@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '../../shared/set
 import type { DataStatus } from '../../shared/rpc';
 import { bridge, hasBridge } from '../bridge';
 import { setSfxVolume } from '../../audio/sfx';
+import { fx } from '../../fx/overlay';
 
 export type Screen =
   | 'title'
@@ -62,6 +63,7 @@ export function applySettings(s: Settings): void {
   root.dataset.theme = s.display.theme;
   root.dataset.crt = s.display.crtStyle;
   setSfxVolume(s.audio.master, s.audio.sfx);
+  fx.reduced = s.display.reducedMotion;
 }
 
 export const useApp = create<AppState>((set, get) => ({

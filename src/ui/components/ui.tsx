@@ -109,6 +109,8 @@ export function Modal({
       <motion.div
         className={`modal panel ${wide ? 'wide' : ''}`}
         data-testid={testId}
+        role="dialog"
+        aria-modal="true"
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 26 }}
@@ -162,7 +164,7 @@ export function CountUp({
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   return (
-    <div className="toasts" data-testid="toasts">
+    <div className="toasts" data-testid="toasts" role="status" aria-live="polite">
       {toasts.map((t) => (
         <motion.div
           key={t.id}
