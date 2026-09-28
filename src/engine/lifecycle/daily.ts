@@ -33,6 +33,12 @@ export interface RealismToggles {
   expirationMechanics: boolean;
   pdt: boolean;
   fees: boolean;
+  /** Cap contracts per order and refuse legs whose market is too wide to trade. */
+  liquidityLimits?: boolean;
+  /** Career: set aside short-term capital-gains tax on each round's net gain. */
+  taxes?: boolean;
+  /** Spreads need a Level 3 margin account ($2,000 minimum equity). */
+  approvalLevels?: boolean;
 }
 
 export const DEFAULT_REALISM: RealismToggles = {
@@ -55,7 +61,16 @@ export interface DayContext {
   rng: Rng;
 }
 
-export const ALL_DECISIONS: DecisionKind[] = ['target_hit', 'stop_hit', 'short_touched', 'dte21', 'earnings_tomorrow', 'exdiv_itm_call', 'pin_risk', 'assigned_shares'];
+export const ALL_DECISIONS: DecisionKind[] = [
+  'target_hit',
+  'stop_hit',
+  'short_touched',
+  'dte21',
+  'earnings_tomorrow',
+  'exdiv_itm_call',
+  'pin_risk',
+  'assigned_shares',
+];
 
 export function defaultPause(): Record<DecisionKind, boolean> {
   return Object.fromEntries(ALL_DECISIONS.map((k) => [k, true])) as Record<DecisionKind, boolean>;
@@ -82,7 +97,8 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
   const suppressed = ctx.suppressOnGap && book.gapDay;
   const want = (k: DecisionKind) => ctx.pause[k] && !suppressed;
   const dte = frontDte(pos, book.date);
-  if (dte !== null && dte <= 7 && (mark?.plCents ?? 0) > 0) pos = { ...pos, flags: { ...pos.flags, heldIntoLast7: true } };
+  if (dte !== null && dte <= 7 && (mark?.plCents ?? 0) > 0)
+    pos = { ...pos, flags: { ...pos.flags, heldIntoLast7: true } };
 
   // After an assignment, the shares wait for a decision at the next session.
   if (pos.flags.assignedPending) {
@@ -104,13 +120,28 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
   // Brackets. Targets use the natural price you could actually get; stops trigger on the mark.
   const q = closeQuote(pos.legs, book, pos.lastLegs);
   const b = pos.brackets;
-  if (b.targetPl !== null && optionLegsOf(pos.legs).length > 0 && plIfClosedAt(pos, q.natural) >= b.targetPl - 1e-9) {
+  if (
+    b.targetPl !== null &&
+    optionLegsOf(pos.legs).length > 0 &&
+    plIfClosedAt(pos, q.natural) >= b.targetPl - 1e-9
+  ) {
     const limitCost = plIfClosedAt(pos, 0) - b.targetPl;
     const fill = Math.min(limitCost, q.natural); // a gap through the limit fills at the better natural
     if (ctx.autoBrackets || !ctx.pause.target_hit) {
       const ex = contractCents(q.mid - fill, pos.qty);
-      pos = closePosition(pos, fill, book.date, 'target', feesFor(pos.legs, pos.qty, ctx.realism.fees), 'Profit target filled');
-      pos = { ...pos, executionCents: pos.executionCents + ex, flags: { ...pos.flags, closedAtPlan: 'target' } };
+      pos = closePosition(
+        pos,
+        fill,
+        book.date,
+        'target',
+        feesFor(pos.legs, pos.qty, ctx.realism.fees),
+        'Profit target filled',
+      );
+      pos = {
+        ...pos,
+        executionCents: pos.executionCents + ex,
+        flags: { ...pos.flags, closedAtPlan: 'target' },
+      };
       return { pos, decisions: [], autoClosed: true };
     }
     decisions.push({
@@ -123,11 +154,27 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
       options: ['close', 'hold', 'roll'],
       planned: 'close',
     });
-  } else if (b.stopPl !== null && mark && optionLegsOf(pos.legs).length > 0 && plIfClosedAt(pos, q.mid) <= -b.stopPl + 1e-9) {
+  } else if (
+    b.stopPl !== null &&
+    mark &&
+    optionLegsOf(pos.legs).length > 0 &&
+    plIfClosedAt(pos, q.mid) <= -b.stopPl + 1e-9
+  ) {
     if (ctx.autoBrackets || !ctx.pause.stop_hit) {
       const ex = contractCents(q.mid - q.natural, pos.qty);
-      pos = closePosition(pos, q.natural, book.date, 'stop', feesFor(pos.legs, pos.qty, ctx.realism.fees), 'Stop filled at the natural price');
-      pos = { ...pos, executionCents: pos.executionCents + ex, flags: { ...pos.flags, closedAtPlan: 'stop' } };
+      pos = closePosition(
+        pos,
+        q.natural,
+        book.date,
+        'stop',
+        feesFor(pos.legs, pos.qty, ctx.realism.fees),
+        'Stop filled at the natural price',
+      );
+      pos = {
+        ...pos,
+        executionCents: pos.executionCents + ex,
+        flags: { ...pos.flags, closedAtPlan: 'stop' },
+      };
       return { pos, decisions: [], autoClosed: true };
     }
     decisions.push({
@@ -136,14 +183,18 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
       kind: 'stop_hit',
       date: book.date,
       title: 'Stop hit',
-      message: 'The trade reached the stop you planned. Taking it now keeps a bad trade from becoming a disaster.',
+      message:
+        'The trade reached the stop you planned. Taking it now keeps a bad trade from becoming a disaster.',
       options: ['close', 'hold', 'roll'],
       planned: 'close',
     });
   }
 
   const shorts = optionLegsOf(pos.legs).filter((l) => l.ratio < 0);
-  if (!pos.flags.shortTouched && shorts.some((s) => (s.right === 'P' ? book.spot <= s.strike : book.spot >= s.strike))) {
+  if (
+    !pos.flags.shortTouched &&
+    shorts.some((s) => (s.right === 'P' ? book.spot <= s.strike : book.spot >= s.strike))
+  ) {
     pos = { ...pos, flags: { ...pos.flags, shortTouched: true } };
     if (want('short_touched'))
       decisions.push({
@@ -204,7 +255,9 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
 
   if (!pos.flags.pinWarned && dte === 0) {
     const pinned = shorts.find((s) => {
-      const longOther = optionLegsOf(pos.legs).find((l) => l.ratio > 0 && l.right === s.right && l.expiration === s.expiration);
+      const longOther = optionLegsOf(pos.legs).find(
+        (l) => l.ratio > 0 && l.right === s.right && l.expiration === s.expiration,
+      );
       const lo = longOther ? Math.min(s.strike, longOther.strike) : s.strike * 0.995;
       const hi = longOther ? Math.max(s.strike, longOther.strike) : s.strike * 1.005;
       return book.spot > lo && book.spot < hi;
@@ -218,7 +271,8 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
           kind: 'pin_risk',
           date: book.date,
           title: 'Pin risk at expiration',
-          message: 'The stock closed between your strikes on expiration day. Hold and you may be assigned shares over the weekend.',
+          message:
+            'The stock closed between your strikes on expiration day. Hold and you may be assigned shares over the weekend.',
           options: ['close', 'hold'],
           planned: 'close',
         });
@@ -244,8 +298,15 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
       const mid = snap ? (snap.bid + snap.ask) / 2 : intrinsic(leg, book.spot);
       const extrinsic = mid - intrinsic(leg, book.spot);
       let assign = false;
-      if (leg.right === 'C' && book.spot > leg.strike && book.exDivTomorrow && extrinsic < book.exDivTomorrow.amount) assign = true;
-      if (leg.right === 'P' && leg.strike > book.spot * 1.02 && extrinsic < 0.05 && ctx.rng.chance(0.2)) assign = true;
+      if (
+        leg.right === 'C' &&
+        book.spot > leg.strike &&
+        book.exDivTomorrow &&
+        extrinsic < book.exDivTomorrow.amount
+      )
+        assign = true;
+      if (leg.right === 'P' && leg.strike > book.spot * 1.02 && extrinsic < 0.05 && ctx.rng.chance(0.2))
+        assign = true;
       if (assign) {
         pos = convertLegToStock(pos, leg, book.date, 'assigned');
         assignedToday = true;
@@ -280,13 +341,16 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
     pos = { ...pos, status: 'closed', closedOn: book.date, exitReason: reason, realizedCents: realized };
   } else {
     pos = markPosition(pos, book);
-    if (assignedToday && stockRatio(pos.legs) !== 0) pos = { ...pos, flags: { ...pos.flags, assignedPending: true } };
+    if (assignedToday && stockRatio(pos.legs) !== 0)
+      pos = { ...pos, flags: { ...pos.flags, assignedPending: true } };
   }
   return { pos, assignedToday };
 }
 
 /** DTE of the front leg, for display. */
 export function daysToExpiry(pos: Position, date: string): number | null {
-  const exps = optionLegsOf(pos.legs).map((l) => l.expiration).sort();
+  const exps = optionLegsOf(pos.legs)
+    .map((l) => l.expiration)
+    .sort();
   return exps.length ? diffDays(date, exps[0]) : null;
 }

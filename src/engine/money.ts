@@ -34,7 +34,8 @@ export function formatCents(c: Cents, opts: { sign?: boolean; decimals?: boolean
   const abs = Math.abs(c);
   const dollars = Math.floor(abs / 100);
   const rem = abs % 100;
-  const body = dollars.toLocaleString('en-US') + (opts.decimals === false ? '' : `.${String(rem).padStart(2, '0')}`);
+  const body =
+    dollars.toLocaleString('en-US') + (opts.decimals === false ? '' : `.${String(rem).padStart(2, '0')}`);
   const sign = neg ? '−' : opts.sign ? '+' : '';
   return `${sign}$${body}`;
 }

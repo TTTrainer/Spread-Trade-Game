@@ -51,7 +51,10 @@ export function buildContext(i: ContextInput): MarketContext {
   const s50 = sma(closes, 50);
   const s200 = sma(closes, 200);
   const n = closes.length;
-  const slope = n > 60 && s50[n - 1] !== null && s50[n - 11] !== null ? (((s50[n - 1] as number) - (s50[n - 11] as number)) / (s50[n - 11] as number) / 10) * 100 : null;
+  const slope =
+    n > 60 && s50[n - 1] !== null && s50[n - 11] !== null
+      ? (((s50[n - 1] as number) - (s50[n - 11] as number)) / (s50[n - 11] as number) / 10) * 100
+      : null;
   const m = macd(closes);
   const cross = lastMacdCross(m);
   const bb = bollinger(closes, 20, 2);
@@ -60,7 +63,8 @@ export function buildContext(i: ContextInput): MarketContext {
   const yearAgo = addDays(last.date, -365);
   const divs = i.dividends.filter((d) => d.exDate > yearAgo && d.exDate <= last.date);
   const divYield = last.close > 0 ? divs.reduce((s, d) => s + d.amount, 0) / last.close : 0;
-  const nextExDiv = i.dividends.filter((d) => d.exDate > last.date).sort((x, y) => (x.exDate < y.exDate ? -1 : 1))[0] ?? null;
+  const nextExDiv =
+    i.dividends.filter((d) => d.exDate > last.date).sort((x, y) => (x.exDate < y.exDate ? -1 : 1))[0] ?? null;
   return {
     date: last.date,
     spot: last.close,

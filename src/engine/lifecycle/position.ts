@@ -12,22 +12,50 @@ import type { Leg, OptionLeg, StructureId } from '../strategies/types';
 import type { ComboQuote } from '../orders/fill';
 import type { Brackets, DayBook, EntrySnapshot, LegSnapshot, Mark, Position, PositionEvent } from './types';
 
-export const optionLegsOf = (legs: Leg[]): OptionLeg[] => legs.filter((l): l is OptionLeg => l.kind === 'option');
-export const stockRatio = (legs: Leg[]): number => legs.filter((l) => l.kind === 'stock').reduce((a, l) => a + l.ratio, 0);
+export const optionLegsOf = (legs: Leg[]): OptionLeg[] =>
+  legs.filter((l): l is OptionLeg => l.kind === 'option');
+export const stockRatio = (legs: Leg[]): number =>
+  legs.filter((l) => l.kind === 'stock').reduce((a, l) => a + l.ratio, 0);
 
-const intrinsic = (leg: OptionLeg, spot: number) => (leg.right === 'C' ? Math.max(0, spot - leg.strike) : Math.max(0, leg.strike - spot));
+const intrinsic = (leg: OptionLeg, spot: number) =>
+  leg.right === 'C' ? Math.max(0, spot - leg.strike) : Math.max(0, leg.strike - spot);
 
 /** Snapshot one leg from today's quote, or model it (BSM with the last known IV) when the quote is missing. */
 export function legSnapshot(leg: OptionLeg, book: DayBook, prev?: LegSnapshot): LegSnapshot {
   const q = book.quote(leg);
-  if (q) return { mid: mid(q), iv: q.iv, delta: q.delta, gamma: q.gamma, theta: q.theta, vega: q.vega, modeled: false };
+  if (q)
+    return {
+      mid: mid(q),
+      iv: q.iv,
+      delta: q.delta,
+      gamma: q.gamma,
+      theta: q.theta,
+      vega: q.vega,
+      modeled: false,
+    };
   const t = Math.max(0, diffDays(book.date, leg.expiration)) / 365;
   const iv = prev?.iv ?? 0.3;
   if (t <= 0) {
     const v = intrinsic(leg, book.spot);
-    return { mid: v, iv, delta: v > 0 ? (leg.right === 'C' ? 1 : -1) : 0, gamma: 0, theta: 0, vega: 0, modeled: true };
+    return {
+      mid: v,
+      iv,
+      delta: v > 0 ? (leg.right === 'C' ? 1 : -1) : 0,
+      gamma: 0,
+      theta: 0,
+      vega: 0,
+      modeled: true,
+    };
   }
-  const g = bsm({ right: leg.right, spot: book.spot, strike: leg.strike, t, vol: iv, rate: book.rate, divYield: book.divYield });
+  const g = bsm({
+    right: leg.right,
+    spot: book.spot,
+    strike: leg.strike,
+    t,
+    vol: iv,
+    rate: book.rate,
+    divYield: book.divYield,
+  });
   return { mid: g.price, iv, delta: g.delta, gamma: g.gamma, theta: g.theta, vega: g.vega, modeled: true };
 }
 
@@ -48,7 +76,16 @@ export function valueLegs(legs: Leg[], book: DayBook, prev: LegSnapshot[] = []):
     if (leg.kind === 'stock') {
       value += leg.ratio * book.spot;
       greeks.delta += leg.ratio * 100;
-      snapshots.push({ stock: true, mid: book.spot, iv: 0, delta: 1, gamma: 0, theta: 0, vega: 0, modeled: false });
+      snapshots.push({
+        stock: true,
+        mid: book.spot,
+        iv: 0,
+        delta: 1,
+        gamma: 0,
+        theta: 0,
+        vega: 0,
+        modeled: false,
+      });
       continue;
     }
     const s = legSnapshot(leg, book, prev[oi]);
@@ -65,7 +102,12 @@ export function valueLegs(legs: Leg[], book: DayBook, prev: LegSnapshot[] = []):
 }
 
 /** Quote for closing all legs, in cost terms (positive = you pay to close). */
-export function closeQuote(legs: Leg[], book: DayBook, prev: LegSnapshot[] = [], stockPrice?: number): ComboQuote {
+export function closeQuote(
+  legs: Leg[],
+  book: DayBook,
+  prev: LegSnapshot[] = [],
+  stockPrice?: number,
+): ComboQuote {
   let midCost = 0;
   let natCost = 0;
   let oi = 0;
@@ -133,7 +175,14 @@ export function openPosition(p: OpenParams): Position {
     exitReason: null,
     realizedCents: null,
     marks: [],
-    events: [{ date: p.date, kind: 'open', detail: `Opened ${p.qty} at ${p.fillNet < 0 ? 'a credit of ' : 'a debit of '}${Math.abs(p.fillNet).toFixed(2)}`, cashCents: cash }],
+    events: [
+      {
+        date: p.date,
+        kind: 'open',
+        detail: `Opened ${p.qty} at ${p.fillNet < 0 ? 'a credit of ' : 'a debit of '}${Math.abs(p.fillNet).toFixed(2)}`,
+        cashCents: cash,
+      },
+    ],
     entry: p.entry,
     flags: {
       shortTouched: false,
@@ -171,7 +220,10 @@ export function markPosition(pos: Position, book: DayBook): Position {
     greeks: v.greeks,
     modeled: v.modeled,
   };
-  const marks = pos.marks.length && pos.marks[pos.marks.length - 1].date === book.date ? [...pos.marks.slice(0, -1), mark] : [...pos.marks, mark];
+  const marks =
+    pos.marks.length && pos.marks[pos.marks.length - 1].date === book.date
+      ? [...pos.marks.slice(0, -1), mark]
+      : [...pos.marks, mark];
   return { ...pos, marks, lastLegs: v.snapshots.filter((_, i) => pos.legs[i]?.kind === 'option') };
 }
 
@@ -185,12 +237,23 @@ export function openCredit(pos: Position): number {
 }
 
 /** Default brackets: credit trades target 50% of max profit and stop at 2x the credit; debits +50% / -50%. */
-export function defaultBrackets(openNet: number, targetPct = 0.5, stopMult = 2, debitTarget = 0.5, debitStop = 0.5): Brackets {
+export function defaultBrackets(
+  openNet: number,
+  targetPct = 0.5,
+  stopMult = 2,
+  debitTarget = 0.5,
+  debitStop = 0.5,
+): Brackets {
   if (openNet < 0) {
     const credit = -openNet;
     return { targetPl: credit * targetPct, stopPl: credit * (stopMult - 1), targetPct, stopMult };
   }
-  return { targetPl: openNet * debitTarget, stopPl: openNet * debitStop, targetPct: debitTarget, stopMult: null };
+  return {
+    targetPl: openNet * debitTarget,
+    stopPl: openNet * debitStop,
+    targetPct: debitTarget,
+    stopMult: null,
+  };
 }
 
 /** P/L per share per unit if closed at a given cost. */
@@ -204,7 +267,14 @@ export function addEvent(pos: Position, e: PositionEvent): Position {
 }
 
 /** Close every remaining leg at a cost (per share per unit). */
-export function closePosition(pos: Position, cost: number, date: ISODate, reason: Position['exitReason'], feesCents: Cents, detail?: string): Position {
+export function closePosition(
+  pos: Position,
+  cost: number,
+  date: ISODate,
+  reason: Position['exitReason'],
+  feesCents: Cents,
+  detail?: string,
+): Position {
   const cashDelta = -contractCents(cost, pos.qty);
   const cashCents = pos.cashCents + cashDelta;
   const fees = pos.feesCents + feesCents;
@@ -218,11 +288,24 @@ export function closePosition(pos: Position, cost: number, date: ISODate, reason
     exitReason: reason,
     realizedCents: cashCents - fees,
   };
-  return addEvent(closed, { date, kind: 'close', detail: detail ?? `Closed (${reason}) at ${cost.toFixed(2)}`, cashCents: cashDelta });
+  return addEvent(closed, {
+    date,
+    kind: 'close',
+    detail: detail ?? `Closed (${reason}) at ${cost.toFixed(2)}`,
+    cashCents: cashDelta,
+  });
 }
 
 /** Replace some legs with others in one order (rolls and adjustments). Cost is per share per unit. */
-export function changeLegs(pos: Position, remove: Leg[], add: Leg[], cost: number, feesCents: Cents, date: ISODate, kind: 'roll' | 'adjust'): Position {
+export function changeLegs(
+  pos: Position,
+  remove: Leg[],
+  add: Leg[],
+  cost: number,
+  feesCents: Cents,
+  date: ISODate,
+  kind: 'roll' | 'adjust',
+): Position {
   const keep = [...pos.legs];
   for (const r of remove) {
     const i = keep.findIndex((l) => sameLeg(l, r));
@@ -239,8 +322,20 @@ export function changeLegs(pos: Position, remove: Leg[], add: Leg[], cost: numbe
     flags.dte21 = false;
     flags.pinWarned = false;
   }
-  const next: Position = { ...pos, legs, cashCents: pos.cashCents + cashDelta, feesCents: pos.feesCents + feesCents, flags, lastLegs: [] };
-  return addEvent(next, { date, kind, detail: `${kind === 'roll' ? 'Rolled' : 'Adjusted'} for a ${cost < 0 ? 'credit' : 'debit'} of ${Math.abs(cost).toFixed(2)}`, cashCents: cashDelta });
+  const next: Position = {
+    ...pos,
+    legs,
+    cashCents: pos.cashCents + cashDelta,
+    feesCents: pos.feesCents + feesCents,
+    flags,
+    lastLegs: [],
+  };
+  return addEvent(next, {
+    date,
+    kind,
+    detail: `${kind === 'roll' ? 'Rolled' : 'Adjusted'} for a ${cost < 0 ? 'credit' : 'debit'} of ${Math.abs(cost).toFixed(2)}`,
+    cashCents: cashDelta,
+  });
 }
 
 /** Remove the first leg equal in value to `leg` (legs are copied often, so never compare references). */
@@ -248,7 +343,11 @@ export function removeLeg(legs: Leg[], leg: Leg): Leg[] {
   const i = legs.findIndex((l) =>
     l.kind === 'stock'
       ? leg.kind === 'stock'
-      : leg.kind === 'option' && l.right === leg.right && l.expiration === leg.expiration && Math.abs(l.strike - leg.strike) < 1e-6 && l.ratio === leg.ratio,
+      : leg.kind === 'option' &&
+        l.right === leg.right &&
+        l.expiration === leg.expiration &&
+        Math.abs(l.strike - leg.strike) < 1e-6 &&
+        l.ratio === leg.ratio,
   );
   return i < 0 ? legs : [...legs.slice(0, i), ...legs.slice(i + 1)];
 }
@@ -257,7 +356,12 @@ export function sameLeg(a: Leg, b: Leg): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === 'stock') return true;
   const o = b as OptionLeg;
-  return a.right === o.right && a.expiration === o.expiration && Math.abs(a.strike - o.strike) < 1e-6 && Math.sign(a.ratio) === Math.sign(o.ratio);
+  return (
+    a.right === o.right &&
+    a.expiration === o.expiration &&
+    Math.abs(a.strike - o.strike) < 1e-6 &&
+    Math.sign(a.ratio) === Math.sign(o.ratio)
+  );
 }
 
 /** Net out identical contracts and stock so legs stay canonical. */
@@ -269,7 +373,13 @@ export function mergeLegs(legs: Leg[]): Leg[] {
       stock += l.ratio;
       continue;
     }
-    const same = out.find((o) => o.kind === 'option' && o.right === l.right && o.expiration === l.expiration && Math.abs(o.strike - l.strike) < 1e-6) as OptionLeg | undefined;
+    const same = out.find(
+      (o) =>
+        o.kind === 'option' &&
+        o.right === l.right &&
+        o.expiration === l.expiration &&
+        Math.abs(o.strike - l.strike) < 1e-6,
+    ) as OptionLeg | undefined;
     if (same) same.ratio += l.ratio;
     else out.push({ ...l });
   }
@@ -281,7 +391,12 @@ export function mergeLegs(legs: Leg[]): Leg[] {
  * Turn an option leg into stock at its strike (exercise or assignment).
  * Call: buyer receives shares, pays strike. Put: buyer delivers shares, receives strike.
  */
-export function convertLegToStock(pos: Position, leg: OptionLeg, date: ISODate, kind: 'exercise' | 'assigned'): Position {
+export function convertLegToStock(
+  pos: Position,
+  leg: OptionLeg,
+  date: ISODate,
+  kind: 'exercise' | 'assigned',
+): Position {
   const shares = leg.right === 'C' ? leg.ratio : -leg.ratio;
   const cashPerShare = leg.right === 'C' ? -leg.ratio * leg.strike : leg.ratio * leg.strike;
   const cashDelta = contractCents(cashPerShare, pos.qty);
@@ -293,7 +408,12 @@ export function convertLegToStock(pos: Position, leg: OptionLeg, date: ISODate, 
   const verb = kind === 'assigned' ? 'Assigned' : 'Exercised';
   return addEvent(
     { ...pos, legs, cashCents: pos.cashCents + cashDelta, flags, lastLegs: [] },
-    { date, kind, detail: `${verb}: ${leg.ratio > 0 ? 'long' : 'short'} ${leg.strike} ${leg.right === 'C' ? 'call' : 'put'} became ${Math.abs(shares * 100 * pos.qty)} shares`, cashCents: cashDelta },
+    {
+      date,
+      kind,
+      detail: `${verb}: ${leg.ratio > 0 ? 'long' : 'short'} ${leg.strike} ${leg.right === 'C' ? 'call' : 'put'} became ${Math.abs(shares * 100 * pos.qty)} shares`,
+      cashCents: cashDelta,
+    },
   );
 }
 
@@ -308,11 +428,16 @@ export function applyDividend(pos: Position, amountPerShare: number, date: ISODa
   if (sr === 0) return pos;
   const cashDelta = contractCents(sr * amountPerShare, pos.qty);
   const flags = { ...pos.flags, dividendsCents: pos.flags.dividendsCents + cashDelta };
-  return addEvent({ ...pos, cashCents: pos.cashCents + cashDelta, flags }, { date, kind: 'dividend', detail: `Dividend ${amountPerShare.toFixed(2)}/share`, cashCents: cashDelta });
+  return addEvent(
+    { ...pos, cashCents: pos.cashCents + cashDelta, flags },
+    { date, kind: 'dividend', detail: `Dividend ${amountPerShare.toFixed(2)}/share`, cashCents: cashDelta },
+  );
 }
 
 export function frontDte(pos: Position, date: ISODate): number | null {
-  const exps = optionLegsOf(pos.legs).map((l) => l.expiration).sort();
+  const exps = optionLegsOf(pos.legs)
+    .map((l) => l.expiration)
+    .sort();
   return exps.length ? diffDays(date, exps[0]) : null;
 }
 

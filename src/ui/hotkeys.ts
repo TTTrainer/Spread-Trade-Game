@@ -36,7 +36,13 @@ function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName;
-  return (tag === 'INPUT' && (t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox') || tag === 'TEXTAREA' || t.isContentEditable;
+  return (
+    (tag === 'INPUT' &&
+      (t as HTMLInputElement).type !== 'range' &&
+      (t as HTMLInputElement).type !== 'checkbox') ||
+    tag === 'TEXTAREA' ||
+    t.isContentEditable
+  );
 }
 
 let installed = false;

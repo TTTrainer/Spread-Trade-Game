@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { breakdown, calibration, equityCurve, mistakeTrends, summarize, toCsv, type LedgerTrade } from '../../src/engine/stats/stats';
+import {
+  breakdown,
+  calibration,
+  equityCurve,
+  mistakeTrends,
+  summarize,
+  toCsv,
+  type LedgerTrade,
+} from '../../src/engine/stats/stats';
 
 const t = (i: number, pl: number, extra: Partial<LedgerTrade> = {}): LedgerTrade => ({
   id: `t${i}`,
@@ -23,7 +31,16 @@ const t = (i: number, pl: number, extra: Partial<LedgerTrade> = {}): LedgerTrade
   ...extra,
 });
 
-const rows = [t(1, 10000), t(2, -5000, { tags: ['held_past_stop'] }), t(3, 20000), t(4, -15000, { callActual: 1, tags: ['held_past_stop', 'oversized'] }), t(5, 5000, { structure: 'iron_condor', regime: { vix: 30, ivr: 70, trend: -0.2, adx: 35, earnings: true } })];
+const rows = [
+  t(1, 10000),
+  t(2, -5000, { tags: ['held_past_stop'] }),
+  t(3, 20000),
+  t(4, -15000, { callActual: 1, tags: ['held_past_stop', 'oversized'] }),
+  t(5, 5000, {
+    structure: 'iron_condor',
+    regime: { vix: 30, ivr: 70, trend: -0.2, adx: 35, earnings: true },
+  }),
+];
 
 describe('stats', () => {
   it('computes the headline numbers', () => {
@@ -48,12 +65,24 @@ describe('stats', () => {
     const byStructure = breakdown(rows, 'structure');
     expect(byStructure[0]).toMatchObject({ key: 'bull_put' });
     expect(byStructure[0].summary.trades).toBe(4);
-    expect(breakdown(rows, 'symbol').map((b) => b.key).sort()).toEqual(['AAPL', 'MSFT']);
+    expect(
+      breakdown(rows, 'symbol')
+        .map((b) => b.key)
+        .sort(),
+    ).toEqual(['AAPL', 'MSFT']);
     const vix = breakdown(rows, 'vix').map((b) => b.key);
     expect(vix).toContain('VIX > 25 (stressed)');
     expect(breakdown(rows, 'ivr').map((b) => b.key)).toContain('IV rank > 60');
-    expect(breakdown(rows, 'trend').map((b) => b.key).sort()).toEqual(['Downtrend', 'Uptrend']);
-    expect(breakdown(rows, 'earnings').map((b) => b.key).sort()).toEqual(['Earnings inside', 'No earnings']);
+    expect(
+      breakdown(rows, 'trend')
+        .map((b) => b.key)
+        .sort(),
+    ).toEqual(['Downtrend', 'Uptrend']);
+    expect(
+      breakdown(rows, 'earnings')
+        .map((b) => b.key)
+        .sort(),
+    ).toEqual(['Earnings inside', 'No earnings']);
     expect(breakdown(rows, 'desk')[0].key).toBe('verticals');
   });
 

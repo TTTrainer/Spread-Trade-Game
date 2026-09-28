@@ -19,13 +19,39 @@ import { expectedMove } from '../strategies/metrics';
 
 export type DrillKind = 'blind_call' | 'guess_iv' | 'greeks' | 'setup' | 'em_darts';
 
-export const DRILL_INFO: Record<DrillKind, { name: string; blurb: string; skill: string; seconds: number }> = {
-  blind_call: { name: '60-Second Blind Call', blurb: 'A blind chart, a ticking clock. Call the next 10 days and how sure you are.', skill: 'Calling direction', seconds: 60 },
-  guess_iv: { name: 'Guess the IV', blurb: 'Read the chart and the option prices. What implied volatility is the market charging?', skill: 'Volatility sense', seconds: 45 },
-  greeks: { name: 'Greeks Speed Round', blurb: 'A position, a move, a few days. What is the P/L now?', skill: 'Greeks intuition', seconds: 25 },
-  setup: { name: 'Spot the Setup', blurb: 'RSI divergence, Bollinger squeeze, trend break, or nothing at all?', skill: 'Reading charts', seconds: 40 },
-  em_darts: { name: 'Expected Move Darts', blurb: 'Drag a range where the stock will finish. Tighter ranges score more, misses score nothing.', skill: 'Expected move', seconds: 45 },
-};
+export const DRILL_INFO: Record<DrillKind, { name: string; blurb: string; skill: string; seconds: number }> =
+  {
+    blind_call: {
+      name: '60-Second Blind Call',
+      blurb: 'A blind chart, a ticking clock. Call the next 10 days and how sure you are.',
+      skill: 'Calling direction',
+      seconds: 60,
+    },
+    guess_iv: {
+      name: 'Guess the IV',
+      blurb: 'Read the chart and the option prices. What implied volatility is the market charging?',
+      skill: 'Volatility sense',
+      seconds: 45,
+    },
+    greeks: {
+      name: 'Greeks Speed Round',
+      blurb: 'A position, a move, a few days. What is the P/L now?',
+      skill: 'Greeks intuition',
+      seconds: 25,
+    },
+    setup: {
+      name: 'Spot the Setup',
+      blurb: 'RSI divergence, Bollinger squeeze, trend break, or nothing at all?',
+      skill: 'Reading charts',
+      seconds: 40,
+    },
+    em_darts: {
+      name: 'Expected Move Darts',
+      blurb: 'Drag a range where the stock will finish. Tighter ranges score more, misses score nothing.',
+      skill: 'Expected move',
+      seconds: 45,
+    },
+  };
 
 export const DRILL_KINDS: DrillKind[] = ['blind_call', 'guess_iv', 'greeks', 'setup', 'em_darts'];
 export const DRILL_HORIZON = 10;
@@ -66,7 +92,8 @@ export interface GreeksQ extends Base {
   choices: number[]; // dollars
   answerIndex: number;
 }
-export type SetupKind = 'rsi_bull_div' | 'rsi_bear_div' | 'bb_squeeze' | 'trend_break_down' | 'trend_break_up' | 'none';
+export type SetupKind =
+  'rsi_bull_div' | 'rsi_bear_div' | 'bb_squeeze' | 'trend_break_down' | 'trend_break_up' | 'none';
 export const SETUP_LABELS: Record<SetupKind, string> = {
   rsi_bull_div: 'Bullish RSI divergence',
   rsi_bear_div: 'Bearish RSI divergence',
@@ -115,15 +142,20 @@ export function detectSetup(bars: Bar[]): SetupKind {
   if (n < 130) return 'none';
   const closes = bars.map((b) => b.close);
   const band = bollinger(closes, 20, 2);
-  const widths = band.map((b) => (b.upper !== null && b.lower !== null && b.mid ? (b.upper - b.lower) / b.mid : null));
+  const widths = band.map((b) =>
+    b.upper !== null && b.lower !== null && b.mid ? (b.upper - b.lower) / b.mid : null,
+  );
   const recent = widths.slice(-120).filter((x): x is number => x !== null);
   const w = widths[n - 1];
-  if (w !== null && recent.length > 60 && recent.filter((x) => x < w).length / recent.length <= 0.04) return 'bb_squeeze';
+  if (w !== null && recent.length > 60 && recent.filter((x) => x < w).length / recent.length <= 0.04)
+    return 'bb_squeeze';
   const s50 = sma(closes, 50);
   const slopeUp = (s50[n - 2] ?? 0) > (s50[n - 22] ?? Infinity);
   const slopeDown = (s50[n - 2] ?? Infinity) < (s50[n - 22] ?? 0);
-  if (slopeUp && closes[n - 2] > (s50[n - 2] ?? 0) && closes[n - 1] < (s50[n - 1] ?? 0)) return 'trend_break_down';
-  if (slopeDown && closes[n - 2] < (s50[n - 2] ?? Infinity) && closes[n - 1] > (s50[n - 1] ?? Infinity)) return 'trend_break_up';
+  if (slopeUp && closes[n - 2] > (s50[n - 2] ?? 0) && closes[n - 1] < (s50[n - 1] ?? 0))
+    return 'trend_break_down';
+  if (slopeDown && closes[n - 2] < (s50[n - 2] ?? Infinity) && closes[n - 1] > (s50[n - 1] ?? Infinity))
+    return 'trend_break_up';
   const r = rsi(closes, 14);
   // Divergence: the last 10 days vs the 10-30 days before.
   const a = { from: n - 30, to: n - 11 };
@@ -140,10 +172,12 @@ export function detectSetup(bars: Bar[]): SetupKind {
   };
   const h1 = maxIdx(a.from, a.to);
   const h2 = maxIdx(b.from, b.to);
-  if (closes[h2] > closes[h1] * 1.005 && (r[h2] ?? 50) < (r[h1] ?? 50) - 4 && (r[h1] ?? 0) > 60) return 'rsi_bear_div';
+  if (closes[h2] > closes[h1] * 1.005 && (r[h2] ?? 50) < (r[h1] ?? 50) - 4 && (r[h1] ?? 0) > 60)
+    return 'rsi_bear_div';
   const l1 = minIdx(a.from, a.to);
   const l2 = minIdx(b.from, b.to);
-  if (closes[l2] < closes[l1] * 0.995 && (r[l2] ?? 50) > (r[l1] ?? 50) + 4 && (r[l1] ?? 100) < 40) return 'rsi_bull_div';
+  if (closes[l2] < closes[l1] * 0.995 && (r[l2] ?? 50) > (r[l1] ?? 50) + 4 && (r[l1] ?? 100) < 40)
+    return 'rsi_bull_div';
   return 'none';
 }
 
@@ -199,9 +233,18 @@ export interface DrillDeps {
 
 const views = new Map<string, MarketView>();
 
-async function openView(d: DrillDeps, w: WindowDef, id: string, flip: boolean, rescale = true): Promise<MarketView> {
+async function openView(
+  d: DrillDeps,
+  w: WindowDef,
+  id: string,
+  flip: boolean,
+  rescale = true,
+): Promise<MarketView> {
   const probe = await asOf(d.source, w.entryDate).bars(w.symbol, w.entryDate, w.entryDate);
-  const t = { ...blindTransform(w.symbol, w.entryDate, probe[0]?.close ?? 100, d.rng.fork(`t:${id}`), rescale), flipBars: flip };
+  const t = {
+    ...blindTransform(w.symbol, w.entryDate, probe[0]?.close ?? 100, d.rng.fork(`t:${id}`), rescale),
+    flipBars: flip,
+  };
   const v = await MarketView.open({ source: d.source, window: w, transform: t, scheduleHorizonDays: 1 });
   views.set(id, v);
   return v;
@@ -223,13 +266,27 @@ export async function dealQuestion(kind: DrillKind, d: DrillDeps): Promise<Drill
       const v = await openView(d, w, id, flip);
       const vol = v.vol();
       const iv = vol[vol.length - 1]?.iv30 ?? 0.3;
-      return { id, kind, windowId: w.id, displaySymbol: v.publicWindow.displaySymbol, realSymbol: w.symbol, date: v.now, bars: v.bars().slice(-130), flipped: flip, emPct: iv * Math.sqrt(DRILL_HORIZON / 252) * 0.8, regime: regimeOf(w) };
+      return {
+        id,
+        kind,
+        windowId: w.id,
+        displaySymbol: v.publicWindow.displaySymbol,
+        realSymbol: w.symbol,
+        date: v.now,
+        bars: v.bars().slice(-130),
+        flipped: flip,
+        emPct: iv * Math.sqrt(DRILL_HORIZON / 252) * 0.8,
+        regime: regimeOf(w),
+      };
     }
     case 'guess_iv': {
       const w = pickWindow(d);
       const v = await openView(d, w, id, false);
       const chain = await v.loadChain();
-      const exp = expirationsOf(chain).find((e) => diffDays(chain.date, e) >= 25) ?? expirationsOf(chain).at(-1) ?? chain.date;
+      const exp =
+        expirationsOf(chain).find((e) => diffDays(chain.date, e) >= 25) ??
+        expirationsOf(chain).at(-1) ??
+        chain.date;
       const atm = nearestStrike(chain, exp, 'C', chain.spot);
       const c = atm ? findQuote(chain, { expiration: exp, strike: atm.strike, right: 'C' }) : undefined;
       const p = atm ? findQuote(chain, { expiration: exp, strike: atm.strike, right: 'P' }) : undefined;
@@ -262,7 +319,8 @@ export async function dealQuestion(kind: DrillKind, d: DrillDeps): Promise<Drill
       const short = Math.round((spot * (1 - vol * Math.sqrt(dte / 365) * 0.5)) / width) * width;
       const long = short - width;
       const t = dte / 365;
-      const price = (s: number, k: number, tt: number, v: number) => bsm({ right: 'P', spot: s, strike: k, t: tt, vol: v, rate: 0.04, divYield: 0 });
+      const price = (s: number, k: number, tt: number, v: number) =>
+        bsm({ right: 'P', spot: s, strike: k, t: tt, vol: v, rate: 0.04, divYield: 0 });
       const p0 = { s: price(spot, short, t, vol), l: price(spot, long, t, vol) };
       const greeks = {
         delta: (-p0.s.delta + p0.l.delta) * 100,
@@ -279,10 +337,18 @@ export async function dealQuestion(kind: DrillKind, d: DrillDeps): Promise<Drill
       const value1 = (price(spot + move, short, t1, v1).price - price(spot + move, long, t1, v1).price) * 100;
       const answer = Math.round(value0 - value1); // short the spread: gain when it gets cheaper
       const deltaOnly = Math.round(greeks.delta * move);
-      const noTheta = Math.round(greeks.delta * move + 0.5 * greeks.gamma * move * move + greeks.vega * ivPts);
+      const noTheta = Math.round(
+        greeks.delta * move + 0.5 * greeks.gamma * move * move + greeks.vega * ivPts,
+      );
       const flipped = -answer;
       const set = new Set<number>([answer]);
-      for (const x of [deltaOnly, noTheta, flipped, answer + Math.round(greeks.theta * days * 2) + 7, Math.round(answer * 1.6) + 11]) {
+      for (const x of [
+        deltaOnly,
+        noTheta,
+        flipped,
+        answer + Math.round(greeks.theta * days * 2) + 7,
+        Math.round(answer * 1.6) + 11,
+      ]) {
         if (set.size >= 4) break;
         if (!set.has(x) && Math.abs(x - answer) >= 5) set.add(x);
       }
@@ -318,7 +384,18 @@ export async function dealQuestion(kind: DrillKind, d: DrillDeps): Promise<Drill
         const others = (Object.keys(SETUP_LABELS) as SetupKind[]).filter((k) => k !== found);
         const choices = d.rng.shuffle([found, ...d.rng.shuffle(others).slice(0, 3)]);
         if (!choices.includes('none') && found !== 'none') choices[choices.length - 1] = 'none';
-        return { id, kind, windowId: w.id, displaySymbol: v.publicWindow.displaySymbol, realSymbol: w.symbol, date: v.now, bars: v.bars().slice(-130), flipped: false, answer: found, choices: d.rng.shuffle(choices) };
+        return {
+          id,
+          kind,
+          windowId: w.id,
+          displaySymbol: v.publicWindow.displaySymbol,
+          realSymbol: w.symbol,
+          date: v.now,
+          bars: v.bars().slice(-130),
+          flipped: false,
+          answer: found,
+          choices: d.rng.shuffle(choices),
+        };
       }
       throw new Error('No setup found');
     }
@@ -326,9 +403,24 @@ export async function dealQuestion(kind: DrillKind, d: DrillDeps): Promise<Drill
       const w = pickWindow(d);
       const v = await openView(d, w, id, false);
       const chain = await v.loadChain();
-      const exp = expirationsOf(chain).find((e) => diffDays(chain.date, e) >= 7 && diffDays(chain.date, e) <= 21) ?? expirationsOf(chain)[0];
+      const exp =
+        expirationsOf(chain).find((e) => diffDays(chain.date, e) >= 7 && diffDays(chain.date, e) <= 21) ??
+        expirationsOf(chain)[0];
       const em = expectedMove(chain, exp) ?? chain.spot * 0.05;
-      return { id, kind, windowId: w.id, displaySymbol: v.publicWindow.displaySymbol, realSymbol: w.symbol, date: v.now, bars: v.bars().slice(-130), flipped: false, expiration: exp, dte: diffDays(chain.date, exp), em, spot: chain.spot };
+      return {
+        id,
+        kind,
+        windowId: w.id,
+        displaySymbol: v.publicWindow.displaySymbol,
+        realSymbol: w.symbol,
+        date: v.now,
+        bars: v.bars().slice(-130),
+        flipped: false,
+        expiration: exp,
+        dte: diffDays(chain.date, exp),
+        em,
+        spot: chain.spot,
+      };
     }
   }
 }
@@ -391,7 +483,10 @@ export async function gradeAnswer(q: DrillQuestion, a: DrillAnswer): Promise<Dri
         kind: q.kind,
         correct,
         score: correct ? 100 : 0,
-        detail: { chosen: ans.index === null ? null : q.choices[ans.index], answer: q.choices[q.answerIndex] },
+        detail: {
+          chosen: ans.index === null ? null : q.choices[ans.index],
+          answer: q.choices[q.answerIndex],
+        },
         revealBars: [],
         explanation: `Δ ${g.delta.toFixed(1)} × ${q.move.toFixed(2)} ≈ ${(g.delta * q.move).toFixed(0)}, Γ adds ${(0.5 * g.gamma * q.move * q.move).toFixed(0)}, Θ adds ${(g.theta * q.days).toFixed(0)} over ${q.days}d, vega ${(g.vega * q.ivPts).toFixed(0)} for ${q.ivPts > 0 ? '+' : ''}${q.ivPts} IV. Exact reprice: ${q.choices[q.answerIndex] >= 0 ? '+' : ''}$${q.choices[q.answerIndex]}.`,
       };
@@ -470,7 +565,11 @@ export function summarize(results: DrillResult[]): DrillSummary {
   const calls = results.filter((r) => r.kind === 'blind_call' && r.detail.bucket !== null);
   const calibration = [0.5, 0.6, 0.7, 0.8, 0.9].map((c) => {
     const xs = calls.filter((r) => Math.abs(Number(r.detail.confidence) - c) < 1e-6);
-    return { confidence: c, n: xs.length, hitRate: xs.length ? xs.filter((r) => r.correct).length / xs.length : 0 };
+    return {
+      confidence: c,
+      n: xs.length,
+      hitRate: xs.length ? xs.filter((r) => r.correct).length / xs.length : 0,
+    };
   });
   return {
     questions: results.length,

@@ -16,12 +16,28 @@ export function Kbd({ children }: { children: ReactNode }) {
   return <span className="kbd">{children}</span>;
 }
 
-export function Meter({ value, max, label, tone = 'cyan', testId }: { value: number; max: number; label?: ReactNode; tone?: 'cyan' | 'magenta' | 'amber' | 'down'; testId?: string }) {
+export function Meter({
+  value,
+  max,
+  label,
+  tone = 'cyan',
+  testId,
+}: {
+  value: number;
+  max: number;
+  label?: ReactNode;
+  tone?: 'cyan' | 'magenta' | 'amber' | 'down';
+  testId?: string;
+}) {
   const frac = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   return (
     <div className={`meter tone-${tone}`} data-testid={testId}>
       <div className="meter-fill" style={{ width: `${frac * 100}%` }} />
-      {label !== undefined && <div className="meter-label num">{label}</div>}
+      {label !== undefined && (
+        <div className="meter-label num">
+          <span>{label}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -77,7 +93,17 @@ export function TiltCard({
   );
 }
 
-export function Modal({ children, onClose, wide, testId }: { children: ReactNode; onClose?: () => void; wide?: boolean; testId?: string }) {
+export function Modal({
+  children,
+  onClose,
+  wide,
+  testId,
+}: {
+  children: ReactNode;
+  onClose?: () => void;
+  wide?: boolean;
+  testId?: string;
+}) {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <motion.div
@@ -94,7 +120,17 @@ export function Modal({ children, onClose, wide, testId }: { children: ReactNode
 }
 
 /** A number that counts up to its target (used for chips, mult and the meter). */
-export function CountUp({ value, digits = 0, duration = 600, onTick }: { value: number; digits?: number; duration?: number; onTick?: (v: number) => void }) {
+export function CountUp({
+  value,
+  digits = 0,
+  duration = 600,
+  onTick,
+}: {
+  value: number;
+  digits?: number;
+  duration?: number;
+  onTick?: (v: number) => void;
+}) {
   const [shown, setShown] = useState(value);
   const from = useRef(value);
   useEffect(() => {
@@ -116,7 +152,11 @@ export function CountUp({ value, digits = 0, duration = 600, onTick }: { value: 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [value]);
-  return <span className="num">{shown.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits })}</span>;
+  return (
+    <span className="num">
+      {shown.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits })}
+    </span>
+  );
 }
 
 export function Toasts() {
@@ -124,7 +164,12 @@ export function Toasts() {
   return (
     <div className="toasts" data-testid="toasts">
       {toasts.map((t) => (
-        <motion.div key={t.id} className={`toast tone-${t.tone}`} initial={{ x: 60, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
+        <motion.div
+          key={t.id}
+          className={`toast tone-${t.tone}`}
+          initial={{ x: 60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+        >
           {t.text}
         </motion.div>
       ))}
@@ -134,7 +179,12 @@ export function Toasts() {
 
 export function Stamp({ text, tone }: { text: string; tone: 'good' | 'bad' }) {
   return (
-    <motion.div className={`stamp tone-${tone}`} initial={{ scale: 3, rotate: -18, opacity: 0 }} animate={{ scale: 1, rotate: -12, opacity: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 18 }}>
+    <motion.div
+      className={`stamp tone-${tone}`}
+      initial={{ scale: 3, rotate: -18, opacity: 0 }}
+      animate={{ scale: 1, rotate: -12, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+    >
       {text}
     </motion.div>
   );

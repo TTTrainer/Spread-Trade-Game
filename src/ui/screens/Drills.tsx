@@ -16,7 +16,13 @@ import {
   type DrillResult,
 } from '../../engine/drills/drills';
 import type { WindowDef } from '../../engine/market/types';
-import { BUCKET_GLYPHS, BUCKET_NAMES, CONFIDENCES, cutoffLabels, type Bucket } from '../../engine/scoring/calls';
+import {
+  BUCKET_GLYPHS,
+  BUCKET_NAMES,
+  CONFIDENCES,
+  cutoffLabels,
+  type Bucket,
+} from '../../engine/scoring/calls';
 import { Rng } from '../../engine/rng';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
@@ -55,7 +61,10 @@ export function DrillsScreen() {
   return (
     <div className="screen drills-menu" data-testid="drills-menu">
       <h1 className="screen-title">DRILLS</h1>
-      <p className="screen-sub">Ten-question reps. Only drills adapt to your weak spots: the mixed session deals more of what you miss.</p>
+      <p className="screen-sub">
+        Ten-question reps. Only drills adapt to your weak spots: the mixed session deals more of what you
+        miss.
+      </p>
       <div className="drill-grid">
         <TiltCard className="drill-card mixed" onClick={() => setMode('mixed')} testId="drill-mixed">
           <div className="drill-name">Adaptive Session</div>
@@ -70,7 +79,9 @@ export function DrillsScreen() {
         </TiltCard>
         {DRILL_KINDS.map((k) => {
           const xs = history.filter((h) => h.kind === k);
-          const avg = xs.length ? xs.slice(-30).reduce((a, h) => a + h.score, 0) / Math.min(30, xs.length) : null;
+          const avg = xs.length
+            ? xs.slice(-30).reduce((a, h) => a + h.score, 0) / Math.min(30, xs.length)
+            : null;
           return (
             <TiltCard key={k} className="drill-card" onClick={() => setMode(k)} testId={`drill-${k}`}>
               <div className="drill-name">{DRILL_INFO[k].name}</div>
@@ -89,7 +100,15 @@ export function DrillsScreen() {
   );
 }
 
-function DrillSession({ mode, history, onExit }: { mode: Mode; history: DrillHistoryItem[]; onExit: () => void }) {
+function DrillSession({
+  mode,
+  history,
+  onExit,
+}: {
+  mode: Mode;
+  history: DrillHistoryItem[];
+  onExit: () => void;
+}) {
   const settings = useApp((s) => s.settings);
   const toast = useApp((s) => s.toast);
   const src = useMemo(() => ipcSource(), []);
@@ -107,7 +126,9 @@ function DrillSession({ mode, history, onExit }: { mode: Mode; history: DrillHis
     void src.windows({}).then((w) => {
       setWindows(w);
       const weights = adaptiveWeights(history);
-      plan.current = Array.from({ length: SESSION_LENGTH }, () => (mode === 'mixed' ? rng.weighted(DRILL_KINDS, (k) => weights[k]) : mode));
+      plan.current = Array.from({ length: SESSION_LENGTH }, () =>
+        mode === 'mixed' ? rng.weighted(DRILL_KINDS, (k) => weights[k]) : mode,
+      );
     });
   }, []);
 
@@ -123,7 +144,13 @@ function DrillSession({ mode, history, onExit }: { mode: Mode; history: DrillHis
     setLoading(true);
     try {
       const kind = plan.current[i];
-      const question = await dealQuestion(kind, { source: src, windows, rng, allowFlip: settings.blind.flipDrills, history });
+      const question = await dealQuestion(kind, {
+        source: src,
+        windows,
+        rng,
+        allowFlip: settings.blind.flipDrills,
+        history,
+      });
       setQ(question);
       setLeft(DRILL_INFO[kind].seconds);
       sfx('deal');
@@ -167,7 +194,17 @@ function DrillSession({ mode, history, onExit }: { mode: Mode; history: DrillHis
         kind: mode,
         at: new Date().toISOString(),
         score: s.avgScore,
-        detail: { summary: s, results: all.map((r) => ({ kind: r.kind, score: r.score, correct: r.correct, regime: r.detail.regime ?? null, brier: r.brier ?? null, confidence: r.detail.confidence ?? null })) },
+        detail: {
+          summary: s,
+          results: all.map((r) => ({
+            kind: r.kind,
+            score: r.score,
+            correct: r.correct,
+            regime: r.detail.regime ?? null,
+            brier: r.brier ?? null,
+            confidence: r.detail.confidence ?? null,
+          })),
+        },
       });
     sfx('win');
   }, [done]);
@@ -186,19 +223,32 @@ function DrillSession({ mode, history, onExit }: { mode: Mode; history: DrillHis
           ◀ QUIT
         </button>
         <span>
-          {q ? DRILL_INFO[q.kind].name : 'Loading'} · question {Math.min(index, SESSION_LENGTH)}/{SESSION_LENGTH}
+          {q ? DRILL_INFO[q.kind].name : 'Loading'} · question {Math.min(index, SESSION_LENGTH)}/
+          {SESSION_LENGTH}
         </span>
         <span className="amber-text">streak {streak}</span>
         <div className="drill-timer">
-          <Meter value={result ? 0 : left} max={q ? DRILL_INFO[q.kind].seconds : 60} tone={left < 10 ? 'down' : 'cyan'} label={result ? 'answered' : `${left}s`} testId="drill-timer" />
+          <Meter
+            value={result ? 0 : left}
+            max={q ? DRILL_INFO[q.kind].seconds : 60}
+            tone={left < 10 ? 'down' : 'cyan'}
+            label={result ? 'answered' : `${left}s`}
+            testId="drill-timer"
+          />
         </div>
       </div>
       {loading && <div className="drill-loading num">Dealing a question…</div>}
       {q && !loading && <QuestionView key={q.id} q={q} result={result} onSubmit={(a) => void submit(a)} />}
       {result && (
-        <motion.div className={`drill-result panel ${result.correct ? 'good' : 'bad'}`} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} data-testid="drill-result">
+        <motion.div
+          className={`drill-result panel ${result.correct ? 'good' : 'bad'}`}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          data-testid="drill-result"
+        >
           <div className="dr-head">
-            <span className={result.correct ? 'up' : 'down'}>{result.correct ? '▲ HIT' : '▼ MISS'}</span> <span className="num">score {result.score}</span>
+            <span className={result.correct ? 'up' : 'down'}>{result.correct ? '▲ HIT' : '▼ MISS'}</span>{' '}
+            <span className="num">score {result.score}</span>
             {q && q.realSymbol !== 'DRILL' && (
               <span className="dim num">
                 {' '}
@@ -237,7 +287,15 @@ function blankAnswer(q: DrillQuestion): DrillAnswer {
   }
 }
 
-function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: DrillResult | null; onSubmit: (a: DrillAnswer) => void }) {
+function QuestionView({
+  q,
+  result,
+  onSubmit,
+}: {
+  q: DrillQuestion;
+  result: DrillResult | null;
+  onSubmit: (a: DrillAnswer) => void;
+}) {
   const [bucket, setBucket] = useState<Bucket | null>(null);
   const [conf, setConf] = useState(0.7);
   const [iv, setIv] = useState(0.35);
@@ -265,7 +323,14 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
   );
 
   const chart = (extra: Partial<Parameters<typeof MiniChart>[0]> = {}) => (
-    <MiniChart bars={bars} width={1100} height={q.kind === 'setup' ? 440 : 400} revealFrom={revealFrom} testId="drill-chart" {...extra} />
+    <MiniChart
+      bars={bars}
+      width={1100}
+      height={q.kind === 'setup' ? 440 : 400}
+      revealFrom={revealFrom}
+      testId="drill-chart"
+      {...extra}
+    />
   );
 
   switch (q.kind) {
@@ -274,12 +339,19 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
       return (
         <div className="question">
           <div className="q-prompt">
-            <b>{q.displaySymbol}</b> {q.flipped && <span className="chip warn">MAYBE FLIPPED</span>} Where will it be in 10 trading days? Expected move ±{(q.emPct * 100).toFixed(1)}%.
+            <b>{q.displaySymbol}</b> {q.flipped && <span className="chip warn">MAYBE FLIPPED</span>} Where
+            will it be in 10 trading days? Expected move ±{(q.emPct * 100).toFixed(1)}%.
           </div>
           {chart({ showBands: true })}
           <div className="q-answers">
             {([0, 1, 2, 3, 4] as Bucket[]).map((b) => (
-              <TiltCard key={b} className={`call-card big b${b}`} selected={bucket === b} onClick={() => !answered && setBucket(b)} testId={`dcall-${b}`}>
+              <TiltCard
+                key={b}
+                className={`call-card big b${b}`}
+                selected={bucket === b}
+                onClick={() => !answered && setBucket(b)}
+                testId={`dcall-${b}`}
+              >
                 <div className="call-glyph">{BUCKET_GLYPHS[b]}</div>
                 <div className="call-name">{BUCKET_NAMES[b]}</div>
                 <div className="call-cut num">{labels[b]}</div>
@@ -292,7 +364,12 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
                 </button>
               ))}
             </div>
-            <button className="pixel-btn primary" disabled={answered || bucket === null} onClick={() => bucket !== null && onSubmit({ kind: 'blind_call', bucket, confidence: conf })} data-testid="drill-submit">
+            <button
+              className="pixel-btn primary"
+              disabled={answered || bucket === null}
+              onClick={() => bucket !== null && onSubmit({ kind: 'blind_call', bucket, confidence: conf })}
+              data-testid="drill-submit"
+            >
               LOCK IT IN <Kbd>Enter</Kbd>
             </button>
           </div>
@@ -303,13 +380,31 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
       return (
         <div className="question">
           <div className="q-prompt">
-            <b>{q.displaySymbol}</b>: the {q.strike} straddle for {q.dte} days costs <b className="amber-text">{(q.callMid + q.putMid).toFixed(2)}</b> (call {q.callMid.toFixed(2)}, put {q.putMid.toFixed(2)}). 20-day realized vol: {q.hv20 === null ? '—' : `${(q.hv20 * 100).toFixed(0)}%`}. What IV is the market charging?
+            <b>{q.displaySymbol}</b>: the {q.strike} straddle for {q.dte} days costs{' '}
+            <b className="amber-text">{(q.callMid + q.putMid).toFixed(2)}</b> (call {q.callMid.toFixed(2)},
+            put {q.putMid.toFixed(2)}). 20-day realized vol:{' '}
+            {q.hv20 === null ? '—' : `${(q.hv20 * 100).toFixed(0)}%`}. What IV is the market charging?
           </div>
           {chart()}
           <div className="q-answers num">
-            <input type="range" min={0.05} max={2} step={0.01} value={iv} onChange={(e) => setIv(Number(e.target.value))} disabled={answered} className="iv-slider" data-testid="iv-slider" />
+            <input
+              type="range"
+              min={0.05}
+              max={2}
+              step={0.01}
+              value={iv}
+              onChange={(e) => setIv(Number(e.target.value))}
+              disabled={answered}
+              className="iv-slider"
+              data-testid="iv-slider"
+            />
             <span className="iv-guess">{Math.round(iv * 100)}%</span>
-            <button className="pixel-btn primary" disabled={answered} onClick={() => onSubmit({ kind: 'guess_iv', iv })} data-testid="drill-submit">
+            <button
+              className="pixel-btn primary"
+              disabled={answered}
+              onClick={() => onSubmit({ kind: 'guess_iv', iv })}
+              data-testid="drill-submit"
+            >
               GUESS
             </button>
           </div>
@@ -326,9 +421,17 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
             <div>Vega {q.greeks.vega.toFixed(2)}</div>
           </div>
           <div className="q-prompt">
-            The stock moves <b>{q.move >= 0 ? '+' : ''}
-            {q.move.toFixed(2)}</b> over <b>{q.days}</b> day{q.days > 1 ? 's' : ''} and IV changes <b>{q.ivPts >= 0 ? '+' : ''}
-            {q.ivPts}</b> points. What is your P/L?
+            The stock moves{' '}
+            <b>
+              {q.move >= 0 ? '+' : ''}
+              {q.move.toFixed(2)}
+            </b>{' '}
+            over <b>{q.days}</b> day{q.days > 1 ? 's' : ''} and IV changes{' '}
+            <b>
+              {q.ivPts >= 0 ? '+' : ''}
+              {q.ivPts}
+            </b>{' '}
+            points. What is your P/L?
           </div>
           <div className="q-answers">
             {q.choices.map((c, i) => (
@@ -354,7 +457,13 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
           {chart({ showBands: true, showSma: true, showRsi: true })}
           <div className="q-answers">
             {q.choices.map((c, i) => (
-              <button key={c} className={`pixel-btn choice ${answered && c === q.answer ? 'right' : ''}`} disabled={answered} onClick={() => onSubmit({ kind: 'setup', choice: c })} data-testid={`choice-${i}`}>
+              <button
+                key={c}
+                className={`pixel-btn choice ${answered && c === q.answer ? 'right' : ''}`}
+                disabled={answered}
+                onClick={() => onSubmit({ kind: 'setup', choice: c })}
+                data-testid={`choice-${i}`}
+              >
                 {SETUP_LABELS[c]}
               </button>
             ))}
@@ -365,12 +474,31 @@ function QuestionView({ q, result, onSubmit }: { q: DrillQuestion; result: Drill
       return (
         <div className="question">
           <div className="q-prompt">
-            <b>{q.displaySymbol}</b> at {q.spot.toFixed(2)}. The at-the-money straddle for {q.dte} days costs <b className="amber-text">{q.em.toFixed(2)}</b>. Drag on the chart to mark where it will finish.
+            <b>{q.displaySymbol}</b> at {q.spot.toFixed(2)}. The at-the-money straddle for {q.dte} days costs{' '}
+            <b className="amber-text">{q.em.toFixed(2)}</b>. Drag on the chart to mark where it will finish.
           </div>
-          {chart({ range, onRange: answered ? undefined : setRange, hLines: answered ? [{ price: q.spot + q.em, color: '#9d6bff', label: '+EM' }, { price: q.spot - q.em, color: '#9d6bff', label: '-EM' }] : [] })}
+          {chart({
+            range,
+            onRange: answered ? undefined : setRange,
+            hLines: answered
+              ? [
+                  { price: q.spot + q.em, color: '#9d6bff', label: '+EM' },
+                  { price: q.spot - q.em, color: '#9d6bff', label: '-EM' },
+                ]
+              : [],
+          })}
           <div className="q-answers num">
-            <span>{range ? `${Math.min(range.low, range.high).toFixed(2)} – ${Math.max(range.low, range.high).toFixed(2)}` : 'drag a range on the chart'}</span>
-            <button className="pixel-btn primary" disabled={answered || !range} onClick={() => range && onSubmit({ kind: 'em_darts', low: range.low, high: range.high })} data-testid="drill-submit">
+            <span>
+              {range
+                ? `${Math.min(range.low, range.high).toFixed(2)} – ${Math.max(range.low, range.high).toFixed(2)}`
+                : 'drag a range on the chart'}
+            </span>
+            <button
+              className="pixel-btn primary"
+              disabled={answered || !range}
+              onClick={() => range && onSubmit({ kind: 'em_darts', low: range.low, high: range.high })}
+              data-testid="drill-submit"
+            >
               THROW
             </button>
           </div>
@@ -408,7 +536,9 @@ function DrillSummaryView({ results, onExit }: { results: DrillResult[]; onExit:
             {s.calibration.map((c) => {
               const cx = 20 + ((c.confidence - 0.4) / 0.6) * 230;
               const cy = 140 - c.hitRate * 130;
-              return c.n > 0 ? <circle key={c.confidence} cx={cx} cy={cy} r={3 + c.n * 1.5} fill="#ffbf3e" /> : null;
+              return c.n > 0 ? (
+                <circle key={c.confidence} cx={cx} cy={cy} r={3 + c.n * 1.5} fill="#ffbf3e" />
+              ) : null;
             })}
             <text x={20} y={156} className="axis">
               50%

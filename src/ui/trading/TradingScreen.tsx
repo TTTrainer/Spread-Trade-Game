@@ -10,7 +10,14 @@ import { useTrading, type Panel, type StudyId } from '../store/trading';
 import { BUCKET_NAMES, CONFIDENCES } from '../../engine/scoring/calls';
 import { ChartPanel } from './ChartPanel';
 import { CallCards, ExpiryChips, OrderTicket, SizeControls, StructureCards } from './BuilderTray';
-import { AnalyzePanel, DecisionModal, FastForwardBar, LineupColumn, PositionsDock } from './Panels';
+import {
+  AnalyzePanel,
+  DecisionModal,
+  FastForwardBar,
+  LineupColumn,
+  PositionsDock,
+  type CardBadges,
+} from './Panels';
 import { PayoffChart, StatsBlock } from './RightPanel';
 import { DebriefStrip } from './Debrief';
 import './trading.css';
@@ -46,7 +53,13 @@ function StudyPicker({ onClose }: { onClose: () => void }) {
       <div className="study-grid num">
         {(Object.keys(STUDY_LABELS) as StudyId[]).map((s) => (
           <label key={s} className={`toggle ${locked.includes(s) ? 'locked' : ''}`}>
-            <input type="checkbox" checked={studies.includes(s)} onChange={() => toggle(s)} disabled={locked.includes(s)} /> {STUDY_LABELS[s]}
+            <input
+              type="checkbox"
+              checked={studies.includes(s)}
+              onChange={() => toggle(s)}
+              disabled={locked.includes(s)}
+            />{' '}
+            {STUDY_LABELS[s]}
             {locked.includes(s) && <span className="chip">ANALYST</span>}
           </label>
         ))}
@@ -94,15 +107,36 @@ export function HelpModal() {
   const keys = useApp((s) => s.settings.hotkeys);
   if (!open) return null;
   const glossary: [string, string][] = [
-    ['IV rank (IVR)', 'Where implied volatility sits in its own one-year range (0 = lowest, 100 = highest). Sell premium when it is high.'],
-    ['Expected move (EM)', 'The market-implied one-standard-deviation move to expiration, from the at-the-money straddle. Keep short strikes outside it.'],
-    ['POP', 'Probability the trade makes money at expiration, from a lognormal model using the options\' own IV.'],
-    ['Delta (Δ)', 'How much the position gains per $1 rise in the stock. A 30Δ short strike is roughly a 30% chance of finishing in the money.'],
+    [
+      'IV rank (IVR)',
+      'Where implied volatility sits in its own one-year range (0 = lowest, 100 = highest). Sell premium when it is high.',
+    ],
+    [
+      'Expected move (EM)',
+      'The market-implied one-standard-deviation move to expiration, from the at-the-money straddle. Keep short strikes outside it.',
+    ],
+    [
+      'POP',
+      "Probability the trade makes money at expiration, from a lognormal model using the options' own IV.",
+    ],
+    [
+      'Delta (Δ)',
+      'How much the position gains per $1 rise in the stock. A 30Δ short strike is roughly a 30% chance of finishing in the money.',
+    ],
     ['Theta (Θ)', 'What time decay pays (or costs) you per day.'],
     ['Vega', 'What a 1-point change in implied volatility does to the position.'],
-    ['Edge Rank', 'How your credit per dollar of width compares with every similar spread on the same chain that day.'],
-    ['Natural / mid', 'Natural is the worst price (buy the ask, sell the bid) and always fills. Mid is halfway and fills less often.'],
-    ['Pin risk', 'When the stock closes right at your short strike on expiration day, you may or may not be assigned.'],
+    [
+      'Edge Rank',
+      'How your credit per dollar of width compares with every similar spread on the same chain that day.',
+    ],
+    [
+      'Natural / mid',
+      'Natural is the worst price (buy the ask, sell the bid) and always fills. Mid is halfway and fills less often.',
+    ],
+    [
+      'Pin risk',
+      'When the stock closes right at your short strike on expiration day, you may or may not be assigned.',
+    ],
   ];
   return (
     <Modal onClose={() => setHelp(false)} wide testId="help-modal">
@@ -120,8 +154,29 @@ export function HelpModal() {
           <div className="section-title">Hotkeys (thinkorswim defaults, remap in Settings)</div>
           {(
             [
-              ['positions', 'builder', 'analyze', 'lineup', 'studies', 'timeframe', 'home', 'back', 'help', 'settings'],
-              ['sell', 'buy', 'flatten', 'reverse', 'autoSend', 'playPause', 'confirm', 'ladderIn', 'ladderOut'],
+              [
+                'positions',
+                'builder',
+                'analyze',
+                'lineup',
+                'studies',
+                'timeframe',
+                'home',
+                'back',
+                'help',
+                'settings',
+              ],
+              [
+                'sell',
+                'buy',
+                'flatten',
+                'reverse',
+                'autoSend',
+                'playPause',
+                'confirm',
+                'ladderIn',
+                'ladderOut',
+              ],
             ] as const
           ).map((group, gi) => (
             <div key={gi} className="hotkey-list">
@@ -133,7 +188,8 @@ export function HelpModal() {
             </div>
           ))}
           <p>
-            <Kbd>1-5</Kbd> call bucket ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd> confidence {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
+            <Kbd>1-5</Kbd> call bucket ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd> confidence{' '}
+            {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
           </p>
         </div>
       </div>
@@ -165,7 +221,23 @@ export function TradingTopBar({ left, right }: { left?: ReactNode; right?: React
   );
 }
 
-export function TradingLayout({ top, allowedStructures, onDone, leftExtra, rightExtra }: { top: ReactNode; allowedStructures?: StructureId[]; onDone?: ReactNode; leftExtra?: ReactNode; rightExtra?: ReactNode }) {
+export function TradingLayout({
+  top,
+  allowedStructures,
+  onDone,
+  leftExtra,
+  rightExtra,
+  badges,
+  levels,
+}: {
+  top: ReactNode;
+  levels?: Partial<Record<StructureId, number>>;
+  allowedStructures?: StructureId[];
+  onDone?: ReactNode;
+  leftExtra?: ReactNode;
+  rightExtra?: ReactNode;
+  badges?: (cardId: string) => CardBadges;
+}) {
   const panel = useTrading((s) => s.panel);
   const setPanel = useTrading((s) => s.setPanel);
   const ff = useTrading((s) => s.ff);
@@ -180,7 +252,12 @@ export function TradingLayout({ top, allowedStructures, onDone, leftExtra, right
   const [studiesOpen, setStudiesOpen] = useStudyPicker();
 
   useEffect(() => {
-    if (shake > 0) void controls.start({ x: [0, -10, 9, -6, 4, 0], y: [0, 5, -4, 3, -1, 0], transition: { duration: 0.4 } });
+    if (shake > 0)
+      void controls.start({
+        x: [0, -10, 9, -6, 4, 0],
+        y: [0, 5, -4, 3, -1, 0],
+        transition: { duration: 0.4 },
+      });
   }, [shake]);
 
   const tabs: Panel[] = ['builder', 'positions', 'analyze'];
@@ -219,7 +296,7 @@ export function TradingLayout({ top, allowedStructures, onDone, leftExtra, right
     <motion.div className="trading" animate={controls} data-testid="trading-screen">
       <div className="t-top">{top}</div>
       <div className="t-left">
-        <LineupColumn extra={leftExtra} />
+        <LineupColumn extra={leftExtra} badges={badges} />
       </div>
       <div className="t-center">
         <ChartPanel />
@@ -232,8 +309,14 @@ export function TradingLayout({ top, allowedStructures, onDone, leftExtra, right
       <div className="t-tray panel">
         <div className="tray-tabs num">
           {tabs.map((t) => (
-            <button key={t} className={panel === t ? 'sel' : ''} onClick={() => setPanel(t)} data-testid={`tab-${t}`}>
-              {t.toUpperCase()} <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
+            <button
+              key={t}
+              className={panel === t ? 'sel' : ''}
+              onClick={() => setPanel(t)}
+              data-testid={`tab-${t}`}
+            >
+              {t.toUpperCase()}{' '}
+              <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
             </button>
           ))}
           <button onClick={() => setStudiesOpen(true)}>
@@ -247,7 +330,7 @@ export function TradingLayout({ top, allowedStructures, onDone, leftExtra, right
           {panel === 'builder' && (
             <div className="builder-row">
               <CallCards />
-              <StructureCards allowed={allowedStructures} />
+              <StructureCards allowed={allowedStructures} levels={levels} />
               <div className="tray-col">
                 <ExpiryChips />
                 <SizeControls />

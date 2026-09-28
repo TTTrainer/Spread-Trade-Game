@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { adx, atr, bollinger, ema, historicalVol, keltner, last, lastMacdCross, macd, relativeVolume, rsi, sma, smaSlopePct, supportResistance } from '../../src/engine/market/indicators';
+import {
+  adx,
+  atr,
+  bollinger,
+  ema,
+  historicalVol,
+  keltner,
+  last,
+  lastMacdCross,
+  macd,
+  relativeVolume,
+  rsi,
+  sma,
+  smaSlopePct,
+  supportResistance,
+} from '../../src/engine/market/indicators';
 import { buildContext, type MarketContext } from '../../src/engine/market/context';
 import { maxContracts, meetsRR, planTrade } from '../../src/engine/trading/plan';
 import { filterWindows } from '../../src/engine/market/filter';
@@ -8,7 +23,15 @@ import type { TradeMetrics } from '../../src/engine/strategies/metrics';
 import { flatChain } from '../helpers/market';
 
 const bars = (closes: number[]): Bar[] =>
-  closes.map((c, i) => ({ date: `2024-01-${String((i % 28) + 1).padStart(2, '0')}`, open: c * 0.995, high: c * 1.01, low: c * 0.99, close: c, volume: 1000 + i * 10, source: 'real' as const }));
+  closes.map((c, i) => ({
+    date: `2024-01-${String((i % 28) + 1).padStart(2, '0')}`,
+    open: c * 0.995,
+    high: c * 1.01,
+    low: c * 0.99,
+    close: c,
+    volume: 1000 + i * 10,
+    source: 'real' as const,
+  }));
 
 describe('indicators', () => {
   const up = Array.from({ length: 80 }, (_, i) => 100 + i + Math.sin(i) * 2);
@@ -44,25 +67,70 @@ describe('indicators', () => {
 
 describe('trade planner', () => {
   const chain = flatChain({ date: '2025-01-03', spot: 100, expirations: ['2025-01-31', '2025-02-28'] });
-  const ctx = buildContext({ bars: bars(Array.from({ length: 260 }, (_, i) => 90 + i * 0.04)), vol: [{ date: '2025-01-03', iv30: 0.3, hv20: 0.25, ivr: 20, ivp: 30 }], upcomingEarnings: [], pastEarnings: [], dividends: [], macro: [], vix: 18 });
-  const input = { chain, ctx: { ...ctx, spot: 100 } as MarketContext, equityCents: 500_000, riskCapPct: 0.1, reservedCents: 0, rate: 0.03 };
+  const ctx = buildContext({
+    bars: bars(Array.from({ length: 260 }, (_, i) => 90 + i * 0.04)),
+    vol: [{ date: '2025-01-03', iv30: 0.3, hv20: 0.25, ivr: 20, ivp: 30 }],
+    upcomingEarnings: [],
+    pastEarnings: [],
+    dividends: [],
+    macro: [],
+    vix: 18,
+  });
+  const input = {
+    chain,
+    ctx: { ...ctx, spot: 100 } as MarketContext,
+    equityCents: 500_000,
+    riskCapPct: 0.1,
+    reservedCents: 0,
+    rate: 0.03,
+  };
 
   it('plans a bull put and sizes it to the cap', () => {
-    const p = planTrade({ ...input, structureId: 'bull_put', params: { expiration: '2025-01-31', delta: 0.3, width: 2 }, qty: 1 });
+    const p = planTrade({
+      ...input,
+      structureId: 'bull_put',
+      params: { expiration: '2025-01-31', delta: 0.3, width: 2 },
+      qty: 1,
+    });
     expect(p.ok).toBe(true);
     expect(p.edge).not.toBeNull();
     expect(p.entry?.shortStrikes).toHaveLength(1);
     const n = maxContracts(p, 500_000, 0.1, 0);
     expect(n).toBeGreaterThanOrEqual(1);
-    const big = planTrade({ ...input, structureId: 'bull_put', params: { expiration: '2025-01-31', delta: 0.3, width: 2 }, qty: n + 1 });
+    const big = planTrade({
+      ...input,
+      structureId: 'bull_put',
+      params: { expiration: '2025-01-31', delta: 0.3, width: 2 },
+      qty: n + 1,
+    });
     expect(big.ok).toBe(false);
     expect(maxContracts(big, 500_000, 0.1, 0)).toBe(0);
   });
 
   it('rejects illegal builds with reasons', () => {
-    expect(planTrade({ ...input, structureId: 'bull_put', params: { expiration: '2025-01-31', delta: 0.3, width: 2 }, qty: 0 }).reason).toMatch(/whole number/);
-    expect(planTrade({ ...input, structureId: 'bull_put', params: { expiration: '2025-01-31', delta: 0.3, width: 0 }, qty: 1 }).reason).toMatch(/Width/);
-    const noQuote = planTrade({ ...input, structureId: 'bull_put', params: { expiration: '2025-01-31', delta: 0.3, width: 2 }, qty: 1, legs: [{ kind: 'option', right: 'P', strike: 1, expiration: '2025-01-31', ratio: -1 }] });
+    expect(
+      planTrade({
+        ...input,
+        structureId: 'bull_put',
+        params: { expiration: '2025-01-31', delta: 0.3, width: 2 },
+        qty: 0,
+      }).reason,
+    ).toMatch(/whole number/);
+    expect(
+      planTrade({
+        ...input,
+        structureId: 'bull_put',
+        params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
+        qty: 1,
+      }).reason,
+    ).toMatch(/Width/);
+    const noQuote = planTrade({
+      ...input,
+      structureId: 'bull_put',
+      params: { expiration: '2025-01-31', delta: 0.3, width: 2 },
+      qty: 1,
+      legs: [{ kind: 'option', right: 'P', strike: 1, expiration: '2025-01-31', ratio: -1 }],
+    });
     expect(noQuote.reason).toMatch(/no quote/);
     const debitAsCredit = planTrade({
       ...input,
@@ -86,18 +154,48 @@ describe('trade planner', () => {
   });
 
   it('measures income trades against a stress loss and full collateral', () => {
-    const csp = planTrade({ ...input, equityCents: 5_000_000, structureId: 'cash_secured_put', params: { expiration: '2025-01-31', delta: 0.3, width: 0 }, qty: 1 });
+    const csp = planTrade({
+      ...input,
+      equityCents: 5_000_000,
+      structureId: 'cash_secured_put',
+      params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
+      qty: 1,
+    });
     expect(csp.collateralCents).toBeGreaterThan(900_000);
     expect(csp.riskCents).toBeLessThan(csp.maxLossCents);
     expect(csp.ok).toBe(true);
-    const cc = planTrade({ ...input, equityCents: 5_000_000, structureId: 'covered_call', params: { expiration: '2025-01-31', delta: 0.3, width: 0 }, qty: 1 });
+    const cc = planTrade({
+      ...input,
+      equityCents: 5_000_000,
+      structureId: 'covered_call',
+      params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
+      qty: 1,
+    });
     expect(cc.collateralCents).toBeGreaterThan(900_000);
-    expect(planTrade({ ...input, structureId: 'cash_secured_put', params: { expiration: '2025-01-31', delta: 0.3, width: 0 }, qty: 1 }).ok).toBe(false);
+    expect(
+      planTrade({
+        ...input,
+        structureId: 'cash_secured_put',
+        params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
+        qty: 1,
+      }).ok,
+    ).toBe(false);
   });
 
-  it('applies each structure family\'s R:R rule', () => {
+  it("applies each structure family's R:R rule", () => {
     const m = (entryNet: number, width: number, maxProfit: number | null = 1): TradeMetrics =>
-      ({ entryNet, width, maxProfit, maxLoss: 1, breakevens: [], pop: 0.5, rewardToRisk: 1, credit: entryNet < 0, greeks: { delta: 0, gamma: 0, theta: 0, vega: 0 }, expectedMove: 5 }) as TradeMetrics;
+      ({
+        entryNet,
+        width,
+        maxProfit,
+        maxLoss: 1,
+        breakevens: [],
+        pop: 0.5,
+        rewardToRisk: 1,
+        credit: entryNet < 0,
+        greeks: { delta: 0, gamma: 0, theta: 0, vega: 0 },
+        expectedMove: 5,
+      }) as TradeMetrics;
     const c = { ...ctx, spot: 100, ivr: 20 } as MarketContext;
     expect(meetsRR('bull_put', m(-0.7, 2), c, 30)).toBe(true);
     expect(meetsRR('bull_put', m(-0.5, 2), c, 30)).toBe(false);
@@ -121,16 +219,40 @@ describe('trade planner', () => {
       forwardDays: 50,
       recent: true,
       weight: 1,
-      tags: { adx: 20, trendSlope: 0, vix: 18, ivr: 40, hasEarnings: false, hasExDiv: false, hasFomc: true, maxGapAtr: 1, spreadPct: 0.02, spreadDecile: 5, ...tags },
+      tags: {
+        adx: 20,
+        trendSlope: 0,
+        vix: 18,
+        ivr: 40,
+        hasEarnings: false,
+        hasExDiv: false,
+        hasFomc: true,
+        maxGapAtr: 1,
+        spreadPct: 0.02,
+        spreadDecile: 5,
+        ...tags,
+      },
       ...extra,
     });
-    const all = [w({ adx: 12 }), w({ adx: 35, hasEarnings: true }), w({ vix: 30, ivr: 10 }), w({ maxGapAtr: 3, spreadDecile: 9, hasExDiv: true }, { symbol: 'B', recent: false, entryDate: '2020-01-02' })];
+    const all = [
+      w({ adx: 12 }),
+      w({ adx: 35, hasEarnings: true }),
+      w({ vix: 30, ivr: 10 }),
+      w(
+        { maxGapAtr: 3, spreadDecile: 9, hasExDiv: true },
+        { symbol: 'B', recent: false, entryDate: '2020-01-02' },
+      ),
+    ];
     expect(filterWindows(all, { maxAdx: 18 })).toHaveLength(1);
     expect(filterWindows(all, { minAdx: 30, hasEarnings: true })).toHaveLength(1);
     expect(filterWindows(all, { minVix: 25, maxIvr: 15 })).toHaveLength(1);
     expect(filterWindows(all, { minIvr: 30 })).toHaveLength(3);
-    expect(filterWindows(all, { minGapAtr: 2, minSpreadDecile: 9, hasExDiv: true, hasFomc: true })).toHaveLength(1);
-    expect(filterWindows(all, { symbols: ['B'], recent: false, entryFrom: '2019-01-01', entryTo: '2021-01-01' })).toHaveLength(1);
+    expect(
+      filterWindows(all, { minGapAtr: 2, minSpreadDecile: 9, hasExDiv: true, hasFomc: true }),
+    ).toHaveLength(1);
+    expect(
+      filterWindows(all, { symbols: ['B'], recent: false, entryFrom: '2019-01-01', entryTo: '2021-01-01' }),
+    ).toHaveLength(1);
     expect(filterWindows(all, { limit: 2 })).toHaveLength(2);
   });
 });

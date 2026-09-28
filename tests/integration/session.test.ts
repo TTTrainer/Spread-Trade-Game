@@ -7,12 +7,17 @@ import { expirationsOf } from '../../src/engine/strategies/structures';
 const src = new SyntheticSource({ symbols: ['HLXR', 'ORGR', 'MKTX'] });
 
 async function playOne(seed: string, blind: boolean, policy: 'plan' | 'hold'): Promise<TradingSession> {
-  const s = new TradingSession(src, defaultSessionConfig({ seed, blind, rescale: blind, benchmark: 'MKTX', mode: blind ? 'run' : 'sandbox' }));
+  const s = new TradingSession(
+    src,
+    defaultSessionConfig({ seed, blind, rescale: blind, benchmark: 'MKTX', mode: blind ? 'run' : 'sandbox' }),
+  );
   const w = src.allWindows().filter((x) => x.symbol === 'ORGR')[120];
   await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
   await s.dispatch({ t: 'call', cardId: 'c1', bucket: 3, confidence: 0.7 });
   const chain = s.chain('c1');
-  const exp = expirationsOf(chain!).find((e) => Date.parse(e) - Date.parse(chain!.date) >= 28 * 86400000) as string;
+  const exp = expirationsOf(chain!).find(
+    (e) => Date.parse(e) - Date.parse(chain!.date) >= 28 * 86400000,
+  ) as string;
   let width = 2;
   let plan = s.planFor('c1', 'bull_put', { expiration: exp, delta: 0.3, width }, 1);
   if (!plan.ok) {
@@ -20,7 +25,15 @@ async function playOne(seed: string, blind: boolean, policy: 'plan' | 'hold'): P
     plan = s.planFor('c1', 'bull_put', { expiration: exp, delta: 0.3, width }, 1);
   }
   expect(plan.ok).toBe(true);
-  const res = await s.dispatch({ t: 'place', cardId: 'c1', structureId: 'bull_put', params: { expiration: exp, delta: 0.3, width }, qty: 1, order: { type: 'market' }, earningsAck: false });
+  const res = await s.dispatch({
+    t: 'place',
+    cardId: 'c1',
+    structureId: 'bull_put',
+    params: { expiration: exp, delta: 0.3, width },
+    qty: 1,
+    order: { type: 'market' },
+    earningsAck: false,
+  });
   expect(res?.filled).toBe(true);
   let guard = 0;
   while (!s.isDone() && guard++ < 80) {
@@ -65,5 +78,50 @@ describe('trading session', () => {
     expect(s.isDone()).toBe(true);
     const declined = s.decisionHistory.filter((d) => d.action === 'hold');
     expect(declined.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it('realism toggles: approval levels and liquidity limits refuse trades in plain words', async () => {
+    const w = src.allWindows().filter((x) => x.symbol === 'ORGR')[130];
+    const mk = async (realism: object, equity: number) => {
+      const s = new TradingSession(
+        src,
+        defaultSessionConfig({
+          seed: 'rt',
+          startEquityCents: equity,
+          realism: { ...defaultSessionConfig().realism, ...realism },
+          riskCapPct: 1,
+        }),
+      );
+      await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
+      await s.dispatch({ t: 'call', cardId: 'c1', bucket: 3, confidence: 0.6 });
+      const chain = s.chain('c1')!;
+      const exp = expirationsOf(chain).find(
+        (e) => Date.parse(e) - Date.parse(chain.date) >= 25 * 86400000,
+      ) as string;
+      return { s, exp };
+    };
+    const a = await mk({ approvalLevels: true }, 150_000);
+    const r1 = await a.s.dispatch({
+      t: 'place',
+      cardId: 'c1',
+      structureId: 'bull_put',
+      params: { expiration: a.exp, delta: 0.3, width: 1 },
+      qty: 1,
+      order: { type: 'market' },
+      earningsAck: true,
+    });
+    expect(r1?.ok).toBe(false);
+    expect(r1?.reason).toMatch(/Level 3/);
+    const b = await mk({ liquidityLimits: true }, 5_000_000);
+    const r2 = await b.s.dispatch({
+      t: 'place',
+      cardId: 'c1',
+      structureId: 'bull_put',
+      params: { expiration: b.exp, delta: 0.3, width: 1 },
+      qty: 11,
+      order: { type: 'market' },
+      earningsAck: true,
+    });
+    expect(r2?.reason).toMatch(/at most 10 contracts/);
   });
 });

@@ -14,7 +14,17 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { atr, bollinger, ema, keltner, macd, relativeVolume, rsi, sma, supportResistance } from '../../engine/market/indicators';
+import {
+  atr,
+  bollinger,
+  ema,
+  keltner,
+  macd,
+  relativeVolume,
+  rsi,
+  sma,
+  supportResistance,
+} from '../../engine/market/indicators';
 import type { Bar } from '../../engine/market/types';
 import { optionLegsOf } from '../../engine/lifecycle/position';
 import type { Leg } from '../../engine/strategies/types';
@@ -38,7 +48,13 @@ function weekly(bars: Bar[]): Bar[] {
       cur = { ...b };
     } else if (cur) {
       const c: Bar = cur;
-      cur = { ...c, high: Math.max(c.high, b.high), low: Math.min(c.low, b.low), close: b.close, volume: c.volume + b.volume };
+      cur = {
+        ...c,
+        high: Math.max(c.high, b.high),
+        low: Math.min(c.low, b.low),
+        close: b.close,
+        volume: c.volume + b.volume,
+      };
     }
   }
   if (cur) out.push(cur);
@@ -93,16 +109,27 @@ export function ChartPanel() {
     const view = session.view(cardId);
     const chart = createChart(host, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#0b0826' }, textColor: COLORS.text, fontFamily: 'VT323, monospace', fontSize: 16, attributionLogo: true, panes: { separatorColor: '#3b2f86', separatorHoverColor: '#5b4bc4' } },
+      layout: {
+        background: { type: ColorType.Solid, color: '#0b0826' },
+        textColor: COLORS.text,
+        fontFamily: 'VT323, monospace',
+        fontSize: 16,
+        attributionLogo: true,
+        panes: { separatorColor: '#3b2f86', separatorHoverColor: '#5b4bc4' },
+      },
       grid: { vertLines: { color: COLORS.grid }, horzLines: { color: COLORS.grid } },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: '#3b2f86' },
       timeScale: {
         borderColor: '#3b2f86',
         rightOffset: 6,
-        tickMarkFormatter: (t: Time) => (blind ? view.dayLabel(toDate(t)).replace('Day ', 'D') : toDate(t).slice(5)),
+        tickMarkFormatter: (t: Time) =>
+          blind ? view.dayLabel(toDate(t)).replace('Day ', 'D') : toDate(t).slice(5),
       },
-      localization: { timeFormatter: (t: Time) => (blind ? view.dayLabel(toDate(t)) : toDate(t)), priceFormatter: (p: number) => p.toFixed(2) },
+      localization: {
+        timeFormatter: (t: Time) => (blind ? view.dayLabel(toDate(t)) : toDate(t)),
+        priceFormatter: (p: number) => p.toFixed(2),
+      },
     });
     chartRef.current = chart;
     const candles = chart.addSeries(CandlestickSeries, {
@@ -116,12 +143,35 @@ export function ChartPanel() {
     candleRef.current = candles;
     const extras: { key: StudyId | 'volume'; series: ISeriesApi<'Line' | 'Histogram'> }[] = [];
     if (studies.includes('vol')) {
-      const v = chart.addSeries(HistogramSeries, { priceScaleId: 'vol', priceFormat: { type: 'volume' }, color: 'rgba(157,107,255,0.35)', lastValueVisible: false, priceLineVisible: false });
+      const v = chart.addSeries(HistogramSeries, {
+        priceScaleId: 'vol',
+        priceFormat: { type: 'volume' },
+        color: 'rgba(157,107,255,0.35)',
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
       chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
       extras.push({ key: 'volume', series: v });
     }
-    const addLine = (key: StudyId, color: string, pane = 0, style: LineStyle = LineStyle.Solid, width: 1 | 2 = 1) => {
-      const s = chart.addSeries(LineSeries, { color, lineWidth: width, lineStyle: style, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }, pane);
+    const addLine = (
+      key: StudyId,
+      color: string,
+      pane = 0,
+      style: LineStyle = LineStyle.Solid,
+      width: 1 | 2 = 1,
+    ) => {
+      const s = chart.addSeries(
+        LineSeries,
+        {
+          color,
+          lineWidth: width,
+          lineStyle: style,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        },
+        pane,
+      );
       extras.push({ key, series: s });
       return s;
     };
@@ -156,7 +206,11 @@ export function ChartPanel() {
       pane++;
     }
     if (studies.includes('relvol')) {
-      const h = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false, color: 'rgba(62,242,255,0.5)' }, pane);
+      const h = chart.addSeries(
+        HistogramSeries,
+        { priceLineVisible: false, lastValueVisible: false, color: 'rgba(62,242,255,0.5)' },
+        pane,
+      );
       extras.push({ key: 'relvol', series: h });
       pane++;
     }
@@ -170,10 +224,13 @@ export function ChartPanel() {
     chartBridge.yToPrice = (y) => candles.coordinateToPrice(y);
     chartBridge.paneHeight = () => panes[0]?.getHeight() ?? host.clientHeight;
     chart.subscribeCrosshairMove((param) => {
-      const d = param.seriesData.get(candles) as { open: number; high: number; low: number; close: number } | undefined;
+      const d = param.seriesData.get(candles) as
+        { open: number; high: number; low: number; close: number } | undefined;
       if (!d || !param.time) return setLegend('');
       const label = blind ? view.dayLabel(toDate(param.time)) : toDate(param.time);
-      setLegend(`${label}  O ${d.open.toFixed(2)}  H ${d.high.toFixed(2)}  L ${d.low.toFixed(2)}  C ${d.close.toFixed(2)}`);
+      setLegend(
+        `${label}  O ${d.open.toFixed(2)}  H ${d.high.toFixed(2)}  L ${d.low.toFixed(2)}  C ${d.close.toFixed(2)}`,
+      );
     });
     return () => {
       chart.remove();
@@ -196,17 +253,41 @@ export function ChartPanel() {
     const chart = chartRef.current;
     const candles = candleRef.current;
     if (!chart || !candles || bars.length === 0) return;
-    candles.setData(bars.map((b) => ({ time: toTs(b.date), open: b.open, high: b.high, low: b.low, close: b.close })));
+    candles.setData(
+      bars.map((b) => ({ time: toTs(b.date), open: b.open, high: b.high, low: b.low, close: b.close })),
+    );
     const closes = bars.map((b) => b.close);
     const byKey = (k: string) => extraRef.current.filter((e) => e.key === k).map((e) => e.series);
     const vol = byKey('volume')[0];
-    if (vol) vol.setData(bars.map((b) => ({ time: toTs(b.date), value: b.volume, color: b.close >= b.open ? 'rgba(77,255,154,0.28)' : 'rgba(255,79,109,0.28)' })));
+    if (vol)
+      vol.setData(
+        bars.map((b) => ({
+          time: toTs(b.date),
+          value: b.volume,
+          color: b.close >= b.open ? 'rgba(77,255,154,0.28)' : 'rgba(255,79,109,0.28)',
+        })),
+      );
     const bb = byKey('bb');
     if (bb.length === 3) {
       const band = bollinger(closes);
-      bb[0].setData(line(band.map((x) => x.upper), bars));
-      bb[1].setData(line(band.map((x) => x.mid), bars));
-      bb[2].setData(line(band.map((x) => x.lower), bars));
+      bb[0].setData(
+        line(
+          band.map((x) => x.upper),
+          bars,
+        ),
+      );
+      bb[1].setData(
+        line(
+          band.map((x) => x.mid),
+          bars,
+        ),
+      );
+      bb[2].setData(
+        line(
+          band.map((x) => x.lower),
+          bars,
+        ),
+      );
     }
     const setOne = (k: StudyId, data: (number | null)[]) => byKey(k)[0]?.setData(line(data, bars));
     setOne('sma20', sma(closes, 20));
@@ -217,8 +298,18 @@ export function ChartPanel() {
     const kc = byKey('keltner');
     if (kc.length === 2) {
       const k = keltner(bars);
-      kc[0].setData(line(k.map((x) => x.upper), bars));
-      kc[1].setData(line(k.map((x) => x.lower), bars));
+      kc[0].setData(
+        line(
+          k.map((x) => x.upper),
+          bars,
+        ),
+      );
+      kc[1].setData(
+        line(
+          k.map((x) => x.lower),
+          bars,
+        ),
+      );
     }
     setOne('rsi', rsi(closes));
     const m = byKey('macd');
@@ -228,10 +319,24 @@ export function ChartPanel() {
         mm
           .map((x, i) => ({ x, i }))
           .filter(({ x }) => x.hist !== null)
-          .map(({ x, i }) => ({ time: toTs(bars[i].date), value: x.hist as number, color: (x.hist as number) >= 0 ? 'rgba(77,255,154,0.5)' : 'rgba(255,79,109,0.5)' })),
+          .map(({ x, i }) => ({
+            time: toTs(bars[i].date),
+            value: x.hist as number,
+            color: (x.hist as number) >= 0 ? 'rgba(77,255,154,0.5)' : 'rgba(255,79,109,0.5)',
+          })),
       );
-      m[1].setData(line(mm.map((x) => x.macd), bars));
-      m[2].setData(line(mm.map((x) => x.signal), bars));
+      m[1].setData(
+        line(
+          mm.map((x) => x.macd),
+          bars,
+        ),
+      );
+      m[2].setData(
+        line(
+          mm.map((x) => x.signal),
+          bars,
+        ),
+      );
     }
     setOne('atr', atr(bars));
     const rv = byKey('relvol')[0];
@@ -251,16 +356,45 @@ export function ChartPanel() {
     if (!candles || !session || !cardId) return;
     for (const l of linesRef.current) candles.removePriceLine(l);
     linesRef.current = [];
-    const add = (price: number, color: string, title: string, style: LineStyle = LineStyle.Solid, width: 1 | 2 = 1) =>
-      linesRef.current.push(candles.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible: true, title }));
-    for (const l of optionLegsOf(legs)) add(l.strike, l.ratio < 0 ? COLORS.magenta : COLORS.cyan, `${l.ratio < 0 ? 'S' : 'L'} ${l.right}`, l.ratio < 0 ? LineStyle.Solid : LineStyle.Dashed, 2);
+    const add = (
+      price: number,
+      color: string,
+      title: string,
+      style: LineStyle = LineStyle.Solid,
+      width: 1 | 2 = 1,
+    ) =>
+      linesRef.current.push(
+        candles.createPriceLine({
+          price,
+          color,
+          lineWidth: width,
+          lineStyle: style,
+          axisLabelVisible: true,
+          title,
+        }),
+      );
+    for (const l of optionLegsOf(legs))
+      add(
+        l.strike,
+        l.ratio < 0 ? COLORS.magenta : COLORS.cyan,
+        `${l.ratio < 0 ? 'S' : 'L'} ${l.right}`,
+        l.ratio < 0 ? LineStyle.Solid : LineStyle.Dashed,
+        2,
+      );
     for (const b of breakevens) add(b, COLORS.amber, 'BE', LineStyle.Dotted);
     const spot = session.view(cardId).spot();
     if (studies.includes('em') && em) {
       add(spot + em, COLORS.violet, '+EM', LineStyle.LargeDashed);
       add(spot - em, COLORS.violet, '-EM', LineStyle.LargeDashed);
     }
-    if (studies.includes('sr')) for (const lvl of supportResistance(session.view(cardId).bars())) add(lvl.price, lvl.kind === 'support' ? 'rgba(77,255,154,0.6)' : 'rgba(255,79,109,0.6)', lvl.kind === 'support' ? 'SUP' : 'RES', LineStyle.SparseDotted);
+    if (studies.includes('sr'))
+      for (const lvl of supportResistance(session.view(cardId).bars()))
+        add(
+          lvl.price,
+          lvl.kind === 'support' ? 'rgba(77,255,154,0.6)' : 'rgba(255,79,109,0.6)',
+          lvl.kind === 'support' ? 'SUP' : 'RES',
+          LineStyle.SparseDotted,
+        );
   }, [legKey]);
 
   useEffect(() => {
@@ -271,9 +405,24 @@ export function ChartPanel() {
     drawRef.current = [];
     for (const d of drawings ?? []) {
       if (d.kind === 'hline') {
-        linesRef.current.push(candles.createPriceLine({ price: d.points[0].price, color: COLORS.amber, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' }));
+        linesRef.current.push(
+          candles.createPriceLine({
+            price: d.points[0].price,
+            color: COLORS.amber,
+            lineWidth: 1,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: false,
+            title: '',
+          }),
+        );
       } else if (d.points.length === 2 && d.points[0].time !== d.points[1].time) {
-        const s = chart.addSeries(LineSeries, { color: COLORS.amber, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        const s = chart.addSeries(LineSeries, {
+          color: COLORS.amber,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
         const pts = d.points.slice().sort((a, b) => a.time - b.time);
         s.setData(pts.map((p) => ({ time: p.time as UTCTimestamp, value: p.price })));
         drawRef.current.push(s);
@@ -305,7 +454,11 @@ export function ChartPanel() {
     <div className="chart-panel panel" data-testid="chart-panel">
       <div className="chart-host" ref={hostRef} style={ff === 'idle' ? undefined : { right: 0 }} />
       <div className="chart-legend num">{legend}</div>
-      {drawTool !== 'none' && <div className="chart-drawhint num">{drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}</div>}
+      {drawTool !== 'none' && (
+        <div className="chart-drawhint num">
+          {drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}
+        </div>
+      )}
       <PriceLadder expiration={builder.expiration} legs={legs} />
     </div>
   );

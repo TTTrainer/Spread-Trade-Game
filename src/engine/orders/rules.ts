@@ -23,7 +23,12 @@ export const PDT_WINDOW_DAYS = 5;
  * Pattern day trader rule: under $25k, at most 3 day trades (open and close the same day)
  * in any rolling 5 trading days. `recentDayTrades` are the dates of past day trades.
  */
-export function pdtAllows(opts: { enabled: boolean; equityCents: Cents; recentDayTrades: ISODate[]; tradingDaysBack: ISODate[] }): boolean {
+export function pdtAllows(opts: {
+  enabled: boolean;
+  equityCents: Cents;
+  recentDayTrades: ISODate[];
+  tradingDaysBack: ISODate[];
+}): boolean {
   if (!opts.enabled || opts.equityCents >= PDT_EQUITY_CENTS) return true;
   const window = new Set(opts.tradingDaysBack.slice(-PDT_WINDOW_DAYS));
   const used = opts.recentDayTrades.filter((d) => window.has(d)).length;
@@ -43,12 +48,22 @@ export type RiskCheck = { ok: true; riskPct: number } | { ok: false; reason: str
 /** Defined-risk only: max loss must fit the risk cap and collateral must fit free equity. */
 export function checkRisk(i: RiskCheckInput): RiskCheck {
   const riskPct = i.equityCents > 0 ? i.maxLossCents / i.equityCents : Infinity;
-  if (!Number.isFinite(i.maxLossCents) || i.maxLossCents <= 0) return { ok: false, reason: 'This build has no defined maximum loss.', riskPct };
+  if (!Number.isFinite(i.maxLossCents) || i.maxLossCents <= 0)
+    return { ok: false, reason: 'This build has no defined maximum loss.', riskPct };
   const cap = Math.floor(i.equityCents * i.riskCapPct);
   if (i.maxLossCents > cap) {
-    return { ok: false, reason: `Max loss is ${(riskPct * 100).toFixed(1)}% of equity; the cap is ${(i.riskCapPct * 100).toFixed(1)}%. Use fewer contracts or a narrower width.`, riskPct };
+    return {
+      ok: false,
+      reason: `Max loss is ${(riskPct * 100).toFixed(1)}% of equity; the cap is ${(i.riskCapPct * 100).toFixed(1)}%. Use fewer contracts or a narrower width.`,
+      riskPct,
+    };
   }
   const free = i.equityCents - i.reservedCents;
-  if (i.collateralCents > free) return { ok: false, reason: 'Not enough free buying power for the collateral this trade needs.', riskPct };
+  if (i.collateralCents > free)
+    return {
+      ok: false,
+      reason: 'Not enough free buying power for the collateral this trade needs.',
+      riskPct,
+    };
   return { ok: true, riskPct };
 }

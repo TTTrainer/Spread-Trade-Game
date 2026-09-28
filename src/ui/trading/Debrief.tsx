@@ -23,7 +23,10 @@ function AttributionBars({ d }: { d: TradeDebrief }) {
         <div key={label} className="attrib-row" title={hint}>
           <span className="attrib-label">{label}</span>
           <span className="attrib-bar">
-            <span className={`attrib-fill ${v >= 0 ? 'pos' : 'neg'}`} style={{ width: `${(Math.abs(v) / max) * 50}%`, [v >= 0 ? 'left' : 'right']: '50%' }} />
+            <span
+              className={`attrib-fill ${v >= 0 ? 'pos' : 'neg'}`}
+              style={{ width: `${(Math.abs(v) / max) * 50}%`, [v >= 0 ? 'left' : 'right']: '50%' }}
+            />
           </span>
           <Pnl cents={v} />
         </div>
@@ -76,16 +79,23 @@ export function DebriefCard({ d, index, blind }: { d: TradeDebrief; index: numbe
             <div className="section-title">Call result</div>
             <p className="num">{d.callLine}</p>
             <p className="num">
-              SPY-style benchmark with the same capital at risk: <Pnl cents={d.benchmarkCents} /> · alpha <Pnl cents={d.alphaCents} />
+              SPY-style benchmark with the same capital at risk: <Pnl cents={d.benchmarkCents} /> · alpha{' '}
+              <Pnl cents={d.alphaCents} />
             </p>
-            {d.modeledMarks > 0 && <p className="chip model">{d.modeledMarks} days were marked with modeled prices</p>}
+            {d.modeledMarks > 0 && (
+              <p className="chip model">{d.modeledMarks} days were marked with modeled prices</p>
+            )}
           </div>
           <div className="receipt-col">
             <div className="section-title">Decision grade {d.grade.grade}</div>
             <p className="outcome">{d.grade.outcome}</p>
             <ul className="checklist num">
               {d.grade.items.map((it) => (
-                <li key={it.id} className={it.pass === null ? 'na' : it.pass ? 'pass' : 'fail'} title={it.note}>
+                <li
+                  key={it.id}
+                  className={it.pass === null ? 'na' : it.pass ? 'pass' : 'fail'}
+                  title={it.note}
+                >
                   {it.pass === null ? '–' : it.pass ? '✔' : '✘'} {it.label}
                   <span className="dim"> · {it.note}</span>
                 </li>
@@ -112,7 +122,9 @@ export function DebriefCard({ d, index, blind }: { d: TradeDebrief; index: numbe
                     <td>
                       <Pnl cents={a.plCents} />
                     </td>
-                    <td>{pct(a.returnPct, 0, true)} on {money(a.riskCents)}</td>
+                    <td>
+                      {pct(a.returnPct, 0, true)} on {money(a.riskCents)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

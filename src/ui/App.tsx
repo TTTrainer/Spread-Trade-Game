@@ -10,6 +10,7 @@ import { DrillsScreen } from './screens/Drills';
 import { StatsScreen } from './screens/Stats';
 import { SettingsScreen } from './screens/Settings';
 import { CreditsScreen } from './screens/Credits';
+import { CareerScreen, RunScreen } from './screens/Career';
 
 const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   title: TitleScreen,
@@ -19,6 +20,8 @@ const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   stats: StatsScreen,
   settings: SettingsScreen,
   credits: CreditsScreen,
+  career: CareerScreen,
+  run: RunScreen,
 };
 
 export function App() {

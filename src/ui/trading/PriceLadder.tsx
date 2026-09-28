@@ -39,16 +39,40 @@ export function PriceLadder({ expiration, legs }: { expiration: string | null; l
   }, [chain, expiration]);
 
   if (!chain || !expiration || ff !== 'idle') return null;
-  const legAt = (k: number) => legs.filter((l): l is OptionLeg => l.kind === 'option' && Math.abs(l.strike - k) < 1e-6 && l.expiration === expiration);
+  const legAt = (k: number) =>
+    legs.filter(
+      (l): l is OptionLeg =>
+        l.kind === 'option' && Math.abs(l.strike - k) < 1e-6 && l.expiration === expiration,
+    );
   const h = chartBridge.paneHeight();
-  const visible = rows
-    .filter((_, i) => i % density === 0 || legAt(rows[i].strike).length > 0)
-    .map((r) => ({ r, y: chartBridge.priceToY(r.strike) }))
-    .filter((x): x is { r: (typeof rows)[number]; y: number } => x.y !== null && x.y > 8 && x.y < h - 8);
+  const placed = rows
+    .map((r, i) => ({ r, i, y: chartBridge.priceToY(r.strike) }))
+    .filter(
+      (x): x is { r: (typeof rows)[number]; i: number; y: number } => x.y !== null && x.y > 8 && x.y < h - 8,
+    );
+  // Rows are 18px tall: when strikes sit closer than that on the price axis, thin them out
+  // (anchored on the at-the-money strike) so the ladder never smears into overlapping text.
+  const gaps = placed
+    .slice(1)
+    .map((x, k) => Math.abs(x.y - placed[k].y))
+    .sort((a, b) => a - b);
+  const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 20;
+  const step = Math.max(density, Math.ceil(19 / Math.max(1, gap)));
+  const atmIdx = rows.reduce(
+    (best, r, i) => (Math.abs(r.strike - chain.spot) < Math.abs(rows[best].strike - chain.spot) ? i : best),
+    0,
+  );
+  const legRows = placed.filter((x) => legAt(x.r.strike).length > 0);
+  const visible = placed.filter((x) => {
+    if (legAt(x.r.strike).length > 0) return true;
+    if ((x.i - atmIdx) % step !== 0) return false;
+    return !legRows.some((l) => Math.abs(l.y - x.y) < 18);
+  });
 
   const onPick = (strike: number, shift: boolean) => {
     sfx('click');
-    const anchor = builder.anchor ?? legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0)?.strike ?? null;
+    const anchor =
+      builder.anchor ?? legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0)?.strike ?? null;
     if (shift && anchor !== null) {
       const right = builder.structureId === 'bear_call' || builder.structureId === 'bull_call' ? 'C' : 'P';
       for (let steps = 1; steps <= 20; steps++) {
@@ -73,7 +97,7 @@ export function PriceLadder({ expiration, legs }: { expiration: string | null; l
       </div>
       {visible.map(({ r, y }) => {
         const here = legAt(r.strike);
-        const atm = Math.abs(r.strike - chain.spot) === Math.min(...rows.map((x) => Math.abs(x.strike - chain.spot)));
+        const atm = r.strike === rows[atmIdx]?.strike;
         return (
           <button
             key={r.strike}

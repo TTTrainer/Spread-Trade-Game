@@ -28,13 +28,22 @@
   background: repeating-linear-gradient(90deg, var(--down) 0 6px, rgba(255, 79, 109, 0.7) 6px 8px);
 }
 .meter-label {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 15px;
-  line-height: 14px;
+  line-height: 1;
   color: var(--text);
   text-shadow: 1px 1px 0 #000;
+}
+/* A dark pill keeps the label readable over any fill color. */
+.meter-label > span {
+  background: rgba(7, 5, 26, 0.82);
+  padding: 1px 6px;
+  white-space: nowrap;
 }
 
 .tilt-card {
@@ -54,7 +63,9 @@
 }
 .tilt-card.selected {
   border-color: var(--magenta);
-  box-shadow: 3px 3px 0 #000, var(--glow-magenta);
+  box-shadow:
+    3px 3px 0 #000,
+    var(--glow-magenta);
 }
 .tilt-card:disabled {
   opacity: 0.4;
@@ -73,10 +84,14 @@
 @keyframes legendary-shine {
   0%,
   100% {
-    box-shadow: 3px 3px 0 #000, 0 0 6px rgba(255, 191, 62, 0.4);
+    box-shadow:
+      3px 3px 0 #000,
+      0 0 6px rgba(255, 191, 62, 0.4);
   }
   50% {
-    box-shadow: 3px 3px 0 #000, 0 0 18px rgba(255, 191, 62, 0.9);
+    box-shadow:
+      3px 3px 0 #000,
+      0 0 18px rgba(255, 191, 62, 0.9);
   }
 }
 
@@ -94,7 +109,9 @@
   max-height: 88vh;
   overflow: auto;
   padding: 18px 22px;
-  box-shadow: 6px 6px 0 #000, 0 0 40px rgba(157, 107, 255, 0.35);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 40px rgba(157, 107, 255, 0.35);
 }
 .modal.wide {
   max-width: 1100px;

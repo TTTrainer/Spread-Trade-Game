@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { breakdown, calibration, equityCurve, mistakeTrends, summarize, toCsv, type BreakdownKey, type LedgerTrade } from '../../engine/stats/stats';
+import {
+  breakdown,
+  calibration,
+  equityCurve,
+  mistakeTrends,
+  summarize,
+  toCsv,
+  type BreakdownKey,
+  type LedgerTrade,
+} from '../../engine/stats/stats';
 import { MISTAKE_LABELS, type MistakeTag } from '../../engine/scoring/grade';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
@@ -25,7 +34,17 @@ const BREAKDOWNS: { key: BreakdownKey; label: string }[] = [
   { key: 'earnings', label: 'Earnings' },
 ];
 
-function Tile({ label, value, sub, testId }: { label: string; value: React.ReactNode; sub?: React.ReactNode; testId?: string }) {
+function Tile({
+  label,
+  value,
+  sub,
+  testId,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  testId?: string;
+}) {
   return (
     <div className="stat-tile panel" data-testid={testId}>
       <div className="section-title">{label}</div>
@@ -46,9 +65,11 @@ function EquityChart({ rows }: { rows: LedgerTrade[] }) {
   const lo = Math.min(...ys);
   const hi = Math.max(...ys);
   const span = hi - lo || 1;
-  const sx = (i: number) => pad.l + (pts.length === 1 ? (W - pad.l - pad.r) / 2 : ((i - 1) / (pts.length - 1)) * (W - pad.l - pad.r));
+  const sx = (i: number) =>
+    pad.l + (pts.length === 1 ? (W - pad.l - pad.r) / 2 : ((i - 1) / (pts.length - 1)) * (W - pad.l - pad.r));
   const sy = (v: number) => pad.t + ((hi - v) / span) * (H - pad.t - pad.b);
-  const path = (f: (p: (typeof pts)[number]) => number) => pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.index).toFixed(1)},${sy(f(p)).toFixed(1)}`).join('');
+  const path = (f: (p: (typeof pts)[number]) => number) =>
+    pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.index).toFixed(1)},${sy(f(p)).toFixed(1)}`).join('');
   const last = pts[pts.length - 1];
   const hp = hover !== null ? pts[hover] : null;
   const ticks = [lo, lo + span / 2, hi];
@@ -101,15 +122,37 @@ function EquityChart({ rows }: { rows: LedgerTrade[] }) {
         </text>
         {hp && (
           <g>
-            <line x1={sx(hp.index)} x2={sx(hp.index)} y1={pad.t} y2={H - pad.b} stroke="#ece9ff" strokeOpacity={0.35} />
-            <circle cx={sx(hp.index)} cy={sy(hp.cumCents)} r={4} fill={SERIES[0]} stroke="#0b0826" strokeWidth={2} />
-            <circle cx={sx(hp.index)} cy={sy(hp.benchCents)} r={4} fill={SERIES[1]} stroke="#0b0826" strokeWidth={2} />
+            <line
+              x1={sx(hp.index)}
+              x2={sx(hp.index)}
+              y1={pad.t}
+              y2={H - pad.b}
+              stroke="#ece9ff"
+              strokeOpacity={0.35}
+            />
+            <circle
+              cx={sx(hp.index)}
+              cy={sy(hp.cumCents)}
+              r={4}
+              fill={SERIES[0]}
+              stroke="#0b0826"
+              strokeWidth={2}
+            />
+            <circle
+              cx={sx(hp.index)}
+              cy={sy(hp.benchCents)}
+              r={4}
+              fill={SERIES[1]}
+              stroke="#0b0826"
+              strokeWidth={2}
+            />
           </g>
         )}
       </svg>
       {hp && (
         <div className="tooltip num" data-testid="equity-tooltip">
-          Trade {hp.index} · {hp.date} · You {money(hp.cumCents)} · SPY {money(hp.benchCents)} · alpha {money(hp.alphaCents, true)}
+          Trade {hp.index} · {hp.date} · You {money(hp.cumCents)} · SPY {money(hp.benchCents)} · alpha{' '}
+          {money(hp.alphaCents, true)}
         </div>
       )}
     </div>
@@ -152,13 +195,20 @@ function CalibrationChart({ rows }: { rows: LedgerTrade[] }) {
               fill={SERIES[2]}
               stroke="#0b0826"
               strokeWidth={2}
-              onMouseEnter={() => setTip(`${Math.round(p.confidence * 100)}% calls: ${Math.round(p.hitRate * 100)}% exact over ${p.n}`)}
+              onMouseEnter={() =>
+                setTip(
+                  `${Math.round(p.confidence * 100)}% calls: ${Math.round(p.hitRate * 100)}% exact over ${p.n}`,
+                )
+              }
               onMouseLeave={() => setTip(null)}
             />
           ))}
       </svg>
       <div className="num tile-sub">
-        {tip ?? (c.calls ? `${c.calls} calls · Brier ${c.meanBrier?.toFixed(3)} · grade ${c.grade}` : 'No calls recorded yet.')}
+        {tip ??
+          (c.calls
+            ? `${c.calls} calls · Brier ${c.meanBrier?.toFixed(3)} · grade ${c.grade}`
+            : 'No calls recorded yet.')}
       </div>
     </div>
   );
@@ -167,7 +217,8 @@ function CalibrationChart({ rows }: { rows: LedgerTrade[] }) {
 function BreakdownTable({ rows, by }: { rows: LedgerTrade[]; by: BreakdownKey }) {
   const groups = useMemo(() => breakdown(rows, by), [rows, by]);
   const max = Math.max(1, ...groups.map((g) => Math.abs(g.summary.totalCents)));
-  const label = (k: string) => (by === 'structure' && k in STRUCTURES ? STRUCTURES[k as StructureId].name : k);
+  const label = (k: string) =>
+    by === 'structure' && k in STRUCTURES ? STRUCTURES[k as StructureId].name : k;
   return (
     <table className="bd-table num" data-testid="breakdown-table">
       <thead>
@@ -196,7 +247,13 @@ function BreakdownTable({ rows, by }: { rows: LedgerTrade[]; by: BreakdownKey })
             </td>
             <td className="bar-col">
               <span className="bd-bar">
-                <span className={`bd-fill ${g.summary.totalCents >= 0 ? 'pos' : 'neg'}`} style={{ width: `${(Math.abs(g.summary.totalCents) / max) * 50}%`, [g.summary.totalCents >= 0 ? 'left' : 'right']: '50%' }} />
+                <span
+                  className={`bd-fill ${g.summary.totalCents >= 0 ? 'pos' : 'neg'}`}
+                  style={{
+                    width: `${(Math.abs(g.summary.totalCents) / max) * 50}%`,
+                    [g.summary.totalCents >= 0 ? 'left' : 'right']: '50%',
+                  }}
+                />
               </span>
             </td>
           </tr>
@@ -225,7 +282,11 @@ function MistakeHeat({ rows }: { rows: LedgerTrade[] }) {
           <tr key={t}>
             <td>{MISTAKE_LABELS[t as MistakeTag] ?? t}</td>
             {m.rates[t].map((r, i) => (
-              <td key={i} title={`${Math.round(r * 100)}% of trades ${m.blocks[i].label}`} style={{ background: `rgba(226,53,141,${0.08 + r * 0.8})` }}>
+              <td
+                key={i}
+                title={`${Math.round(r * 100)}% of trades ${m.blocks[i].label}`}
+                style={{ background: `rgba(226,53,141,${0.08 + r * 0.8})` }}
+              >
                 {Math.round(r * 100)}%
               </td>
             ))}
@@ -245,7 +306,10 @@ export function StatsScreen() {
   useEffect(() => {
     if (hasBridge()) void bridge().invoke('user.trades').then(setAll);
   }, []);
-  const rows: LedgerTrade[] = useMemo(() => (mode === 'all' ? all : all.filter((r) => r.mode === mode)), [all, mode]);
+  const rows: LedgerTrade[] = useMemo(
+    () => (mode === 'all' ? all : all.filter((r) => r.mode === mode)),
+    [all, mode],
+  );
   const s = summarize(rows);
   const exportCsv = async () => {
     const path = await bridge().invoke('system.saveTextFile', 'spread-trading-trades.csv', toCsv(rows));
@@ -262,12 +326,22 @@ export function StatsScreen() {
           <span className="dim">Mode</span>
           <div className="seg">
             {MODES.map((m) => (
-              <button key={m} className={mode === m ? 'sel' : ''} onClick={() => setMode(m)} data-testid={`mode-${m}`}>
+              <button
+                key={m}
+                className={mode === m ? 'sel' : ''}
+                onClick={() => setMode(m)}
+                data-testid={`mode-${m}`}
+              >
                 {m.toUpperCase()}
               </button>
             ))}
           </div>
-          <button className="pixel-btn primary" onClick={() => void exportCsv()} disabled={rows.length === 0} data-testid="export-csv">
+          <button
+            className="pixel-btn primary"
+            onClick={() => void exportCsv()}
+            disabled={rows.length === 0}
+            data-testid="export-csv"
+          >
             EXPORT CSV
           </button>
           <button className="pixel-btn" onClick={back}>
@@ -275,15 +349,49 @@ export function StatsScreen() {
           </button>
         </div>
       </div>
-      <p className="screen-sub">From the real ledger only: every closed trade, as it actually filled. The arcade meter never touches these numbers.</p>
+      <p className="screen-sub">
+        From the real ledger only: every closed trade, as it actually filled. The arcade meter never touches
+        these numbers.
+      </p>
       <div className="tiles">
-        <Tile label="Trades" value={s.trades} sub={`${s.wins} wins · ${s.losses} losses`} testId="tile-trades" />
+        <Tile
+          label="Trades"
+          value={s.trades}
+          sub={`${s.wins} wins · ${s.losses} losses`}
+          testId="tile-trades"
+        />
         <Tile label="Win rate" value={pct(s.winRate, 0)} testId="tile-winrate" />
-        <Tile label="Expectancy" value={<Pnl cents={Math.round(s.expectancyCents)} />} sub="per trade" testId="tile-expectancy" />
-        <Tile label="Avg win / loss" value={<><Pnl cents={Math.round(s.avgWinCents)} /> / <Pnl cents={Math.round(s.avgLossCents)} /></>} />
-        <Tile label="Profit factor" value={s.profitFactor === null ? '∞' : s.profitFactor.toFixed(2)} sub="gross wins ÷ gross losses" testId="tile-pf" />
-        <Tile label="Total P/L" value={<Pnl cents={s.totalCents} />} sub={`max drawdown ${money(s.maxDrawdownCents)}`} />
-        <Tile label="Alpha vs SPY" value={<Pnl cents={s.alphaCents} />} sub={`benchmark ${money(s.benchmarkCents, true)}`} testId="tile-alpha" />
+        <Tile
+          label="Expectancy"
+          value={<Pnl cents={Math.round(s.expectancyCents)} />}
+          sub="per trade"
+          testId="tile-expectancy"
+        />
+        <Tile
+          label="Avg win / loss"
+          value={
+            <>
+              <Pnl cents={Math.round(s.avgWinCents)} /> / <Pnl cents={Math.round(s.avgLossCents)} />
+            </>
+          }
+        />
+        <Tile
+          label="Profit factor"
+          value={s.profitFactor === null ? '∞' : s.profitFactor.toFixed(2)}
+          sub="gross wins ÷ gross losses"
+          testId="tile-pf"
+        />
+        <Tile
+          label="Total P/L"
+          value={<Pnl cents={s.totalCents} />}
+          sub={`max drawdown ${money(s.maxDrawdownCents)}`}
+        />
+        <Tile
+          label="Alpha vs SPY"
+          value={<Pnl cents={s.alphaCents} />}
+          sub={`benchmark ${money(s.benchmarkCents, true)}`}
+          testId="tile-alpha"
+        />
       </div>
       <div className="stats-grid">
         <div className="panel box">
@@ -300,7 +408,12 @@ export function StatsScreen() {
           <div className="section-title">Breakdown</div>
           <div className="seg num" style={{ marginBottom: 6 }}>
             {BREAKDOWNS.map((b) => (
-              <button key={b.key} className={by === b.key ? 'sel' : ''} onClick={() => setBy(b.key)} data-testid={`by-${b.key}`}>
+              <button
+                key={b.key}
+                className={by === b.key ? 'sel' : ''}
+                onClick={() => setBy(b.key)}
+                data-testid={`by-${b.key}`}
+              >
                 {b.label}
               </button>
             ))}

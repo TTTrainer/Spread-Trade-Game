@@ -17,10 +17,32 @@ import { feesFor, pdtAllows } from '../orders/rules';
 import { Rng } from '../rng';
 import { STRUCTURES } from '../strategies/structures';
 import type { BuildParams, Leg, OptionLeg, StructureId } from '../strategies/types';
-import { adjustAction, closeAction, exerciseAction, forceCloseAtWindowEnd, rollAction, sellSharesAtOpen, type ActionEnv } from '../lifecycle/actions';
-import { atClose, defaultPause, endOfDay, DEFAULT_REALISM, type DayContext, type RealismToggles } from '../lifecycle/daily';
+import {
+  adjustAction,
+  closeAction,
+  exerciseAction,
+  forceCloseAtWindowEnd,
+  rollAction,
+  sellSharesAtOpen,
+  type ActionEnv,
+} from '../lifecycle/actions';
+import {
+  atClose,
+  defaultPause,
+  endOfDay,
+  DEFAULT_REALISM,
+  type DayContext,
+  type RealismToggles,
+} from '../lifecycle/daily';
 import { defaultBrackets, lastMark, openPosition, optionLegsOf } from '../lifecycle/position';
-import type { Brackets, DayBook, DecisionAction, DecisionKind, DecisionPoint, Position } from '../lifecycle/types';
+import type {
+  Brackets,
+  DayBook,
+  DecisionAction,
+  DecisionKind,
+  DecisionPoint,
+  Position,
+} from '../lifecycle/types';
 import type { Bucket, Call } from '../scoring/calls';
 import { dayBook } from './book';
 import { planTrade, type TradePlan } from './plan';
@@ -35,7 +57,12 @@ export interface SessionConfig {
   autoBrackets: boolean;
   suppressOnGap: boolean;
   execution: ExecutionMods;
-  bracketDefaults: { creditTargetPct: number; creditStopMult: number; debitTargetPct: number; debitStopPct: number };
+  bracketDefaults: {
+    creditTargetPct: number;
+    creditStopMult: number;
+    debitTargetPct: number;
+    debitStopPct: number;
+  };
   benchmark: string | null;
   callMode: 'em' | 'fixed';
   blind: boolean;
@@ -69,10 +96,19 @@ export interface OrderSpec {
   type: OrderType;
   limit?: number;
   atMid?: boolean;
+  /** Risk-desk liquidation: fills at the natural price, ignoring PDT and disabled market orders. */
+  forceNatural?: boolean;
 }
+
+/** Liquidity limits (a realism toggle): biggest order, and the widest leg market that trades. */
+export const LIQUIDITY_MAX_CONTRACTS = 10;
+export const LIQUIDITY_MAX_SPREAD = 0.5;
+/** Approval levels (a realism toggle): spreads need a Level 3 margin account with this much equity. */
+export const SPREAD_APPROVAL_MIN_CENTS = 200_000;
 
 export type SessionAction =
   | { t: 'addCard'; cardId: string; windowId: number; timeSkip?: number }
+  | { t: 'removeCard'; cardId: string }
   | { t: 'call'; cardId: string; bucket: Bucket; confidence: number }
   | {
       t: 'place';
@@ -210,7 +246,10 @@ export class TradingSession {
   }
 
   reservedCents(): Cents {
-    return this.openPositions().reduce((a, p) => a + p.collateralCents, 0) + this.orders.reduce((a, o) => a + o.plan.collateralCents, 0);
+    return (
+      this.openPositions().reduce((a, p) => a + p.collateralCents, 0) +
+      this.orders.reduce((a, o) => a + o.plan.collateralCents, 0)
+    );
   }
 
   /** Equity for sizing: start plus realized P/L of closed trades. */
@@ -225,14 +264,30 @@ export class TradingSession {
   }
 
   runningCardIds(): string[] {
-    return this.cards.filter((c) => c.positionIds.some((id) => this.position(id)?.status === 'open') || c.orderIds.length > 0).map((c) => c.id);
+    return this.cards
+      .filter(
+        (c) => c.positionIds.some((id) => this.position(id)?.status === 'open') || c.orderIds.length > 0,
+      )
+      .map((c) => c.id);
   }
 
   isDone(): boolean {
-    return this.clockStarted && this.openPositions().length === 0 && this.orders.length === 0 && this.decisions.length === 0 && !this.inDay;
+    return (
+      this.clockStarted &&
+      this.openPositions().length === 0 &&
+      this.orders.length === 0 &&
+      this.decisions.length === 0 &&
+      !this.inDay
+    );
   }
 
-  planFor(cardId: string, structureId: StructureId, params: BuildParams, qty: number, legs?: Leg[]): TradePlan {
+  planFor(
+    cardId: string,
+    structureId: StructureId,
+    params: BuildParams,
+    qty: number,
+    legs?: Leg[],
+  ): TradePlan {
     const chain = this.chains.get(cardId);
     const ctx = this.contexts.get(cardId);
     if (!chain || !ctx) throw new Error('Card has no chain loaded');
@@ -259,9 +314,18 @@ export class TradingSession {
       case 'addCard':
         await this.addCard(a.cardId, a.windowId, a.timeSkip ?? 0);
         return null;
+      case 'removeCard':
+        this.removeCard(a.cardId);
+        return null;
       case 'call': {
         const card = this.card(a.cardId);
-        card.call = { bucket: a.bucket, confidence: a.confidence, emPct: this.emPct(a.cardId), horizonDays: 30, mode: this.config.callMode };
+        card.call = {
+          bucket: a.bucket,
+          confidence: a.confidence,
+          emPct: this.emPct(a.cardId),
+          horizonDays: 30,
+          mode: this.config.callMode,
+        };
         return null;
       }
       case 'place':
@@ -280,14 +344,20 @@ export class TradingSession {
         return null;
       case 'close': {
         const p = this.mustOpen(a.positionId);
-        this.applyClose(p, a.order, 'manual');
+        this.applyClose(p, a.order, a.order.forceNatural ? 'liquidated' : 'manual');
         return null;
       }
       case 'roll': {
         const p = this.mustOpen(a.positionId);
         const r = rollAction(p, a.legs, a.order, this.actionEnv(p.cardId));
         this.replace(r.pos);
-        this.pushEvent(p, r.fill.filled ? 'fill' : 'reject', r.fill.filled ? `Rolled for ${r.fill.price < 0 ? 'a credit' : 'a debit'} of ${Math.abs(r.fill.price).toFixed(2)}` : (r.fill.reason ?? 'Roll did not fill'));
+        this.pushEvent(
+          p,
+          r.fill.filled ? 'fill' : 'reject',
+          r.fill.filled
+            ? `Rolled for ${r.fill.price < 0 ? 'a credit' : 'a debit'} of ${Math.abs(r.fill.price).toFixed(2)}`
+            : (r.fill.reason ?? 'Roll did not fill'),
+        );
         if (r.fill.filled) await this.view(p.cardId).track(a.legs);
         return null;
       }
@@ -332,20 +402,51 @@ export class TradingSession {
       if (this.config.rescale) {
         const [lo, hi] = this.config.priceRange;
         const px = probe[0]?.close ?? 100;
-        const fits = [0.1, 0.2, 0.25, 0.5, 1, 2, 4, 5, 10].filter((f) => px * f >= lo && px * f <= hi && f !== 1);
+        const fits = [0.1, 0.2, 0.25, 0.5, 1, 2, 4, 5, 10].filter(
+          (f) => px * f >= lo && px * f <= hi && f !== 1,
+        );
         t = { ...t, scale: fits.length ? r.pick(fits) : t.scale };
       }
     } else if (this.config.mode === 'sandbox' || this.config.mode === 'live') {
       t = { ...t, displaySymbol: w.symbol };
     }
-    if (this.cards.some((c) => c.displaySymbol === t.displaySymbol)) t = { ...t, displaySymbol: codename(this.rng.fork(`dup:${cardId}`)) };
-    const view = await MarketView.open({ source: this.source, window: w, transform: t, benchmark: this.config.benchmark ?? undefined, startOffset: timeSkip });
+    if (this.cards.some((c) => c.displaySymbol === t.displaySymbol))
+      t = { ...t, displaySymbol: codename(this.rng.fork(`dup:${cardId}`)) };
+    const view = await MarketView.open({
+      source: this.source,
+      window: w,
+      transform: t,
+      benchmark: this.config.benchmark ?? undefined,
+      startOffset: timeSkip,
+    });
     this.views.set(cardId, view);
     this.windows.set(cardId, w);
     const chain = await view.loadChain();
     this.chains.set(cardId, chain);
     this.contexts.set(cardId, this.buildCtx(view));
-    this.cards.push({ id: cardId, windowId, displaySymbol: t.displaySymbol, realSymbol: w.symbol, call: null, positionIds: [], orderIds: [], earningsAck: false, timeSkip });
+    this.cards.push({
+      id: cardId,
+      windowId,
+      displaySymbol: t.displaySymbol,
+      realSymbol: w.symbol,
+      call: null,
+      positionIds: [],
+      orderIds: [],
+      earningsAck: false,
+      timeSkip,
+    });
+  }
+
+  /** Take an untraded card off the table (lineup rerolls and Time Skip). */
+  private removeCard(cardId: string): void {
+    const card = this.cards.find((c) => c.id === cardId);
+    if (!card || card.positionIds.length || card.orderIds.length) return;
+    this.cards = this.cards.filter((c) => c.id !== cardId);
+    this.views.delete(cardId);
+    this.chains.delete(cardId);
+    this.contexts.delete(cardId);
+    this.books.delete(cardId);
+    this.windows.delete(cardId);
   }
 
   private buildCtx(view: MarketView): MarketContext {
@@ -380,33 +481,117 @@ export class TradingSession {
     const plan = this.planFor(a.cardId, a.structureId, a.params, a.qty, a.legs);
     const fail = (reason: string): PlaceResult => {
       this.lastEvents.push({ kind: 'reject', cardId: a.cardId, text: reason });
-      return { ok: false, filled: false, reason, positionId: null, orderId: null, probability: 0, price: null };
+      return {
+        ok: false,
+        filled: false,
+        reason,
+        positionId: null,
+        orderId: null,
+        probability: 0,
+        price: null,
+      };
     };
-    if (!plan.ok || plan.mid === null || plan.natural === null || !plan.entry) return fail(plan.reason ?? 'This trade cannot be placed.');
+    if (!plan.ok || plan.mid === null || plan.natural === null || !plan.entry)
+      return fail(plan.reason ?? 'This trade cannot be placed.');
+    const realism = this.config.realism;
+    if (realism.approvalLevels && isSpread(plan.legs) && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS)
+      return fail(
+        'Approval levels: your broker requires a Level 3 margin account with at least $2,000 for spreads.',
+      );
+    if (realism.liquidityLimits) {
+      if (a.qty > LIQUIDITY_MAX_CONTRACTS)
+        return fail(`Liquidity limits: at most ${LIQUIDITY_MAX_CONTRACTS} contracts per order.`);
+      const chain = this.chains.get(a.cardId);
+      const wide = optionLegsOf(plan.legs).some((l) => {
+        const q = chain?.quotes.find(
+          (x) => x.right === l.right && x.strike === l.strike && x.expiration === l.expiration,
+        );
+        const mid = q ? (q.bid + q.ask) / 2 : 0;
+        return !q || mid <= 0 || (q.ask - q.bid) / mid > LIQUIDITY_MAX_SPREAD;
+      });
+      if (wide)
+        return fail(
+          'Liquidity limits: one of the legs has a market too wide to trade (bid/ask over 50% of mid).',
+        );
+    }
     const bidAsk = this.config.realism.bidAsk;
     const q = { mid: plan.mid, natural: bidAsk ? plan.natural : plan.mid };
-    const fill = attemptFill(q, { type: a.order.type, limit: a.order.limit, atMid: a.order.atMid }, this.rng.fork(`fill:${this.log.length}`), this.config.execution);
+    const fill = attemptFill(
+      q,
+      { type: a.order.type, limit: a.order.limit, atMid: a.order.atMid },
+      this.rng.fork(`fill:${this.log.length}`),
+      this.config.execution,
+    );
     card.earningsAck = a.earningsAck;
     if (a.params.expiration && card.call) {
-      const horizon = Math.max(1, Math.round((Date.parse(a.params.expiration) - Date.parse(view.now)) / 86400000));
-      card.call = { ...card.call, emPct: plan.entry.expectedMovePct ?? card.call.emPct, horizonDays: horizon };
+      const horizon = Math.max(
+        1,
+        Math.round((Date.parse(a.params.expiration) - Date.parse(view.now)) / 86400000),
+      );
+      card.call = {
+        ...card.call,
+        emPct: plan.entry.expectedMovePct ?? card.call.emPct,
+        horizonDays: horizon,
+      };
     }
     if (!fill.filled) {
       if (fill.reason) return fail(fill.reason);
       const orderId = this.nextId('o');
-      this.orders.push({ id: orderId, cardId: a.cardId, structureId: a.structureId, legs: plan.legs, qty: a.qty, limit: a.order.limit ?? plan.mid, placedOn: view.now, brackets: a.brackets, plan });
+      this.orders.push({
+        id: orderId,
+        cardId: a.cardId,
+        structureId: a.structureId,
+        legs: plan.legs,
+        qty: a.qty,
+        limit: a.order.limit ?? plan.mid,
+        placedOn: view.now,
+        brackets: a.brackets,
+        plan,
+      });
       card.orderIds.push(orderId);
       await view.track(optionLegsOf(plan.legs));
-      this.lastEvents.push({ kind: 'rest', cardId: a.cardId, text: `Limit resting (${Math.round(fill.probability * 100)}% chance missed). It fills if the market comes to you.` });
-      return { ok: true, filled: false, reason: null, positionId: null, orderId, probability: fill.probability, price: null };
+      this.lastEvents.push({
+        kind: 'rest',
+        cardId: a.cardId,
+        text: `Limit resting (${Math.round(fill.probability * 100)}% chance missed). It fills if the market comes to you.`,
+      });
+      return {
+        ok: true,
+        filled: false,
+        reason: null,
+        positionId: null,
+        orderId,
+        probability: fill.probability,
+        price: null,
+      };
     }
     const pos = this.openFrom(a.cardId, a.structureId, plan, a.qty, fill.price, a.brackets);
     await view.track(optionLegsOf(plan.legs));
-    this.lastEvents.push({ kind: 'fill', cardId: a.cardId, positionId: pos.id, text: `Filled ${a.qty} ${STRUCTURES[a.structureId].short} at ${fill.price < 0 ? 'a credit of ' : 'a debit of '}${Math.abs(fill.price).toFixed(2)}` });
-    return { ok: true, filled: true, reason: null, positionId: pos.id, orderId: null, probability: fill.probability, price: fill.price };
+    this.lastEvents.push({
+      kind: 'fill',
+      cardId: a.cardId,
+      positionId: pos.id,
+      text: `Filled ${a.qty} ${STRUCTURES[a.structureId].short} at ${fill.price < 0 ? 'a credit of ' : 'a debit of '}${Math.abs(fill.price).toFixed(2)}`,
+    });
+    return {
+      ok: true,
+      filled: true,
+      reason: null,
+      positionId: pos.id,
+      orderId: null,
+      probability: fill.probability,
+      price: fill.price,
+    };
   }
 
-  private openFrom(cardId: string, structureId: StructureId, plan: TradePlan, qty: number, price: number, br?: Brackets | null): Position {
+  private openFrom(
+    cardId: string,
+    structureId: StructureId,
+    plan: TradePlan,
+    qty: number,
+    price: number,
+    br?: Brackets | null,
+  ): Position {
     const view = this.view(cardId);
     const card = this.card(cardId);
     const entry = plan.entry as NonNullable<TradePlan['entry']>;
@@ -487,10 +672,27 @@ export class TradingSession {
     this.realizedCents += p.realizedCents ?? 0;
     if (p.openedOn === p.closedOn && p.closedOn) this.dayTrades.push(p.closedOn);
     this.decisions = this.decisions.filter((d) => d.positionId !== p.id);
-    this.pushEvent(p, p.exitReason === 'expired' ? 'expired' : p.exitReason === 'assigned' ? 'assigned' : 'close', closeText(p), p.realizedCents ?? 0);
+    this.pushEvent(
+      p,
+      p.exitReason === 'expired' ? 'expired' : p.exitReason === 'assigned' ? 'assigned' : 'close',
+      closeText(p),
+      p.realizedCents ?? 0,
+    );
   }
 
   private applyClose(p: Position, order: OrderSpec, reason: Position['exitReason']): boolean {
+    if (order.forceNatural) {
+      const env = this.actionEnv(p.cardId);
+      const r = closeAction(
+        p,
+        { type: 'market' },
+        { ...env, mods: { ...env.mods, marketImprove: 0, marketOrdersDisabled: false } as ExecutionMods },
+        'liquidated',
+      );
+      this.replace(r.pos);
+      this.onClosed(r.pos);
+      return true;
+    }
     // Pattern day trader rule: closing on the day you opened is a day trade.
     if (p.openedOn === this.bookFor(p.cardId).date) {
       const allowed = pdtAllows({
@@ -504,9 +706,18 @@ export class TradingSession {
         return false;
       }
     }
-    const r = closeAction(p, { type: order.type, limit: order.limit, atMid: order.atMid }, this.actionEnv(p.cardId), reason ?? 'manual');
+    const r = closeAction(
+      p,
+      { type: order.type, limit: order.limit, atMid: order.atMid },
+      this.actionEnv(p.cardId),
+      reason ?? 'manual',
+    );
     if (!r.fill.filled) {
-      this.pushEvent(p, 'reject', r.fill.reason ?? `Close did not fill (${Math.round(r.fill.probability * 100)}% chance).`);
+      this.pushEvent(
+        p,
+        'reject',
+        r.fill.reason ?? `Close did not fill (${Math.round(r.fill.probability * 100)}% chance).`,
+      );
       return false;
     }
     this.replace(r.pos);
@@ -525,14 +736,26 @@ export class TradingSession {
       const view = this.view(cardId);
       const moved = await view.advance();
       const book = this.bookFor(cardId);
-      if (book.gapDay) this.lastEvents.push({ kind: 'gap', cardId, text: `${this.card(cardId).displaySymbol} gapped ${book.open > (view.bars().at(-2)?.close ?? book.open) ? 'up' : 'down'} hard at the open.` });
+      if (book.gapDay)
+        this.lastEvents.push({
+          kind: 'gap',
+          cardId,
+          text: `${this.card(cardId).displaySymbol} gapped ${book.open > (view.bars().at(-2)?.close ?? book.open) ? 'up' : 'down'} hard at the open.`,
+        });
       this.contexts.set(cardId, this.buildCtx(view));
       // Resting limits fill only if today's market crosses them.
       for (const o of this.orders.filter((x) => x.cardId === cardId)) {
         const q = this.restingQuote(o, book);
         if (q && restingFill(q, o.limit).filled) {
           this.cancel(o.id);
-          const pos = this.openFrom(cardId, o.structureId, { ...o.plan, mid: q.mid }, o.qty, o.limit, o.brackets);
+          const pos = this.openFrom(
+            cardId,
+            o.structureId,
+            { ...o.plan, mid: q.mid },
+            o.qty,
+            o.limit,
+            o.brackets,
+          );
           this.pushEvent(pos, 'fill', `Resting limit filled at ${Math.abs(o.limit).toFixed(2)}`);
         } else if (!moved) this.cancel(o.id);
       }
@@ -578,8 +801,18 @@ export class TradingSession {
     const order = a.order ?? { type: 'market' as const };
     switch (a.action) {
       case 'hold': {
-        if (dp.kind === 'stop_hit') this.replace({ ...p, brackets: { ...p.brackets, stopPl: null }, flags: { ...p.flags, stopDeclined: true } });
-        if (dp.kind === 'target_hit') this.replace({ ...p, brackets: { ...p.brackets, targetPl: null }, flags: { ...p.flags, targetDeclined: true } });
+        if (dp.kind === 'stop_hit')
+          this.replace({
+            ...p,
+            brackets: { ...p.brackets, stopPl: null },
+            flags: { ...p.flags, stopDeclined: true },
+          });
+        if (dp.kind === 'target_hit')
+          this.replace({
+            ...p,
+            brackets: { ...p.brackets, targetPl: null },
+            flags: { ...p.flags, targetDeclined: true },
+          });
         break;
       }
       case 'close': {
@@ -639,8 +872,14 @@ function closeText(p: Position): string {
     expired: 'Expired',
     assigned: 'Assignment settled',
     window_end: 'Closed at window end',
+    liquidated: 'Liquidated by the risk desk',
   };
   return `${why[p.exitReason ?? 'manual']}: ${sign}${amt}`;
+}
+
+function isSpread(legs: Leg[]): boolean {
+  const opts = optionLegsOf(legs);
+  return opts.some((l) => l.ratio < 0) && opts.some((l) => l.ratio > 0);
 }
 
 export type { Bucket };

@@ -30,7 +30,13 @@ export interface TradeRow {
   callConf: number | null;
   callActual: number | null;
   brier: number | null;
-  regime: { vix: number | null; ivr: number | null; trend: number | null; adx: number | null; earnings: boolean };
+  regime: {
+    vix: number | null;
+    ivr: number | null;
+    trend: number | null;
+    adx: number | null;
+    earnings: boolean;
+  };
   recordedAt: string;
   data?: Record<string, unknown>;
 }

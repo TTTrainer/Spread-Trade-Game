@@ -6,3 +6,5 @@ test-results
 playwright-report
 package-lock.json
 *.md
+data/*.db*
+build

@@ -54,7 +54,12 @@ export interface CallResult {
  * Resolve a call at the trade's exit. When a trade closes early, the expected move is scaled by
  * the square root of the time that actually passed, so the same skill is measured either way.
  */
-export function resolveCall(call: Call, entrySpot: number, exitSpot: number, elapsedDays: number): CallResult {
+export function resolveCall(
+  call: Call,
+  entrySpot: number,
+  exitSpot: number,
+  elapsedDays: number,
+): CallResult {
   const frac = call.horizonDays > 0 ? Math.min(1, Math.max(1, elapsedDays) / call.horizonDays) : 1;
   const movePct = exitSpot / entrySpot - 1;
   const actual = bucketOf(movePct, cutoffs(call, frac));
@@ -62,7 +67,14 @@ export function resolveCall(call: Call, entrySpot: number, exitSpot: number, ela
   const adjacent = !exact && Math.abs(actual - call.bucket) === 1;
   const dirSign = (b: Bucket) => (b < 2 ? -1 : b > 2 ? 1 : 0);
   const directionRight = dirSign(actual) === dirSign(call.bucket);
-  return { actual, movePct, exact, adjacent, directionRight, bonus: callBonus(call.confidence, exact, adjacent) };
+  return {
+    actual,
+    movePct,
+    exact,
+    adjacent,
+    directionRight,
+    bonus: callBonus(call.confidence, exact, adjacent),
+  };
 }
 
 export function callBonus(confidence: number, exact: boolean, adjacent: boolean): number {
@@ -103,5 +115,11 @@ export function meanBrier(scores: number[]): number | null {
 export function cutoffLabels(call: Pick<Call, 'emPct' | 'mode'>): string[] {
   const c = cutoffs(call);
   const p = (x: number) => `${(x * 100).toFixed(1)}%`;
-  return [`< −${p(c.big)}`, `−${p(c.big)} to −${p(c.flat)}`, `±${p(c.flat)}`, `+${p(c.flat)} to +${p(c.big)}`, `> +${p(c.big)}`];
+  return [
+    `< −${p(c.big)}`,
+    `−${p(c.big)} to −${p(c.flat)}`,
+    `±${p(c.flat)}`,
+    `+${p(c.flat)} to +${p(c.big)}`,
+    `> +${p(c.big)}`,
+  ];
 }

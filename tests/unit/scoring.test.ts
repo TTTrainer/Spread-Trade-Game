@@ -1,9 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { brier, bucketOf, calibrationGrade, callBonus, cutoffLabels, cutoffs, meanBrier, resolveCall, type Call } from '../../src/engine/scoring/calls';
+import {
+  brier,
+  bucketOf,
+  calibrationGrade,
+  callBonus,
+  cutoffLabels,
+  cutoffs,
+  meanBrier,
+  resolveCall,
+  type Call,
+} from '../../src/engine/scoring/calls';
 import { edgeStep, levelSteps, pnlChips, runScore, type ScoreStep } from '../../src/engine/scoring/mult';
-import { alternateKeys, alternateSpecs, benchmarkCents, valueAlternates } from '../../src/engine/scoring/alternates';
+import {
+  alternateKeys,
+  alternateSpecs,
+  benchmarkCents,
+  valueAlternates,
+} from '../../src/engine/scoring/alternates';
 import { mistakeTags, processGrade } from '../../src/engine/scoring/grade';
-import { contractCents, formatCents, pctOf, toCents, centsToDollars, assertCents } from '../../src/engine/money';
+import {
+  contractCents,
+  formatCents,
+  pctOf,
+  toCents,
+  centsToDollars,
+  assertCents,
+} from '../../src/engine/money';
 import type { Position } from '../../src/engine/lifecycle/types';
 import { flatChain } from '../helpers/market';
 
@@ -52,7 +74,12 @@ describe('calls', () => {
     expect(r.bonus).toBeCloseTo(1.5, 12);
     const early = resolveCall(call, 100, 101, 5);
     expect(early.actual).toBe(3); // 1% in 5 days beats the scaled flat band
-    expect(resolveCall(call, 100, 90, 30)).toMatchObject({ actual: 0, exact: false, adjacent: false, directionRight: false });
+    expect(resolveCall(call, 100, 90, 30)).toMatchObject({
+      actual: 0,
+      exact: false,
+      adjacent: false,
+      directionRight: false,
+    });
   });
 
   it('scores calibration with a multi-class Brier score', () => {
@@ -117,7 +144,13 @@ describe('alternates and benchmark', () => {
   it('prices what else you could have done on the same chain', () => {
     const entry = flatChain({ date: '2025-01-03', spot: 100, expirations: ['2025-01-31'] });
     const specs = alternateSpecs(entry, '2025-01-31', true);
-    expect(specs.map((s) => s.id)).toEqual(['shares', 'long_option', 'debit_spread', 'credit_spread', 'condor16']);
+    expect(specs.map((s) => s.id)).toEqual([
+      'shares',
+      'long_option',
+      'debit_spread',
+      'credit_spread',
+      'condor16',
+    ]);
     expect(alternateKeys(specs).length).toBeGreaterThan(8);
     const exit = flatChain({ date: '2025-01-24', spot: 106, expirations: ['2025-01-31'] });
     const idx = new Map(exit.quotes.map((q) => [`${q.strike}|${q.right}`, q] as const));
@@ -139,7 +172,13 @@ describe('process grade and mistake tags', () => {
     structureId: 'bull_put',
     realizedCents: -20000,
     exitReason: 'stop',
-    flags: { stopDeclined: false, heldIntoLast7: false, rolledForDebit: false, assigned: false, closedAtPlan: 'stop' },
+    flags: {
+      stopDeclined: false,
+      heldIntoLast7: false,
+      rolledForDebit: false,
+      assigned: false,
+      closedAtPlan: 'stop',
+    },
     entry: {
       spot: 100,
       ivr: 45,
@@ -154,10 +193,17 @@ describe('process grade and mistake tags', () => {
   } as unknown as Position;
 
   it('grades a disciplined losing trade as good process, bad luck', () => {
-    const g = processGrade({ pos: base, riskCapPct: 0.1, earningsAcknowledged: false, declinedDecisions: [] });
+    const g = processGrade({
+      pos: base,
+      riskCapPct: 0.1,
+      earningsAcknowledged: false,
+      declinedDecisions: [],
+    });
     expect(g.grade).toBe('A');
     expect(g.outcome).toBe('Good trade, bad luck.');
-    expect(mistakeTags({ pos: base, riskCapPct: 0.1, earningsAcknowledged: false, declinedDecisions: [] })).toEqual([]);
+    expect(
+      mistakeTags({ pos: base, riskCapPct: 0.1, earningsAcknowledged: false, declinedDecisions: [] }),
+    ).toEqual([]);
   });
 
   it('tags the usual mistakes', () => {
@@ -165,10 +211,30 @@ describe('process grade and mistake tags', () => {
       ...base,
       realizedCents: 5000,
       exitReason: 'manual',
-      flags: { ...base.flags, stopDeclined: true, heldIntoLast7: true, rolledForDebit: true, assigned: true, closedAtPlan: null },
-      entry: { ...base.entry, ivr: 10, shortStrikes: [98], riskPct: 0.09, earningsInside: true, edgePercentile: 0.1, sma50Slope: -0.3 },
+      flags: {
+        ...base.flags,
+        stopDeclined: true,
+        heldIntoLast7: true,
+        rolledForDebit: true,
+        assigned: true,
+        closedAtPlan: null,
+      },
+      entry: {
+        ...base.entry,
+        ivr: 10,
+        shortStrikes: [98],
+        riskPct: 0.09,
+        earningsInside: true,
+        edgePercentile: 0.1,
+        sma50Slope: -0.3,
+      },
     } as unknown as Position;
-    const tags = mistakeTags({ pos: bad, riskCapPct: 0.1, earningsAcknowledged: false, declinedDecisions: ['pin_risk', 'exdiv_itm_call'] });
+    const tags = mistakeTags({
+      pos: bad,
+      riskCapPct: 0.1,
+      earningsAcknowledged: false,
+      declinedDecisions: ['pin_risk', 'exdiv_itm_call'],
+    });
     expect(tags).toEqual([
       'held_past_stop',
       'low_ivr_premium',

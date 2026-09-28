@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { adaptiveRegimeWeights, adaptiveWeights, dealQuestion, detectSetup, DRILL_KINDS, gradeAnswer, releaseQuestion, summarize, type DrillAnswer, type DrillQuestion } from '../../src/engine/drills/drills';
+import {
+  adaptiveRegimeWeights,
+  adaptiveWeights,
+  dealQuestion,
+  detectSetup,
+  DRILL_KINDS,
+  gradeAnswer,
+  releaseQuestion,
+  summarize,
+  type DrillAnswer,
+  type DrillQuestion,
+} from '../../src/engine/drills/drills';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
 import { Rng } from '../../src/engine/rng';
 import type { Bar } from '../../src/engine/market/types';
@@ -49,7 +60,13 @@ describe('drills', () => {
   });
 
   it('grades the greeks round with a correct reprice among distractors', async () => {
-    const q = await dealQuestion('greeks', { source, windows, rng: new Rng('g'), allowFlip: false, history: [] });
+    const q = await dealQuestion('greeks', {
+      source,
+      windows,
+      rng: new Rng('g'),
+      allowFlip: false,
+      history: [],
+    });
     if (q.kind !== 'greeks') throw new Error('kind');
     expect(new Set(q.choices).size).toBe(4);
     expect((await gradeAnswer(q, { kind: 'greeks', index: (q.answerIndex + 1) % 4 })).correct).toBe(false);
@@ -77,9 +94,35 @@ describe('drills', () => {
 
   it('summarizes streaks, Brier and calibration', () => {
     const s = summarize([
-      { questionId: 'a', kind: 'blind_call', correct: true, score: 80, brier: 0.3, detail: { bucket: 3, confidence: 0.7 }, revealBars: [], explanation: '' },
-      { questionId: 'b', kind: 'blind_call', correct: true, score: 80, brier: 0.3, detail: { bucket: 3, confidence: 0.7 }, revealBars: [], explanation: '' },
-      { questionId: 'c', kind: 'greeks', correct: false, score: 0, detail: {}, revealBars: [], explanation: '' },
+      {
+        questionId: 'a',
+        kind: 'blind_call',
+        correct: true,
+        score: 80,
+        brier: 0.3,
+        detail: { bucket: 3, confidence: 0.7 },
+        revealBars: [],
+        explanation: '',
+      },
+      {
+        questionId: 'b',
+        kind: 'blind_call',
+        correct: true,
+        score: 80,
+        brier: 0.3,
+        detail: { bucket: 3, confidence: 0.7 },
+        revealBars: [],
+        explanation: '',
+      },
+      {
+        questionId: 'c',
+        kind: 'greeks',
+        correct: false,
+        score: 0,
+        detail: {},
+        revealBars: [],
+        explanation: '',
+      },
     ]);
     expect(s.bestStreak).toBe(2);
     expect(s.meanBrier).toBeCloseTo(0.3, 9);

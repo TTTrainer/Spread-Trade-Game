@@ -93,14 +93,19 @@ export function legsValue(legs: Leg[], spot: number, at: ISODate, env: PricingEn
       v += leg.ratio * (leg.right === 'C' ? Math.max(0, spot - leg.strike) : Math.max(0, leg.strike - spot));
     } else {
       const vol = Math.max(0.01, env.ivOf(leg) + ivShift);
-      v += leg.ratio * bsm({ right: leg.right, spot, strike: leg.strike, t, vol, rate: env.rate, divYield: env.divYield }).price;
+      v +=
+        leg.ratio *
+        bsm({ right: leg.right, spot, strike: leg.strike, t, vol, rate: env.rate, divYield: env.divYield })
+          .price;
     }
   }
   return v;
 }
 
 export function frontExpiration(legs: Leg[]): ISODate | null {
-  const exps = optionLegs(legs).map((l) => l.expiration).sort();
+  const exps = optionLegs(legs)
+    .map((l) => l.expiration)
+    .sort();
   return exps[0] ?? null;
 }
 
@@ -110,7 +115,14 @@ export function payoffAtExpiry(legs: Leg[], entryNet: number, spot: number, env:
   return legsValue(legs, spot, fe ?? env.date, env) - entryNet;
 }
 
-export function payoffNow(legs: Leg[], entryNet: number, spot: number, env: PricingEnv, daysForward = 0, ivShift = 0): number {
+export function payoffNow(
+  legs: Leg[],
+  entryNet: number,
+  spot: number,
+  env: PricingEnv,
+  daysForward = 0,
+  ivShift = 0,
+): number {
   const at = new Date(Date.parse(env.date) + daysForward * 86400000).toISOString().slice(0, 10);
   return legsValue(legs, spot, at, env, ivShift) - entryNet;
 }
@@ -160,7 +172,9 @@ export function spreadWidth(legs: Leg[]): number {
     const side = ol.filter((l) => l.right === right);
     const shorts = side.filter((l) => l.ratio < 0);
     const longs = side.filter((l) => l.ratio > 0);
-    for (const s of shorts) for (const l of longs) if (l.expiration === s.expiration) w = Math.max(w, Math.abs(l.strike - s.strike));
+    for (const s of shorts)
+      for (const l of longs)
+        if (l.expiration === s.expiration) w = Math.max(w, Math.abs(l.strike - s.strike));
   }
   return w;
 }
@@ -182,7 +196,13 @@ export function positionGreeks(legs: Leg[], chain: Chain): TradeMetrics['greeks'
 }
 
 /** Probability the stock finishes where the payoff is positive (lognormal, risk-neutral drift). */
-export function probabilityOfProfit(legs: Leg[], entryNet: number, env: PricingEnv, spot: number, sigma: number): number {
+export function probabilityOfProfit(
+  legs: Leg[],
+  entryNet: number,
+  env: PricingEnv,
+  spot: number,
+  sigma: number,
+): number {
   const fe = frontExpiration(legs) ?? env.date;
   const t = Math.max(diffDays(env.date, fe), 0.5) / 365;
   const grid = priceGrid(legs, spot);
@@ -220,7 +240,14 @@ function bisectZero(f: (x: number) => number, a: number, b: number): number {
   return 0.5 * (lo + hi);
 }
 
-export function computeMetrics(legs: Leg[], chain: Chain, def: StructureDef, rate: number, divYield = 0, entryNet?: number): TradeMetrics | null {
+export function computeMetrics(
+  legs: Leg[],
+  chain: Chain,
+  def: StructureDef,
+  rate: number,
+  divYield = 0,
+  entryNet?: number,
+): TradeMetrics | null {
   const net = entryNet ?? netOpenPrice(legs, chain, 'mid');
   if (net === null) return null;
   const env = envFromChain(chain, rate, divYield);
@@ -238,7 +265,8 @@ export function computeMetrics(legs: Leg[], chain: Chain, def: StructureDef, rat
   const unlimited = slopeRight > 0.5;
   const breakevens: number[] = [];
   for (let i = 1; i < n; i++) {
-    if (vals[i - 1] > 0 !== vals[i] > 0) breakevens.push(bisectZero((s) => payoffAtExpiry(legs, net, s, env), grid[i - 1], grid[i]));
+    if (vals[i - 1] > 0 !== vals[i] > 0)
+      breakevens.push(bisectZero((s) => payoffAtExpiry(legs, net, s, env), grid[i - 1], grid[i]));
   }
   const fe = frontExpiration(legs);
   const shortLegs = optionLegs(legs).filter((l) => l.ratio < 0);
@@ -282,6 +310,10 @@ export function plainGreeks(g: TradeMetrics['greeks'], units: number): string[] 
       : `If implied volatility drops 1 point, you ${g.vega < 0 ? 'make' : 'lose'} about ${d(g.vega)}.`,
   );
   if (Math.abs(g.gamma) > 0.01)
-    lines.push(g.gamma < 0 ? 'Big moves hurt more the closer the stock gets to your short strike.' : 'Big moves in either direction help you.');
+    lines.push(
+      g.gamma < 0
+        ? 'Big moves hurt more the closer the stock gets to your short strike.'
+        : 'Big moves in either direction help you.',
+    );
   return lines;
 }

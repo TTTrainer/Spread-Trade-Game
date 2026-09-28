@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { diffDays } from '../../engine/calendar';
 import { limitFillProbability } from '../../engine/orders/fill';
-import { BUCKET_GLYPHS, BUCKET_NAMES, CONFIDENCES, cutoffLabels, type Bucket } from '../../engine/scoring/calls';
+import {
+  BUCKET_GLYPHS,
+  BUCKET_NAMES,
+  CONFIDENCES,
+  cutoffLabels,
+  type Bucket,
+} from '../../engine/scoring/calls';
 import { expirationsOf, STRUCTURES } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
@@ -20,7 +26,9 @@ export function CallCards() {
   const plan = useTrading((s) => s.plan)();
   const ff = useTrading((s) => s.ff);
   const card = session && cardId ? session.card(cardId) : null;
-  const emPct = plan?.entry?.expectedMovePct ?? (session && cardId ? (session.context(cardId).iv30 ?? 0.3) * Math.sqrt(30 / 365) * 0.8 : 0.05);
+  const emPct =
+    plan?.entry?.expectedMovePct ??
+    (session && cardId ? (session.context(cardId).iv30 ?? 0.3) * Math.sqrt(30 / 365) * 0.8 : 0.05);
   const labels = cutoffLabels({ emPct, mode: session?.config.callMode ?? 'em' });
   const locked = ff !== 'idle' || !!card?.positionIds.length;
   return (
@@ -30,16 +38,36 @@ export function CallCards() {
       </div>
       <div className="call-row">
         {([0, 1, 2, 3, 4] as Bucket[]).map((b) => (
-          <TiltCard key={b} className={`call-card b${b}`} selected={card?.call?.bucket === b} onClick={() => !locked && void setCall(b)} testId={`call-${b}`} disabled={locked && card?.call?.bucket !== b}>
+          <TiltCard
+            key={b}
+            className={`call-card b${b}`}
+            selected={card?.call?.bucket === b}
+            onClick={() => !locked && void setCall(b)}
+            testId={`call-${b}`}
+            disabled={locked && card?.call?.bucket !== b}
+          >
             <div className="call-glyph">{BUCKET_GLYPHS[b]}</div>
             <div className="call-name">{BUCKET_NAMES[b]}</div>
             <div className="call-cut num">{labels[b]}</div>
           </TiltCard>
         ))}
       </div>
-      <div className="conf-row" onWheel={(e) => !locked && void setConfidence(Math.max(0.5, Math.min(0.9, Math.round((confidence + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10)))}>
+      <div
+        className="conf-row"
+        onWheel={(e) =>
+          !locked &&
+          void setConfidence(
+            Math.max(0.5, Math.min(0.9, Math.round((confidence + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10)),
+          )
+        }
+      >
         {CONFIDENCES.map((c) => (
-          <button key={c} className={`conf-btn num ${Math.abs(confidence - c) < 1e-6 ? 'sel' : ''}`} onClick={() => !locked && void setConfidence(c)} data-testid={`conf-${Math.round(c * 100)}`}>
+          <button
+            key={c}
+            className={`conf-btn num ${Math.abs(confidence - c) < 1e-6 ? 'sel' : ''}`}
+            onClick={() => !locked && void setConfidence(c)}
+            data-testid={`conf-${Math.round(c * 100)}`}
+          >
             {Math.round(c * 100)}%
           </button>
         ))}
@@ -48,7 +76,13 @@ export function CallCards() {
   );
 }
 
-export function StructureCards({ allowed }: { allowed?: StructureId[] }) {
+export function StructureCards({
+  allowed,
+  levels,
+}: {
+  allowed?: StructureId[];
+  levels?: Partial<Record<StructureId, number>>;
+}) {
   const builder = useTrading((s) => s.builder);
   const setStructure = useTrading((s) => s.setStructure);
   const ids = allowed ?? (Object.keys(STRUCTURES) as StructureId[]);
@@ -59,9 +93,19 @@ export function StructureCards({ allowed }: { allowed?: StructureId[] }) {
       </div>
       <div className="structure-row">
         {ids.map((id) => (
-          <TiltCard key={id} className="structure-card" selected={builder.structureId === id} onClick={() => setStructure(id)} testId={`structure-${id}`} title={STRUCTURES[id].blurb}>
+          <TiltCard
+            key={id}
+            className="structure-card"
+            selected={builder.structureId === id}
+            onClick={() => setStructure(id)}
+            testId={`structure-${id}`}
+            title={STRUCTURES[id].blurb}
+          >
             <div className="st-name">{STRUCTURES[id].short}</div>
-            <div className={`st-kind num ${STRUCTURES[id].credit ? 'credit' : 'debit'}`}>{STRUCTURES[id].credit ? 'CREDIT' : 'DEBIT'}</div>
+            <div className={`st-kind num ${STRUCTURES[id].credit ? 'credit' : 'debit'}`}>
+              {STRUCTURES[id].credit ? 'CREDIT' : 'DEBIT'}
+            </div>
+            {levels && <div className="st-level num">LV {levels[id] ?? 1}</div>}
           </TiltCard>
         ))}
       </div>
@@ -96,7 +140,11 @@ export function ExpiryChips() {
               className={`exp-chip num ${builder.expiration === e ? 'sel' : ''} ${d <= 10 ? 'weekly' : 'monthly'}`}
               onClick={() => {
                 sfx('click');
-                setBuilder({ expiration: e, legs: null, backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null });
+                setBuilder({
+                  expiration: e,
+                  legs: null,
+                  backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
+                });
               }}
               data-testid={`exp-${d}`}
             >
@@ -112,7 +160,11 @@ export function ExpiryChips() {
           </div>
           <div className="chip-row">
             {backs.map((e) => (
-              <button key={e} className={`exp-chip num ${builder.backExpiration === e ? 'sel' : ''}`} onClick={() => setBuilder({ backExpiration: e, legs: null })}>
+              <button
+                key={e}
+                className={`exp-chip num ${builder.backExpiration === e ? 'sel' : ''}`}
+                onClick={() => setBuilder({ backExpiration: e, legs: null })}
+              >
                 {diffDays(now, e)}d
               </button>
             ))}
@@ -128,7 +180,14 @@ export function SizeControls() {
   const setBuilder = useTrading((s) => s.setBuilder);
   const session = useTrading((s) => s.session);
   const plan = useTrading((s) => s.plan)();
-  const hasWidth = !['long_straddle', 'long_strangle', 'covered_call', 'cash_secured_put', 'calendar', 'double_calendar'].includes(builder.structureId);
+  const hasWidth = ![
+    'long_straddle',
+    'long_strangle',
+    'covered_call',
+    'cash_secured_put',
+    'calendar',
+    'double_calendar',
+  ].includes(builder.structureId);
   const cap = session?.config.riskCapPct ?? 0.1;
   const risk = plan?.riskPct ?? 0;
   return (
@@ -149,10 +208,25 @@ export function SizeControls() {
         {hasWidth && (
           <>
             <label>Width</label>
-            <div className="stepper" onWheel={(e) => setBuilder({ width: Math.max(1, Math.min(12, builder.width + (e.deltaY < 0 ? 1 : -1))), legs: null })}>
-              <button onClick={() => setBuilder({ width: Math.max(1, builder.width - 1), legs: null })}>−</button>
-              <span data-testid="width-value">{plan?.metrics ? `$${price(plan.metrics.width)}` : builder.width}</span>
-              <button onClick={() => setBuilder({ width: Math.min(12, builder.width + 1), legs: null })} data-testid="width-plus">
+            <div
+              className="stepper"
+              onWheel={(e) =>
+                setBuilder({
+                  width: Math.max(1, Math.min(12, builder.width + (e.deltaY < 0 ? 1 : -1))),
+                  legs: null,
+                })
+              }
+            >
+              <button onClick={() => setBuilder({ width: Math.max(1, builder.width - 1), legs: null })}>
+                −
+              </button>
+              <span data-testid="width-value">
+                {plan?.metrics ? `$${price(plan.metrics.width)}` : builder.width}
+              </span>
+              <button
+                onClick={() => setBuilder({ width: Math.min(12, builder.width + 1), legs: null })}
+                data-testid="width-plus"
+              >
                 +
               </button>
             </div>
@@ -169,7 +243,10 @@ export function SizeControls() {
             +
           </button>
         </div>
-        <span className={risk > cap ? 'down' : risk > cap * 0.6 ? 'warn-text' : ''} data-testid="risk-readout">
+        <span
+          className={risk > cap ? 'down' : risk > cap * 0.6 ? 'warn-text' : ''}
+          data-testid="risk-readout"
+        >
           {pct(risk)} / {pct(cap, 0)}
         </span>
       </div>
@@ -192,12 +269,18 @@ export function OrderTicket() {
   const ff = useTrading((s) => s.ff);
   const [confirm, setConfirm] = useState<null | 'buy' | 'sell'>(null);
   const card = session && cardId ? session.card(cardId) : null;
-  const hasPosition = !!card?.positionIds.some((id) => session?.position(id)?.status === 'open') || !!card?.orderIds.length;
+  const hasPosition =
+    !!card?.positionIds.some((id) => session?.position(id)?.status === 'open') || !!card?.orderIds.length;
   const mid = plan?.mid ?? null;
   const nat = plan?.natural ?? null;
   const credit = mid !== null && mid < 0;
   const limit = mid !== null && nat !== null ? mid + (nat - mid) * builder.limitFrac : null;
-  const prob = mid !== null && nat !== null && limit !== null ? (builder.orderType === 'market' ? 1 : limitFillProbability({ mid, natural: nat }, limit, session?.config.execution)) : 0;
+  const prob =
+    mid !== null && nat !== null && limit !== null
+      ? builder.orderType === 'market'
+        ? 1
+        : limitFillProbability({ mid, natural: nat }, limit, session?.config.execution)
+      : 0;
   const disabled = !plan?.ok || ff !== 'idle' || hasPosition;
   const earnings = plan?.entry?.earningsInside;
 
@@ -232,14 +315,22 @@ export function OrderTicket() {
   return (
     <div className="tray-section ticket" data-testid="order-ticket">
       <div className="section-title">
-        Order <Kbd>Alt+S</Kbd> sell <Kbd>Alt+B</Kbd> buy <Kbd>Alt+A</Kbd> auto-send {builder.autoSend ? 'ON' : 'off'}
+        Order <Kbd>Alt+S</Kbd> sell <Kbd>Alt+B</Kbd> buy <Kbd>Alt+A</Kbd> auto-send{' '}
+        {builder.autoSend ? 'ON' : 'off'}
       </div>
       <div className="ticket-grid num">
         <div className="seg">
-          <button className={builder.orderType === 'limit' ? 'sel' : ''} onClick={() => setBuilder({ orderType: 'limit' })}>
+          <button
+            className={builder.orderType === 'limit' ? 'sel' : ''}
+            onClick={() => setBuilder({ orderType: 'limit' })}
+          >
             LIMIT
           </button>
-          <button className={builder.orderType === 'market' ? 'sel' : ''} onClick={() => setBuilder({ orderType: 'market' })} data-testid="order-market">
+          <button
+            className={builder.orderType === 'market' ? 'sel' : ''}
+            onClick={() => setBuilder({ orderType: 'market' })}
+            data-testid="order-market"
+          >
             MARKET
           </button>
         </div>
@@ -257,17 +348,28 @@ export function OrderTicket() {
           <div className="limit-labels">
             <span>MID {price(mid !== null ? Math.abs(mid) : null)}</span>
             <span className="limit-now">
-              {builder.orderType === 'market' ? 'NATURAL' : `LMT ${price(limit !== null ? Math.abs(limit) : null)}`} · fill {Math.round(prob * 100)}%
+              {builder.orderType === 'market'
+                ? 'NATURAL'
+                : `LMT ${price(limit !== null ? Math.abs(limit) : null)}`}{' '}
+              · fill {Math.round(prob * 100)}%
             </span>
             <span>NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
           </div>
         </div>
         <label className="toggle">
-          <input type="checkbox" checked={builder.bracketsOn} onChange={(e) => setBuilder({ bracketsOn: e.target.checked })} /> Brackets
+          <input
+            type="checkbox"
+            checked={builder.bracketsOn}
+            onChange={(e) => setBuilder({ bracketsOn: e.target.checked })}
+          />{' '}
+          Brackets
           {builder.bracketsOn && credit && (
             <span className="bracket-edit">
               target
-              <select value={builder.targetPct} onChange={(e) => setBuilder({ targetPct: Number(e.target.value) })}>
+              <select
+                value={builder.targetPct}
+                onChange={(e) => setBuilder({ targetPct: Number(e.target.value) })}
+              >
                 {[0.25, 0.4, 0.5, 0.65, 0.75].map((x) => (
                   <option key={x} value={x}>
                     {Math.round(x * 100)}%
@@ -275,7 +377,10 @@ export function OrderTicket() {
                 ))}
               </select>
               stop
-              <select value={builder.stopMult} onChange={(e) => setBuilder({ stopMult: Number(e.target.value) })}>
+              <select
+                value={builder.stopMult}
+                onChange={(e) => setBuilder({ stopMult: Number(e.target.value) })}
+              >
                 {[1.5, 2, 2.5, 3].map((x) => (
                   <option key={x} value={x}>
                     {x}x
@@ -287,14 +392,29 @@ export function OrderTicket() {
         </label>
         {earnings && (
           <label className="toggle warn-text" data-testid="earnings-ack">
-            <input type="checkbox" checked={builder.earningsAck} onChange={(e) => setBuilder({ earningsAck: e.target.checked })} /> Earnings inside: holding through on purpose
+            <input
+              type="checkbox"
+              checked={builder.earningsAck}
+              onChange={(e) => setBuilder({ earningsAck: e.target.checked })}
+            />{' '}
+            Earnings inside: holding through on purpose
           </label>
         )}
         <div className="ticket-buttons">
-          <button className="pixel-btn sell" disabled={disabled || !credit} onClick={() => go('sell')} data-testid="sell-button">
+          <button
+            className="pixel-btn sell"
+            disabled={disabled || !credit}
+            onClick={() => go('sell')}
+            data-testid="sell-button"
+          >
             SELL {credit && mid !== null ? `+${price(-mid)}` : ''}
           </button>
-          <button className="pixel-btn buy" disabled={disabled || credit} onClick={() => go('buy')} data-testid="buy-button">
+          <button
+            className="pixel-btn buy"
+            disabled={disabled || credit}
+            onClick={() => go('buy')}
+            data-testid="buy-button"
+          >
             BUY {!credit && mid !== null ? `−${price(mid)}` : ''}
           </button>
         </div>
@@ -307,10 +427,15 @@ export function OrderTicket() {
               {builder.qty} × {STRUCTURES[builder.structureId].name} on {card?.displaySymbol}
             </div>
             <div>
-              {builder.orderType === 'market' ? 'Market (natural)' : `Limit ${price(limit !== null ? Math.abs(limit) : null)}`} · fill chance {Math.round(prob * 100)}%
+              {builder.orderType === 'market'
+                ? 'Market (natural)'
+                : `Limit ${price(limit !== null ? Math.abs(limit) : null)}`}{' '}
+              · fill chance {Math.round(prob * 100)}%
             </div>
             <div>
-              Max loss {money(plan.maxLossCents)} · max profit {plan.maxProfitCents === null ? 'unlimited' : money(plan.maxProfitCents)} · POP {pct(plan.metrics?.pop ?? 0, 0)}
+              Max loss {money(plan.maxLossCents)} · max profit{' '}
+              {plan.maxProfitCents === null ? 'unlimited' : money(plan.maxProfitCents)} · POP{' '}
+              {pct(plan.metrics?.pop ?? 0, 0)}
             </div>
           </div>
           <div className="modal-actions">

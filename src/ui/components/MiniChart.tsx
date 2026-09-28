@@ -18,7 +18,19 @@ interface Props {
 }
 
 /** A small pixel-crisp SVG candle chart for drills, previews and the tutorial. */
-export function MiniChart({ bars, width, height, revealFrom, showBands, showSma, showRsi, range, onRange, hLines = [], testId }: Props) {
+export function MiniChart({
+  bars,
+  width,
+  height,
+  revealFrom,
+  showBands,
+  showSma,
+  showRsi,
+  range,
+  onRange,
+  hLines = [],
+  testId,
+}: Props) {
   const ref = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<number | null>(null);
   if (bars.length === 0) return <svg width={width} height={height} />;
@@ -75,18 +87,49 @@ export function MiniChart({ bars, width, height, revealFrom, showBands, showSma,
       style={{ cursor: onRange ? 'ns-resize' : undefined }}
     >
       <rect x={0} y={0} width={plotW} height={mainH} fill="#0b0826" />
-      {revealFrom !== undefined && revealFrom < bars.length && <rect x={revealFrom * step} y={0} width={plotW - revealFrom * step} height={mainH} fill="rgba(255,191,62,0.06)" />}
+      {revealFrom !== undefined && revealFrom < bars.length && (
+        <rect
+          x={revealFrom * step}
+          y={0}
+          width={plotW - revealFrom * step}
+          height={mainH}
+          fill="rgba(255,191,62,0.06)"
+        />
+      )}
       {[0.25, 0.5, 0.75].map((f) => (
         <line key={f} x1={0} x2={plotW} y1={mainH * f} y2={mainH * f} stroke="rgba(91,75,196,0.2)" />
       ))}
       {showBands && (
         <>
-          <polyline points={line(bb.map((b) => b.upper), y)} fill="none" stroke="rgba(62,242,255,0.5)" />
-          <polyline points={line(bb.map((b) => b.lower), y)} fill="none" stroke="rgba(62,242,255,0.5)" />
+          <polyline
+            points={line(
+              bb.map((b) => b.upper),
+              y,
+            )}
+            fill="none"
+            stroke="rgba(62,242,255,0.5)"
+          />
+          <polyline
+            points={line(
+              bb.map((b) => b.lower),
+              y,
+            )}
+            fill="none"
+            stroke="rgba(62,242,255,0.5)"
+          />
         </>
       )}
       {showSma && <polyline points={line(s50, y)} fill="none" stroke="#ff8a3d" strokeWidth={1.5} />}
-      {range && <rect x={0} y={y(Math.max(range.low, range.high))} width={plotW} height={Math.abs(y(range.low) - y(range.high))} fill="rgba(255,62,165,0.18)" stroke="#ff3ea5" />}
+      {range && (
+        <rect
+          x={0}
+          y={y(Math.max(range.low, range.high))}
+          width={plotW}
+          height={Math.abs(y(range.low) - y(range.high))}
+          fill="rgba(255,62,165,0.18)"
+          stroke="#ff3ea5"
+        />
+      )}
       {bars.map((b, i) => {
         const up = b.close >= b.open;
         const faded = revealFrom !== undefined && i >= revealFrom;
@@ -94,11 +137,26 @@ export function MiniChart({ bars, width, height, revealFrom, showBands, showSma,
         return (
           <g key={i} opacity={faded ? 1 : revealFrom !== undefined ? 0.75 : 1}>
             <line x1={x(i)} x2={x(i)} y1={y(b.high)} y2={y(b.low)} stroke={color} />
-            <rect x={x(i) - Math.max(1, step * 0.35)} y={y(Math.max(b.open, b.close))} width={Math.max(2, step * 0.7)} height={Math.max(1, Math.abs(y(b.open) - y(b.close)))} fill={color} />
+            <rect
+              x={x(i) - Math.max(1, step * 0.35)}
+              y={y(Math.max(b.open, b.close))}
+              width={Math.max(2, step * 0.7)}
+              height={Math.max(1, Math.abs(y(b.open) - y(b.close)))}
+              fill={color}
+            />
           </g>
         );
       })}
-      {revealFrom !== undefined && revealFrom < bars.length && <line x1={revealFrom * step} x2={revealFrom * step} y1={0} y2={mainH} stroke="#ffbf3e" strokeDasharray="4 3" />}
+      {revealFrom !== undefined && revealFrom < bars.length && (
+        <line
+          x1={revealFrom * step}
+          x2={revealFrom * step}
+          y1={0}
+          y2={mainH}
+          stroke="#ffbf3e"
+          strokeDasharray="4 3"
+        />
+      )}
       {hLines.map((h, i) => (
         <g key={i}>
           <line x1={0} x2={plotW} y1={y(h.price)} y2={y(h.price)} stroke={h.color} strokeDasharray="5 3" />
@@ -117,8 +175,22 @@ export function MiniChart({ bars, width, height, revealFrom, showBands, showSma,
       {showRsi && (
         <>
           <rect x={0} y={mainH + 6} width={plotW} height={rsiH} fill="#0b0826" />
-          <line x1={0} x2={plotW} y1={ry(70)} y2={ry(70)} stroke="rgba(255,79,109,0.4)" strokeDasharray="3 3" />
-          <line x1={0} x2={plotW} y1={ry(30)} y2={ry(30)} stroke="rgba(77,255,154,0.4)" strokeDasharray="3 3" />
+          <line
+            x1={0}
+            x2={plotW}
+            y1={ry(70)}
+            y2={ry(70)}
+            stroke="rgba(255,79,109,0.4)"
+            strokeDasharray="3 3"
+          />
+          <line
+            x1={0}
+            x2={plotW}
+            y1={ry(30)}
+            y2={ry(30)}
+            stroke="rgba(77,255,154,0.4)"
+            strokeDasharray="3 3"
+          />
           <polyline points={line(r, ry)} fill="none" stroke="#9d6bff" strokeWidth={1.5} />
           <text x={plotW + 4} y={mainH + 18} className="axis">
             RSI

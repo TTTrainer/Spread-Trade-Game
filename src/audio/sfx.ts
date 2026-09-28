@@ -47,21 +47,125 @@ const DEFS: Record<SfxName, SfxDef> = {
   click: { wave: 'square', freq: 900, sustain: 0.012, decay: 0.03, volume: 0.25, duty: 0.3 },
   hover: { wave: 'sine', freq: 1400, sustain: 0.005, decay: 0.02, volume: 0.08 },
   select: { wave: 'square', freq: 520, slide: 3, sustain: 0.03, decay: 0.05, volume: 0.25, duty: 0.25 },
-  deal: { wave: 'noise', freq: 3000, sustain: 0.01, decay: 0.05, volume: 0.25, lowpass: 0.6, layer: { wave: 'triangle', freq: 700, slide: 2, sustain: 0.01, decay: 0.04, volume: 0.15 } },
-  fill: { wave: 'square', freq: 523, sustain: 0.05, decay: 0.12, volume: 0.3, duty: 0.4, arp: [{ at: 0.05, mult: 1.5 }] },
-  stamp: { wave: 'noise', freq: 800, sustain: 0.02, decay: 0.16, volume: 0.5, lowpass: 0.25, layer: { wave: 'square', freq: 90, slide: 0.4, sustain: 0.03, decay: 0.12, volume: 0.45 } },
+  deal: {
+    wave: 'noise',
+    freq: 3000,
+    sustain: 0.01,
+    decay: 0.05,
+    volume: 0.25,
+    lowpass: 0.6,
+    layer: { wave: 'triangle', freq: 700, slide: 2, sustain: 0.01, decay: 0.04, volume: 0.15 },
+  },
+  fill: {
+    wave: 'square',
+    freq: 523,
+    sustain: 0.05,
+    decay: 0.12,
+    volume: 0.3,
+    duty: 0.4,
+    arp: [{ at: 0.05, mult: 1.5 }],
+  },
+  stamp: {
+    wave: 'noise',
+    freq: 800,
+    sustain: 0.02,
+    decay: 0.16,
+    volume: 0.5,
+    lowpass: 0.25,
+    layer: { wave: 'square', freq: 90, slide: 0.4, sustain: 0.03, decay: 0.12, volume: 0.45 },
+  },
   tick: { wave: 'triangle', freq: 1200, sustain: 0.004, decay: 0.025, volume: 0.15 },
-  multPop: { wave: 'square', freq: 660, slide: 4, sustain: 0.03, decay: 0.08, volume: 0.28, duty: 0.2, vibratoDepth: 0.03, vibratoSpeed: 30 },
-  coin: { wave: 'square', freq: 988, sustain: 0.06, decay: 0.2, volume: 0.28, duty: 0.5, arp: [{ at: 0.06, mult: 1.335 }] },
-  win: { wave: 'square', freq: 523, sustain: 0.36, decay: 0.3, volume: 0.28, duty: 0.35, arp: [{ at: 0.09, mult: 1.26 }, { at: 0.18, mult: 1.498 }, { at: 0.27, mult: 2 }] },
+  multPop: {
+    wave: 'square',
+    freq: 660,
+    slide: 4,
+    sustain: 0.03,
+    decay: 0.08,
+    volume: 0.28,
+    duty: 0.2,
+    vibratoDepth: 0.03,
+    vibratoSpeed: 30,
+  },
+  coin: {
+    wave: 'square',
+    freq: 988,
+    sustain: 0.06,
+    decay: 0.2,
+    volume: 0.28,
+    duty: 0.5,
+    arp: [{ at: 0.06, mult: 1.335 }],
+  },
+  win: {
+    wave: 'square',
+    freq: 523,
+    sustain: 0.36,
+    decay: 0.3,
+    volume: 0.28,
+    duty: 0.35,
+    arp: [
+      { at: 0.09, mult: 1.26 },
+      { at: 0.18, mult: 1.498 },
+      { at: 0.27, mult: 2 },
+    ],
+  },
   loss: { wave: 'saw', freq: 196, slide: 0.35, sustain: 0.15, decay: 0.3, volume: 0.35, lowpass: 0.35 },
-  stop: { wave: 'square', freq: 330, slide: 0.3, sustain: 0.1, decay: 0.2, volume: 0.3, duty: 0.5, layer: { wave: 'noise', freq: 400, sustain: 0.02, decay: 0.1, volume: 0.3, lowpass: 0.3 } },
-  whoosh: { wave: 'noise', freq: 2000, attack: 0.08, sustain: 0.05, decay: 0.15, volume: 0.25, lowpass: 0.45 },
-  error: { wave: 'square', freq: 196, sustain: 0.06, decay: 0.06, volume: 0.28, duty: 0.5, arp: [{ at: 0.07, mult: 0.8 }] },
-  decision: { wave: 'triangle', freq: 440, sustain: 0.12, decay: 0.25, volume: 0.35, arp: [{ at: 0.08, mult: 1.5 }], vibratoDepth: 0.01, vibratoSpeed: 8 },
-  boom: { wave: 'noise', freq: 200, sustain: 0.05, decay: 0.45, volume: 0.55, lowpass: 0.12, layer: { wave: 'sine', freq: 60, slide: 0.5, sustain: 0.05, decay: 0.35, volume: 0.5 } },
+  stop: {
+    wave: 'square',
+    freq: 330,
+    slide: 0.3,
+    sustain: 0.1,
+    decay: 0.2,
+    volume: 0.3,
+    duty: 0.5,
+    layer: { wave: 'noise', freq: 400, sustain: 0.02, decay: 0.1, volume: 0.3, lowpass: 0.3 },
+  },
+  whoosh: {
+    wave: 'noise',
+    freq: 2000,
+    attack: 0.08,
+    sustain: 0.05,
+    decay: 0.15,
+    volume: 0.25,
+    lowpass: 0.45,
+  },
+  error: {
+    wave: 'square',
+    freq: 196,
+    sustain: 0.06,
+    decay: 0.06,
+    volume: 0.28,
+    duty: 0.5,
+    arp: [{ at: 0.07, mult: 0.8 }],
+  },
+  decision: {
+    wave: 'triangle',
+    freq: 440,
+    sustain: 0.12,
+    decay: 0.25,
+    volume: 0.35,
+    arp: [{ at: 0.08, mult: 1.5 }],
+    vibratoDepth: 0.01,
+    vibratoSpeed: 8,
+  },
+  boom: {
+    wave: 'noise',
+    freq: 200,
+    sustain: 0.05,
+    decay: 0.45,
+    volume: 0.55,
+    lowpass: 0.12,
+    layer: { wave: 'sine', freq: 60, slide: 0.5, sustain: 0.05, decay: 0.35, volume: 0.5 },
+  },
   reveal: { wave: 'triangle', freq: 392, slide: 1.8, sustain: 0.1, decay: 0.2, volume: 0.3 },
-  buy: { wave: 'square', freq: 392, sustain: 0.05, decay: 0.12, volume: 0.3, duty: 0.4, arp: [{ at: 0.05, mult: 1.26 }] },
+  buy: {
+    wave: 'square',
+    freq: 392,
+    sustain: 0.05,
+    decay: 0.12,
+    volume: 0.3,
+    duty: 0.4,
+    arp: [{ at: 0.05, mult: 1.26 }],
+  },
 };
 
 const RATE = 44100;
@@ -108,7 +212,12 @@ function render(def: SfxDef): Float32Array {
         break;
     }
     lp += lpAlpha * (s - lp);
-    const env = t < attack ? t / attack : t < attack + def.sustain ? 1 : Math.max(0, 1 - (t - attack - def.sustain) / def.decay);
+    const env =
+      t < attack
+        ? t / attack
+        : t < attack + def.sustain
+          ? 1
+          : Math.max(0, 1 - (t - attack - def.sustain) / def.decay);
     out[i] = lp * env * (def.volume ?? 0.3);
     freq *= slidePerSample;
   }

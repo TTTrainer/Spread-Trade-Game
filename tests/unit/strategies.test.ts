@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { computeEdgeRank, edgeRatio } from '../../src/engine/strategies/edgeRank';
-import { computeMetrics, envFromChain, expectedMove, legsValue, netClosePrice, netOpenPrice, payoffAtExpiry, plainGreeks, probabilityOfProfit, spreadWidth } from '../../src/engine/strategies/metrics';
-import { ALL_STRUCTURES, buildStructure, expirationsOf, findQuote, reverseOf, stepStrike, strikeByDelta, strikeStep, STRUCTURES } from '../../src/engine/strategies/structures';
+import {
+  computeMetrics,
+  envFromChain,
+  expectedMove,
+  legsValue,
+  netClosePrice,
+  netOpenPrice,
+  payoffAtExpiry,
+  plainGreeks,
+  probabilityOfProfit,
+  spreadWidth,
+} from '../../src/engine/strategies/metrics';
+import {
+  ALL_STRUCTURES,
+  buildStructure,
+  expirationsOf,
+  findQuote,
+  reverseOf,
+  stepStrike,
+  strikeByDelta,
+  strikeStep,
+  STRUCTURES,
+} from '../../src/engine/strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../../src/engine/strategies/types';
 import { flatChain } from '../helpers/market';
 
@@ -10,7 +31,12 @@ const BACK = '2025-02-28';
 const chain = flatChain({ date: '2025-01-03', spot: 100, expirations: [FRONT, BACK] });
 
 const legsOf = (id: StructureId, extra = {}) => {
-  const r = buildStructure(id, chain, { expiration: FRONT, backExpiration: BACK, ...STRUCTURES[id].defaults, ...extra });
+  const r = buildStructure(id, chain, {
+    expiration: FRONT,
+    backExpiration: BACK,
+    ...STRUCTURES[id].defaults,
+    ...extra,
+  });
   if (!r.ok) throw new Error(`${id}: ${r.reason}`);
   return r.legs;
 };
@@ -32,7 +58,9 @@ describe('structures', () => {
     expect(long.strike).toBe(short.strike - 2);
     const bc = legsOf('bear_call') as OptionLeg[];
     expect(bc.find((l) => l.ratio < 0)?.right).toBe('C');
-    expect((bc.find((l) => l.ratio > 0) as OptionLeg).strike).toBeGreaterThan((bc.find((l) => l.ratio < 0) as OptionLeg).strike);
+    expect((bc.find((l) => l.ratio > 0) as OptionLeg).strike).toBeGreaterThan(
+      (bc.find((l) => l.ratio < 0) as OptionLeg).strike,
+    );
   });
 
   it('explain illegal builds in plain words', () => {
@@ -60,14 +88,20 @@ describe('structures', () => {
     expect(stepStrike(chain, FRONT, 'P', 80, -1)).toBeNull();
     expect(strikeStep(chain, FRONT)).toBe(1);
     expect(strikeByDelta(chain, FRONT, 'C', 0.5)?.strike).toBeCloseTo(101, 0);
-    const anchored = buildStructure('bull_put', chain, { expiration: FRONT, delta: 0.3, width: 3, anchor: 92.4 });
+    const anchored = buildStructure('bull_put', chain, {
+      expiration: FRONT,
+      delta: 0.3,
+      width: 3,
+      anchor: 92.4,
+    });
     expect(anchored.ok && (anchored.legs[0] as OptionLeg).strike).toBe(92);
   });
 });
 
 describe('payoff tables', () => {
   const env = envFromChain(chain, 0.03);
-  const payoff = (legs: Leg[], net: number, s: number) => Math.round(payoffAtExpiry(legs, net, s, env) * 1e6) / 1e6;
+  const payoff = (legs: Leg[], net: number, s: number) =>
+    Math.round(payoffAtExpiry(legs, net, s, env) * 1e6) / 1e6;
 
   it('credit verticals', () => {
     const legs: Leg[] = [
@@ -169,8 +203,12 @@ describe('pricing spreads from legs', () => {
     const closeNat = netClosePrice(legs, chain, 'natural') as number;
     expect(mid - closeNat).toBeGreaterThan(0.09);
     expect(mid - closeNat).toBeLessThan(0.13);
-    expect(netOpenPrice([{ kind: 'option', right: 'P', strike: 1, expiration: FRONT, ratio: 1 }], chain, 'mid')).toBeNull();
-    expect(netClosePrice([{ kind: 'option', right: 'P', strike: 1, expiration: FRONT, ratio: 1 }], chain, 'mid')).toBeNull();
+    expect(
+      netOpenPrice([{ kind: 'option', right: 'P', strike: 1, expiration: FRONT, ratio: 1 }], chain, 'mid'),
+    ).toBeNull();
+    expect(
+      netClosePrice([{ kind: 'option', right: 'P', strike: 1, expiration: FRONT, ratio: 1 }], chain, 'mid'),
+    ).toBeNull();
     expect(spreadWidth(legs)).toBe(2);
     expect(expectedMove(chain, FRONT)).toBeGreaterThan(4);
     expect(expectedMove(chain, '2030-01-01')).toBeNull();
@@ -196,7 +234,9 @@ describe('pricing spreads from legs', () => {
     expect(lines[1]).toMatch(/If the stock rises \$1, you make about/);
     expect(lines[2]).toMatch(/drops 1 point, you make/);
     expect(plainGreeks({ delta: 0, gamma: 0, theta: 0, vega: 0 }, 1)[0]).toMatch(/barely/);
-    expect(plainGreeks({ delta: -30, gamma: 0.5, theta: -3, vega: 8 }, 1).join(' ')).toMatch(/costs you.*lose.*lose.*help/);
+    expect(plainGreeks({ delta: -30, gamma: 0.5, theta: -3, vega: 8 }, 1).join(' ')).toMatch(
+      /costs you.*lose.*lose.*help/,
+    );
   });
 });
 

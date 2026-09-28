@@ -30,7 +30,8 @@ export function SandboxSetup() {
   useEffect(() => {
     void src.symbols().then((s) => {
       setSymbols(s);
-      if (s.length && !picks[0].symbol) setPicks([{ symbol: s.find((x) => !x.isEtf)?.symbol ?? s[0].symbol, window: null }]);
+      if (s.length && !picks[0].symbol)
+        setPicks([{ symbol: s.find((x) => !x.isEtf)?.symbol ?? s[0].symbol, window: null }]);
     });
   }, []);
 
@@ -74,7 +75,12 @@ export function SandboxSetup() {
           blind: false,
         }),
       );
-      for (let i = 0; i < ready.length; i++) await session.dispatch({ t: 'addCard', cardId: `c${i + 1}`, windowId: (ready[i].window as WindowDef).id });
+      for (let i = 0; i < ready.length; i++)
+        await session.dispatch({
+          t: 'addCard',
+          cardId: `c${i + 1}`,
+          windowId: (ready[i].window as WindowDef).id,
+        });
       useTrading.getState().init(session, { recordMode: 'sandbox' });
       sfx('whoosh');
       go('trading');
@@ -89,18 +95,30 @@ export function SandboxSetup() {
   return (
     <div className="screen sandbox-setup" data-testid="sandbox-setup">
       <h1 className="screen-title">SANDBOX</h1>
-      <p className="screen-sub">Open mode: any ticker, any date, every tool, no score. Study the events that made or broke traders.</p>
+      <p className="screen-sub">
+        Open mode: any ticker, any date, every tool, no score. Study the events that made or broke traders.
+      </p>
       <div className="setup-grid">
         <div className="panel setup-col">
           <div className="section-title">Tickers ({picks.length}/3)</div>
           <div className="pick-tabs">
             {picks.map((p, i) => (
-              <button key={i} className={`pixel-btn ${i === active ? 'primary' : ''}`} onClick={() => setActive(i)}>
+              <button
+                key={i}
+                className={`pixel-btn ${i === active ? 'primary' : ''}`}
+                onClick={() => setActive(i)}
+              >
                 {p.symbol || '—'} {p.window ? p.window.entryDate : ''}
               </button>
             ))}
             {picks.length < 3 && (
-              <button className="pixel-btn" onClick={() => (setPicks([...picks, { symbol: symbols[0]?.symbol ?? '', window: null }]), setActive(picks.length))}>
+              <button
+                className="pixel-btn"
+                onClick={() => (
+                  setPicks([...picks, { symbol: symbols[0]?.symbol ?? '', window: null }]),
+                  setActive(picks.length)
+                )}
+              >
                 + ADD
               </button>
             )}
@@ -117,7 +135,10 @@ export function SandboxSetup() {
                 data-testid={`sym-${s.symbol}`}
               >
                 <b>{s.symbol}</b>
-                <span className="dim">{s.kind === 'synthetic' ? 'SIM · ' : ''}{s.sector}</span>
+                <span className="dim">
+                  {s.kind === 'synthetic' ? 'SIM · ' : ''}
+                  {s.sector}
+                </span>
               </button>
             ))}
           </div>
@@ -128,33 +149,63 @@ export function SandboxSetup() {
           <div className="seg num">
             {(['all', 'earnings', 'gaps', 'highiv'] as const).map((f) => (
               <button key={f} className={filter === f ? 'sel' : ''} onClick={() => setFilter(f)}>
-                {f === 'all' ? 'ALL DATES' : f === 'earnings' ? 'EARNINGS AHEAD' : f === 'gaps' ? 'BIG GAPS AHEAD' : 'IV RANK 60+'}
+                {f === 'all'
+                  ? 'ALL DATES'
+                  : f === 'earnings'
+                    ? 'EARNINGS AHEAD'
+                    : f === 'gaps'
+                      ? 'BIG GAPS AHEAD'
+                      : 'IV RANK 60+'}
               </button>
             ))}
           </div>
           <div className="date-pick num">
-            <input type="range" min={0} max={Math.max(0, filtered.length - 1)} value={Math.min(idx, filtered.length - 1)} onChange={(e) => setIdx(Number(e.target.value))} data-testid="date-slider" />
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, filtered.length - 1)}
+              value={Math.min(idx, filtered.length - 1)}
+              onChange={(e) => setIdx(Number(e.target.value))}
+              data-testid="date-slider"
+            />
             <div className="date-label" data-testid="date-label">
               {chosen ? chosen.entryDate : 'no dates'} <span className="dim">({filtered.length} dates)</span>
             </div>
             {chosen && (
               <div className="dim">
-                IVR {chosen.tags.ivr.toFixed(0)} · VIX {chosen.tags.vix.toFixed(1)} · ADX {chosen.tags.adx.toFixed(0)} {chosen.recent ? '· recent' : ''}
+                IVR {chosen.tags.ivr.toFixed(0)} · VIX {chosen.tags.vix.toFixed(1)} · ADX{' '}
+                {chosen.tags.adx.toFixed(0)} {chosen.recent ? '· recent' : ''}
               </div>
             )}
             <div className="modal-actions">
               <button className="pixel-btn" onClick={() => setIdx(Math.max(0, filtered.length - 1))}>
                 LATEST
               </button>
-              <button className="pixel-btn" onClick={() => setIdx(Math.floor(Math.random() * filtered.length))}>
+              <button
+                className="pixel-btn"
+                onClick={() => setIdx(Math.floor(Math.random() * filtered.length))}
+              >
                 RANDOM
               </button>
             </div>
           </div>
           <div className="section-title">Starting capital</div>
-          <input className="num capital" type="number" min={1000} max={100000} step={500} value={capital} onChange={(e) => setCapital(Math.max(1000, Math.min(100000, Number(e.target.value))))} />
+          <input
+            className="num capital"
+            type="number"
+            min={1000}
+            max={100000}
+            step={500}
+            value={capital}
+            onChange={(e) => setCapital(Math.max(1000, Math.min(100000, Number(e.target.value))))}
+          />
           <div className="modal-actions">
-            <button className="pixel-btn primary" onClick={() => void start()} disabled={busy || !picks.some((p) => p.window)} data-testid="sandbox-start">
+            <button
+              className="pixel-btn primary"
+              onClick={() => void start()}
+              disabled={busy || !picks.some((p) => p.window)}
+              data-testid="sandbox-start"
+            >
               {busy ? 'LOADING…' : 'OPEN THE DESK ▶'}
             </button>
             <button className="pixel-btn" onClick={() => useApp.getState().back()}>
@@ -188,7 +239,11 @@ export function SandboxTrading() {
       }
       onDone={
         <div className="modal-actions done-actions">
-          <button className="pixel-btn primary" onClick={() => go('sandboxSetup')} data-testid="sandbox-again">
+          <button
+            className="pixel-btn primary"
+            onClick={() => go('sandboxSetup')}
+            data-testid="sandbox-again"
+          >
             NEW SANDBOX
           </button>
           <button className="pixel-btn" onClick={home}>

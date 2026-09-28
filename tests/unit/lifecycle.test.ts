@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../../src/engine/rng';
-import { adjustAction, closeAction, exerciseAction, forceCloseAtWindowEnd, rollAction, sellSharesAtOpen } from '../../src/engine/lifecycle/actions';
-import { atClose, DEFAULT_REALISM, defaultPause, endOfDay, daysToExpiry, type DayContext } from '../../src/engine/lifecycle/daily';
-import { defaultBrackets, mergeLegs, openPosition, plIfClosedAt, stockRatio } from '../../src/engine/lifecycle/position';
+import {
+  adjustAction,
+  closeAction,
+  exerciseAction,
+  forceCloseAtWindowEnd,
+  rollAction,
+  sellSharesAtOpen,
+} from '../../src/engine/lifecycle/actions';
+import {
+  atClose,
+  DEFAULT_REALISM,
+  defaultPause,
+  endOfDay,
+  daysToExpiry,
+  type DayContext,
+} from '../../src/engine/lifecycle/daily';
+import {
+  defaultBrackets,
+  mergeLegs,
+  openPosition,
+  plIfClosedAt,
+  stockRatio,
+} from '../../src/engine/lifecycle/position';
 import type { DayBook, EntrySnapshot, Position } from '../../src/engine/lifecycle/types';
 import type { Leg, OptionLeg } from '../../src/engine/strategies/types';
 import { bookFromChain, flatBook, flatChain } from '../helpers/market';
@@ -47,7 +67,14 @@ const bullPut: Leg[] = [
 ];
 
 function ctx(over: Partial<DayContext> = {}): DayContext {
-  return { realism: { ...DEFAULT_REALISM }, pause: defaultPause(), autoBrackets: false, suppressOnGap: false, rng: new Rng('ctx'), ...over };
+  return {
+    realism: { ...DEFAULT_REALISM },
+    pause: defaultPause(),
+    autoBrackets: false,
+    suppressOnGap: false,
+    rng: new Rng('ctx'),
+    ...over,
+  };
 }
 
 function open(legs = bullPut, qty = 2, fill = -1.5, book?: DayBook): Position {
@@ -71,7 +98,8 @@ function open(legs = bullPut, qty = 2, fill = -1.5, book?: DayBook): Position {
   });
 }
 
-const day = (date: string, spot: number, extra: Partial<DayBook> = {}, vol = 0.3) => flatBook({ date, spot, vol, expirations: [EXP, '2025-02-28'] }, extra);
+const day = (date: string, spot: number, extra: Partial<DayBook> = {}, vol = 0.3) =>
+  flatBook({ date, spot, vol, expirations: [EXP, '2025-02-28'] }, extra);
 
 describe('opening and marking', () => {
   it('books the credit as integer cents and P/L = cash + value - fees', () => {
@@ -123,7 +151,11 @@ describe('brackets and decision points', () => {
       { kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: 1 },
     ];
     const bc = open(bearCall, 1, -2);
-    const ex = atClose(bc, day('2025-01-06', 102, { exDivTomorrow: { symbol: 'TEST', exDate: '2025-01-07', amount: 0.8 } }), ctx());
+    const ex = atClose(
+      bc,
+      day('2025-01-06', 102, { exDivTomorrow: { symbol: 'TEST', exDate: '2025-01-07', amount: 0.8 } }),
+      ctx(),
+    );
     expect(ex.decisions.map((d) => d.kind)).toContain('exdiv_itm_call');
     const pin = atClose(p, day(EXP, 92.5), ctx());
     expect(pin.decisions.map((d) => d.kind)).toContain('pin_risk');
@@ -167,7 +199,12 @@ describe('expiration', () => {
     expect(stockRatio(r.pos.legs)).toBe(1); // long 200 shares (1 per unit x 2 units)
     const next = atClose(r.pos, day('2025-02-03', 93, { open: 92 }), ctx());
     expect(next.decisions.map((d) => d.kind)).toContain('assigned_shares');
-    const sold = sellSharesAtOpen(next.pos, { book: day('2025-02-03', 93, { open: 92 }), rng: new Rng('x'), feesOn: false, bidAsk: true });
+    const sold = sellSharesAtOpen(next.pos, {
+      book: day('2025-02-03', 93, { open: 92 }),
+      rng: new Rng('x'),
+      feesOn: false,
+      bidAsk: true,
+    });
     expect(sold.pos.status).toBe('closed');
     // Paid 95 for shares, sold at 92: -3 x 200 = -600, plus the 300 credit.
     expect(sold.pos.realizedCents).toBe(30000 - 60000);
@@ -183,37 +220,65 @@ describe('expiration', () => {
     expect(assigned).toBeGreaterThan(150);
     expect(assigned).toBeLessThan(250);
     const again = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday;
-    expect(endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday).toBe(again);
+    expect(endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday).toBe(
+      again,
+    );
   });
 
   it('cash-settles at intrinsic when expiration mechanics are off', () => {
     const p = open();
-    const r = endOfDay(p, day(EXP, 92.8), ctx({ realism: { ...DEFAULT_REALISM, expirationMechanics: false } }));
+    const r = endOfDay(
+      p,
+      day(EXP, 92.8),
+      ctx({ realism: { ...DEFAULT_REALISM, expirationMechanics: false } }),
+    );
     expect(r.pos.status).toBe('closed');
     expect(r.pos.realizedCents).toBe(30000 - 44000);
   });
 });
 
 describe('early assignment and dividends', () => {
-  it('assigns an ITM short call whose extrinsic is below tomorrow\'s dividend', () => {
+  it("assigns an ITM short call whose extrinsic is below tomorrow's dividend", () => {
     const call: Leg[] = [{ kind: 'option', right: 'C', strike: 90, expiration: EXP, ratio: -1 }];
     const p = open(call, 1, -10.5);
-    const book = flatBook({ date: '2025-01-28', spot: 101, vol: 0.05, expirations: [EXP] }, { exDivTomorrow: { symbol: 'T', exDate: '2025-01-29', amount: 1 } });
+    const book = flatBook(
+      { date: '2025-01-28', spot: 101, vol: 0.05, expirations: [EXP] },
+      { exDivTomorrow: { symbol: 'T', exDate: '2025-01-29', amount: 1 } },
+    );
     const r = endOfDay(p, book, ctx());
     expect(r.assignedToday).toBe(true);
     expect(stockRatio(r.pos.legs)).toBe(-1);
     // Short stock pays the dividend on the ex-date.
-    const exd = atClose(r.pos, flatBook({ date: '2025-01-29', spot: 100, expirations: [EXP] }, { exDivToday: { symbol: 'T', exDate: '2025-01-29', amount: 1 } }), ctx());
+    const exd = atClose(
+      r.pos,
+      flatBook(
+        { date: '2025-01-29', spot: 100, expirations: [EXP] },
+        { exDivToday: { symbol: 'T', exDate: '2025-01-29', amount: 1 } },
+      ),
+      ctx(),
+    );
     expect(exd.pos.flags.dividendsCents).toBe(-10000); // short 100 shares pays $1 each
   });
 
   it('can assign deep in-the-money short puts early (seeded)', () => {
     const csp: Leg[] = [{ kind: 'option', right: 'P', strike: 110, expiration: EXP, ratio: -1 }];
     let n = 0;
-    for (let i = 0; i < 200; i++) if (endOfDay(open(csp, 1, -3), flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }), ctx({ rng: new Rng(`ea${i}`) })).assignedToday) n++;
+    for (let i = 0; i < 200; i++)
+      if (
+        endOfDay(
+          open(csp, 1, -3),
+          flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }),
+          ctx({ rng: new Rng(`ea${i}`) }),
+        ).assignedToday
+      )
+        n++;
     expect(n).toBeGreaterThan(20);
     expect(n).toBeLessThan(65);
-    const off = endOfDay(open(csp, 1, -3), flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }), ctx({ realism: { ...DEFAULT_REALISM, earlyAssignment: false } }));
+    const off = endOfDay(
+      open(csp, 1, -3),
+      flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }),
+      ctx({ realism: { ...DEFAULT_REALISM, earlyAssignment: false } }),
+    );
     expect(off.assignedToday).toBe(false);
   });
 });
@@ -251,7 +316,12 @@ describe('player actions', () => {
     // Rolling costs only execution and fees versus holding the old legs at mid.
     expect(before - after).toBeGreaterThan(0);
     expect(before - after).toBeLessThan(5000);
-    const missing = rollAction(p, [{ kind: 'option', right: 'P', strike: 1, expiration: '2025-02-28', ratio: -1 }], { type: 'market' }, env(b));
+    const missing = rollAction(
+      p,
+      [{ kind: 'option', right: 'P', strike: 1, expiration: '2025-02-28', ratio: -1 }],
+      { type: 'market' },
+      env(b),
+    );
     expect(missing.fill.filled).toBe(false);
   });
 
@@ -284,7 +354,9 @@ describe('player actions', () => {
 
   it('models a mark when a quote is missing', () => {
     const p = open();
-    const sparse = bookFromChain(flatChain({ date: '2025-01-10', spot: 60, expirations: [EXP], strikes: [50, 55, 60] }));
+    const sparse = bookFromChain(
+      flatChain({ date: '2025-01-10', spot: 60, expirations: [EXP], strikes: [50, 55, 60] }),
+    );
     const r = atClose(p, sparse, ctx());
     expect(r.pos.marks.at(-1)?.modeled).toBe(true);
     expect(r.pos.marks.at(-1)?.value).toBeCloseTo(-5, 1);

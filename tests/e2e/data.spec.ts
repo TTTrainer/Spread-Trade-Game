@@ -9,7 +9,12 @@ test('market data flows over IPC and the main process refuses the future', async
   await expect(page.getByTestId('data-status')).toContainText('MARKET: SIM');
   const ok = await page.evaluate(async () => {
     const stg = (window as unknown as { stg: { invoke: (...a: unknown[]) => Promise<unknown> } }).stg;
-    const bars = (await stg.invoke('market.call', 'bars', ['HLXR', '2024-01-02', '2024-01-12'], '2024-01-12')) as unknown[];
+    const bars = (await stg.invoke(
+      'market.call',
+      'bars',
+      ['HLXR', '2024-01-02', '2024-01-12'],
+      '2024-01-12',
+    )) as unknown[];
     let blocked = '';
     try {
       await stg.invoke('market.call', 'bars', ['HLXR', '2024-01-02', '2024-02-12'], '2024-01-12');
@@ -37,8 +42,15 @@ test('reads a built game.db through the main process', async () => {
   await expect(page.getByTestId('data-status')).toContainText('tickers');
   const chainLen = await page.evaluate(async () => {
     const stg = (window as unknown as { stg: { invoke: (...a: unknown[]) => Promise<unknown> } }).stg;
-    const wins = (await stg.invoke('market.call', 'windows', [{ symbols: ['HLXR'], limit: 1 }], null)) as { entryDate: string }[];
-    const chain = (await stg.invoke('market.call', 'chain', ['HLXR', wins[0].entryDate], wins[0].entryDate)) as { quotes: unknown[] };
+    const wins = (await stg.invoke('market.call', 'windows', [{ symbols: ['HLXR'], limit: 1 }], null)) as {
+      entryDate: string;
+    }[];
+    const chain = (await stg.invoke(
+      'market.call',
+      'chain',
+      ['HLXR', wins[0].entryDate],
+      wins[0].entryDate,
+    )) as { quotes: unknown[] };
     return chain.quotes.length;
   });
   expect(chainLen).toBeGreaterThan(100);

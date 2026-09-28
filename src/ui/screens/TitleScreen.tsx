@@ -82,7 +82,8 @@ export function TitleScreen() {
         {data && (
           <span className="title-data" data-testid="data-status">
             {' '}
-            · MARKET: {data.kind === 'synthetic' ? 'SIM' : 'REAL'} · {data.symbols} tickers · through {data.lastDate}
+            · MARKET: {data.kind === 'synthetic' ? 'SIM' : 'REAL'} · {data.symbols} tickers · through{' '}
+            {data.lastDate}
           </span>
         )}
       </div>

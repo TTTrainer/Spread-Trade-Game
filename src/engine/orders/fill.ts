@@ -53,7 +53,12 @@ export interface FillResult {
 }
 
 /** Fill probability for a limit, before the dice roll. */
-export function limitFillProbability(q: ComboQuote, limit: number, mods: ExecutionMods = BASE_EXECUTION, pMid = FILL_P_AT_MID): number {
+export function limitFillProbability(
+  q: ComboQuote,
+  limit: number,
+  mods: ExecutionMods = BASE_EXECUTION,
+  pMid = FILL_P_AT_MID,
+): number {
   const half = q.natural - q.mid; // >= 0 for a cost convention
   if (half <= 1e-12) return limit >= q.natural - 1e-9 ? 1 : 0;
   const eff = limit + mods.limitBoost * half;
@@ -72,14 +77,26 @@ export function marketPrice(q: ComboQuote, mods: ExecutionMods = BASE_EXECUTION,
   return Math.min(q.natural, q.mid + half * (1 - improve) + half * extra);
 }
 
-export function attemptFill(q: ComboQuote, a: FillAttempt, rng: Rng, mods: ExecutionMods = BASE_EXECUTION): FillResult {
+export function attemptFill(
+  q: ComboQuote,
+  a: FillAttempt,
+  rng: Rng,
+  mods: ExecutionMods = BASE_EXECUTION,
+): FillResult {
   if (a.atMid) return { filled: true, price: q.mid, probability: 1 };
   if (a.type === 'market') {
-    if (mods.marketOrdersDisabled) return { filled: false, price: q.natural, probability: 0, reason: 'Market orders are disabled this round.' };
+    if (mods.marketOrdersDisabled)
+      return {
+        filled: false,
+        price: q.natural,
+        probability: 0,
+        reason: 'Market orders are disabled this round.',
+      };
     return { filled: true, price: marketPrice(q, mods, a.isRoll), probability: 1 };
   }
   const limit = a.limit ?? q.mid;
-  if (limit >= q.natural - 1e-9) return { filled: true, price: marketPrice(q, mods, a.isRoll), probability: 1 };
+  if (limit >= q.natural - 1e-9)
+    return { filled: true, price: marketPrice(q, mods, a.isRoll), probability: 1 };
   const p = limitFillProbability(q, limit, mods);
   const roll = rng.next();
   return { filled: roll < p, price: limit, probability: p };

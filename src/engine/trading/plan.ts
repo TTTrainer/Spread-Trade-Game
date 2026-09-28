@@ -98,7 +98,13 @@ export function meetsRR(id: StructureId, m: TradeMetrics, ctx: MarketContext, dt
  * cash-secured puts can in theory lose nearly the whole collateral, so the cap uses a stress loss
  * (a drop of 3 expected moves, at least 25%) and the full collateral must still fit in equity.
  */
-function riskFor(id: StructureId, m: TradeMetrics, spot: number, legs: Leg[], qty: number): { risk: Cents; collateral: Cents; maxLoss: Cents } {
+function riskFor(
+  id: StructureId,
+  m: TradeMetrics,
+  spot: number,
+  legs: Leg[],
+  qty: number,
+): { risk: Cents; collateral: Cents; maxLoss: Cents } {
   const maxLoss = contractCents(m.maxLoss, qty);
   if (id === 'cash_secured_put' || id === 'covered_call') {
     const emPct = m.expectedMove !== null && spot > 0 ? m.expectedMove / spot : 0.08;
@@ -106,8 +112,12 @@ function riskFor(id: StructureId, m: TradeMetrics, spot: number, legs: Leg[], qt
     const stressSpot = spot * (1 - drop);
     const k = optionLegs(legs)[0]?.strike ?? spot;
     const credit = id === 'covered_call' ? spot - m.entryNet : -m.entryNet;
-    const stressLoss = id === 'cash_secured_put' ? Math.max(0, k - stressSpot - credit) : Math.max(0, spot - stressSpot - credit);
-    const collateral = id === 'cash_secured_put' ? contractCents(k - credit, qty) : contractCents(spot - credit, qty);
+    const stressLoss =
+      id === 'cash_secured_put'
+        ? Math.max(0, k - stressSpot - credit)
+        : Math.max(0, spot - stressSpot - credit);
+    const collateral =
+      id === 'cash_secured_put' ? contractCents(k - credit, qty) : contractCents(spot - credit, qty);
     return { risk: contractCents(stressLoss, qty), collateral, maxLoss };
   }
   const collateral = m.entryNet > 0 ? contractCents(m.entryNet, qty) : maxLoss;
@@ -129,13 +139,28 @@ export function planTrade(i: PlanInput): TradePlan {
   const def = STRUCTURES[i.structureId];
   const metrics = computeMetrics(legs, i.chain, def, i.rate, i.ctx.divYield, mid);
   if (!metrics) return { ...empty(i, 'One of the legs has no quote today.'), legs };
-  if (def.credit && metrics.entryNet >= 0 && i.structureId !== 'covered_call') return { ...empty(i, 'This build collects no credit at mid. Move the short strike closer or widen.'), legs };
-  if (metrics.width === 0 && ['bull_put', 'bear_call', 'bull_call', 'bear_put', 'iron_condor', 'iron_fly', 'bwb_condor'].includes(i.structureId))
+  if (def.credit && metrics.entryNet >= 0 && i.structureId !== 'covered_call')
+    return {
+      ...empty(i, 'This build collects no credit at mid. Move the short strike closer or widen.'),
+      legs,
+    };
+  if (
+    metrics.width === 0 &&
+    ['bull_put', 'bear_call', 'bull_call', 'bear_put', 'iron_condor', 'iron_fly', 'bwb_condor'].includes(
+      i.structureId,
+    )
+  )
     return { ...empty(i, 'Width is zero. Pick two different strikes.'), legs };
   const exp = frontExpiration(legs);
   const dte = exp ? diffDays(i.chain.date, exp) : null;
   const { risk, collateral, maxLoss } = riskFor(i.structureId, metrics, i.chain.spot, legs, i.qty);
-  const riskCheck = checkRisk({ maxLossCents: risk, collateralCents: collateral, equityCents: i.equityCents, riskCapPct: i.riskCapPct, reservedCents: i.reservedCents });
+  const riskCheck = checkRisk({
+    maxLossCents: risk,
+    collateralCents: collateral,
+    equityCents: i.equityCents,
+    riskCapPct: i.riskCapPct,
+    reservedCents: i.reservedCents,
+  });
   const edge = computeEdgeRank(i.structureId, legs, i.chain);
   const goodRR = dte !== null && meetsRR(i.structureId, metrics, i.ctx, dte);
   const shortStrikes = optionLegs(legs)
@@ -172,6 +197,7 @@ export function planTrade(i: PlanInput): TradePlan {
     atr: i.ctx.atr,
     credit: metrics.entryNet < 0,
     fillVsMidCents: 0,
+    goodRR,
   };
   return {
     ok: riskCheck.ok,
@@ -197,9 +223,15 @@ export function planTrade(i: PlanInput): TradePlan {
 }
 
 /** Largest whole number of contracts that fits the risk cap and buying power. */
-export function maxContracts(plan1: TradePlan, equityCents: Cents, riskCapPct: number, reservedCents: Cents): number {
+export function maxContracts(
+  plan1: TradePlan,
+  equityCents: Cents,
+  riskCapPct: number,
+  reservedCents: Cents,
+): number {
   if (!plan1.metrics || plan1.qty !== 1) return 0;
   const byRisk = plan1.riskCents > 0 ? Math.floor((equityCents * riskCapPct) / plan1.riskCents) : 0;
-  const byBp = plan1.collateralCents > 0 ? Math.floor((equityCents - reservedCents) / plan1.collateralCents) : 0;
+  const byBp =
+    plan1.collateralCents > 0 ? Math.floor((equityCents - reservedCents) / plan1.collateralCents) : 0;
   return Math.max(0, Math.min(byRisk, byBp));
 }

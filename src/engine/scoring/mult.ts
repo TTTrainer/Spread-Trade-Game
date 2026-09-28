@@ -58,7 +58,11 @@ export function pnlChips(realizedCents: Cents, roundStartEquityCents: Cents): nu
  * Run the pipeline. `steps` must already be in order: base additive sources, then Edge Rank,
  * then cartridges in slot order (the caller builds the list).
  */
-export function runScore(realizedCents: Cents, roundStartEquityCents: Cents, steps: ScoreStep[]): ScoreResult {
+export function runScore(
+  realizedCents: Cents,
+  roundStartEquityCents: Cents,
+  steps: ScoreStep[],
+): ScoreResult {
   const base = pnlChips(realizedCents, roundStartEquityCents);
   const winner = realizedCents > 0;
   const trace: TraceRow[] = [{ label: 'P/L', op: 'chips', value: base, chips: base, mult: 1 }];
@@ -82,14 +86,23 @@ export function levelSteps(level: number, baseChips: number): ScoreStep[] {
   const s = BALANCE.scoring;
   const steps: ScoreStep[] = [{ label: 'Structure base', kind: 'base', op: 'chips', value: baseChips }];
   if (level > 1) {
-    steps.push({ label: `Level ${level} chips`, kind: 'level', op: 'chips', value: (level - 1) * s.levelChips });
+    steps.push({
+      label: `Level ${level} chips`,
+      kind: 'level',
+      op: 'chips',
+      value: (level - 1) * s.levelChips,
+    });
     steps.push({ label: `Level ${level}`, kind: 'level', op: 'add', value: (level - 1) * s.levelMult });
   }
   return steps;
 }
 
-export function edgeStep(tier: 'top10' | 'top25' | 'none' | null, top10: number = BALANCE.scoring.edgeTop10): ScoreStep | null {
+export function edgeStep(
+  tier: 'top10' | 'top25' | 'none' | null,
+  top10: number = BALANCE.scoring.edgeTop10,
+): ScoreStep | null {
   if (tier === 'top10') return { label: 'Edge Rank top 10%', kind: 'edge', op: 'mul', value: top10 };
-  if (tier === 'top25') return { label: 'Edge Rank top 25%', kind: 'edge', op: 'mul', value: BALANCE.scoring.edgeTop25 };
+  if (tier === 'top25')
+    return { label: 'Edge Rank top 25%', kind: 'edge', op: 'mul', value: BALANCE.scoring.edgeTop25 };
   return null;
 }

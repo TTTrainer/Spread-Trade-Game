@@ -49,7 +49,9 @@ export function edgeRatio(id: StructureId, legs: Leg[], chain: Chain): number | 
 }
 
 function deltaOf(chain: Chain, leg: OptionLeg): number | null {
-  const q = chain.quotes.find((x) => x.expiration === leg.expiration && x.right === leg.right && Math.abs(x.strike - leg.strike) < 1e-6);
+  const q = chain.quotes.find(
+    (x) => x.expiration === leg.expiration && x.right === leg.right && Math.abs(x.strike - leg.strike) < 1e-6,
+  );
   return q ? Math.abs(q.delta) : null;
 }
 
@@ -68,7 +70,9 @@ export function computeEdgeRank(id: StructureId, legs: Leg[], chain: Chain): Edg
   const inc = strikeStep(chain, exp);
   const width = spreadWidth(legs);
   const right = shorts[0].right;
-  const candidates = quotesFor(chain, exp, right).filter((q) => Math.abs(Math.abs(q.delta) - anchorDelta) <= 0.05 + 1e-9);
+  const candidates = quotesFor(chain, exp, right).filter(
+    (q) => Math.abs(Math.abs(q.delta) - anchorDelta) <= 0.05 + 1e-9,
+  );
   const ratios: number[] = [];
   const widthSteps = [1, 2, 3, 4, 5, 6, 8, 10];
   for (const q of candidates) {
@@ -91,7 +95,11 @@ export function computeEdgeRank(id: StructureId, legs: Leg[], chain: Chain): Edg
     // Condors vary both short deltas together; widen the comparable set by delta alone.
     for (const d of [-0.05, -0.03, -0.01, 0.01, 0.03, 0.05]) {
       for (const steps of widthSteps) {
-        const built = buildStructure(id, chain, { expiration: exp, delta: Math.max(0.03, anchorDelta + d), width: steps });
+        const built = buildStructure(id, chain, {
+          expiration: exp,
+          delta: Math.max(0.03, anchorDelta + d),
+          width: steps,
+        });
         if (!built.ok) continue;
         if (Math.abs(spreadWidth(built.legs) - width) > inc + 1e-9) continue;
         const r = edgeRatio(id, built.legs, chain);
@@ -101,7 +109,8 @@ export function computeEdgeRank(id: StructureId, legs: Leg[], chain: Chain): Edg
   }
   ratios.push(mine);
   const unique = ratios.length;
-  if (unique < EDGE_MIN_COMPARABLES) return { ratio: mine, percentile: 0.5, rank: 1, of: unique, tier: 'none' };
+  if (unique < EDGE_MIN_COMPARABLES)
+    return { ratio: mine, percentile: 0.5, rank: 1, of: unique, tier: 'none' };
   const better = ratios.filter((r) => r > mine + 1e-12).length;
   const beatsOrTies = ratios.filter((r) => r <= mine + 1e-12).length;
   const percentile = beatsOrTies / unique;

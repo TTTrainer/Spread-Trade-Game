@@ -22,7 +22,19 @@ const DP_LABELS: Record<DecisionKind, string> = {
   assigned_shares: 'Assigned shares',
 };
 
-function Toggle({ label, value, onChange, hint, testId }: { label: string; value: boolean; onChange: (v: boolean) => void; hint?: string; testId?: string }) {
+function Toggle({
+  label,
+  value,
+  onChange,
+  hint,
+  testId,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  hint?: string;
+  testId?: string;
+}) {
   return (
     <label className="set-row toggle" title={hint}>
       <input
@@ -40,11 +52,37 @@ function Toggle({ label, value, onChange, hint, testId }: { label: string; value
   );
 }
 
-function Slider({ label, value, min, max, step, onChange, fmt, testId }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; fmt?: (v: number) => string; testId?: string }) {
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  fmt,
+  testId,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+  fmt?: (v: number) => string;
+  testId?: string;
+}) {
   return (
     <label className="set-row slider">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} data-testid={testId} />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        data-testid={testId}
+      />
       <span className="num val">{fmt ? fmt(value) : value}</span>
     </label>
   );
@@ -67,7 +105,12 @@ export function SettingsScreen() {
       <div className="set-layout">
         <nav className="set-nav">
           {(['game', 'realism', 'display', 'audio', 'hotkeys', 'data'] as Section[]).map((s) => (
-            <button key={s} className={`pixel-btn ${section === s ? 'primary' : ''}`} onClick={() => setSection(s)} data-testid={`set-${s}`}>
+            <button
+              key={s}
+              className={`pixel-btn ${section === s ? 'primary' : ''}`}
+              onClick={() => setSection(s)}
+              data-testid={`set-${s}`}
+            >
               {s.toUpperCase()}
             </button>
           ))}
@@ -85,56 +128,182 @@ export function SettingsScreen() {
                 fmt={(v) => `$${v.toLocaleString('en-US')}`}
                 testId="set-capital"
               />
-              <Slider label="Default short-strike delta" value={settings.game.shortDelta} min={0.1} max={0.45} step={0.01} onChange={(v) => set((s) => ({ ...s, game: { ...s.game, shortDelta: v } }))} fmt={(v) => `${Math.round(v * 100)}Δ`} />
-              <Slider label="Fast-forward speed (seconds per day)" value={settings.game.ffSecondsPerDay} min={0.15} max={1} step={0.05} onChange={(v) => set((s) => ({ ...s, game: { ...s.game, ffSecondsPerDay: v } }))} fmt={(v) => v.toFixed(2)} />
+              <Slider
+                label="Default short-strike delta"
+                value={settings.game.shortDelta}
+                min={0.1}
+                max={0.45}
+                step={0.01}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, shortDelta: v } }))}
+                fmt={(v) => `${Math.round(v * 100)}Δ`}
+              />
+              <Slider
+                label="Fast-forward speed (seconds per day)"
+                value={settings.game.ffSecondsPerDay}
+                min={0.15}
+                max={1}
+                step={0.05}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, ffSecondsPerDay: v } }))}
+                fmt={(v) => v.toFixed(2)}
+              />
               <div className="set-row">
                 <span>Call buckets</span>
                 <div className="seg num">
-                  <button className={settings.game.bucketMode === 'em' ? 'sel' : ''} onClick={() => set((s) => ({ ...s, game: { ...s.game, bucketMode: 'em' } }))}>
+                  <button
+                    className={settings.game.bucketMode === 'em' ? 'sel' : ''}
+                    onClick={() => set((s) => ({ ...s, game: { ...s.game, bucketMode: 'em' } }))}
+                  >
                     SCALED TO EXPECTED MOVE
                   </button>
-                  <button className={settings.game.bucketMode === 'fixed' ? 'sel' : ''} onClick={() => set((s) => ({ ...s, game: { ...s.game, bucketMode: 'fixed' } }))}>
+                  <button
+                    className={settings.game.bucketMode === 'fixed' ? 'sel' : ''}
+                    onClick={() => set((s) => ({ ...s, game: { ...s.game, bucketMode: 'fixed' } }))}
+                  >
                     FIXED ±1% / ±5%
                   </button>
                 </div>
               </div>
-              <Toggle label="Pure Market (no ARCADE cartridges)" value={settings.game.pureMarket} onChange={(v) => set((s) => ({ ...s, game: { ...s.game, pureMarket: v } }))} hint="Only powerups that mirror real edges" testId="set-pure" />
+              <Toggle
+                label="Pure Market (no ARCADE cartridges)"
+                value={settings.game.pureMarket}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, pureMarket: v } }))}
+                hint="Only powerups that mirror real edges"
+                testId="set-pure"
+              />
               <div className="section-title">Decision points that pause the fast-forward</div>
               {(Object.keys(DP_LABELS) as DecisionKind[]).map((k) => (
-                <Toggle key={k} label={DP_LABELS[k]} value={settings.game.pause[k]} onChange={(v) => set((s) => ({ ...s, game: { ...s.game, pause: { ...s.game.pause, [k]: v } } }))} />
+                <Toggle
+                  key={k}
+                  label={DP_LABELS[k]}
+                  value={settings.game.pause[k]}
+                  onChange={(v) =>
+                    set((s) => ({ ...s, game: { ...s.game, pause: { ...s.game.pause, [k]: v } } }))
+                  }
+                />
               ))}
             </>
           )}
           {section === 'realism' && (
             <>
-              <p className="dim">Each rule is its own toggle. Defined-risk collateral is always enforced; nothing in the game has undefined risk.</p>
-              <Toggle label="Bid/ask spreads" value={settings.realism.bidAsk} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, bidAsk: v } }))} hint="Off: everything fills at mid" testId="set-bidask" />
-              <Toggle label="Earnings gaps and IV crush" value={settings.realism.earnings} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, earnings: v } }))} />
-              <Toggle label="Early assignment" value={settings.realism.earlyAssignment} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, earlyAssignment: v } }))} />
-              <Toggle label="Expiration mechanics (assignment into shares, pin risk)" value={settings.realism.expirationMechanics} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, expirationMechanics: v } }))} />
-              <Toggle label="Pattern day trader rule" value={settings.realism.pdt} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, pdt: v } }))} />
-              <Toggle label="Fees ($0.65 per contract)" value={settings.realism.fees} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, fees: v } }))} testId="set-fees" />
-              <Toggle label="Liquidity limits" value={settings.realism.liquidityLimits} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, liquidityLimits: v } }))} hint="Caps contracts on wide markets" />
-              <Toggle label="Taxes (short-term gains estimate)" value={settings.realism.taxes} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, taxes: v } }))} />
-              <Toggle label="Broker approval levels" value={settings.realism.approvalLevels} onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, approvalLevels: v } }))} />
+              <p className="dim">
+                Each rule is its own toggle. Defined-risk collateral is always enforced; nothing in the game
+                has undefined risk.
+              </p>
+              <Toggle
+                label="Bid/ask spreads"
+                value={settings.realism.bidAsk}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, bidAsk: v } }))}
+                hint="Off: everything fills at mid"
+                testId="set-bidask"
+              />
+              <Toggle
+                label="Earnings gaps and IV crush"
+                value={settings.realism.earnings}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, earnings: v } }))}
+              />
+              <Toggle
+                label="Early assignment"
+                value={settings.realism.earlyAssignment}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, earlyAssignment: v } }))}
+              />
+              <Toggle
+                label="Expiration mechanics (assignment into shares, pin risk)"
+                value={settings.realism.expirationMechanics}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, expirationMechanics: v } }))}
+              />
+              <Toggle
+                label="Pattern day trader rule"
+                value={settings.realism.pdt}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, pdt: v } }))}
+              />
+              <Toggle
+                label="Fees ($0.65 per contract)"
+                value={settings.realism.fees}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, fees: v } }))}
+                testId="set-fees"
+              />
+              <Toggle
+                label="Liquidity limits"
+                value={settings.realism.liquidityLimits}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, liquidityLimits: v } }))}
+                hint="At most 10 contracts per order; legs with a bid/ask wider than 50% of mid refuse to trade"
+              />
+              <Toggle
+                label="Taxes (short-term gains estimate)"
+                value={settings.realism.taxes}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, taxes: v } }))}
+                hint="Career sets aside 24% of each round's net gain from your equity"
+              />
+              <Toggle
+                label="Broker approval levels"
+                value={settings.realism.approvalLevels}
+                onChange={(v) => set((s) => ({ ...s, realism: { ...s.realism, approvalLevels: v } }))}
+                hint="Spreads need a Level 3 margin account ($2,000 minimum equity)"
+              />
               <div className="section-title">Blind transforms</div>
-              <Toggle label="Rescale prices in blind mode (split-style)" value={settings.blind.rescale} onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, rescale: v } }))} />
-              <Toggle label="Allow flipped charts in drills" value={settings.blind.flipDrills} onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, flipDrills: v } }))} />
-              <Toggle label="Synthetic markets in Endless and drills" value={settings.blind.synthetic} onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, synthetic: v } }))} />
+              <Toggle
+                label="Rescale prices in blind mode (split-style)"
+                value={settings.blind.rescale}
+                onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, rescale: v } }))}
+              />
+              <Toggle
+                label="Allow flipped charts in drills"
+                value={settings.blind.flipDrills}
+                onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, flipDrills: v } }))}
+              />
+              <Toggle
+                label="Synthetic markets in Endless and drills"
+                value={settings.blind.synthetic}
+                onChange={(v) => set((s) => ({ ...s, blind: { ...s.blind, synthetic: v } }))}
+              />
             </>
           )}
           {section === 'display' && (
             <>
-              <Slider label="CRT scanlines" value={settings.display.crt} min={0} max={1} step={0.05} onChange={(v) => set((s) => ({ ...s, display: { ...s.display, crt: v } }))} fmt={(v) => `${Math.round(v * 100)}%`} testId="set-crt" />
-              <Slider label="UI scale" value={settings.display.uiScale} min={0.85} max={1.3} step={0.05} onChange={(v) => set((s) => ({ ...s, display: { ...s.display, uiScale: v } }))} fmt={(v) => `${Math.round(v * 100)}%`} />
-              <Toggle label="Screen shake" value={settings.display.shake} onChange={(v) => set((s) => ({ ...s, display: { ...s.display, shake: v } }))} />
-              <Toggle label="Reduced motion" value={settings.display.reducedMotion} onChange={(v) => set((s) => ({ ...s, display: { ...s.display, reducedMotion: v } }))} />
-              <Toggle label="Colorblind-safe palette (blue/orange P/L)" value={settings.display.colorblind} onChange={(v) => set((s) => ({ ...s, display: { ...s.display, colorblind: v } }))} testId="set-colorblind" />
+              <Slider
+                label="CRT scanlines"
+                value={settings.display.crt}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v) => set((s) => ({ ...s, display: { ...s.display, crt: v } }))}
+                fmt={(v) => `${Math.round(v * 100)}%`}
+                testId="set-crt"
+              />
+              <Slider
+                label="UI scale"
+                value={settings.display.uiScale}
+                min={0.85}
+                max={1.3}
+                step={0.05}
+                onChange={(v) => set((s) => ({ ...s, display: { ...s.display, uiScale: v } }))}
+                fmt={(v) => `${Math.round(v * 100)}%`}
+              />
+              <Toggle
+                label="Screen shake"
+                value={settings.display.shake}
+                onChange={(v) => set((s) => ({ ...s, display: { ...s.display, shake: v } }))}
+              />
+              <Toggle
+                label="Reduced motion"
+                value={settings.display.reducedMotion}
+                onChange={(v) => set((s) => ({ ...s, display: { ...s.display, reducedMotion: v } }))}
+              />
+              <Toggle
+                label="Colorblind-safe palette (blue/orange P/L)"
+                value={settings.display.colorblind}
+                onChange={(v) => set((s) => ({ ...s, display: { ...s.display, colorblind: v } }))}
+                testId="set-colorblind"
+              />
               <div className="set-row">
                 <span>Terminal theme</span>
                 <div className="seg num">
                   {(['indigo', 'amber', 'phosphor'] as const).map((t) => (
-                    <button key={t} className={settings.display.theme === t ? 'sel' : ''} onClick={() => set((s) => ({ ...s, display: { ...s.display, theme: t } }))}>
+                    <button
+                      key={t}
+                      className={settings.display.theme === t ? 'sel' : ''}
+                      onClick={() => set((s) => ({ ...s, display: { ...s.display, theme: t } }))}
+                    >
                       {t.toUpperCase()}
                     </button>
                   ))}
@@ -147,8 +316,24 @@ export function SettingsScreen() {
           )}
           {section === 'audio' && (
             <>
-              <Slider label="Master" value={settings.audio.master} min={0} max={1} step={0.05} onChange={(v) => set((s) => ({ ...s, audio: { ...s.audio, master: v } }))} fmt={(v) => `${Math.round(v * 100)}%`} />
-              <Slider label="Music" value={settings.audio.music} min={0} max={1} step={0.05} onChange={(v) => set((s) => ({ ...s, audio: { ...s.audio, music: v } }))} fmt={(v) => `${Math.round(v * 100)}%`} />
+              <Slider
+                label="Master"
+                value={settings.audio.master}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v) => set((s) => ({ ...s, audio: { ...s.audio, master: v } }))}
+                fmt={(v) => `${Math.round(v * 100)}%`}
+              />
+              <Slider
+                label="Music"
+                value={settings.audio.music}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v) => set((s) => ({ ...s, audio: { ...s.audio, music: v } }))}
+                fmt={(v) => `${Math.round(v * 100)}%`}
+              />
               <Slider
                 label="Sound effects"
                 value={settings.audio.sfx}
@@ -165,7 +350,11 @@ export function SettingsScreen() {
                 <span>Music style</span>
                 <div className="seg num">
                   {(['synthwave', 'darkwave', 'chiptune'] as const).map((t) => (
-                    <button key={t} className={settings.audio.style === t ? 'sel' : ''} onClick={() => set((s) => ({ ...s, audio: { ...s.audio, style: t } }))}>
+                    <button
+                      key={t}
+                      className={settings.audio.style === t ? 'sel' : ''}
+                      onClick={() => set((s) => ({ ...s, audio: { ...s.audio, style: t } }))}
+                    >
                       {t.toUpperCase()}
                     </button>
                   ))}
@@ -205,7 +394,11 @@ function HotkeyEditor() {
     <>
       <div className="set-row">
         <span className="dim">Click a binding, then press the new key (Esc cancels).</span>
-        <button className="pixel-btn" onClick={() => update((s) => ({ ...s, hotkeys: { ...DEFAULT_HOTKEYS } }))} data-testid="reset-hotkeys">
+        <button
+          className="pixel-btn"
+          onClick={() => update((s) => ({ ...s, hotkeys: { ...DEFAULT_HOTKEYS } }))}
+          data-testid="reset-hotkeys"
+        >
           RESET TO THINKORSWIM DEFAULTS
         </button>
       </div>
@@ -213,7 +406,11 @@ function HotkeyEditor() {
         {(Object.keys(HOTKEY_LABELS) as HotkeyAction[]).map((a) => (
           <div key={a} className="hk-row">
             <span>{HOTKEY_LABELS[a]}</span>
-            <button className={`hk-btn ${listening === a ? 'listening' : ''} ${(dupes.get(settings.hotkeys[a]) ?? 0) > 1 ? 'dupe' : ''}`} onClick={() => setListening(a)} data-testid={`hk-${a}`}>
+            <button
+              className={`hk-btn ${listening === a ? 'listening' : ''} ${(dupes.get(settings.hotkeys[a]) ?? 0) > 1 ? 'dupe' : ''}`}
+              onClick={() => setListening(a)}
+              data-testid={`hk-${a}`}
+            >
               {listening === a ? 'press a key…' : settings.hotkeys[a]}
             </button>
           </div>
@@ -228,13 +425,21 @@ function DataPanel() {
   const refresh = useApp((s) => s.refreshData);
   const toast = useApp((s) => s.toast);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ stage: string; fraction: number; log: string[] }>({ stage: '', fraction: 0, log: [] });
+  const [progress, setProgress] = useState<{ stage: string; fraction: number; log: string[] }>({
+    stage: '',
+    fraction: 0,
+    log: [],
+  });
   const [report, setReport] = useState<string | null>(null);
   const [diskAsk, setDiskAsk] = useState<string | null>(null);
   useEffect(() => {
     if (!hasBridge()) return;
     return bridge().on('data.progress', (p) =>
-      setProgress((cur) => (p.fraction < 0 ? { ...cur, log: [...cur.log.slice(-8), p.message] } : { ...cur, stage: p.stage, fraction: p.fraction })),
+      setProgress((cur) =>
+        p.fraction < 0
+          ? { ...cur, log: [...cur.log.slice(-8), p.message] }
+          : { ...cur, stage: p.stage, fraction: p.fraction },
+      ),
     );
   }, []);
   const run = async (mode: 'synthetic' | 'real' | 'sync', confirmLowDisk = false) => {
@@ -249,10 +454,15 @@ function DataPanel() {
     <>
       <div className="data-status num">
         <div>
-          Market data: <b className="amber-text">{data ? (data.kind === 'synthetic' ? 'SIM (fictional companies)' : 'REAL') : '…'}</b>
+          Market data:{' '}
+          <b className="amber-text">
+            {data ? (data.kind === 'synthetic' ? 'SIM (fictional companies)' : 'REAL') : '…'}
+          </b>
         </div>
         <div>{data ? `${data.symbols} tickers through ${data.lastDate}` : ''}</div>
-        <div className="dim">game.db: {data?.gameDbPath} {data?.gameDbExists ? '' : '(not built yet)'}</div>
+        <div className="dim">
+          game.db: {data?.gameDbPath} {data?.gameDbExists ? '' : '(not built yet)'}
+        </div>
         {data?.notes.map((n) => (
           <div key={n} className="dim">
             {n}
@@ -260,10 +470,17 @@ function DataPanel() {
         ))}
       </div>
       <p>
-        <b>Build real market data</b> downloads about 16 GB from DoltHub (free, public options data) the first time, takes a few hours, and needs about 40 GB free. The game can fetch the Dolt tool by itself. You can keep playing the SIM market meanwhile.
+        <b>Build real market data</b> downloads about 16 GB from DoltHub (free, public options data) the first
+        time, takes a few hours, and needs about 40 GB free. The game can fetch the Dolt tool by itself. You
+        can keep playing the SIM market meanwhile.
       </p>
       <div className="modal-actions">
-        <button className="pixel-btn primary" disabled={busy} onClick={() => void run('real')} data-testid="build-real">
+        <button
+          className="pixel-btn primary"
+          disabled={busy}
+          onClick={() => void run('real')}
+          data-testid="build-real"
+        >
           BUILD REAL DATA
         </button>
         <button className="pixel-btn" disabled={busy} onClick={() => void run('sync')}>
@@ -272,7 +489,11 @@ function DataPanel() {
         <button className="pixel-btn" disabled={busy} onClick={() => void run('synthetic')}>
           REBUILD SIM DATABASE
         </button>
-        <button className="pixel-btn" onClick={() => void bridge().invoke('data.report').then(setReport)} data-testid="view-report">
+        <button
+          className="pixel-btn"
+          onClick={() => void bridge().invoke('data.report').then(setReport)}
+          data-testid="view-report"
+        >
           VIEW DATA REPORT
         </button>
       </div>

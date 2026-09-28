@@ -1,17 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { bsm, bsmPrice, forward, impliedVol, normCdf, normInv, normPdf } from '../../src/engine/pricing/bsm';
-import { buildChain, gridSurface, marketAround, strikeGrid, strikeIncrement } from '../../src/engine/pricing/chainModel';
+import {
+  buildChain,
+  gridSurface,
+  marketAround,
+  strikeGrid,
+  strikeIncrement,
+} from '../../src/engine/pricing/chainModel';
 
 describe('Black-Scholes-Merton golden values', () => {
   it('matches textbook prices', () => {
     // Hull: S=42, K=40, r=10%, sigma=20%, T=0.5
-    expect(bsmPrice({ right: 'C', spot: 42, strike: 40, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0 })).toBeCloseTo(4.7594, 4);
-    expect(bsmPrice({ right: 'P', spot: 42, strike: 40, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0 })).toBeCloseTo(0.8086, 4);
+    expect(
+      bsmPrice({ right: 'C', spot: 42, strike: 40, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0 }),
+    ).toBeCloseTo(4.7594, 4);
+    expect(
+      bsmPrice({ right: 'P', spot: 42, strike: 40, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0 }),
+    ).toBeCloseTo(0.8086, 4);
     // S=K=100, r=5%, sigma=20%, T=1
-    expect(bsmPrice({ right: 'C', spot: 100, strike: 100, t: 1, vol: 0.2, rate: 0.05, divYield: 0 })).toBeCloseTo(10.4506, 4);
-    expect(bsmPrice({ right: 'P', spot: 100, strike: 100, t: 1, vol: 0.2, rate: 0.05, divYield: 0 })).toBeCloseTo(5.5735, 4);
+    expect(
+      bsmPrice({ right: 'C', spot: 100, strike: 100, t: 1, vol: 0.2, rate: 0.05, divYield: 0 }),
+    ).toBeCloseTo(10.4506, 4);
+    expect(
+      bsmPrice({ right: 'P', spot: 100, strike: 100, t: 1, vol: 0.2, rate: 0.05, divYield: 0 }),
+    ).toBeCloseTo(5.5735, 4);
     // Haug generalized BSM put: S=100, K=95, T=0.5, r=10%, cost of carry 5% (q=5%), sigma=20%
-    expect(bsmPrice({ right: 'P', spot: 100, strike: 95, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0.05 })).toBeCloseTo(2.4648, 4);
+    expect(
+      bsmPrice({ right: 'P', spot: 100, strike: 95, t: 0.5, vol: 0.2, rate: 0.1, divYield: 0.05 }),
+    ).toBeCloseTo(2.4648, 4);
   });
 
   it('satisfies put-call parity with dividends', () => {
@@ -42,9 +58,15 @@ describe('Black-Scholes-Merton golden values', () => {
   });
 
   it('handles expiry and zero vol at intrinsic', () => {
-    expect(bsm({ right: 'C', spot: 110, strike: 100, t: 0, vol: 0.3, rate: 0.03, divYield: 0 })).toMatchObject({ price: 10, delta: 1 });
-    expect(bsm({ right: 'P', spot: 110, strike: 100, t: 0, vol: 0.3, rate: 0.03, divYield: 0 })).toMatchObject({ price: 0, delta: 0 });
-    expect(bsm({ right: 'P', spot: 90, strike: 100, t: 0.1, vol: 0, rate: 0.03, divYield: 0 }).delta).toBe(-1);
+    expect(
+      bsm({ right: 'C', spot: 110, strike: 100, t: 0, vol: 0.3, rate: 0.03, divYield: 0 }),
+    ).toMatchObject({ price: 10, delta: 1 });
+    expect(
+      bsm({ right: 'P', spot: 110, strike: 100, t: 0, vol: 0.3, rate: 0.03, divYield: 0 }),
+    ).toMatchObject({ price: 0, delta: 0 });
+    expect(bsm({ right: 'P', spot: 90, strike: 100, t: 0.1, vol: 0, rate: 0.03, divYield: 0 }).delta).toBe(
+      -1,
+    );
   });
 
   it('round-trips implied volatility across a grid', () => {

@@ -11,21 +11,22 @@ import { money, pct, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useTrading } from '../store/trading';
+import { Sparkline } from '../components/Sparkline';
 
-function Sparkline({ closes, w = 150, h = 36 }: { closes: number[]; w?: number; h?: number }) {
-  if (closes.length < 2) return null;
-  const lo = Math.min(...closes);
-  const hi = Math.max(...closes);
-  const pts = closes.map((c, i) => `${((i / (closes.length - 1)) * w).toFixed(1)},${(h - ((c - lo) / (hi - lo || 1)) * h).toFixed(1)}`).join(' ');
-  const up = closes[closes.length - 1] >= closes[0];
-  return (
-    <svg width={w} height={h} className="spark">
-      <polyline points={pts} fill="none" stroke={up ? 'var(--up)' : 'var(--down)'} strokeWidth={1.5} />
-    </svg>
-  );
+/** What a lineup card may show. Sandbox shows everything; Career earns badges through analysts. */
+export interface CardBadges {
+  ivr: boolean;
+  earnings: boolean;
+  extra?: React.ReactNode;
 }
 
-export function LineupColumn({ extra }: { extra?: React.ReactNode }) {
+export function LineupColumn({
+  extra,
+  badges,
+}: {
+  extra?: React.ReactNode;
+  badges?: (cardId: string) => CardBadges;
+}) {
   const session = useTrading((s) => s.session);
   useTrading((s) => s.version);
   const selected = useTrading((s) => s.selectedCardId);
@@ -53,25 +54,51 @@ export function LineupColumn({ extra }: { extra?: React.ReactNode }) {
         const bars = view.bars();
         const pos = c.positionIds.map((id) => session.position(id)).find((p) => p?.status === 'open');
         const closed = c.positionIds.map((id) => session.position(id)).filter((p) => p?.status === 'closed');
-        const pl = pos ? (lastMark(pos)?.plCents ?? 0) : closed.reduce((a, p) => a + (p?.realizedCents ?? 0), 0);
+        const pl = pos
+          ? (lastMark(pos)?.plCents ?? 0)
+          : closed.reduce((a, p) => a + (p?.realizedCents ?? 0), 0);
         const earnDays = ctx.nextEarnings ? diffDays(view.now, ctx.nextEarnings.date) : null;
+        const b = badges ? badges(c.id) : { ivr: true, earnings: true };
         return (
-          <TiltCard key={c.id} selected={selected === c.id} onClick={() => select(c.id)} className="lineup-card" testId={`card-${i}`}>
+          <TiltCard
+            key={c.id}
+            selected={selected === c.id}
+            onClick={() => select(c.id)}
+            className="lineup-card"
+            testId={`card-${i}`}
+          >
             <div className="lc-top">
               <span className="lc-sym">{c.displaySymbol}</span>
               <span className="lc-px num">{view.spot().toFixed(2)}</span>
             </div>
-            {!session.config.blind && c.realSymbol !== c.displaySymbol && <div className="lc-name">{c.realSymbol}</div>}
+            {!session.config.blind && c.realSymbol !== c.displaySymbol && (
+              <div className="lc-name">{c.realSymbol}</div>
+            )}
             <Sparkline closes={bars.slice(-60).map((b) => b.close)} />
             <div className="lc-badges">
               <span className="chip">{view.dayLabel()}</span>
-              {ctx.ivr !== null && <span className={`chip ${ctx.ivr >= 50 ? 'magenta' : ''}`}>IVR {ctx.ivr.toFixed(0)}</span>}
-              {earnDays !== null && earnDays <= 45 && <span className="chip warn">ERN {earnDays}d</span>}
-              {bars[bars.length - 1]?.source !== 'real' && <span className="chip model">{bars[bars.length - 1]?.source === 'synthetic' ? 'SIM' : 'MODEL'}</span>}
+              {b.ivr && ctx.ivr !== null && (
+                <span className={`chip ${ctx.ivr >= 50 ? 'magenta' : ''}`}>IVR {ctx.ivr.toFixed(0)}</span>
+              )}
+              {b.earnings && earnDays !== null && earnDays <= 45 && (
+                <span className="chip warn">ERN {earnDays}d</span>
+              )}
+              {b.extra}
+              {bars[bars.length - 1]?.source !== 'real' && (
+                <span className="chip model">
+                  {bars[bars.length - 1]?.source === 'synthetic' ? 'SIM' : 'MODEL'}
+                </span>
+              )}
               <span className="chip">{bars.length - 1}d hist</span>
             </div>
             <div className="lc-bottom num">
-              {c.call ? <span className="lc-call">{BUCKET_GLYPHS[c.call.bucket]} {Math.round(c.call.confidence * 100)}%</span> : <span className="dim">no call</span>}
+              {c.call ? (
+                <span className="lc-call">
+                  {BUCKET_GLYPHS[c.call.bucket]} {Math.round(c.call.confidence * 100)}%
+                </span>
+              ) : (
+                <span className="dim">no call</span>
+              )}
               {(pos || closed.length > 0) && <Pnl cents={pl} />}
             </div>
           </TiltCard>
@@ -86,7 +113,10 @@ function distanceToShort(p: Position, spot: number): { atr: number | null; em: n
   const shorts = optionLegsOf(p.legs).filter((l) => l.ratio < 0);
   if (!shorts.length) return { atr: null, em: null };
   const d = Math.min(...shorts.map((s) => Math.abs(s.strike - spot)));
-  return { atr: p.entry.atr ? d / p.entry.atr : null, em: p.entry.expectedMove ? d / p.entry.expectedMove : null };
+  return {
+    atr: p.entry.atr ? d / p.entry.atr : null,
+    em: p.entry.expectedMove ? d / p.entry.expectedMove : null,
+  };
 }
 
 export function PositionsDock() {
@@ -137,10 +167,17 @@ export function PositionsDock() {
             const view = session.view(p.cardId);
             const m = lastMark(p);
             const pl = p.status === 'open' ? (m?.plCents ?? 0) : (p.realizedCents ?? 0);
-            const dte = optionLegsOf(p.legs).length ? Math.min(...optionLegsOf(p.legs).map((l) => diffDays(view.now, l.expiration))) : null;
+            const dte = optionLegsOf(p.legs).length
+              ? Math.min(...optionLegsOf(p.legs).map((l) => diffDays(view.now, l.expiration)))
+              : null;
             const dist = distanceToShort(p, view.spot());
             return (
-              <tr key={p.id} className={`${p.status} ${selectedPos === p.id ? 'sel' : ''}`} onClick={() => selectPosition(p.id)} data-testid={`pos-${p.id}`}>
+              <tr
+                key={p.id}
+                className={`${p.status} ${selectedPos === p.id ? 'sel' : ''}`}
+                onClick={() => selectPosition(p.id)}
+                data-testid={`pos-${p.id}`}
+              >
                 <td>{p.symbol}</td>
                 <td>
                   {STRUCTURES[p.structureId].short}
@@ -159,13 +196,28 @@ export function PositionsDock() {
                 <td>{p.status === 'open' ? (m?.greeks.theta ?? 0).toFixed(1) : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.vega ?? 0).toFixed(1) : '—'}</td>
                 <td>
-                  {p.brackets.targetPl !== null ? `T+${money(Math.round(p.brackets.targetPl * 100 * p.qty * 100))}` : 'T—'} {p.brackets.stopPl !== null ? `S−${money(Math.round(p.brackets.stopPl * 100 * p.qty * 100))}` : p.flags.stopDeclined ? <span className="down">STOP DECLINED</span> : 'S—'}
+                  {p.brackets.targetPl !== null
+                    ? `T+${money(Math.round(p.brackets.targetPl * 100 * p.qty * 100))}`
+                    : 'T—'}{' '}
+                  {p.brackets.stopPl !== null ? (
+                    `S−${money(Math.round(p.brackets.stopPl * 100 * p.qty * 100))}`
+                  ) : p.flags.stopDeclined ? (
+                    <span className="down">STOP DECLINED</span>
+                  ) : (
+                    'S—'
+                  )}
                 </td>
-                <td>{dist.atr === null ? '—' : `${dist.atr.toFixed(1)} ATR · ${dist.em?.toFixed(2) ?? '—'} EM`}</td>
+                <td>
+                  {dist.atr === null ? '—' : `${dist.atr.toFixed(1)} ATR · ${dist.em?.toFixed(2) ?? '—'} EM`}
+                </td>
                 <td>
                   {p.status === 'open' && (
                     <>
-                      <button className="mini-btn" onClick={() => void closePosition(p.id)} data-testid={`close-${p.id}`}>
+                      <button
+                        className="mini-btn"
+                        onClick={() => void closePosition(p.id)}
+                        data-testid={`close-${p.id}`}
+                      >
                         CLOSE
                       </button>
                       <button className="mini-btn" onClick={() => setRolling(p)}>
@@ -205,7 +257,15 @@ export function PositionsDock() {
 }
 
 /** Pick a new expiration and strikes; shows the net credit or debit of the roll. */
-export function RollDialog({ pos, onClose, onRoll }: { pos: Position; onClose: () => void; onRoll?: (legs: OptionLeg[]) => void }) {
+export function RollDialog({
+  pos,
+  onClose,
+  onRoll,
+}: {
+  pos: Position;
+  onClose: () => void;
+  onRoll?: (legs: OptionLeg[]) => void;
+}) {
   const session = useTrading((s) => s.session);
   const rollPosition = useTrading((s) => s.rollPosition);
   const [exp, setExp] = useState<string | null>(null);
@@ -218,7 +278,9 @@ export function RollDialog({ pos, onClose, onRoll }: { pos: Position; onClose: (
     void view.loadChain().then((c) => {
       setChain(c);
       const current = optionLegsOf(pos.legs)[0]?.expiration;
-      setExp(expirationsOf(c).find((e) => current && diffDays(current, e) >= 7) ?? expirationsOf(c).at(-1) ?? null);
+      setExp(
+        expirationsOf(c).find((e) => current && diffDays(current, e) >= 7) ?? expirationsOf(c).at(-1) ?? null,
+      );
     });
   }, [view, pos.id]);
   const legs = useMemo(() => {
@@ -227,7 +289,10 @@ export function RollDialog({ pos, onClose, onRoll }: { pos: Position; onClose: (
     for (const l of optionLegsOf(pos.legs)) {
       const listed = quotesFor(chain, exp, l.right).map((q) => q.strike);
       if (!listed.length) return null;
-      let k = listed.reduce((best, x) => (Math.abs(x - l.strike) < Math.abs(best - l.strike) ? x : best), listed[0]);
+      let k = listed.reduce(
+        (best, x) => (Math.abs(x - l.strike) < Math.abs(best - l.strike) ? x : best),
+        listed[0],
+      );
       if (shift) k = stepStrike(chain, exp, l.right, k, shift) ?? k;
       out.push({ ...l, expiration: exp, strike: k });
     }
@@ -235,14 +300,33 @@ export function RollDialog({ pos, onClose, onRoll }: { pos: Position; onClose: (
   }, [chain, exp, shift]);
   const net = useMemo(() => {
     if (!chain || !legs || !view) return null;
-    const find = (l: OptionLeg) => chain.quotes.find((q) => q.expiration === l.expiration && q.right === l.right && Math.abs(q.strike - l.strike) < 1e-6);
+    const find = (l: OptionLeg) =>
+      chain.quotes.find(
+        (q) => q.expiration === l.expiration && q.right === l.right && Math.abs(q.strike - l.strike) < 1e-6,
+      );
     let open = 0;
     for (const l of legs) {
       const q = find(l);
       if (!q) return null;
       open += l.ratio * mid(q);
     }
-    const close = closeQuote(pos.legs, { date: view.now, spot: view.spot(), open: view.spot(), rate: view.rate(), divYield: 0, quote: (k) => view.quote(k), earningsTomorrow: false, exDivToday: null, exDivTomorrow: null, gapDay: false, atr: null }, pos.lastLegs).mid;
+    const close = closeQuote(
+      pos.legs,
+      {
+        date: view.now,
+        spot: view.spot(),
+        open: view.spot(),
+        rate: view.rate(),
+        divYield: 0,
+        quote: (k) => view.quote(k),
+        earningsTomorrow: false,
+        exDivToday: null,
+        exDivTomorrow: null,
+        gapDay: false,
+        atr: null,
+      },
+      pos.lastLegs,
+    ).mid;
     return close + open;
   }, [chain, legs]);
   const exps = chain ? expirationsOf(chain).filter((e) => view && diffDays(view.now, e) >= 1) : [];
@@ -266,10 +350,17 @@ export function RollDialog({ pos, onClose, onRoll }: { pos: Position; onClose: (
       <div className="num roll-legs">
         {legs?.map((l, i) => (
           <div key={i}>
-            {l.ratio < 0 ? 'SELL' : 'BUY'} {l.strike} {l.right === 'C' ? 'call' : 'put'} {view ? `${diffDays(view.now, l.expiration)}d` : ''}
+            {l.ratio < 0 ? 'SELL' : 'BUY'} {l.strike} {l.right === 'C' ? 'call' : 'put'}{' '}
+            {view ? `${diffDays(view.now, l.expiration)}d` : ''}
           </div>
         ))}
-        <div className={net !== null && net < 0 ? 'up' : 'down'}>{net === null ? '—' : net < 0 ? `Net credit ${price(-net)}` : `Net debit ${price(net)} (rolling for a debit)`}</div>
+        <div className={net !== null && net < 0 ? 'up' : 'down'}>
+          {net === null
+            ? '—'
+            : net < 0
+              ? `Net credit ${price(-net)}`
+              : `Net debit ${price(net)} (rolling for a debit)`}
+        </div>
       </div>
       <div className="modal-actions">
         <button
@@ -301,7 +392,12 @@ const ACTION_LABEL: Record<DecisionAction, string> = {
   exercise: 'Exercise',
   sell_shares: 'Sell shares at the open',
 };
-const ACTION_KEY: Partial<Record<DecisionAction, string>> = { close: 'C', hold: 'H', roll: 'R', sell_shares: 'S' };
+const ACTION_KEY: Partial<Record<DecisionAction, string>> = {
+  close: 'C',
+  hold: 'H',
+  roll: 'R',
+  sell_shares: 'S',
+};
 
 export function DecisionModal() {
   const session = useTrading((s) => s.session);
@@ -357,7 +453,11 @@ export function DecisionModal() {
           </button>
         ))}
       </div>
-      {dp.kind === 'stop_hit' && <p className="dp-warn">Holding past your own stop is how small losses become big ones. It will cost stress.</p>}
+      {dp.kind === 'stop_hit' && (
+        <p className="dp-warn">
+          Holding past your own stop is how small losses become big ones. It will cost stress.
+        </p>
+      )}
       <p className="dim num">
         <Kbd>Enter</Kbd> follows the plan
       </p>
@@ -383,10 +483,19 @@ export function FastForwardBar() {
   useHotkeys({ playPause: () => toggle() });
   return (
     <div className="ffbar num" data-testid="ff-bar">
-      <button className={`pixel-btn ${ff === 'running' ? '' : 'primary'}`} onClick={() => toggle()} disabled={ff === 'decision' || ff === 'done'} data-testid="play-button">
+      <button
+        className={`pixel-btn ${ff === 'running' ? '' : 'primary'}`}
+        onClick={() => toggle()}
+        disabled={ff === 'decision' || ff === 'done'}
+        data-testid="play-button"
+      >
         {ff === 'running' ? '❚❚ PAUSE' : '▶ START CLOCK'} <span className="kbd">Space</span>
       </button>
-      <button className="pixel-btn" onClick={() => void step()} disabled={ff === 'running' || ff === 'decision' || ff === 'done' || !session?.clockStarted}>
+      <button
+        className="pixel-btn"
+        onClick={() => void step()}
+        disabled={ff === 'running' || ff === 'decision' || ff === 'done' || !session?.clockStarted}
+      >
         STEP 1 DAY
       </button>
       <span className="ff-state" data-testid="ff-state">
@@ -409,8 +518,24 @@ export function AnalyzePanel() {
   const chain = session.chain(cardId);
   const exp = builder.expiration;
   const view = session.view(cardId);
-  const rows = chain && exp ? quotesFor(chain, exp, 'C').map((c) => ({ c, p: chain.quotes.find((q) => q.expiration === exp && q.right === 'P' && q.strike === c.strike) })) : [];
-  const env: PricingEnv | null = chain ? { date: view.now, rate: view.rate(), divYield: 0, ivOf: (l) => chain.quotes.find((q) => q.expiration === l.expiration && q.right === l.right && q.strike === l.strike)?.iv ?? 0.3 } : null;
+  const rows =
+    chain && exp
+      ? quotesFor(chain, exp, 'C').map((c) => ({
+          c,
+          p: chain.quotes.find((q) => q.expiration === exp && q.right === 'P' && q.strike === c.strike),
+        }))
+      : [];
+  const env: PricingEnv | null = chain
+    ? {
+        date: view.now,
+        rate: view.rate(),
+        divYield: 0,
+        ivOf: (l) =>
+          chain.quotes.find(
+            (q) => q.expiration === l.expiration && q.right === l.right && q.strike === l.strike,
+          )?.iv ?? 0.3,
+      }
+    : null;
   const spot = chain?.spot ?? view.spot();
   const dte = exp ? diffDays(view.now, exp) : 30;
   return (
@@ -420,20 +545,56 @@ export function AnalyzePanel() {
         <label>
           Price {whatIf.pricePct > 0 ? '+' : ''}
           {whatIf.pricePct}%
-          <input type="range" min={-20} max={20} step={0.5} value={whatIf.pricePct} onChange={(e) => setWhatIf({ pricePct: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={-20}
+            max={20}
+            step={0.5}
+            value={whatIf.pricePct}
+            onChange={(e) => setWhatIf({ pricePct: Number(e.target.value) })}
+          />
         </label>
         <label>
           Days +{whatIf.days}
-          <input type="range" min={0} max={Math.max(1, dte)} step={1} value={whatIf.days} onChange={(e) => setWhatIf({ days: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={0}
+            max={Math.max(1, dte)}
+            step={1}
+            value={whatIf.days}
+            onChange={(e) => setWhatIf({ days: Number(e.target.value) })}
+          />
         </label>
         <label>
           IV {whatIf.ivPts > 0 ? '+' : ''}
           {whatIf.ivPts} pts
-          <input type="range" min={-30} max={30} step={1} value={whatIf.ivPts} onChange={(e) => setWhatIf({ ivPts: Number(e.target.value) })} />
+          <input
+            type="range"
+            min={-30}
+            max={30}
+            step={1}
+            value={whatIf.ivPts}
+            onChange={(e) => setWhatIf({ ivPts: Number(e.target.value) })}
+          />
         </label>
         {plan?.mid !== null && plan?.mid !== undefined && env && (
           <div className="whatif-out">
-            P/L then: <Pnl cents={Math.round(payoffNow(plan.legs, plan.mid, spot * (1 + whatIf.pricePct / 100), env, whatIf.days, whatIf.ivPts / 100) * 100 * builder.qty * 100)} />
+            P/L then:{' '}
+            <Pnl
+              cents={Math.round(
+                payoffNow(
+                  plan.legs,
+                  plan.mid,
+                  spot * (1 + whatIf.pricePct / 100),
+                  env,
+                  whatIf.days,
+                  whatIf.ivPts / 100,
+                ) *
+                  100 *
+                  builder.qty *
+                  100,
+              )}
+            />
           </div>
         )}
         <label className="toggle">
@@ -451,7 +612,17 @@ export function AnalyzePanel() {
                   const px = spot * (1 + (c - 6) * 0.02);
                   const v = payoffNow(plan.legs, plan.mid as number, px, env, d, 0) * 100 * builder.qty;
                   const a = Math.min(1, Math.abs(v) / Math.max(1, plan.maxLossCents / 100));
-                  return <span key={c} className="heat-cell" title={`${px.toFixed(2)} → ${v.toFixed(0)}`} style={{ background: v >= 0 ? `rgba(77,255,154,${0.1 + a * 0.6})` : `rgba(255,79,109,${0.1 + a * 0.6})` }} />;
+                  return (
+                    <span
+                      key={c}
+                      className="heat-cell"
+                      title={`${px.toFixed(2)} → ${v.toFixed(0)}`}
+                      style={{
+                        background:
+                          v >= 0 ? `rgba(77,255,154,${0.1 + a * 0.6})` : `rgba(255,79,109,${0.1 + a * 0.6})`,
+                      }}
+                    />
+                  );
                 })}
               </div>
             );

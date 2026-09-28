@@ -83,6 +83,7 @@ export const BALANCE = {
     enterReview: 10,
     skipRound: -10,
     closeAtPlan: -5,
+    assignment: 5, // not in the plan's table; the Assignment Artist cartridge implies assignments cost stress
     vacationDay: -30,
     burnoutAt: 100,
     burnoutResetTo: 50,
@@ -104,6 +105,11 @@ export const BALANCE = {
     pagePrice: 3,
     voucherPrice: 10,
     deskAffinity: 0.6,
+  },
+
+  ledger: {
+    shortTermTaxRate: 0.24, // realism toggle "taxes": set aside on each round's net gain
+    drawdownStressPct: 0.05,
   },
 
   fills: {

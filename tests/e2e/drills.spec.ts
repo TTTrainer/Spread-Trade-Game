@@ -3,7 +3,9 @@ import { launchGame, shot } from './helpers';
 
 async function answerCurrent(page: Page): Promise<void> {
   const session = page.getByTestId('drill-session');
-  await expect(session.getByTestId('drill-chart').or(session.getByTestId('choice-0')).first()).toBeVisible({ timeout: 20000 });
+  await expect(session.getByTestId('drill-chart').or(session.getByTestId('choice-0')).first()).toBeVisible({
+    timeout: 20000,
+  });
   if (await page.getByTestId('dcall-3').count()) {
     await page.keyboard.press('4');
     await page.keyboard.press('Shift+2');
@@ -45,7 +47,9 @@ test('a 10-question adaptive drill completes and its results are stored', async 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await shot(page, '04-drill-summary-1920');
   const stored = await page.evaluate(async () => {
-    const stg = (window as unknown as { stg: { invoke: (c: string) => Promise<{ detail: { results: unknown[] } }[]> } }).stg;
+    const stg = (
+      window as unknown as { stg: { invoke: (c: string) => Promise<{ detail: { results: unknown[] } }[]> } }
+    ).stg;
     const rows = await stg.invoke('user.drills');
     return rows.map((r) => r.detail.results.length);
   });

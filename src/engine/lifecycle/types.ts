@@ -44,7 +44,8 @@ export interface Mark {
   modeled: boolean;
 }
 
-export type ExitReason = 'target' | 'stop' | 'manual' | 'expired' | 'assigned' | 'window_end' | 'decision';
+export type ExitReason =
+  'target' | 'stop' | 'manual' | 'expired' | 'assigned' | 'window_end' | 'decision' | 'liquidated';
 
 /** Brackets in P/L per share per unit: close for a profit of targetPl or a loss of -stopPl. */
 export interface Brackets {
@@ -127,6 +128,8 @@ export interface EntrySnapshot {
   atr: number | null;
   credit: boolean;
   fillVsMidCents: Cents; // execution cost at entry (positive = paid away)
+  /** Met its structure's "good R:R" rule at entry (scores +1 mult). */
+  goodRR?: boolean;
 }
 
 export interface Position {

@@ -3,13 +3,23 @@ import { launchGame, shot } from './helpers';
 
 type Stg = {
   app: { getState: () => { updateSettings: (f: (s: unknown) => unknown) => void } };
-  trading: { getState: () => { session: { positions: { realizedCents: number | null; exitReason: string | null; status: string }[]; realizedCents: number } | null; ff: string } };
+  trading: {
+    getState: () => {
+      session: {
+        positions: { realizedCents: number | null; exitReason: string | null; status: string }[];
+        realizedCents: number;
+      } | null;
+      ff: string;
+    };
+  };
 };
 
 async function ffUntilDone(page: Page, maxDecisions = 40): Promise<string[]> {
   const seen: string[] = [];
   for (let i = 0; i < 400; i++) {
-    const state = await page.evaluate(() => (window as unknown as { __stg: Stg }).__stg.trading.getState().ff);
+    const state = await page.evaluate(
+      () => (window as unknown as { __stg: Stg }).__stg.trading.getState().ff,
+    );
     if (state === 'done') return seen;
     if (state === 'decision') {
       const title = (await page.getByTestId('decision-modal').locator('h2').textContent()) ?? '';
@@ -30,7 +40,10 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   const { app, page } = await launchGame();
   await page.evaluate(() => {
     const stg = (window as unknown as { __stg: Stg }).__stg;
-    stg.app.getState().updateSettings((s) => ({ ...(s as object), game: { ...(s as { game: object }).game, ffSecondsPerDay: 0.06 } }));
+    stg.app.getState().updateSettings((s) => ({
+      ...(s as object),
+      game: { ...(s as { game: object }).game, ffSecondsPerDay: 0.06 },
+    }));
   });
   await page.getByTestId('menu-sandboxSetup').click();
   await expect(page.getByTestId('sandbox-setup')).toBeVisible();
@@ -73,7 +86,10 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   expect(['expired', 'assigned', 'window_end']).toContain(engine?.pos.exitReason);
   const shown = (await page.getByTestId('receipt-pl-0').textContent()) ?? '';
   const cents = engine?.pos.realizedCents ?? 0;
-  const dollars = (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dollars = (Math.abs(cents) / 100).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   expect(shown).toContain(dollars);
   expect(shown).toContain(cents > 0 ? '▲' : cents < 0 ? '▼' : '■');
   await page.waitForTimeout(900);

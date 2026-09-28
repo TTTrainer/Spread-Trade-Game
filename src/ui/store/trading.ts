@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import type { TradingSession, SessionAction, SessionEvent, OrderSpec } from '../../engine/trading/session';
+import type {
+  TradingSession,
+  SessionAction,
+  SessionEvent,
+  OrderSpec,
+  PlaceResult,
+} from '../../engine/trading/session';
 import type { TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
 import { STRUCTURES, expirationsOf, reverseOf } from '../../engine/strategies/structures';
@@ -47,7 +53,26 @@ export interface Drawing {
   points: { time: number; price: number }[];
 }
 
-export type StudyId = 'bb' | 'rsi' | 'macd' | 'vol' | 'sma20' | 'sma50' | 'sma200' | 'ema9' | 'ema21' | 'keltner' | 'atr' | 'sr' | 'relvol' | 'em';
+/** Career routes every session action through the run engine (tickets, the Max-Loss Line...). */
+export type ExternalDispatch = (
+  a: SessionAction,
+) => Promise<{ result: PlaceResult | null; events: SessionEvent[] }>;
+
+export type StudyId =
+  | 'bb'
+  | 'rsi'
+  | 'macd'
+  | 'vol'
+  | 'sma20'
+  | 'sma50'
+  | 'sma200'
+  | 'ema9'
+  | 'ema21'
+  | 'keltner'
+  | 'atr'
+  | 'sr'
+  | 'relvol'
+  | 'em';
 
 interface TradingState {
   session: TradingSession | null;
@@ -71,7 +96,18 @@ interface TradingState {
   runId: string | null;
   deskId: string | null;
   onSessionEnd: (() => void) | null;
-  init: (s: TradingSession, opts?: { recordMode?: TradeRow['mode']; runId?: string | null; deskId?: string | null; lockedStudies?: StudyId[]; onSessionEnd?: (() => void) | null }) => void;
+  external: ExternalDispatch | null;
+  init: (
+    s: TradingSession,
+    opts?: {
+      recordMode?: TradeRow['mode'];
+      runId?: string | null;
+      deskId?: string | null;
+      lockedStudies?: StudyId[];
+      onSessionEnd?: (() => void) | null;
+      external?: ExternalDispatch | null;
+    },
+  ) => void;
   reset: () => void;
   bump: () => void;
   select: (cardId: string) => void;
@@ -118,6 +154,59 @@ const defaultBuilder = (): BuilderState => ({
   earningsAck: false,
 });
 
+/** One ledger row for a closed trade. Used by every mode that records to Stats. */
+export function tradeRow(
+  s: TradingSession,
+  d: TradeDebrief,
+  mode: TradeRow['mode'],
+  runId: string | null,
+  desk: string | null,
+): TradeRow | null {
+  const pos = s.position(d.positionId);
+  if (!pos) return null;
+  const card = s.card(d.cardId);
+  const w = s.window(d.cardId);
+  return {
+    id: `${s.config.seed}:${d.positionId}`,
+    mode,
+    runId,
+    desk,
+    closedOn: d.exitDate,
+    openedOn: d.entryDate,
+    symbol: d.realSymbol,
+    displaySymbol: d.displaySymbol,
+    structure: pos.structureId,
+    qty: pos.qty,
+    realizedCents: d.realizedCents,
+    riskCents: d.riskCents,
+    benchmarkCents: d.benchmarkCents,
+    alphaCents: d.alphaCents,
+    exitReason: d.exitReason,
+    grade: d.grade.grade,
+    tags: d.tags,
+    callBucket: card.call?.bucket ?? null,
+    callConf: card.call?.confidence ?? null,
+    callActual: d.call?.actual ?? null,
+    brier: card.call && d.call ? brier(card.call, d.call.actual) : null,
+    regime: {
+      vix: w?.tags.vix ?? null,
+      ivr: pos.entry.ivr,
+      trend: pos.entry.sma50Slope,
+      adx: w?.tags.adx ?? null,
+      earnings: pos.entry.earningsInside,
+    },
+    recordedAt: new Date().toISOString(),
+    data: {
+      attribution: d.attribution,
+      pop: pos.entry.pop,
+      edge: pos.entry.edgePercentile,
+      dte: pos.entry.dte,
+      riskPct: pos.entry.riskPct,
+      process: d.grade.score,
+    },
+  };
+}
+
 let feedId = 0;
 let loopToken = 0;
 // Planning runs Edge Rank over the whole chain; cache it per (session state, builder).
@@ -131,6 +220,13 @@ export const useTrading = create<TradingState>((set, get) => {
   const dispatch = async (a: SessionAction) => {
     const s = get().session;
     if (!s) return null;
+    const ext = get().external;
+    if (ext) {
+      const { result, events } = await ext(a);
+      handleEvents(events);
+      set({ version: get().version + 1 });
+      return result;
+    }
     const r = await s.dispatch(a);
     handleEvents(s.lastEvents);
     set({ version: get().version + 1 });
@@ -142,7 +238,16 @@ export const useTrading = create<TradingState>((set, get) => {
     const day = s?.dayIndex ?? 0;
     const items: FeedItem[] = [];
     for (const e of events) {
-      const tone: FeedItem['tone'] = e.kind === 'reject' ? 'warn' : e.kind === 'gap' ? 'warn' : e.cents !== undefined ? (e.cents >= 0 ? 'good' : 'bad') : 'info';
+      const tone: FeedItem['tone'] =
+        e.kind === 'reject'
+          ? 'warn'
+          : e.kind === 'gap'
+            ? 'warn'
+            : e.cents !== undefined
+              ? e.cents >= 0
+                ? 'good'
+                : 'bad'
+              : 'info';
       items.push({ id: ++feedId, text: e.text, tone, day });
       switch (e.kind) {
         case 'fill':
@@ -181,6 +286,11 @@ export const useTrading = create<TradingState>((set, get) => {
     const s = get().session;
     if (!s || !s.isDone()) return false;
     set({ ff: 'done' });
+    if (get().external) {
+      // The run engine builds the debriefs and the Career screen records the ledger.
+      get().onSessionEnd?.();
+      return true;
+    }
     const debriefs: TradeDebrief[] = [];
     for (const p of s.positions.filter((x) => x.status === 'closed')) {
       try {
@@ -198,37 +308,8 @@ export const useTrading = create<TradingState>((set, get) => {
 
   const recordTrade = async (s: TradingSession, d: TradeDebrief) => {
     if (!hasBridge()) return;
-    const pos = s.position(d.positionId);
-    const card = s.card(d.cardId);
-    const w = s.window(d.cardId);
-    if (!pos) return;
-    const row: TradeRow = {
-      id: `${s.config.seed}:${d.positionId}`,
-      mode: get().recordMode,
-      runId: get().runId,
-      desk: get().deskId,
-      closedOn: d.exitDate,
-      openedOn: d.entryDate,
-      symbol: d.realSymbol,
-      displaySymbol: d.displaySymbol,
-      structure: pos.structureId,
-      qty: pos.qty,
-      realizedCents: d.realizedCents,
-      riskCents: d.riskCents,
-      benchmarkCents: d.benchmarkCents,
-      alphaCents: d.alphaCents,
-      exitReason: d.exitReason,
-      grade: d.grade.grade,
-      tags: d.tags,
-      callBucket: card.call?.bucket ?? null,
-      callConf: card.call?.confidence ?? null,
-      callActual: d.call?.actual ?? null,
-      brier: card.call && d.call ? brier(card.call, d.call.actual) : null,
-      regime: { vix: w?.tags.vix ?? null, ivr: pos.entry.ivr, trend: pos.entry.sma50Slope, adx: w?.tags.adx ?? null, earnings: pos.entry.earningsInside },
-      recordedAt: new Date().toISOString(),
-      data: { attribution: d.attribution, pop: pos.entry.pop, edge: pos.entry.edgePercentile, dte: pos.entry.dte, riskPct: pos.entry.riskPct, process: d.grade.score },
-    };
-    await bridge().invoke('user.recordTrade', row);
+    const row = tradeRow(s, d, get().recordMode, get().runId, get().deskId);
+    if (row) await bridge().invoke('user.recordTrade', row);
   };
 
   const loop = async (token: number) => {
@@ -262,6 +343,7 @@ export const useTrading = create<TradingState>((set, get) => {
     runId: null,
     deskId: null,
     onSessionEnd: null,
+    external: null,
 
     init: (s, opts = {}) => {
       loopToken++;
@@ -283,12 +365,13 @@ export const useTrading = create<TradingState>((set, get) => {
         deskId: opts.deskId ?? null,
         lockedStudies: opts.lockedStudies ?? [],
         onSessionEnd: opts.onSessionEnd ?? null,
+        external: opts.external ?? null,
       });
       if (first) get().select(first);
     },
     reset: () => {
       loopToken++;
-      set({ session: null, ff: 'idle', debriefs: [], feed: [] });
+      set({ session: null, ff: 'idle', debriefs: [], feed: [], external: null, onSessionEnd: null });
     },
     bump: () => set({ version: get().version + 1 }),
 
@@ -299,17 +382,43 @@ export const useTrading = create<TradingState>((set, get) => {
       const exps = chain ? expirationsOf(chain) : [];
       const now = s.view(cardId).now;
       // Default: the first monthly-ish expiration 30-45 days out, else the nearest available.
-      const pick = exps.find((e) => diffDays(now, e) >= 28 && diffDays(now, e) <= 45) ?? exps.find((e) => diffDays(now, e) >= 7) ?? exps[0] ?? null;
+      const pick =
+        exps.find((e) => diffDays(now, e) >= 28 && diffDays(now, e) <= 45) ??
+        exps.find((e) => diffDays(now, e) >= 7) ??
+        exps[0] ??
+        null;
       const back = exps.find((e) => pick !== null && diffDays(pick, e) >= 21) ?? null;
       sfx('select');
-      set({ selectedCardId: cardId, builder: { ...get().builder, expiration: pick, backExpiration: back, legs: null, anchor: null, earningsAck: false } });
+      set({
+        selectedCardId: cardId,
+        builder: {
+          ...get().builder,
+          expiration: pick,
+          backExpiration: back,
+          legs: null,
+          anchor: null,
+          earningsAck: false,
+        },
+      });
     },
     selectPosition: (id) => set({ selectedPositionId: id }),
     setBuilder: (patch) => set({ builder: { ...get().builder, ...patch } }),
     setStructure: (id) => {
       const def = STRUCTURES[id];
       sfx('deal');
-      set({ builder: { ...get().builder, structureId: id, delta: id === 'bull_put' || id === 'bear_call' ? useApp.getState().settings.game.shortDelta : def.defaults.delta, width: def.defaults.width || get().builder.width, legs: null, anchor: null } });
+      set({
+        builder: {
+          ...get().builder,
+          structureId: id,
+          delta:
+            id === 'bull_put' || id === 'bear_call'
+              ? useApp.getState().settings.game.shortDelta
+              : def.defaults.delta,
+          width: def.defaults.width || get().builder.width,
+          legs: null,
+          anchor: null,
+        },
+      });
     },
     reverse: () => {
       const b = get().builder;
@@ -328,7 +437,13 @@ export const useTrading = create<TradingState>((set, get) => {
         const value = session.planFor(
           selectedCardId,
           builder.structureId,
-          { expiration: builder.expiration, backExpiration: builder.backExpiration ?? undefined, delta: builder.delta, width: builder.width, anchor: builder.anchor ?? undefined },
+          {
+            expiration: builder.expiration,
+            backExpiration: builder.backExpiration ?? undefined,
+            delta: builder.delta,
+            width: builder.width,
+            anchor: builder.anchor ?? undefined,
+          },
           builder.qty,
           builder.legs ?? undefined,
         );
@@ -382,14 +497,30 @@ export const useTrading = create<TradingState>((set, get) => {
       const d = session.config.bracketDefaults;
       const brackets = builder.bracketsOn
         ? isCredit
-          ? { targetPl: -plan.mid * builder.targetPct, stopPl: -plan.mid * (builder.stopMult - 1), targetPct: builder.targetPct, stopMult: builder.stopMult }
-          : { targetPl: plan.mid * d.debitTargetPct, stopPl: plan.mid * d.debitStopPct, targetPct: d.debitTargetPct, stopMult: null }
+          ? {
+              targetPl: -plan.mid * builder.targetPct,
+              stopPl: -plan.mid * (builder.stopMult - 1),
+              targetPct: builder.targetPct,
+              stopMult: builder.stopMult,
+            }
+          : {
+              targetPl: plan.mid * d.debitTargetPct,
+              stopPl: plan.mid * d.debitStopPct,
+              targetPct: d.debitTargetPct,
+              stopMult: null,
+            }
         : null;
       const r = await dispatch({
         t: 'place',
         cardId: selectedCardId,
         structureId: builder.structureId,
-        params: { expiration: builder.expiration, backExpiration: builder.backExpiration ?? undefined, delta: builder.delta, width: builder.width, anchor: builder.anchor ?? undefined },
+        params: {
+          expiration: builder.expiration,
+          backExpiration: builder.backExpiration ?? undefined,
+          delta: builder.delta,
+          width: builder.width,
+          anchor: builder.anchor ?? undefined,
+        },
         legs: builder.legs ?? undefined,
         qty: builder.qty,
         order: { type: builder.orderType, limit: builder.orderType === 'limit' ? limit : undefined },
@@ -445,7 +576,8 @@ export const useTrading = create<TradingState>((set, get) => {
       if (!s) return;
       const dp = s.decisions.find((d) => d.id === dpId);
       await dispatch({ t: 'decide', dpId, action, legs });
-      if (dp?.kind === 'stop_hit' && action === 'hold') useApp.getState().toast('You declined your own stop.', 'bad');
+      if (dp?.kind === 'stop_hit' && action === 'hold')
+        useApp.getState().toast('You declined your own stop.', 'bad');
       if (s.decisions.length === 0) {
         await dispatch({ t: 'end' });
         if (await finishIfDone()) return;

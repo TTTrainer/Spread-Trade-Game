@@ -12,9 +12,10 @@ test('stats dashboard aggregates the ledger and exports a CSV', async () => {
   // Seed a ledger of 40 closed trades through the real user.db channel.
   await page.evaluate(
     async ({ STRUCTS, SYMS, TAGS }) => {
-      const stg = (window as unknown as { stg: { invoke: (c: string, ...a: unknown[]) => Promise<unknown> } }).stg;
+      const stg = (window as unknown as { stg: { invoke: (c: string, ...a: unknown[]) => Promise<unknown> } })
+        .stg;
       for (let i = 0; i < 40; i++) {
-        const pl = Math.round((Math.sin(i * 1.7) * 30000 + 6000) / 1) ;
+        const pl = Math.round((Math.sin(i * 1.7) * 30000 + 6000) / 1);
         await stg.invoke('user.recordTrade', {
           id: `seed-${i}`,
           mode: i % 3 === 0 ? 'sandbox' : 'career',
@@ -37,7 +38,13 @@ test('stats dashboard aggregates the ledger and exports a CSV', async () => {
           callConf: [0.5, 0.6, 0.7, 0.8, 0.9][i % 5],
           callActual: i % 3 === 0 ? 3 : 2,
           brier: null,
-          regime: { vix: 12 + (i % 20), ivr: (i * 7) % 100, trend: i % 2 ? 0.1 : -0.1, adx: 20, earnings: i % 6 === 0 },
+          regime: {
+            vix: 12 + (i % 20),
+            ivr: (i * 7) % 100,
+            trend: i % 2 ? 0.1 : -0.1,
+            adx: 20,
+            earnings: i % 6 === 0,
+          },
           recordedAt: new Date().toISOString(),
           data: {},
         });

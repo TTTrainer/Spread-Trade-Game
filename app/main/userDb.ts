@@ -39,7 +39,8 @@ function handle(): Db {
 export function registerUserHandlers(): void {
   addHandlers({
     'user.get': (key: string) => {
-      const row = handle().prepare('SELECT value FROM kv WHERE key = ?').get(key) as { value: string } | undefined;
+      const row = handle().prepare('SELECT value FROM kv WHERE key = ?').get(key) as
+        { value: string } | undefined;
       return row ? (JSON.parse(row.value) as unknown) : null;
     },
     'user.set': (key: string, value: unknown) => {
@@ -51,14 +52,27 @@ export function registerUserHandlers(): void {
         .run(slot.slot, slot.kind, slot.updatedAt, JSON.stringify(slot.summary), JSON.stringify(slot.data));
     },
     'user.load': (slot: string) => {
-      const r = handle().prepare('SELECT * FROM saves WHERE slot = ?').get(slot) as Record<string, string> | undefined;
-      return r ? { slot: r.slot, kind: r.kind as SaveSlot['kind'], updatedAt: r.updated_at, summary: JSON.parse(r.summary) as Record<string, unknown>, data: JSON.parse(r.data) as unknown } : null;
+      const r = handle().prepare('SELECT * FROM saves WHERE slot = ?').get(slot) as
+        Record<string, string> | undefined;
+      return r
+        ? {
+            slot: r.slot,
+            kind: r.kind as SaveSlot['kind'],
+            updatedAt: r.updated_at,
+            summary: JSON.parse(r.summary) as Record<string, unknown>,
+            data: JSON.parse(r.data) as unknown,
+          }
+        : null;
     },
     'user.deleteSave': (slot: string) => {
       handle().prepare('DELETE FROM saves WHERE slot = ?').run(slot);
     },
     'user.listSaves': () =>
-      (handle().prepare('SELECT slot, kind, updated_at, summary FROM saves ORDER BY updated_at DESC').all() as Record<string, string>[]).map((r) => ({
+      (
+        handle()
+          .prepare('SELECT slot, kind, updated_at, summary FROM saves ORDER BY updated_at DESC')
+          .all() as Record<string, string>[]
+      ).map((r) => ({
         slot: r.slot,
         kind: r.kind as SaveSlot['kind'],
         updatedAt: r.updated_at,
@@ -99,54 +113,82 @@ export function registerUserHandlers(): void {
         );
     },
     'user.trades': () =>
-      (handle().prepare('SELECT * FROM trades ORDER BY closed_on, recorded_at').all() as Record<string, string | number | null>[]).map(
-        (r): TradeRow => ({
-          id: String(r.id),
-          mode: String(r.mode) as TradeRow['mode'],
-          runId: r.run_id === null ? null : String(r.run_id),
-          desk: r.desk === null ? null : String(r.desk),
-          closedOn: String(r.closed_on),
-          openedOn: String(r.opened_on),
-          symbol: String(r.symbol),
-          displaySymbol: String(r.display_symbol),
-          structure: String(r.structure),
-          qty: Number(r.qty),
-          realizedCents: Number(r.realized_cents),
-          riskCents: Number(r.risk_cents),
-          benchmarkCents: Number(r.benchmark_cents),
-          alphaCents: Number(r.alpha_cents),
-          exitReason: String(r.exit_reason),
-          grade: String(r.grade),
-          tags: JSON.parse(String(r.tags)) as string[],
-          callBucket: r.call_bucket === null ? null : Number(r.call_bucket),
-          callConf: r.call_conf === null ? null : Number(r.call_conf),
-          callActual: r.call_actual === null ? null : Number(r.call_actual),
-          brier: r.brier === null ? null : Number(r.brier),
-          regime: JSON.parse(String(r.regime)) as TradeRow['regime'],
-          recordedAt: String(r.recorded_at),
-          data: JSON.parse(String(r.data)) as Record<string, unknown>,
-        }),
-      ),
+      (
+        handle().prepare('SELECT * FROM trades ORDER BY closed_on, recorded_at').all() as Record<
+          string,
+          string | number | null
+        >[]
+      ).map((r): TradeRow => ({
+        id: String(r.id),
+        mode: String(r.mode) as TradeRow['mode'],
+        runId: r.run_id === null ? null : String(r.run_id),
+        desk: r.desk === null ? null : String(r.desk),
+        closedOn: String(r.closed_on),
+        openedOn: String(r.opened_on),
+        symbol: String(r.symbol),
+        displaySymbol: String(r.display_symbol),
+        structure: String(r.structure),
+        qty: Number(r.qty),
+        realizedCents: Number(r.realized_cents),
+        riskCents: Number(r.risk_cents),
+        benchmarkCents: Number(r.benchmark_cents),
+        alphaCents: Number(r.alpha_cents),
+        exitReason: String(r.exit_reason),
+        grade: String(r.grade),
+        tags: JSON.parse(String(r.tags)) as string[],
+        callBucket: r.call_bucket === null ? null : Number(r.call_bucket),
+        callConf: r.call_conf === null ? null : Number(r.call_conf),
+        callActual: r.call_actual === null ? null : Number(r.call_actual),
+        brier: r.brier === null ? null : Number(r.brier),
+        regime: JSON.parse(String(r.regime)) as TradeRow['regime'],
+        recordedAt: String(r.recorded_at),
+        data: JSON.parse(String(r.data)) as Record<string, unknown>,
+      })),
     'user.recordDrill': (d: DrillRow) => {
-      handle().prepare('INSERT OR REPLACE INTO drills(id, kind, at, score, detail) VALUES (?,?,?,?,?)').run(d.id, d.kind, d.at, d.score, JSON.stringify(d.detail));
+      handle()
+        .prepare('INSERT OR REPLACE INTO drills(id, kind, at, score, detail) VALUES (?,?,?,?,?)')
+        .run(d.id, d.kind, d.at, d.score, JSON.stringify(d.detail));
     },
     'user.drills': () =>
-      (handle().prepare('SELECT * FROM drills ORDER BY at').all() as Record<string, string | number>[]).map((r) => ({
-        id: String(r.id),
-        kind: String(r.kind),
-        at: String(r.at),
-        score: Number(r.score),
-        detail: JSON.parse(String(r.detail)) as Record<string, unknown>,
-      })),
+      (handle().prepare('SELECT * FROM drills ORDER BY at').all() as Record<string, string | number>[]).map(
+        (r) => ({
+          id: String(r.id),
+          kind: String(r.kind),
+          at: String(r.at),
+          score: Number(r.score),
+          detail: JSON.parse(String(r.detail)) as Record<string, unknown>,
+        }),
+      ),
     'user.recordRun': (r: RunRow) => {
       handle()
         .prepare(
           'INSERT OR REPLACE INTO runs(id, mode, desk, seed, tier, started_at, ended_at, result, rounds, score, cal_grade, alpha_cents, xp, bonus, data) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         )
-        .run(r.id, r.mode, r.desk, r.seed, r.tier, r.startedAt, r.endedAt, r.result, r.rounds, r.score, r.calGrade, r.alphaCents, r.xp, r.bonus, JSON.stringify(r.data ?? {}));
+        .run(
+          r.id,
+          r.mode,
+          r.desk,
+          r.seed,
+          r.tier,
+          r.startedAt,
+          r.endedAt,
+          r.result,
+          r.rounds,
+          r.score,
+          r.calGrade,
+          r.alphaCents,
+          r.xp,
+          r.bonus,
+          JSON.stringify(r.data ?? {}),
+        );
     },
     'user.runs': () =>
-      (handle().prepare('SELECT * FROM runs ORDER BY started_at').all() as Record<string, string | number | null>[]).map((r) => ({
+      (
+        handle().prepare('SELECT * FROM runs ORDER BY started_at').all() as Record<
+          string,
+          string | number | null
+        >[]
+      ).map((r) => ({
         id: String(r.id),
         mode: String(r.mode),
         desk: String(r.desk),

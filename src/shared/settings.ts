@@ -223,7 +223,11 @@ export const DEFAULT_SETTINGS: Settings = {
 export function mergeSettings(saved: unknown): Settings {
   const s = (saved ?? {}) as Partial<Settings>;
   return {
-    game: { ...DEFAULT_SETTINGS.game, ...s.game, pause: { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause } },
+    game: {
+      ...DEFAULT_SETTINGS.game,
+      ...s.game,
+      pause: { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
+    },
     realism: { ...DEFAULT_SETTINGS.realism, ...s.realism },
     blind: { ...DEFAULT_SETTINGS.blind, ...s.blind },
     display: { ...DEFAULT_SETTINGS.display, ...s.display },

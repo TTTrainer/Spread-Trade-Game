@@ -25,7 +25,13 @@ export interface LedgerTrade {
   callConf: number | null;
   callActual: number | null;
   brier: number | null;
-  regime: { vix: number | null; ivr: number | null; trend: number | null; adx: number | null; earnings: boolean };
+  regime: {
+    vix: number | null;
+    ivr: number | null;
+    trend: number | null;
+    adx: number | null;
+    earnings: boolean;
+  };
 }
 
 export interface Summary {
@@ -81,20 +87,35 @@ export function summarize(rows: LedgerTrade[]): Summary {
 }
 
 export function sortByClose(rows: LedgerTrade[]): LedgerTrade[] {
-  return rows.slice().sort((a, b) => (a.closedOn < b.closedOn ? -1 : a.closedOn > b.closedOn ? 1 : a.id < b.id ? -1 : 1));
+  return rows
+    .slice()
+    .sort((a, b) => (a.closedOn < b.closedOn ? -1 : a.closedOn > b.closedOn ? 1 : a.id < b.id ? -1 : 1));
 }
 
-export type BreakdownKey = 'structure' | 'desk' | 'symbol' | 'vix' | 'ivr' | 'trend' | 'earnings' | 'mode' | 'grade';
+export type BreakdownKey =
+  'structure' | 'desk' | 'symbol' | 'vix' | 'ivr' | 'trend' | 'earnings' | 'mode' | 'grade';
 
 export function regimeLabel(r: LedgerTrade, key: 'vix' | 'ivr' | 'trend' | 'earnings'): string {
   switch (key) {
     case 'vix': {
       const v = r.regime.vix;
-      return v === null ? 'VIX unknown' : v < 15 ? 'VIX < 15 (calm)' : v <= 25 ? 'VIX 15-25' : 'VIX > 25 (stressed)';
+      return v === null
+        ? 'VIX unknown'
+        : v < 15
+          ? 'VIX < 15 (calm)'
+          : v <= 25
+            ? 'VIX 15-25'
+            : 'VIX > 25 (stressed)';
     }
     case 'ivr': {
       const v = r.regime.ivr;
-      return v === null ? 'IVR unknown' : v < 30 ? 'IV rank < 30' : v <= 60 ? 'IV rank 30-60' : 'IV rank > 60';
+      return v === null
+        ? 'IVR unknown'
+        : v < 30
+          ? 'IV rank < 30'
+          : v <= 60
+            ? 'IV rank 30-60'
+            : 'IV rank > 60';
     }
     case 'trend': {
       const t = r.regime.trend;
@@ -130,7 +151,9 @@ export function breakdown(rows: LedgerTrade[], key: BreakdownKey): { key: string
     list.push(r);
     groups.set(k, list);
   }
-  return [...groups.entries()].map(([k, list]) => ({ key: k, summary: summarize(list) })).sort((a, b) => b.summary.trades - a.summary.trades);
+  return [...groups.entries()]
+    .map(([k, list]) => ({ key: k, summary: summarize(list) }))
+    .sort((a, b) => b.summary.trades - a.summary.trades);
 }
 
 export interface CalibrationPoint {
@@ -139,13 +162,29 @@ export interface CalibrationPoint {
   hitRate: number;
 }
 
-export function calibration(rows: LedgerTrade[]): { points: CalibrationPoint[]; meanBrier: number | null; grade: Grade; calls: number } {
+export function calibration(rows: LedgerTrade[]): {
+  points: CalibrationPoint[];
+  meanBrier: number | null;
+  grade: Grade;
+  calls: number;
+} {
   const calls = rows.filter((r) => r.callBucket !== null && r.callConf !== null && r.callActual !== null);
   const points = [0.5, 0.6, 0.7, 0.8, 0.9].map((c) => {
     const xs = calls.filter((r) => Math.abs((r.callConf as number) - c) < 1e-6);
-    return { confidence: c, n: xs.length, hitRate: xs.length ? xs.filter((r) => r.callBucket === r.callActual).length / xs.length : 0 };
+    return {
+      confidence: c,
+      n: xs.length,
+      hitRate: xs.length ? xs.filter((r) => r.callBucket === r.callActual).length / xs.length : 0,
+    };
   });
-  const scores = calls.map((r) => r.brier ?? brier({ bucket: r.callBucket as 0 | 1 | 2 | 3 | 4, confidence: r.callConf as number }, r.callActual as 0 | 1 | 2 | 3 | 4));
+  const scores = calls.map(
+    (r) =>
+      r.brier ??
+      brier(
+        { bucket: r.callBucket as 0 | 1 | 2 | 3 | 4, confidence: r.callConf as number },
+        r.callActual as 0 | 1 | 2 | 3 | 4,
+      ),
+  );
   const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   return { points, meanBrier: mean, grade: calibrationGrade(mean), calls: calls.length };
 }
@@ -169,7 +208,11 @@ export function equityCurve(rows: LedgerTrade[]): EquityPoint[] {
 }
 
 /** How often each mistake tag appears in consecutive blocks of trades (oldest block first). */
-export function mistakeTrends(rows: LedgerTrade[], blockSize = 10, maxBlocks = 8): { blocks: { label: string; n: number }[]; rates: Record<string, number[]> } {
+export function mistakeTrends(
+  rows: LedgerTrade[],
+  blockSize = 10,
+  maxBlocks = 8,
+): { blocks: { label: string; n: number }[]; rates: Record<string, number[]> } {
   const sorted = sortByClose(rows);
   const blocks: LedgerTrade[][] = [];
   for (let i = 0; i < sorted.length; i += blockSize) blocks.push(sorted.slice(i, i + blockSize));
@@ -178,9 +221,13 @@ export function mistakeTrends(rows: LedgerTrade[], blockSize = 10, maxBlocks = 8
   const tags = new Set<string>();
   for (const r of sorted) for (const t of r.tags) tags.add(t);
   const rates: Record<string, number[]> = {};
-  for (const t of tags) rates[t] = shown.map((b) => (b.length ? b.filter((r) => r.tags.includes(t)).length / b.length : 0));
+  for (const t of tags)
+    rates[t] = shown.map((b) => (b.length ? b.filter((r) => r.tags.includes(t)).length / b.length : 0));
   return {
-    blocks: shown.map((b, i) => ({ label: `#${(offset + i) * blockSize + 1}-${(offset + i) * blockSize + b.length}`, n: b.length })),
+    blocks: shown.map((b, i) => ({
+      label: `#${(offset + i) * blockSize + 1}-${(offset + i) * blockSize + b.length}`,
+      n: b.length,
+    })),
     rates,
   };
 }

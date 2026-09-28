@@ -8,7 +8,13 @@ import type { Cents } from '../money';
 import type { ContractKey, OptionQuote } from '../market/types';
 import type { Position } from '../lifecycle/types';
 import { attribute, type Attribution } from '../scoring/attribution';
-import { alternateKeys, alternateSpecs, benchmarkCents, valueAlternates, type AlternateResult } from '../scoring/alternates';
+import {
+  alternateKeys,
+  alternateSpecs,
+  benchmarkCents,
+  valueAlternates,
+  type AlternateResult,
+} from '../scoring/alternates';
 import { resolveCall, BUCKET_GLYPHS, BUCKET_NAMES, type CallResult } from '../scoring/calls';
 import { mistakeTags, processGrade, type MistakeTag, type ProcessGrade } from '../scoring/grade';
 import { STRUCTURES } from '../strategies/structures';
@@ -49,8 +55,15 @@ export async function buildDebrief(session: TradingSession, positionId: string):
   const view = session.view(pos.cardId);
   const exit = pos.closedOn as ISODate;
   const attribution = attribute(pos);
-  const declined = session.decisionHistory.filter((d) => d.dp.positionId === pos.id && d.action === 'hold').map((d) => d.dp.kind);
-  const gradeInput = { pos, riskCapPct: session.config.riskCapPct, earningsAcknowledged: card.earningsAck, declinedDecisions: declined };
+  const declined = session.decisionHistory
+    .filter((d) => d.dp.positionId === pos.id && d.action === 'hold')
+    .map((d) => d.dp.kind);
+  const gradeInput = {
+    pos,
+    riskCapPct: session.config.riskCapPct,
+    earningsAcknowledged: card.earningsAck,
+    declinedDecisions: declined,
+  };
   const grade = processGrade(gradeInput);
   const tags = mistakeTags(gradeInput);
 
@@ -70,16 +83,26 @@ export async function buildDebrief(session: TradingSession, positionId: string):
         if (rows[0]) quotes.set(contractId(k), rows[0]);
       }
     }
-    const exitSpot = pos.marks.find((m) => m.date === exit)?.spot ?? pos.marks[pos.marks.length - 1]?.spot ?? entryChain.spot;
-    alternates = valueAlternates(specs, entryChain, exitSpot, (k) => quotes.get(contractId(k)) ?? null, expired);
+    const exitSpot =
+      pos.marks.find((m) => m.date === exit)?.spot ??
+      pos.marks[pos.marks.length - 1]?.spot ??
+      entryChain.spot;
+    alternates = valueAlternates(
+      specs,
+      entryChain,
+      exitSpot,
+      (k) => quotes.get(contractId(k)) ?? null,
+      expired,
+    );
   }
 
   const exitSpot = pos.marks[pos.marks.length - 1]?.spot ?? pos.entry.spot;
   const daysHeld = Math.max(0, diffDays(pos.openedOn, exit));
   const call = card.call ? resolveCall(card.call, pos.entry.spot, exitSpot, daysHeld) : null;
-  const callLine = card.call && call
-    ? `You called ${BUCKET_GLYPHS[card.call.bucket]} ${BUCKET_NAMES[card.call.bucket]} at ${Math.round(card.call.confidence * 100)}%. It went ${BUCKET_GLYPHS[call.actual]} ${BUCKET_NAMES[call.actual]} (${call.movePct >= 0 ? '+' : ''}${(call.movePct * 100).toFixed(1)}%): ${call.exact ? 'exact' : call.adjacent ? 'one bucket off' : 'wrong'}.`
-    : 'No call recorded.';
+  const callLine =
+    card.call && call
+      ? `You called ${BUCKET_GLYPHS[card.call.bucket]} ${BUCKET_NAMES[card.call.bucket]} at ${Math.round(card.call.confidence * 100)}%. It went ${BUCKET_GLYPHS[call.actual]} ${BUCKET_NAMES[call.actual]} (${call.movePct >= 0 ? '+' : ''}${(call.movePct * 100).toFixed(1)}%): ${call.exact ? 'exact' : call.adjacent ? 'one bucket off' : 'wrong'}.`
+      : 'No call recorded.';
 
   const bench = view.benchmarkBars();
   const b0 = bench.find((b) => b.date === pos.openedOn)?.close;
@@ -122,8 +145,14 @@ function catalystLine(session: TradingSession, pos: Position): string {
   const exit = pos.closedOn ?? view.now;
   const earn = view.earnings().past.find((e) => e.reactionDate > pos.openedOn && e.reactionDate <= exit);
   if (earn && earn.movePct !== null) {
-    const beat = earn.actual !== null && earn.estimate !== null ? (earn.actual >= earn.estimate ? 'beat' : 'missed') : 'reported';
-    const implied = earn.impliedMovePct !== null ? ` against an implied ±${earn.impliedMovePct.toFixed(1)}%` : '';
+    const beat =
+      earn.actual !== null && earn.estimate !== null
+        ? earn.actual >= earn.estimate
+          ? 'beat'
+          : 'missed'
+        : 'reported';
+    const implied =
+      earn.impliedMovePct !== null ? ` against an implied ±${earn.impliedMovePct.toFixed(1)}%` : '';
     return `${card.realSymbol} ${beat} estimates and moved ${earn.movePct >= 0 ? '+' : ''}${earn.movePct.toFixed(1)}% on ${earn.reactionDate}${implied}.`;
   }
   const bars = view.bars().filter((b) => b.date > pos.openedOn && b.date <= exit);

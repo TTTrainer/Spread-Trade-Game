@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 6 (the Career run loop) is next.
+**Current phase:** Phase 7 (all the content: characters, headlines, achievements, the other desks' flows) is next.
 
 ## How to run (on your PC)
 
@@ -12,6 +12,24 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 6: The Career run loop
+- **Career menu:** pick a desk (Verticals is open; the other four show their Bonus price and unlock in Phase 9), an optional seed, and START RUN. A run in progress shows up with CONTINUE and ABANDON (with a no-undo warning).
+- **A run is a fiscal year:** 4 quarters × (Month 1, Month 2, Review) = 12 rounds. Targets start at 150 / 250 / 400 points and grow ×1.6 a quarter; the Annual Review is ×1.25 more.
+- **Each round:** 3 blind lineup cards (codenames, rescaled prices, "Day N"), dealt 75% from the last three years; **3 tickets**; **2 rerolls** (`R`, redraws every card you haven't traded); **skip** Month 1 or 2 (`K`) for −10 stress and a Tag (shown on the button before you choose). A call is required before every trade, one position per card, only your desk's playbook, and no new trades once the clock runs.
+- **Max-Loss Line:** checked at every close. Cross it and the risk desk liquidates everything at the natural price and the round fails. The top bar shows the room you have left.
+- **Scoring:** every closed trade goes through chips × mult in order: structure base and level, good R:R +1, call bonus, closed at plan +0.5, the desk passive, family bonuses, then Edge Rank ×, then each cartridge in slot order (order matters), then memos. Losers are never multiplied. The meter fills live during the fast-forward.
+- **Tally:** receipts print line by line (chips count, mult pops, sounds), the meter fills, TARGET MET / MISSED / LIQUIDATED is stamped, and the debrief strip reveals the real tickers and dates.
+- **Stress** (0–100, always on screen; click it for every change and its cause): +15 declining your own stop, +10 a drawdown over 5%, +5 per loser, +10 a wrong call at 80%+, +10 entering a Review, +5 an assignment; −10 skipping, −5 closing at plan, −30 Vacation Day. At 100: burnout (next round one fewer ticket and a random analyst goes silent), then back to 50.
+- **Cash and the shop:** round wins pay $3/$4/$5, +$1 per unused ticket, interest $1 per $5 (cap $5). The shop offers 2 cartridges (rarity 60/28/10/2, 60/40 toward your desk), an analyst (or a level-2 upgrade), 2 boosters (memos or Playbook Pages), and a voucher; rerolls cost $5, $6, $7…; cartridges sell back for half; drag order with ◀ ▶.
+- **All 50 cartridges** are implemented through a hook pipeline (entry, day close, decision point, close, tally, round end, passives), plus **family bonuses** at 2/3/4 of a kind, **9 analysts** (each with a live readout on the Analyst desk: IV rank history, volatility risk premium and term structure, earnings history vs implied moves, extra chart studies, skew, SPY/VIX with the Fed/CPI calendar, base rates from the stock's own past, portfolio Greeks), **11 memos**, **10 vouchers**, **8 tags**, **10 Reviews**, and **8 Risk Tiers** (Tier 0 is the default until Phase 9 adds the picker).
+- **Reviews:** COMPLY-3000 announces each one (typed out), the lineup is dealt only from matching market regimes, and the rule applies (e.g., The Chop halves debit directional wins, Wide Markets disables market orders). Q4 is always the Annual Review.
+- **Endings:** victory needs the Annual Review passed *and* positive alpha against SPY for the year; otherwise "You survived, but the board asks why you didn't just buy SPY." Defeat when a round misses its target or crosses the line (the Golden Parachute saves you once). The end screen shows rounds, points, real P/L, alpha, the calibration grade (Brier), career XP and Bonus (spent in Phase 9). Every trade goes to Stats.
+- **Autosave with no undo:** the run saves after every action. It stores a checkpoint plus the actions since, so quitting mid-round and pressing CONTINUE replays the round to the exact same state. A whole run replays from its seed and action log (tested).
+- **Realism toggles now wired:** liquidity limits (max 10 contracts per order; legs wider than 50% of mid refuse to trade), taxes (Career sets aside 24% of each round's net gain), approval levels (spreads need $2,000 equity, like a Level 3 margin account).
+- **Headless bots** (disciplined, hold-to-expiry, random, greedy) drive the real engine; a full year takes well under a second on the SIM market, which is what the Phase 8 simulator will use.
+- Fixed along the way: the price ladder now thins out strikes when they're packed too tightly to read, and meter labels sit on a dark pill so they stay readable over bright fills.
+- Tests: 159 unit/integration tests (scoring order, losers never multiplied, family thresholds, shop odds and prices, dealing, content rules, burnout, Reviews, replay, save/resume, "arcade cartridges never change the ledger"). E2E: start from the menu, reroll, save and exit, continue, abandon; and a full 12-round Verticals year (first two rounds through the real UI, a quit and resume mid-round in a fresh process, then a bot finishes the year) with screenshots reviewed.
 
 ### Phase 5: Stats and the v1 Windows build
 - **Stats** (from the real ledger only, filterable by mode): trades, win rate, expectancy, average win and loss, profit factor, total P/L with max drawdown, and alpha vs the SPY benchmark; an equity curve against the benchmark (hover for each trade); a calibration chart (your confidence vs your hit rate, with Brier score and grade); breakdowns by structure, desk, ticker, VIX regime, IV rank, trend and earnings; mistake-tag trends per 10 trades.
@@ -87,11 +105,23 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **Built in a Linux cloud container, not on Windows.** Phase 0 asked to confirm native Windows. This session runs in a cloud Linux box, so everything is built and tested here, and the Windows installer is cross-built. Things that only a Windows machine can prove (the installer on a fresh profile) are listed in `PLAYTEST.md` for you to check.
 - **Project moved to the repository root.** `CLAUDE.md` and `MASTER_PROMPT.md` now sit at the top of the repo so Claude Code picks them up automatically.
 - **SQLite without a native module.** The plan named better-sqlite3. Electron 44 ships SQLite built in (`node:sqlite`), which needs no compiling for Windows and behaves the same in the game, the tests and the data scripts. Same database files, fewer ways for the install to break.
+- **Practice runs.** A run can be flagged "practice" (a missed round doesn't end it). The tutorial will use it; the end-to-end test uses it so a whole year always plays out regardless of balance.
+- **Rerolls redraw every card you haven't traded** (traded cards stay), rather than the whole lineup, so a reroll never throws away an open position.
+- **Skipping goes straight to the next round with no shop**, like skipping a blind in Balatro.
+- **Assignments add +5 stress** (not in the plan's table). The Assignment Artist cartridge says assignments give chips "instead of stress", so they needed a stress cost to replace; the Income desk and that cartridge remove it.
+- **The Chop's rule** ("debit and directional wins score ×0.5") is read as *debit trades with a bull or bear lean*, so a bull put credit spread in a range isn't punished for being the right trade there.
+- **Algo Execution** makes brackets execute on their own (no confirm step), since brackets already default on.
+- **Crossing the Max-Loss Line liquidates** open positions at the natural price, the way a real risk desk would, so the ledger records what that costs.
+- **Taxes** reduce equity by a 24% short-term estimate on each round's net gain; the trade ledger itself stays pre-tax so Stats compare like with like.
+- **Duo Legendaries** get a 15% chance to show up once you own both parents (the plain 2% Legendary rate would make them almost unseeable).
+- **`npm run verify` now also checks formatting** (Prettier), and the whole codebase was formatted once.
+
 - **`.npmrc` sets `legacy-peer-deps`.** Some current packages declare over-strict version ranges for each other; this keeps `npm install` from refusing.
 
 ## Known issues
 
-- **Three realism toggles are placeholders until the run loop lands:** liquidity limits, taxes and broker approval levels are in Settings but don't act yet (Phase 6 wires them in).
+- **Balance is untuned.** The simple disciplined bot clears only a few rounds a year right now, so targets, payouts and cartridge strengths will move in Phase 8 (the simulator), not by feel.
+- The other four desks exist as content (structures, passives, cartridges) but stay locked until Phase 9's Bonus unlocks; their special flows (the wheel, condor management) get their E2E coverage then.
 - The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
 
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
@@ -100,4 +130,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 6: the Career run loop (desks, lineup, calls, tickets, targets, Max-Loss Line, stress, skips and tags, tally, shop, Reviews, victory and defeat, autosave).
+Phase 7: content. Characters (Director Kessler, Ines Ortiz, Bradley Stroud IV, COMPLY-3000) with 150+ lines and pixel portraits, headline template libraries for real events, clients, achievements, per-cartridge tests, and making every item reachable in play.
