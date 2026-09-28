@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 4 (Drills) is next.
+**Current phase:** Phase 5 (Stats and the first Windows build) is next.
 
 ## How to run (on your PC)
 
@@ -13,6 +13,17 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 3. `npm run dev` opens the game.
 
 ## Done
+
+### Phase 4: Drills
+- **60-Second Blind Call:** a blind chart (codename, rescaled prices, sometimes flipped), a ticking timer, five buckets and a confidence level; scored with the Brier score, streaks tracked, the reveal animates the next 10 days.
+- **Guess the IV:** read the straddle price and the chart, estimate implied volatility; the answer explains the rule of thumb (IV ≈ straddle ÷ (0.8 × price × √(days/365))).
+- **Greeks Speed Round:** a position's Greeks and a scenario (move, days, IV change); pick the P/L from four choices built from the common mistakes (delta only, forgetting theta, wrong sign).
+- **Spot the Setup:** RSI divergences, Bollinger squeezes and 50-day trend breaks found by detectors that only look backward; the reveal shows what happened next.
+- **Expected Move Darts:** drag a price range on the chart; tighter ranges score more, misses score nothing; the reveal draws the ±1 expected move.
+- **Drill-only adaptation:** the adaptive session deals more of the skills you score worst on, and blind calls lean toward the market regimes you read worst. Career never adapts.
+- Every session is saved (score, hits, streak, Brier, per-question results) and feeds a calibration chart.
+- Fixed along the way: dealer probes (the entry-day price used for blind rescaling) now pass their date through the main process's time gate, which Career's blind cards also rely on.
+
 
 ### Phase 3: Trading screen and Sandbox
 - **The trading screen** (1920×1080 layout, with a compact layout for 1366×768): top bar, lineup cards with sparklines and badges (IV rank, earnings countdown, SIM/MODEL labels), the chart, the bottom tray, and a right panel with payoff and stats.
@@ -78,4 +89,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 4: Drills (60-second blind calls, calibration, four mini-games, drill-only adaptation).
+Phase 5: the Stats dashboard with CSV export, then the first Windows build (v1: trading, drills, stats).

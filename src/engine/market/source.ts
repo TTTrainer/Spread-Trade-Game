@@ -79,6 +79,11 @@ export function isClockAware(s: MarketDataSource): s is ClockAwareSource {
   return typeof (s as Partial<ClockAwareSource>).withClock === 'function';
 }
 
+/** The source as seen from a fixed date (for dealer probes at a window's entry). */
+export function asOf(s: MarketDataSource, date: ISODate): MarketDataSource {
+  return isClockAware(s) ? s.withClock(() => date) : s;
+}
+
 /** Thrown whenever anything asks for data dated after the current simulated day. */
 export class LookaheadError extends Error {
   constructor(what: string, requested: ISODate, now: ISODate) {

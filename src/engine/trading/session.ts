@@ -7,7 +7,7 @@
 
 import type { ISODate } from '../calendar';
 import { buildContext, type MarketContext } from '../market/context';
-import type { MarketDataSource } from '../market/source';
+import { asOf, type MarketDataSource } from '../market/source';
 import { blindTransform, codename, openTransform, type BlindTransform } from '../market/transform';
 import type { Chain, WindowDef } from '../market/types';
 import { MarketView } from '../market/view';
@@ -326,7 +326,7 @@ export class TradingSession {
     if (!w) throw new Error(`Window ${windowId} not found`);
     let t: BlindTransform = openTransform(w.symbol, w.entryDate);
     if (this.config.blind) {
-      const probe = await this.source.bars(w.symbol, w.entryDate, w.entryDate);
+      const probe = await asOf(this.source, w.entryDate).bars(w.symbol, w.entryDate, w.entryDate);
       const r = this.rng.fork(`card:${cardId}:${windowId}`);
       t = blindTransform(w.symbol, w.entryDate, probe[0]?.close ?? 100, r, this.config.rescale);
       if (this.config.rescale) {

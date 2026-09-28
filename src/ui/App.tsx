@@ -6,11 +6,13 @@ import { TitleScreen } from './screens/TitleScreen';
 import { SandboxSetup, SandboxTrading } from './screens/Sandbox';
 import { HelpModal } from './trading/TradingScreen';
 import { PlaceholderScreen } from './screens/Placeholder';
+import { DrillsScreen } from './screens/Drills';
 
 const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   title: TitleScreen,
   sandboxSetup: SandboxSetup,
   trading: SandboxTrading,
+  drills: DrillsScreen,
 };
 
 export function App() {
