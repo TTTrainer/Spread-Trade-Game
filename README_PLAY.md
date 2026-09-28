@@ -4,7 +4,9 @@ A paper-trading roguelite about options spreads. Nothing in it touches a real br
 
 ## 1. Install it (about 2 minutes)
 
-You have two files. Use either one.
+If you received the game in pieces (`...exe.part1` to `part4` plus a `Join-Portable.bat` or `Join-Setup.bat`), put all five files in one folder and double-click the `Join-…bat` file first. The pieces exist only because of an upload size limit. The script glues them back into the `.exe` and checks it's byte-for-byte the file that was built. If Windows asks about running the .bat file, choose More info → Run anyway.
+
+Then you have two ways to run the game. Use either one.
 
 - **`SpreadTradingGame-Setup-1.0.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
 - **`SpreadTradingGame-Portable-1.0.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
