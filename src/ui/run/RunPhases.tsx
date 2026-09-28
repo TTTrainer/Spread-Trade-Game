@@ -5,7 +5,7 @@ import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
 import { MEMOS, VOUCHERS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
-import { ROUND_NAMES, computeTarget, sellPrice, type RunEngine } from '../../engine/run/engine';
+import { ROUND_NAMES, computeTarget, quarterLabel, sellPrice, type RunEngine } from '../../engine/run/engine';
 import type { ShopItem, TradeTally } from '../../engine/run/types';
 import type { TraceRow } from '../../engine/scoring/mult';
 import { STRUCTURES } from '../../engine/strategies/structures';
@@ -14,7 +14,7 @@ import { CountUp, Kbd, Meter, Pnl, Stamp, TiltCard } from '../components/ui';
 import { money } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
-import { useRun } from '../store/run';
+import { useRun, type DailyGhost } from '../store/run';
 import { DebriefStrip } from '../trading/Debrief';
 import { CartridgeRail } from './RunParts';
 import './run.css';
@@ -130,7 +130,7 @@ export function TallyView({ e }: { e: RunEngine }) {
     <div className="screen run-tally" data-testid="tally-screen">
       <div className="tally-head">
         <h1 className="screen-title">
-          Q{e.state.quarter} {ROUND_NAMES[r.index].toUpperCase()} · TALLY
+          {quarterLabel(e.state.quarter)} {ROUND_NAMES[r.index].toUpperCase()} · TALLY
         </h1>
         <div className="tally-meter">
           <Meter
@@ -306,11 +306,12 @@ export function ShopView({ e }: { e: RunEngine }) {
   if (!shop) return null;
   const nextIndex = (st.roundIndex + 1) % 3;
   const nextQ = st.roundIndex === 2 ? st.quarter + 1 : st.quarter;
-  const nextName = nextIndex === 2 ? 'the Review' : `Q${nextQ} ${ROUND_NAMES[nextIndex]}`;
+  const nextName = nextIndex === 2 ? 'the Review' : `${quarterLabel(nextQ)} ${ROUND_NAMES[nextIndex]}`;
+  const annual = st.endless ? nextQ % 4 === 0 : nextQ >= st.config.quarters;
   const nextTarget = computeTarget(
     nextQ,
     nextIndex,
-    nextIndex === 2 && nextQ >= st.config.quarters ? 'annual_review' : null,
+    nextIndex === 2 && annual ? 'annual_review' : null,
     st.config,
   );
   const payout = r.payouts.reduce((a, p) => a + p.cash, 0);
@@ -470,7 +471,7 @@ export function ReviewIntro({ e }: { e: RunEngine }) {
           <div className="mouth" />
         </div>
         <div className="comply-body">
-          <div className="dim num">COMPLY-3000 // QUARTER-END REVIEW // Q{st.quarter}</div>
+          <div className="dim num">COMPLY-3000 // QUARTER-END REVIEW // {quarterLabel(st.quarter)}</div>
           <h1 className="screen-title">{rv.name.toUpperCase()}</h1>
           <p className="comply-text num">
             <Typed text={rv.announce} />
@@ -500,10 +501,24 @@ export function ReviewIntro({ e }: { e: RunEngine }) {
   );
 }
 
-export function RunEnd({ e, onNew }: { e: RunEngine; onNew: () => void }) {
+export function RunEnd({
+  e,
+  onNew,
+  newLabel = 'NEW RUN',
+  ghost,
+}: {
+  e: RunEngine;
+  onNew: () => void;
+  newLabel?: string;
+  ghost?: DailyGhost | null;
+}) {
   const go = useApp((s) => s.go);
   const home = useApp((s) => s.home);
+  const act = useRun((s) => s.act);
   const res = e.state.result;
+  const cfg = e.state.config;
+  const endless = e.state.endless;
+  const canEndless = res?.outcome === 'victory' && cfg.mode === 'career' && !cfg.practice && !endless;
   useEffect(() => {
     sfx(res?.outcome === 'victory' ? 'win' : res?.outcome === 'survived' ? 'coin' : 'loss');
   }, []);
@@ -523,9 +538,25 @@ export function RunEnd({ e, onNew }: { e: RunEngine; onNew: () => void }) {
         {title}
       </h1>
       <p className="end-reason">{res.reason}</p>
+      {endless && (
+        <p className="end-reason amber-text" data-testid="endless-summary">
+          Endless: you reached {yearRound(e.state.history.length - 1)} ({e.state.history.length - 12} rounds
+          past the year).
+        </p>
+      )}
+      {ghost && (
+        <p
+          className={`end-reason ${res.points > ghost.total ? 'up-text' : 'down-text'}`}
+          data-testid="ghost-result"
+        >
+          Bradley scored {ghost.total.toLocaleString()} on this seed.{' '}
+          {res.points > ghost.total ? 'You beat his ghost.' : 'His ghost wins today.'}
+        </p>
+      )}
       <div className="end-stats num">
         <div>
-          <span className="dim">Rounds cleared</span> {res.roundsCleared} / {e.state.config.quarters * 3}
+          <span className="dim">Rounds cleared</span> {res.roundsCleared} /{' '}
+          {endless ? e.state.history.length : e.state.config.quarters * 3}
         </div>
         <div>
           <span className="dim">Points</span> {res.points.toLocaleString()}
@@ -561,7 +592,7 @@ export function RunEnd({ e, onNew }: { e: RunEngine; onNew: () => void }) {
           {e.state.history.map((h, i) => (
             <tr key={i}>
               <td>
-                Q{h.quarter} {ROUND_NAMES[h.index]} {h.reviewId ? `· ${REVIEWS[h.reviewId].name}` : ''}
+                {yearRound(i)} {h.reviewId ? `· ${REVIEWS[h.reviewId].name}` : ''}
               </td>
               <td>{h.target.toLocaleString()}</td>
               <td>{h.meter.toLocaleString()}</td>
@@ -578,8 +609,22 @@ export function RunEnd({ e, onNew }: { e: RunEngine; onNew: () => void }) {
         </tbody>
       </table>
       <div className="modal-actions">
-        <button className="pixel-btn primary" onClick={onNew} data-testid="end-new-run">
-          NEW RUN
+        {canEndless && (
+          <button
+            className="pixel-btn primary"
+            onClick={() => void act({ t: 'endless' })}
+            data-testid="end-endless"
+            title="Keep your build and play on. Targets grow x1.8 a quarter. The year's victory is already banked."
+          >
+            CONTINUE INTO ENDLESS ▶
+          </button>
+        )}
+        <button
+          className={`pixel-btn ${canEndless ? '' : 'primary'}`}
+          onClick={onNew}
+          data-testid="end-new-run"
+        >
+          {newLabel}
         </button>
         <button className="pixel-btn" onClick={() => go('stats')}>
           STATS
@@ -591,4 +636,11 @@ export function RunEnd({ e, onNew }: { e: RunEngine; onNew: () => void }) {
       <p className="dim small">Every trade from this run is in Stats (filter: Career).</p>
     </div>
   );
+}
+
+/** "Q2 Month 1" in the first year, "Y2 Q1 Review" after that (Endless). */
+function yearRound(i: number): string {
+  const q = Math.floor(i / 3);
+  const y = Math.floor(q / 4) + 1;
+  return `${y > 1 ? `Y${y} ` : ''}Q${(q % 4) + 1} ${ROUND_NAMES[i % 3]}`;
 }

@@ -101,6 +101,10 @@ interface TradingState {
   deskId: string | null;
   onSessionEnd: (() => void) | null;
   external: ExternalDispatch | null;
+  /** Contracts allow one trade. */
+  maxPositions: number | null;
+  /** Called after every session action (Live mode saves its log). */
+  onChange: (() => void) | null;
   init: (
     s: TradingSession,
     opts?: {
@@ -110,6 +114,8 @@ interface TradingState {
       lockedStudies?: StudyId[];
       onSessionEnd?: (() => void) | null;
       external?: ExternalDispatch | null;
+      maxPositions?: number | null;
+      onChange?: (() => void) | null;
     },
   ) => void;
   reset: () => void;
@@ -238,6 +244,7 @@ export const useTrading = create<TradingState>((set, get) => {
     const r = await s.dispatch(a);
     handleEvents(s.lastEvents);
     set({ version: get().version + 1 });
+    get().onChange?.();
     return r;
   };
 
@@ -356,6 +363,8 @@ export const useTrading = create<TradingState>((set, get) => {
     deskId: null,
     onSessionEnd: null,
     external: null,
+    maxPositions: null,
+    onChange: null,
 
     init: (s, opts = {}) => {
       loopToken++;
@@ -378,12 +387,23 @@ export const useTrading = create<TradingState>((set, get) => {
         lockedStudies: opts.lockedStudies ?? [],
         onSessionEnd: opts.onSessionEnd ?? null,
         external: opts.external ?? null,
+        maxPositions: opts.maxPositions ?? null,
+        onChange: opts.onChange ?? null,
       });
       if (first) get().select(first);
     },
     reset: () => {
       loopToken++;
-      set({ session: null, ff: 'idle', debriefs: [], feed: [], external: null, onSessionEnd: null });
+      set({
+        session: null,
+        ff: 'idle',
+        debriefs: [],
+        feed: [],
+        external: null,
+        onSessionEnd: null,
+        maxPositions: null,
+        onChange: null,
+      });
     },
     bump: () => set({ version: get().version + 1 }),
 
@@ -499,6 +519,14 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx('error');
         return false;
       }
+      const max = get().maxPositions;
+      if (max !== null && session.positions.length + session.orders.length >= max) {
+        useApp
+          .getState()
+          .toast(`This one allows ${max} trade${max > 1 ? 's' : ''}. Manage the one you have.`, 'warn');
+        sfx('error');
+        return false;
+      }
       const card = session.card(selectedCardId);
       if (!card.call) {
         useApp.getState().toast('Call your shot first: press 1-5 (and Shift+1-5 for confidence).', 'warn');
@@ -570,6 +598,13 @@ export const useTrading = create<TradingState>((set, get) => {
     step: async () => {
       const s = get().session;
       if (!s) return;
+      if (!s.inDay && s.atLiveEdge()) {
+        // Live mode: nothing after the latest close until the next sync.
+        loopToken++;
+        set({ ff: 'idle' });
+        useApp.getState().toast('Caught up to the latest close. Sync data for new days.', 'info');
+        return;
+      }
       if (!s.inDay) {
         await dispatch({ t: 'begin' });
         sfx('tick', 1 + Math.min(0.5, s.dayIndex / 60));

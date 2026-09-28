@@ -6,6 +6,9 @@ import { bridge, hasBridge } from '../bridge';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
+import { useProfile } from '../store/profile';
+import { COSMETICS, unlockText, type CosmeticKind } from '../../content/meta';
+import { cosmeticUnlocked } from '../../engine/meta/profile';
 import './screens.css';
 import './settings.css';
 
@@ -295,20 +298,32 @@ export function SettingsScreen() {
                 onChange={(v) => set((s) => ({ ...s, display: { ...s.display, colorblind: v } }))}
                 testId="set-colorblind"
               />
-              <div className="set-row">
-                <span>Terminal theme</span>
-                <div className="seg num">
-                  {(['indigo', 'amber', 'phosphor'] as const).map((t) => (
-                    <button
-                      key={t}
-                      className={settings.display.theme === t ? 'sel' : ''}
-                      onClick={() => set((s) => ({ ...s, display: { ...s.display, theme: t } }))}
-                    >
-                      {t.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <CosmeticPicker
+                label="Terminal theme"
+                kind="theme"
+                value={settings.display.theme}
+                onPick={(v) =>
+                  set((s) => ({ ...s, display: { ...s.display, theme: v as Settings['display']['theme'] } }))
+                }
+              />
+              <CosmeticPicker
+                label="CRT style"
+                kind="crt"
+                value={settings.display.crtStyle}
+                onPick={(v) =>
+                  set((s) => ({
+                    ...s,
+                    display: { ...s.display, crtStyle: v as Settings['display']['crtStyle'] },
+                  }))
+                }
+              />
+              <CosmeticPicker
+                label="Card back"
+                kind="cardback"
+                value={settings.display.cardBack}
+                onPick={(v) => set((s) => ({ ...s, display: { ...s.display, cardBack: v } }))}
+                preview
+              />
               <p className="num">
                 Preview: <span className="up">▲ +$123.45</span> <span className="down">▼ −$67.89</span>
               </p>
@@ -346,20 +361,14 @@ export function SettingsScreen() {
                 }}
                 fmt={(v) => `${Math.round(v * 100)}%`}
               />
-              <div className="set-row">
-                <span>Music style</span>
-                <div className="seg num">
-                  {(['synthwave', 'darkwave', 'chiptune'] as const).map((t) => (
-                    <button
-                      key={t}
-                      className={settings.audio.style === t ? 'sel' : ''}
-                      onClick={() => set((s) => ({ ...s, audio: { ...s.audio, style: t } }))}
-                    >
-                      {t.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <CosmeticPicker
+                label="Music style"
+                kind="music"
+                value={settings.audio.style}
+                onPick={(v) =>
+                  set((s) => ({ ...s, audio: { ...s.audio, style: v as Settings['audio']['style'] } }))
+                }
+              />
             </>
           )}
           {section === 'hotkeys' && <HotkeyEditor />}
@@ -536,5 +545,50 @@ function DataPanel() {
         </Modal>
       )}
     </>
+  );
+}
+
+/** A row of cosmetic choices; locked ones show how to unlock them. */
+function CosmeticPicker({
+  label,
+  kind,
+  value,
+  onPick,
+  preview = false,
+}: {
+  label: string;
+  kind: CosmeticKind;
+  value: string;
+  onPick: (v: string) => void;
+  preview?: boolean;
+}) {
+  const profile = useProfile((s) => s.profile);
+  const load = useProfile((s) => s.load);
+  const loaded = useProfile((s) => s.loaded);
+  useEffect(() => {
+    if (!loaded) void load();
+  }, [loaded]);
+  return (
+    <div className="set-row">
+      <span>{label}</span>
+      <div className="seg num cosmetic-seg">
+        {COSMETICS.filter((c) => c.kind === kind).map((c) => {
+          const open = cosmeticUnlocked(profile, c);
+          return (
+            <button
+              key={c.id}
+              className={`${value === c.value ? 'sel' : ''} ${open ? '' : 'locked'}`}
+              disabled={!open}
+              title={open ? c.name : `Locked: ${unlockText(c.unlock)}`}
+              onClick={() => onPick(c.value)}
+              data-testid={`cos-${c.id}`}
+            >
+              {preview && <span className={`cb-swatch cardback cardback-${c.value}`} />}
+              {open ? c.name.toUpperCase() : `🔒 ${c.name.toUpperCase()}`}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

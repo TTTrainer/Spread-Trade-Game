@@ -13,8 +13,12 @@ import { CreditsScreen } from './screens/Credits';
 import { CareerScreen, RunScreen } from './screens/Career';
 import { DialogueBox } from './run/Dialogue';
 import { AchievementsScreen } from './screens/Achievements';
+import { PadScreen } from './screens/Pad';
+import { DailyScreen } from './screens/Daily';
+import { LiveScreen, LiveTrading } from './screens/Live';
+import { ContractsScreen, ContractTrading } from './screens/Contracts';
 
-const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
+const SCREENS: Partial<Record<Screen, () => React.ReactElement | null>> = {
   title: TitleScreen,
   sandboxSetup: SandboxSetup,
   trading: SandboxTrading,
@@ -25,6 +29,12 @@ const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   career: CareerScreen,
   run: RunScreen,
   achievements: AchievementsScreen,
+  pad: PadScreen,
+  daily: DailyScreen,
+  live: LiveScreen,
+  liveTrading: LiveTrading,
+  contracts: ContractsScreen,
+  contractTrading: ContractTrading,
 };
 
 export function App() {

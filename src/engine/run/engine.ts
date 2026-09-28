@@ -18,6 +18,7 @@ import { emptyFamilies, familyPassives } from '../../content/families';
 import { MEMOS, TAG_IDS, VOUCHERS } from '../../content/items';
 import { ANNUAL_MIX, QUARTER_REVIEWS, REVIEWS } from '../../content/reviews';
 import { tierMods } from '../../content/tiers';
+import { complianceMods } from '../../content/meta';
 import { pickLine, type CharacterId, type Trigger } from '../../content/characters';
 import type {
   AnalystId,
@@ -81,20 +82,39 @@ const windowCache = new WeakMap<MarketDataSource, Promise<{ windows: WindowDef[]
 export const ROUND_NAMES = ['Month 1', 'Month 2', 'Review'] as const;
 
 export function roundLabel(quarter: number, index: number): string {
-  return `Q${quarter} ${ROUND_NAMES[index]}`;
+  return yearLabel(quarter, index);
 }
 
 export function computeTarget(
   quarter: number,
   index: number,
   reviewId: ReviewId | null,
-  cfg: Pick<RunConfig, 'tier'>,
+  cfg: Pick<RunConfig, 'tier'> & Partial<Pick<RunConfig, 'compliance' | 'quarters'>>,
 ): number {
   const t = BALANCE.targets;
   const rule = reviewId ? REVIEWS[reviewId].rule : {};
+  // Past the year (Endless), targets grow faster every quarter.
+  const yearEnd = Math.max(1, cfg.quarters ?? 4);
+  const growth =
+    t.quarterGrowth ** (Math.min(quarter, yearEnd) - 1) * t.endlessGrowth ** Math.max(0, quarter - yearEnd);
   const raw =
-    t.q1[index] * t.quarterGrowth ** (quarter - 1) * (rule.targetMult ?? 1) * tierMods(cfg.tier).targetMult;
+    t.q1[index] *
+    growth *
+    (rule.targetMult ?? 1) *
+    tierMods(cfg.tier).targetMult *
+    complianceMods(cfg.compliance).targetMult;
   return Math.round(raw / 10) * 10;
+}
+
+/** "Q2 Month 1" in the first year, "Y2 Q1 Review" in Endless. */
+export function yearLabel(quarter: number, index: number): string {
+  return `${quarterLabel(quarter)} ${ROUND_NAMES[index]}`;
+}
+
+/** "Q3", or "Y2 Q1" once Endless passes the first year. */
+export function quarterLabel(quarter: number): string {
+  const y = Math.floor((quarter - 1) / 4) + 1;
+  return `${y > 1 ? `Y${y} ` : ''}Q${((quarter - 1) % 4) + 1}`;
 }
 
 function emptyRound(): RoundState {
@@ -183,8 +203,8 @@ export function initialState(config: RunConfig, startedAt = ''): RunState {
     quarter: 1,
     roundIndex: 0,
     equityCents: config.startEquityCents,
-    cash: BALANCE.cash.startingCash,
-    stress: Math.max(0, Math.min(99, config.startingStress)),
+    cash: BALANCE.cash.startingCash + (config.perks?.startCash ?? 0),
+    stress: Math.max(0, Math.min(99, config.startingStress + complianceMods(config.compliance).startStress)),
     stressLog: [],
     cartridges: desk.startingCartridges.filter(
       (id) => !(config.pureMarket && CARTRIDGE_BY_ID[id]?.tag === 'ARCADE'),
@@ -223,7 +243,9 @@ export function initialState(config: RunConfig, startedAt = ''): RunState {
       maxAnalysts: desk.startingAnalysts.length,
       owned: [...desk.startingCartridges],
       ownedAt: Object.fromEntries(desk.startingCartridges.map((c) => [c, 0])),
+      year: 1,
     },
+    endless: false,
   };
 }
 
@@ -314,8 +336,10 @@ export class RunEngine {
   // ---------- derived views ----------
 
   activeCartridges(): string[] {
+    const inert = this.state.config.inert;
     return this.state.cartridges.filter(
-      (id) => !(this.state.config.pureMarket && CARTRIDGE_BY_ID[id]?.tag === 'ARCADE'),
+      (id) =>
+        !(this.state.config.pureMarket && CARTRIDGE_BY_ID[id]?.tag === 'ARCADE') && !inert?.includes(id),
     );
   }
 
@@ -407,6 +431,7 @@ export class RunEngine {
   }
 
   isLastRound(): boolean {
+    if (this.state.endless) return false;
     return this.state.quarter >= this.state.config.quarters && this.state.roundIndex === 2;
   }
 
@@ -414,6 +439,7 @@ export class RunEngine {
     const r = this.state.round;
     return (
       this.state.phase === 'round' &&
+      !complianceMods(this.state.config.compliance).noSkips &&
       r.index < 2 &&
       !r.clockStarted &&
       !!this.session &&
@@ -430,7 +456,8 @@ export class RunEngine {
     this.log.push(a);
     this.pending.push(a);
     let out: PlaceResult | null = null;
-    if (this.over && a.t !== 'move') this.warn('The run is over.');
+    if (a.t === 'endless') this.enterEndless();
+    else if (this.over && a.t !== 'move') this.warn('The run is over.');
     else
       switch (a.t) {
         case 's':
@@ -879,7 +906,7 @@ export class RunEngine {
     else this.say(r.status === 'passed' ? 'target_met' : 'target_missed', 5);
     const unused = Math.max(0, r.tickets - r.ticketsUsed);
     if (this.activeCartridges().includes('patience_pays'))
-      st.patienceStacks = Math.min(2, st.patienceStacks + unused);
+      st.patienceStacks = Math.min(3, st.patienceStacks + unused);
     st.phase = 'tally';
     this.finishedSession = s;
     this.session = null;
@@ -925,7 +952,9 @@ export class RunEngine {
           label: `${unused} unused ticket${unused > 1 ? 's' : ''}`,
           cash: unused * BALANCE.cash.perUnusedTicket,
         });
-      const interest = interestFor(cashBefore, this.passives().interestCapAdd);
+      const interest = complianceMods(st.config.compliance).noInterest
+        ? 0
+        : interestFor(cashBefore, this.passives().interestCapAdd);
       if (interest)
         r.payouts.push({ label: `Interest ($1 per $${BALANCE.cash.interestPer})`, cash: interest });
     }
@@ -969,6 +998,13 @@ export class RunEngine {
         st.stats.parachuteSaves++;
       } else if (st.config.practice) {
         this.events.push({ kind: 'info', text: 'Practice run: a missed round does not end the run.' });
+      } else if (st.endless) {
+        // The year's victory is banked; Endless ends where you fall.
+        this.finishRun(
+          'victory',
+          `Endless ended in ${yearLabel(st.quarter, r.index)}: ${r.breached ? 'you crossed the Max-Loss Line' : `${r.meter} of ${r.target} points`}.`,
+        );
+        return;
       } else {
         this.finishRun(
           'defeat',
@@ -997,6 +1033,23 @@ export class RunEngine {
       );
       return;
     }
+    this.openShop();
+  }
+
+  /** After a victory: keep the build and play on. The year's result stays banked. */
+  private enterEndless(): void {
+    const st = this.state;
+    if (
+      st.phase !== 'victory' ||
+      st.result?.outcome !== 'victory' ||
+      st.config.practice ||
+      st.config.mode !== 'career'
+    )
+      return this.warn('Endless opens after a Career victory.');
+    if (st.endless) return this.warn('Already in Endless.');
+    st.endless = true;
+    st.result = null;
+    this.say('endless', 9);
     this.openShop();
   }
 
@@ -1059,6 +1112,7 @@ export class RunEngine {
     const rule = r.reviewId ? REVIEWS[r.reviewId].rule : {};
     const p = this.passives();
     const desk = DESKS[cfg.deskId];
+    const comp = complianceMods(cfg.compliance);
     return defaultSessionConfig({
       seed: r.sessionSeed,
       mode: cfg.mode === 'sim' ? 'sim' : 'run',
@@ -1066,7 +1120,8 @@ export class RunEngine {
       riskCapPct: tier.riskCapPct * p.riskCapMult,
       realism: {
         ...cfg.realism,
-        fees: cfg.realism.fees || tier.fees,
+        ...Object.fromEntries(Object.entries(comp.realism).filter(([, v]) => v)),
+        fees: cfg.realism.fees || tier.fees || !!comp.realism.fees,
         earlyAssignment: cfg.realism.earlyAssignment || tier.assignmentAlways || !!rule.earlyAssignmentAlways,
         expirationMechanics: cfg.realism.expirationMechanics || tier.assignmentAlways,
       },
@@ -1076,7 +1131,7 @@ export class RunEngine {
       execution: {
         ...p.execution,
         fillPenalty: tier.fillPenalty,
-        marketOrdersDisabled: !!rule.marketOrdersDisabled,
+        marketOrdersDisabled: !!rule.marketOrdersDisabled || comp.marketOrdersDisabled,
       },
       bracketDefaults: {
         creditTargetPct: BALANCE.brackets.creditTargetPct,
@@ -1117,10 +1172,12 @@ export class RunEngine {
     const rule = reviewId ? REVIEWS[reviewId].rule : {};
     const p = this.passives();
     const target = computeTarget(q, idx, reviewId, cfg);
+    const comp = complianceMods(cfg.compliance);
     const line = Math.max(
       0.02,
       BALANCE.risk.maxLossLinePct +
         tier.lineDelta +
+        comp.lineDelta +
         (rule.maxLossLineDelta ?? 0) +
         p.maxLossLineDelta +
         st.tagEffects.calm,
@@ -1149,6 +1206,8 @@ export class RunEngine {
         0,
         BALANCE.run.rerollsPerRound +
           tier.rerollDelta +
+          comp.rerollDelta +
+          (idx === 0 ? (cfg.perks?.month1Rerolls ?? 0) : 0) +
           cfg.extraRerolls +
           (silent === 'scout' ? 0 : scoutRerolls),
       ),
@@ -1172,11 +1231,12 @@ export class RunEngine {
         kind: 'bad',
         text: `Burnout: one fewer ticket this round${silent ? `, and ${ANALYSTS[silent].name} is not answering` : ''}.`,
       });
-    const count = Math.min(
-      BALANCE.run.lineupMax + (DESKS[cfg.deskId].lineupAdd ?? 0),
-      BALANCE.run.lineupSize + p.lineupAdd + (DESKS[cfg.deskId].lineupAdd ?? 0),
-    );
-    const { windows, relaxed } = await this.deal(count, []);
+    const count =
+      Math.min(
+        BALANCE.run.lineupMax + (DESKS[cfg.deskId].lineupAdd ?? 0),
+        BALANCE.run.lineupSize + p.lineupAdd + (DESKS[cfg.deskId].lineupAdd ?? 0),
+      ) + comp.lineupDelta;
+    const { windows, relaxed } = await this.deal(Math.max(1, count), []);
     const r = st.round;
     r.filterRelaxed = relaxed;
     r.cards = windows.map((w) => ({ cardId: `c${++r.cardCounter}`, windowId: w.id, timeSkip: 0 }));
@@ -1261,7 +1321,7 @@ export class RunEngine {
     this.say('skip', 5);
     st.stats.skips++;
     if (this.activeCartridges().includes('patience_pays'))
-      st.patienceStacks = Math.min(2, st.patienceStacks + 1);
+      st.patienceStacks = Math.min(3, st.patienceStacks + 1);
     r.status = 'skipped';
     st.history.push({
       quarter: st.quarter,
@@ -1338,8 +1398,12 @@ export class RunEngine {
     }
     st.quarter = q;
     st.roundIndex = i;
+    st.stats.year = Math.floor((q - 1) / 4) + 1;
+    const relief = st.config.perks?.quarterStressRelief ?? 0;
+    if (i === 0 && q > 1 && relief > 0) this.addStress(-relief, 'The Pad: a quiet evening at home');
     if (i === 2) {
-      const last = q >= st.config.quarters;
+      // The year ends with the Annual Review; in Endless every fourth quarter is another one.
+      const last = st.endless ? q % 4 === 0 : q >= st.config.quarters;
       let review: ReviewId = 'annual_review';
       if (!last) {
         const pool = QUARTER_REVIEWS.filter((x) => !st.reviewsSeen.includes(x));
@@ -1595,7 +1659,7 @@ export class RunEngine {
     if (before < 75 && st.stress >= 75 && st.stress < BALANCE.stress.burnoutAt)
       this.say('high_stress', 4, { stress: st.stress });
     st.stats.maxStress = Math.max(st.stats.maxStress, st.stress);
-    const at = `Q${st.quarter} ${ROUND_NAMES[st.roundIndex]}`;
+    const at = yearLabel(st.quarter, st.roundIndex);
     if (st.stress !== before) {
       st.stressLog.push({ delta: st.stress - before, reason, at });
       this.events.push({

@@ -14,7 +14,8 @@ import {
   skew25,
   termStructure,
 } from '../../engine/run/analystTools';
-import { ROUND_NAMES, type RunEngine } from '../../engine/run/engine';
+import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
+import { heatOf } from '../../content/meta';
 import { clientChecks } from '../../engine/run/clients';
 import { CLIENT_BY_ID } from '../../content/clients';
 import { previewScore } from '../../engine/run/preview';
@@ -167,8 +168,9 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           ◀ SAVE & EXIT
         </button>
         <div className="tb-item rtb-round">
-          <span className="amber-text">Q{st.quarter}</span> {ROUND_NAMES[r.index].toUpperCase()}
+          <span className="amber-text">{quarterLabel(st.quarter)}</span> {ROUND_NAMES[r.index].toUpperCase()}
           {review && <span className="chip magenta">{review.name.toUpperCase()}</span>}
+          <ModeChips e={e} />
           {r.memo.waiver && <span className="chip warn">WAIVER</span>}
         </div>
         <div className="rtb-meter" title="Round meter: points from closed trades against the target">
@@ -295,6 +297,32 @@ export function careerBadges(
     }
     return { ivr: quant, earnings: whisper, extra: extra.length ? <>{extra}</> : undefined };
   };
+}
+
+/** Small badges for the kind of run: Daily (with Bradley's score this round), tutorial, Endless, Tier, Heat. */
+function ModeChips({ e }: { e: RunEngine }) {
+  const ghost = useRun((s) => s.ghost);
+  const cfg = e.state.config;
+  const i = e.state.history.length;
+  const heat = heatOf(cfg.compliance);
+  return (
+    <>
+      {cfg.mode === 'daily' && <span className="chip warn">DAILY</span>}
+      {cfg.mode === 'daily' && ghost && ghost.rounds[i] !== undefined && (
+        <span className="chip" title="Bradley's ghost scored this on the same round" data-testid="ghost-chip">
+          BRADLEY {ghost.rounds[i].toLocaleString()}
+        </span>
+      )}
+      {cfg.mode === 'tutorial' && <span className="chip good">TUTORIAL</span>}
+      {e.state.endless && <span className="chip magenta">ENDLESS</span>}
+      {cfg.tier > 0 && <span className="chip">TIER {cfg.tier}</span>}
+      {heat > 0 && (
+        <span className="chip warn" title="Compliance Rules in force">
+          HEAT {heat}
+        </span>
+      )}
+    </>
+  );
 }
 
 function ClientCard({ e }: { e: RunEngine }) {

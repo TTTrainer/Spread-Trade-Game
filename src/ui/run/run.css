@@ -609,6 +609,7 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: stretch;
   margin-bottom: 14px;
 }
 .desk-card {
@@ -779,4 +780,92 @@
 }
 .client-checks .fail {
   color: var(--text-faint);
+}
+
+/* Career: ladder, tutorial banner, options */
+.career-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.career-ladder {
+  min-width: 330px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 20px;
+}
+.tutorial-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-color: var(--amber);
+}
+.desk-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.desk-slot .desk-card {
+  flex: 1;
+}
+.desk-unlock {
+  width: 100%;
+}
+.desk-best {
+  margin-top: auto;
+  font-size: 15px;
+}
+.career-options {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.2fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.career-opt {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.compliance-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 10px;
+  font-size: 14px;
+}
+.comp-rule {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+.comp-rule.on {
+  color: var(--amber);
+}
+.pack-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.career .small {
+  font-size: 13px;
+}
+.cyan-text {
+  color: var(--cyan);
+}
+@media (max-width: 1500px) {
+  .career-options {
+    grid-template-columns: 1fr 1fr;
+  }
+  .desk-card {
+    width: 238px;
+    min-height: 230px;
+  }
 }

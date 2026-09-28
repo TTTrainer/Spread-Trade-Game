@@ -34,6 +34,7 @@ export function cartridgePool(
   const desk: DeskId = state.config.deskId;
   return CARTRIDGES.filter((c) => {
     if (state.cartridges.includes(c.id)) return false;
+    if (state.config.cartridgePool && !state.config.cartridgePool.includes(c.id)) return false;
     if (c.desks !== 'any' && !c.desks.includes(desk)) return false;
     if (state.config.pureMarket && c.tag === 'ARCADE') return false;
     if (c.duoOf && !(state.cartridges.includes(c.duoOf[0]) && state.cartridges.includes(c.duoOf[1])))

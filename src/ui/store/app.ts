@@ -21,7 +21,9 @@ export type Screen =
   | 'live'
   | 'contracts'
   | 'tutorial'
-  | 'achievements';
+  | 'achievements'
+  | 'liveTrading'
+  | 'contractTrading';
 
 export interface Toast {
   id: number;
@@ -58,6 +60,7 @@ export function applySettings(s: Settings): void {
   root.dataset.palette = s.display.colorblind ? 'colorblind' : 'default';
   root.dataset.reducedMotion = String(s.display.reducedMotion);
   root.dataset.theme = s.display.theme;
+  root.dataset.crt = s.display.crtStyle;
   setSfxVolume(s.audio.master, s.audio.sfx);
 }
 

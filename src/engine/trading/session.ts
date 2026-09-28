@@ -5,7 +5,7 @@
  * run loop, Live mode and the balance simulator all drive trading through this class.
  */
 
-import type { ISODate } from '../calendar';
+import { addDays, type ISODate } from '../calendar';
 import { buildContext, type MarketContext } from '../market/context';
 import { asOf, type MarketDataSource } from '../market/source';
 import { blindTransform, codename, openTransform, type BlindTransform } from '../market/transform';
@@ -77,6 +77,11 @@ export interface SessionConfig {
   rescale: boolean;
   /** Displayed prices aim for this range when rescaling (split-style). */
   priceRange: [number, number];
+  /**
+   * Live mode: the latest day with data. Cards stop there (nothing is force-closed) and wait for
+   * the next sync, which moves the edge forward.
+   */
+  liveEdge: ISODate | null;
 }
 
 export function defaultSessionConfig(over: Partial<SessionConfig> = {}): SessionConfig {
@@ -96,6 +101,7 @@ export function defaultSessionConfig(over: Partial<SessionConfig> = {}): Session
     blind: false,
     rescale: false,
     priceRange: [20, 150],
+    liveEdge: null,
     ...over,
   };
 }
@@ -116,6 +122,8 @@ export const SPREAD_APPROVAL_MIN_CENTS = 200_000;
 
 export type SessionAction =
   | { t: 'addCard'; cardId: string; windowId: number; timeSkip?: number }
+  /** Live mode: a card on a symbol from a given day up to the live edge (no dealt window). */
+  | { t: 'addLive'; cardId: string; symbol: string; entryDate: ISODate }
   | { t: 'removeCard'; cardId: string }
   | { t: 'call'; cardId: string; bucket: Bucket; confidence: number }
   | {
@@ -318,11 +326,24 @@ export class TradingSession {
   // ---------- actions ----------
 
   async dispatch(a: SessionAction): Promise<PlaceResult | null> {
-    this.log.push(a);
     this.lastEvents = [];
+    // At the live edge there is no next day yet. The request is not logged, so a replay after the
+    // next sync (when the edge has moved) cannot turn it into a real day.
+    if (a.t === 'begin' && !this.inDay && this.atLiveEdge()) {
+      this.lastEvents.push({
+        kind: 'reject',
+        cardId: '',
+        text: 'You are at the latest close. Sync for new data.',
+      });
+      return null;
+    }
+    this.log.push(a);
     switch (a.t) {
       case 'addCard':
         await this.addCard(a.cardId, a.windowId, a.timeSkip ?? 0);
+        return null;
+      case 'addLive':
+        await this.addLiveCard(a.cardId, a.symbol, a.entryDate);
         return null;
       case 'removeCard':
         this.removeCard(a.cardId);
@@ -401,9 +422,50 @@ export class TradingSession {
     return iv * Math.sqrt(30 / 365) * 0.8;
   }
 
+  /** Live mode: is every running card at the latest day with data? */
+  atLiveEdge(): boolean {
+    const edge = this.config.liveEdge;
+    if (!edge) return false;
+    const running = this.runningCardIds();
+    return running.length > 0 && running.every((id) => this.view(id).now >= edge);
+  }
+
+  private async addLiveCard(cardId: string, symbol: string, entryDate: ISODate): Promise<void> {
+    const edge = this.config.liveEdge;
+    if (!edge) throw new Error('Live cards need a live edge');
+    const w: WindowDef = {
+      id: -1 - this.cards.length,
+      symbol,
+      historyStart: addDays(entryDate, -420),
+      entryDate,
+      endDate: edge,
+      forwardDays: 0,
+      recent: true,
+      weight: 0,
+      tags: {
+        adx: 0,
+        trendSlope: 0,
+        vix: 0,
+        ivr: 0,
+        hasEarnings: false,
+        hasExDiv: false,
+        hasFomc: false,
+        maxGapAtr: 0,
+        spreadPct: 0,
+        spreadDecile: 0,
+      },
+    };
+    await this.addCardFrom(cardId, w, 0);
+  }
+
   private async addCard(cardId: string, windowId: number, timeSkip: number): Promise<void> {
     const w = await this.source.window(windowId);
     if (!w) throw new Error(`Window ${windowId} not found`);
+    await this.addCardFrom(cardId, w, timeSkip);
+  }
+
+  private async addCardFrom(cardId: string, w: WindowDef, timeSkip: number): Promise<void> {
+    const windowId = w.id;
     let t: BlindTransform = openTransform(w.symbol, w.entryDate);
     if (this.config.blind) {
       const probe = await asOf(this.source, w.entryDate).bars(w.symbol, w.entryDate, w.entryDate);
@@ -770,9 +832,10 @@ export class TradingSession {
             o.brackets,
           );
           this.pushEvent(pos, 'fill', `Resting limit filled at ${Math.abs(o.limit).toFixed(2)}`);
-        } else if (!moved) this.cancel(o.id);
+        } else if (!moved && !this.config.liveEdge) this.cancel(o.id);
       }
       for (const p of this.openPositions().filter((x) => x.cardId === cardId)) {
+        if (!moved && this.config.liveEdge) continue;
         if (!moved) {
           const closed = forceCloseAtWindowEnd(p, this.actionEnv(cardId));
           this.replace(closed);

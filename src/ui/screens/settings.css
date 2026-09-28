@@ -93,3 +93,20 @@
   font-weight: 400;
   margin: 18px 0 4px;
 }
+.cosmetic-seg {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 640px;
+}
+.cosmetic-seg button.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cb-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 16px;
+  margin-right: 5px;
+  vertical-align: -3px;
+  border-width: 1px;
+}

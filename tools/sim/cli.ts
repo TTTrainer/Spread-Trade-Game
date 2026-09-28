@@ -41,6 +41,8 @@ const DESK_RUNS = Number(arg('desk-runs', '120'));
 const CART_RUNS = Number(arg('cart-runs', '500'));
 /** Cartridges picked fewer times than this are listed but not judged: the noise is too large. */
 const MIN_PICKS = 30;
+/** Cards whose observed lift is above this get the switched-off check. */
+const CAUSAL_FROM = 0.1;
 const TIER = Number(arg('tier', '0'));
 const DB = process.argv.includes('--db') ? resolve(arg('db', '')) : null;
 const SEED = arg('seed', 'sim');
@@ -312,7 +314,7 @@ async function main(): Promise<void> {
       '| Cartridge | Rarity | Runs picked | Win rate when picked | Expected at those shops | Lift | 95% CI |',
       '|---|---|---|---|---|---|---|',
     );
-    const rows: { id: string; n: number; w: number; base: number }[] = [];
+    const rows: { id: string; n: number; w: number; base: number; picked: SimResult[] }[] = [];
     for (const [id, c] of Object.entries(CARTRIDGE_BY_ID)) {
       const desks = DESK_ORDER.filter(
         (d) => (c.desks === 'any' || c.desks.includes(d)) && !DESKS[d].startingCartridges.includes(id),
@@ -322,7 +324,7 @@ async function main(): Promise<void> {
       const picked = pool.filter((r) => r.ownedAt[id] !== undefined);
       const baseAt = (k: number) => winRate(pool.filter((r) => r.roundsPlayed >= k));
       const base = mean(picked.map((r) => baseAt(r.ownedAt[id])));
-      rows.push({ id, n: picked.length, w: winRate(picked), base });
+      rows.push({ id, n: picked.length, w: winRate(picked), base, picked });
     }
     rows.sort((a, b) => b.w - b.base - (a.w - a.base));
     for (const r of rows) {
@@ -332,14 +334,51 @@ async function main(): Promise<void> {
       );
     }
     const judged = rows.filter((r) => r.n >= MIN_PICKS);
-    const worst = judged.reduce((a, r) => Math.max(a, r.w - r.base), -1);
-    const top = judged.find((r) => r.w - r.base === worst);
+    // A high lift can be selection, not power: the runs that happen to buy a card may be doing
+    // well for other reasons. For any card that looks strong, replay exactly those runs with the
+    // card owned but switched off (same seeds, same shops, same decisions up to the purchase).
+    // The difference is what the card itself adds.
+    const causal = new Map<string, { off: number }>();
+    for (const r of judged.filter((x) => x.w - x.base > CAUSAL_FROM)) {
+      const reruns = await runAll(
+        r.picked.map((p) => ({ ...p.spec, inert: r.id })),
+        `switched off: ${CARTRIDGE_BY_ID[r.id].name}`,
+      );
+      causal.set(r.id, { off: winRate(reruns) });
+    }
+    const effective = (r: (typeof rows)[number]) => {
+      const c = causal.get(r.id);
+      return c ? r.w - c.off : r.w - r.base;
+    };
+    const worst = judged.reduce((a, r) => Math.max(a, effective(r)), -1);
+    const top = judged.find((r) => effective(r) === worst);
+    const topCausal = top ? causal.get(top.id) : undefined;
     checks.push({
-      name: `Strongest cartridge lift (picked ${MIN_PICKS}+ times)`,
+      name: `Strongest cartridge (picked ${MIN_PICKS}+ times)`,
       target: '≤ +15 pts',
-      actual: top ? `${CARTRIDGE_BY_ID[top.id].name} ${((top.w - top.base) * 100).toFixed(1)} pts` : 'n/a',
+      actual: top
+        ? `${CARTRIDGE_BY_ID[top.id].name} ${(worst * 100).toFixed(1)} pts${topCausal ? ' (switched-off check)' : ''}`
+        : 'n/a',
       pass: worst <= 0.15 + 1e-9,
     });
+    if (causal.size) {
+      lines.push(
+        '',
+        `### Switched-off check (cards with a lift over +${Math.round(CAUSAL_FROM * 100)} points)`,
+        '',
+        'The same runs replayed with the card owned but doing nothing. "What the card adds" is the difference; it is the number the ≤ +15 target is judged on for these cards.',
+        '',
+        '| Cartridge | Runs | Win rate with it | Same runs, switched off | What the card adds | Observed lift |',
+        '|---|---|---|---|---|---|',
+      );
+      for (const [id, c] of causal) {
+        const r = rows.find((x) => x.id === id);
+        if (!r) continue;
+        lines.push(
+          `| ${CARTRIDGE_BY_ID[id].name} | ${r.n} | ${pct(r.w)} | ${pct(c.off)} | ${r.w - c.off >= 0 ? '+' : ''}${((r.w - c.off) * 100).toFixed(1)} pts | ${r.w >= r.base ? '+' : ''}${((r.w - r.base) * 100).toFixed(1)} pts |`,
+        );
+      }
+    }
     lines.push(
       '',
       `Cartridges picked fewer than ${MIN_PICKS} times are listed but not judged: with that few runs the 95% interval is wider than ±17 points, so a lucky streak would look like an overpowered card. ${rows.filter((r) => r.n < MIN_PICKS).length} of ${rows.length} fall below that here (mostly rares and legendaries, which the shop rarely offers).`,

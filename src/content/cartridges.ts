@@ -219,12 +219,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['condor', 'verticals'],
     rarity: 'R',
     tag: 'ARCADE',
-    text: 'Short premium held through earnings, and the stock stays inside the expected move: x2.',
+    text: 'Short premium held through earnings, and the stock stays inside the expected move: x3.',
     synergies: ['iv_crusher', 'earnings_whisper', 'wing_clipper'],
     score: ({ facts }) =>
       when(
         facts.win && facts.shortPremium && facts.heldThroughEarnings && facts.stayedInsideEm === true,
-        mul('Crush It', 2),
+        mul('Crush It', 3),
       ),
   },
 
@@ -404,12 +404,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Each skipped round or unused ticket stores +0.5 mult for your next winner (up to +1).',
+    text: 'Each skipped round or unused ticket: +1 mult on your next winner (up to +3).',
     synergies: ['right_sized', 'bonus_pool'],
     score: ({ facts, run }) =>
       when(
         facts.win && run.patienceStacks > 0,
-        add(`Patience Pays (${Math.min(2, run.patienceStacks)})`, 0.5 * Math.min(2, run.patienceStacks)),
+        add(`Patience Pays (${Math.min(3, run.patienceStacks)})`, Math.min(3, run.patienceStacks)),
       ),
   },
   {

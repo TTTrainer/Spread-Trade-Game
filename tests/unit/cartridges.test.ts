@@ -100,7 +100,7 @@ const CASES: Record<string, () => void> = {
   crush_it: () => {
     expect(one('crush_it', { heldThroughEarnings: true, stayedInsideEm: true })).toEqual({
       op: 'mul',
-      value: 2,
+      value: 3,
     });
     expect(one('crush_it', { heldThroughEarnings: true, stayedInsideEm: false })).toBeNull();
   },
@@ -164,7 +164,7 @@ const CASES: Record<string, () => void> = {
   },
   iron_stomach: () => expect(CARTRIDGE_BY_ID.iron_stomach.passive?.stressGainMult).toBe(0.5),
   patience_pays: () => {
-    expect(one('patience_pays', {}, { patienceStacks: 5 })).toEqual({ op: 'add', value: 1 });
+    expect(one('patience_pays', {}, { patienceStacks: 5 })).toEqual({ op: 'add', value: 3 });
     expect(one('patience_pays', {}, { patienceStacks: 0 })).toBeNull();
   },
   roll_artist: () => {

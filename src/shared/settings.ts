@@ -175,7 +175,9 @@ export interface Settings {
     reducedMotion: boolean;
     colorblind: boolean;
     uiScale: number;
-    theme: 'indigo' | 'amber' | 'phosphor';
+    theme: 'indigo' | 'amber' | 'phosphor' | 'vapor';
+    crtStyle: 'scanlines' | 'clean' | 'aperture' | 'rolling';
+    cardBack: string;
   };
   audio: { master: number; music: number; sfx: number; style: 'synthwave' | 'darkwave' | 'chiptune' };
   hotkeys: Record<HotkeyAction, string>;
@@ -213,7 +215,16 @@ export const DEFAULT_SETTINGS: Settings = {
     approvalLevels: false,
   },
   blind: { rescale: true, flipDrills: true, synthetic: false },
-  display: { crt: 0.55, shake: true, reducedMotion: false, colorblind: false, uiScale: 1, theme: 'indigo' },
+  display: {
+    crt: 0.55,
+    shake: true,
+    reducedMotion: false,
+    colorblind: false,
+    uiScale: 1,
+    theme: 'indigo',
+    crtStyle: 'scanlines',
+    cardBack: 'standard',
+  },
   audio: { master: 0.8, music: 0.5, sfx: 0.8, style: 'synthwave' },
   hotkeys: { ...DEFAULT_HOTKEYS },
   data: { gameDbPath: null },

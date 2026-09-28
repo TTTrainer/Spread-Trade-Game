@@ -95,6 +95,22 @@
   --text-dim: #8fd6a2;
   --text-faint: #4f8a60;
 }
+/* Unlocked at Heat 10: a magenta and teal "audit" terminal. */
+:root[data-theme='vapor'] {
+  --cyan: #5effd8;
+  --magenta: #ff5ecb;
+  --violet: #b98cff;
+  --amber: #ffd35e;
+  --bg-0: #0d0214;
+  --bg-1: #1a0626;
+  --bg-2: #260a38;
+  --bg-3: #34104a;
+  --line: #5e1f7a;
+  --line-bright: #9a38b8;
+  --text: #ffe8fb;
+  --text-dim: #d59ae0;
+  --text-faint: #8c5a9c;
+}
 
 * {
   box-sizing: border-box;
@@ -177,6 +193,95 @@ button {
 }
 :root[data-reduced-motion='true'] .crt-overlay::after {
   animation: none;
+}
+/* CRT styles (cosmetics). */
+:root[data-crt='clean'] .crt-overlay {
+  background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.45) 100%);
+}
+:root[data-crt='clean'] .crt-overlay::after {
+  display: none;
+}
+:root[data-crt='aperture'] .crt-overlay {
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 0, 60, 0.1) 0px,
+      rgba(255, 0, 60, 0.1) 1px,
+      rgba(0, 255, 120, 0.1) 1px,
+      rgba(0, 255, 120, 0.1) 2px,
+      rgba(40, 80, 255, 0.1) 2px,
+      rgba(40, 80, 255, 0.1) 3px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.18) 0px,
+      rgba(0, 0, 0, 0.18) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
+}
+:root[data-crt='rolling'] .crt-overlay::after {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 48%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 56%
+  );
+  background-size: 100% 300%;
+  animation: crt-roll 7s linear infinite;
+  opacity: 1;
+}
+@keyframes crt-roll {
+  from {
+    background-position: 0 100%;
+  }
+  to {
+    background-position: 0 -200%;
+  }
+}
+:root[data-reduced-motion='true'][data-crt='rolling'] .crt-overlay::after {
+  animation: none;
+}
+
+/* Card backs (cosmetics): used by lineup cards while they deal in, and in previews. */
+.cardback {
+  --cb-a: var(--bg-3);
+  --cb-b: var(--line-bright);
+  background: repeating-linear-gradient(45deg, var(--cb-a) 0 6px, var(--bg-2) 6px 12px), var(--bg-2);
+  border: 2px solid var(--cb-b);
+}
+.cardback-ines {
+  background: repeating-linear-gradient(to bottom, #f4efe0 0 9px, #9fb4ff 9px 10px), #f4efe0;
+  border-color: #c04040;
+}
+.cardback-circuit {
+  background:
+    linear-gradient(90deg, transparent 45%, #2de2a6 45% 55%, transparent 55%) 0 0 / 16px 16px,
+    linear-gradient(0deg, transparent 45%, #2de2a6 45% 55%, transparent 55%) 8px 8px / 16px 16px,
+    #06301e;
+  border-color: #2de2a6;
+}
+.cardback-redacted {
+  background: repeating-linear-gradient(to bottom, #111 0 5px, #e8e4d8 5px 8px), #e8e4d8;
+  border-color: #111;
+}
+.cardback-tape {
+  background:
+    repeating-linear-gradient(to right, #0a2010 0 3px, #062010 3px 5px),
+    repeating-linear-gradient(to bottom, transparent 0 10px, rgba(107, 255, 143, 0.5) 10px 11px), #031008;
+  border-color: #6bff8f;
+}
+.cardback-hazard {
+  background: repeating-linear-gradient(-45deg, #ffcf1a 0 8px, #141414 8px 16px);
+  border-color: #ffcf1a;
+}
+.cardback-gold {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.5), transparent 40%),
+    repeating-linear-gradient(135deg, #b88a1a 0 4px, #e8c15a 4px 8px);
+  border-color: #fff0b0;
 }
 
 /* Ordered-dither texture for panels: a 4x4 Bayer pattern drawn with gradients. */

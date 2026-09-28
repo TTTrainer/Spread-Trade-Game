@@ -12,6 +12,7 @@ import type { StructureId } from '../strategies/types';
 import type { SessionAction } from '../trading/session';
 import type { TradeDebrief } from '../trading/debrief';
 import type { Line } from '../../content/characters';
+import type { PadPerk } from '../../content/meta';
 
 export type RunPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'victory' | 'defeat';
 
@@ -32,6 +33,14 @@ export interface RunConfig {
   extraRerolls: number;
   /** Practice (tutorial): a missed round does not end the run. */
   practice: boolean;
+  /** Compliance Rules switched on for this run (each adds Heat). */
+  compliance?: string[];
+  /** The Pad's comfort perks. */
+  perks?: PadPerk;
+  /** Cartridge ids the shop may offer (the profile's unlocked pool). All of them when absent. */
+  cartridgePool?: string[];
+  /** Simulator only: cartridges that are owned but do nothing (the counterfactual balance check). */
+  inert?: string[];
 }
 
 export interface StressEntry {
@@ -195,6 +204,8 @@ export interface RunState {
   reputation: number;
   /** Counters for achievements and the end screen. */
   stats: RunStats;
+  /** Playing on after a victory: quarters keep coming and targets grow faster. */
+  endless?: boolean;
 }
 
 export interface RunStats {
@@ -222,6 +233,8 @@ export interface RunStats {
   owned: string[];
   /** Rounds finished when each cartridge was first picked up (0 = the starting kit). */
   ownedAt: Record<string, number>;
+  /** The year reached (2+ only in Endless). */
+  year?: number;
 }
 
 export type RunAction =
@@ -238,6 +251,7 @@ export type RunAction =
   | { t: 'rerollShop' }
   | { t: 'leaveShop' }
   | { t: 'startReview' }
+  | { t: 'endless' }
   | { t: 'forfeit' };
 
 export interface RunEvent {

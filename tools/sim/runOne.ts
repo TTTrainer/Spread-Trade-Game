@@ -17,6 +17,8 @@ export interface SimSpec {
   tier: number;
   shop: 'families' | 'random' | 'none';
   benchmark: string | null;
+  /** A cartridge that is owned but does nothing (the counterfactual check). */
+  inert?: string;
 }
 
 export interface SimResult {
@@ -68,6 +70,7 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
     startingStress: 0,
     extraRerolls: 0,
     practice: false,
+    inert: spec.inert ? [spec.inert] : undefined,
   });
   let error: string | undefined;
   try {

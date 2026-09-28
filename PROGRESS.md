@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 9 (meta-progression and the other modes) is next.
+**Current phase:** Phase 10 (juice and polish) is next.
 
 ## How to run (on your PC)
 
@@ -12,6 +12,61 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 9: Meta-progression and every mode
+- **Career ladder.** Every run pays career XP, failed runs included. Eight ranks:
+  - Intern → Analyst → Associate → Trader → Senior Trader → Portfolio Manager → Head of Desk → Fund Founder.
+  - Each rank unlocks something: a cartridge pack, a terminal theme, cheaper desk unlocks (25% off, then 50%), a card back, or a new home for The Pad.
+  - A promotion pops up the moment you earn it.
+- **Bonus**, the money you keep between runs, comes from:
+  - each run's score, calibration grade, beating SPY and finishing the year;
+  - every achievement (paid once, including ones unlocked before Bonus existed);
+  - Contracts.
+- **Spending Bonus:**
+  - Unlock the other four desks from the Career screen.
+  - Buy cartridge packs: 12 of the 50 cartridges start locked, in three packs that also open for free at a rank. The Career shop only offers what you've unlocked. The balance simulator uses all 50.
+  - Upgrade The Pad and buy cosmetics.
+- **Risk Tiers.** A picker on the Career screen, 0 to 8. Clearing a whole year at your highest tier unlocks the next one. Each desk remembers the best tier you've cleared on it.
+- **Compliance Rules (Heat).** Twelve optional rules that make a run harder, each worth 1–2 Heat. Clearing a year with more Heat unlocks cosmetics at Heat 3, 6, 10 and 12. The rules:
+  - fees on, taxes on, liquidity limits, approval levels;
+  - no market orders, no skipping, no interest;
+  - start at 25 stress;
+  - Max-Loss Line 3% tighter;
+  - one fewer card, two fewer rerolls;
+  - targets +20%.
+- **The Pad.** Your apartment, drawn in pixel art in code. It fills up as you buy things:
+  - Four homes: Studio → Loft → Penthouse → Orbital Suite. Each has a small, capped comfort perk: +$2 starting cash, +1 reroll in every Month 1, and −5 stress at each new quarter.
+  - Collections: 12 art pieces, 8 watches and 6 vehicles, each piece pricier than the last.
+  - Desk upgrades (monitors, chair, plants, lighting) and up to four desk items on display.
+- **Cosmetics.** Settings now shows every theme, CRT style, card back and music style, with locked ones saying how to earn them:
+  - Themes: four in all (new: Vapor Audit).
+  - CRT styles: scanlines, clean LCD, aperture grille, rolling bar.
+  - Card backs: seven.
+  - Music styles: three.
+- **Endless.** After a Career victory, CONTINUE INTO ENDLESS keeps your build and plays on into Year 2 and beyond:
+  - Targets grow ×1.8 a quarter, and every fourth quarter is another Annual Review.
+  - The year's victory is already banked, so Endless can only add to it: more rounds, more XP and Bonus.
+- **Daily.** One seeded quarter (Month 1, Month 2, a Review), the same for everyone that day, on default rules. The desk rotates daily.
+  - Bradley's ghost is the disciplined bot playing the same seed. His round-by-round score shows in the top bar, and the end screen says who won.
+  - The first finish of the day counts toward your streak, which breaks if you miss a day.
+- **Contracts.** A weekly board of five clients, each with one request on a blind chart:
+  - Place one trade that meets every line of the checklist (it ticks live as you build) to earn Bonus, plus half again if the trade makes money.
+  - Once you place the trade the contract is taken, so you can't peek at the outcome and retry.
+  - A request that needs a desk you haven't unlocked says so.
+- **Live.** Paper spreads on the latest end-of-day chain, real names.
+  - Your positions carry over: the game replays your trades against the newer data after each sync, and the clock runs up to the latest close, then waits.
+  - Closed trades go to Stats under "Live".
+  - With real data, SYNC DATA pulls the newest days. On the SIM market there's nothing to download, so SYNC moves a simulated calendar forward one week, and the screen says so.
+  - Nothing connects to a broker.
+- **Tutorial.** Three practice rounds with Ines, from a banner on the Career screen (or its TUTORIAL button). Her tips follow what you're doing and never block a click:
+  - read the card, call your shot, build a bull put, start the clock;
+  - decision points, the tally, the shop, Month 2, the Review.
+  - Finishing it gives you Ines's Mug (a desk item) and her Notebook card back.
+- Tests:
+  - 18 unit tests for the profile rules (ladder, payouts once per run, tier unlocks, prices, rank gates, collections, cosmetics, desk items, streaks, week keys, contracts).
+  - 9 integration tests on the real engine: Compliance Rules, Pad perks, the unlocked cartridge pool, Endless into Year 2, Daily determinism (the ghost), Live sessions stopping at the edge and replaying after a sync, and the Contracts board.
+  - E2E smoke tests for Daily (with the ghost, save and continue), Contracts (take, trade, get paid), Live (trade, sync, catch up), The Pad and the Career office (buy art, a home, a desk; tiers; Heat), the tutorial and Endless.
+  - Screenshots reviewed. Fixes from that review: the chair now sits in front of the desk, the vehicle sits on a showroom plinth, and Ines's tip box moved clear of the order buttons.
 
 ### Phase 8: Balance
 - **`npm run sim`** plays thousands of headless Career runs through the real engine (the same code the game runs, on the SIM market) with four bots, then writes `sim/REPORT.md`. It uses every CPU core and takes about 15 minutes.
@@ -35,10 +90,10 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
     - Volatility: +3 tickets, +2 cards, profit taking at +15%.
     - Calendar: +1 ticket, +1 card, profit taking at +15%.
     - Income and Calendar are dealt on cheaper-looking share prices.
-  - Two cartridges were toned down: Patience Pays now stores +0.5 mult per unused ticket or skipped round, up to +1 (it was +1 each, up to +3), and Crush It is ×2 (was ×3).
 - **Honest caveats** are written into the report:
   - These numbers come from the SIM market. Once you build real data, `npm run sim -- --db <path to game.db>` reruns everything on it.
   - Cartridges picked fewer than 30 times (mostly rares and legendaries the shop rarely shows) are listed but not judged, because with so few runs the uncertainty is bigger than the 15-point limit.
+- **Checking what a cartridge really does.** The first report flagged Patience Pays: runs that bought it won 22 points more often. Weakening it changed nothing, down to the decimal. So I replayed the same 65 runs with the card owned but switched off, and they won just as often (one run in 65 changed). The card wasn't strong. The runs that happened to buy it were already doing well. The simulator now runs this switched-off replay for every card that looks strong and judges it on what the card itself adds. Patience Pays and Crush It stay exactly as the plan describes them.
 - Tests: E2E expectations and unit tests now read targets, lineup size and the rest from `balance.ts` instead of hard-coded numbers, so future tuning can't silently break them.
 
 ### Phase 7: Content
@@ -133,6 +188,13 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Decisions and deviations (why things differ from the plan)
 
+- **Live mode on the SIM market.** Live is meant for this week's real market. Until you build real data there's nothing new to download, so on the SIM market the Sync button moves a simulated "today" forward one week through the SIM history. Everything else works the same way, and the screen labels it plainly.
+- **The Pad's perks.** The plan's example perk, "−5 starting stress", would do nothing because runs already start at 0 stress. The Orbital Suite instead takes 5 stress off at every new quarter. The other perks are +$2 starting cash (Loft) and +1 reroll in each Month 1 (Penthouse). All are small and none touch the market.
+- **Some cartridges start locked.** 12 of the 50 cartridges are in three packs that open by rank or for Bonus. That gives the ladder something to unlock without cutting content. The balance report is measured with all 50 in the pool, as a long-time player has them.
+- **The Daily plays on default rules** (default capital, the default realism toggles) and rotates through all five desks. That way everyone, and Bradley's ghost, plays the same game that day. Only your first finish of the day counts; the next day brings a new seed.
+- **Contracts are taken when you place the trade.** Leaving afterwards forfeits the contract, so a blind chart's outcome can't be peeked at and retried.
+- **Endless adds an Annual Review every fourth quarter**, so each Endless year ends like the first one did.
+
 - **Calls on trades closed early.** The plan resolves a call at the trade's expiration. If you close early, the game grades the call on the move so far, with the expected move scaled by the square root of the time that passed. That way closing a winner early never leaves the call hanging, and the same skill is measured either way.
 - **Income trades and the risk cap.** A cash-secured put or covered call can in theory lose nearly all its collateral, which would never fit a 10% risk cap on a small account. For those two, the cap measures a stress loss (a drop of three expected moves, at least 25%) while the full collateral must still fit in your equity.
 - **Stops mean "the loss reaches 2× the credit".** Phase 2 first read "a stop at 2× credit" as buying the spread back at twice the credit. The balance simulator showed that version stopping out on ordinary daily noise. The stop now fires when the trade has lost twice what it collected, which is the common reading on trading desks. The stop choices in the builder (1×, 1.5×, 2×, 3×) use the same meaning.
@@ -160,7 +222,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 ## Known issues
 
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
-- The other four desks play fully but stay locked until Phase 9's Bonus unlocks.
+- **Card backs are chosen in Settings but only show in previews so far.** Phase 10 adds the card-flip animation that uses them in play. Music styles likewise wait for Phase 10's music.
 - The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
 
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
@@ -169,4 +231,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 9: the career ladder (ranks and Bonus), desk unlocks, The Pad, cosmetics, Risk Tiers and Compliance Rules, Endless, Daily with Bradley's ghost, Contracts, Live mode with sync, and the tutorial.
+Phase 10: juice and polish. The animated backdrop and particles, card motion (deal, flip with your card back, shine on Legendaries), screen shake, adaptive music in three styles, more sound effects, accessibility, and a smooth 60 fps on the chart and fast-forward.
