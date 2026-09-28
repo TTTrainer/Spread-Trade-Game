@@ -2,25 +2,33 @@
   font-family: 'DotGothic16';
   src: url('../../assets/fonts/dotgothic16-latin-400-normal.woff2') format('woff2');
   font-display: block;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'DotGothic16';
   src: url('../../assets/fonts/dotgothic16-latin-ext-400-normal.woff2') format('woff2');
   font-display: block;
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  unicode-range:
+    U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
   font-family: 'VT323';
   src: url('../../assets/fonts/vt323-latin-400-normal.woff2') format('woff2');
   font-display: block;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'VT323';
   src: url('../../assets/fonts/vt323-latin-ext-400-normal.woff2') format('woff2');
   font-display: block;
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  unicode-range:
+    U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
 }
 
 /* A deliberately small palette: indigo ground, three neons, two P/L colors. */
@@ -137,7 +145,13 @@ button {
   z-index: 9000;
   opacity: var(--crt-intensity);
   background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.28) 0px, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.28) 0px,
+      rgba(0, 0, 0, 0.28) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
     radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
   mix-blend-mode: multiply;
 }
@@ -170,14 +184,20 @@ button {
   background-image:
     radial-gradient(rgba(157, 107, 255, 0.12) 1px, transparent 1px),
     radial-gradient(rgba(62, 242, 255, 0.06) 1px, transparent 1px);
-  background-size: 4px 4px, 4px 4px;
-  background-position: 0 0, 2px 2px;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-position:
+    0 0,
+    2px 2px;
 }
 
 .panel {
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border: 2px solid var(--line);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.8);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.8);
   image-rendering: pixelated;
 }
 
@@ -197,7 +217,9 @@ button {
 .pixel-btn:focus-visible {
   border-color: var(--cyan);
   outline: none;
-  box-shadow: 3px 3px 0 0 #000, var(--glow-cyan);
+  box-shadow:
+    3px 3px 0 0 #000,
+    var(--glow-cyan);
 }
 .pixel-btn:active {
   transform: translate(2px, 2px);
@@ -212,7 +234,9 @@ button {
   background: #3a0f3a;
 }
 .pixel-btn.primary:hover {
-  box-shadow: 3px 3px 0 0 #000, var(--glow-magenta);
+  box-shadow:
+    3px 3px 0 0 #000,
+    var(--glow-magenta);
 }
 
 .kbd {

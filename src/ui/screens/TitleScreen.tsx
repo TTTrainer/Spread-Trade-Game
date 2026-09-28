@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 import './title.css';
 
-const MENU = ['Career', 'Daily', 'Drills', 'Live', 'Contracts', 'Sandbox', 'Stats', 'The Pad', 'Settings', 'Credits'];
+const MENU = [
+  'Career',
+  'Daily',
+  'Drills',
+  'Live',
+  'Contracts',
+  'Sandbox',
+  'Stats',
+  'The Pad',
+  'Settings',
+  'Credits',
+];
 
 export function TitleScreen() {
   const [sel, setSel] = useState(0);

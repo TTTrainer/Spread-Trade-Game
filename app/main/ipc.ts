@@ -4,7 +4,11 @@ import type { EventChannel, EventMap, RpcChannel, RpcMap } from '../../src/share
 import { defaultGameDbPath, logDir, userDataDir } from './paths';
 import { log } from './log';
 
-type Handlers = { [C in RpcChannel]: (...args: Parameters<RpcMap[C]>) => ReturnType<RpcMap[C]> | Promise<ReturnType<RpcMap[C]>> };
+type Handlers = {
+  [C in RpcChannel]: (
+    ...args: Parameters<RpcMap[C]>
+  ) => ReturnType<RpcMap[C]> | Promise<ReturnType<RpcMap[C]>>;
+};
 
 let getWindow: () => BrowserWindow | null = () => null;
 
@@ -62,8 +66,7 @@ export function registerIpc(windowGetter: () => BrowserWindow | null): void {
   const base = systemHandlers();
   ipcMain.handle('rpc', async (_event, channel: RpcChannel, ...args: unknown[]) => {
     const handler = (extraHandlers[channel] ?? (base as Partial<Handlers>)[channel]) as
-      | ((...a: unknown[]) => unknown)
-      | undefined;
+      ((...a: unknown[]) => unknown) | undefined;
     if (!handler) throw new Error(`Unknown channel ${channel}`);
     try {
       return await handler(...args);

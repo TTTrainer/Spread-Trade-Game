@@ -45,7 +45,8 @@
   height: 360px;
   margin-left: -180px;
   border-radius: 50%;
-  background: repeating-linear-gradient(to bottom, var(--amber) 0 14px, transparent 14px 20px),
+  background:
+    repeating-linear-gradient(to bottom, var(--amber) 0 14px, transparent 14px 20px),
     linear-gradient(to bottom, var(--amber), var(--magenta));
   background-blend-mode: multiply;
   mask-image: linear-gradient(to bottom, black 45%, transparent 100%);

@@ -40,8 +40,23 @@ export default tseslint.config(
         'error',
         {
           patterns: [
-            { group: ['react', 'react-dom', 'electron', 'zustand', 'motion*', 'pixi*', 'tone', 'lightweight-charts'], message: 'Engine code must stay UI-free.' },
-            { group: ['**/ui/**', '**/fx/**', '**/audio/**', '**/app/**'], message: 'Engine code must not import UI layers.' },
+            {
+              group: [
+                'react',
+                'react-dom',
+                'electron',
+                'zustand',
+                'motion*',
+                'pixi*',
+                'tone',
+                'lightweight-charts',
+              ],
+              message: 'Engine code must stay UI-free.',
+            },
+            {
+              group: ['**/ui/**', '**/fx/**', '**/audio/**', '**/app/**'],
+              message: 'Engine code must not import UI layers.',
+            },
           ],
         },
       ],
