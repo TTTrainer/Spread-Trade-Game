@@ -259,3 +259,8 @@ button {
   background: var(--line);
   border: 2px solid var(--bg-1);
 }
+
+input[type='range'],
+input[type='checkbox'] {
+  accent-color: var(--magenta);
+}

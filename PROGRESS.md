@@ -4,15 +4,23 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 5 (Stats and the first Windows build) is next.
+**Current phase:** Phase 6 (the Career run loop) is next.
 
 ## How to run (on your PC)
 
-1. Install Node.js LTS (one time): `winget install OpenJS.NodeJS.LTS`
-2. In this folder: `npm install`
-3. `npm run dev` opens the game.
+- **Installer:** `npm run build:win` writes `release/SpreadTradingGame-Setup-<version>.exe` (installer) and `release/SpreadTradingGame-Portable-<version>.exe` (runs without installing).
+- **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 5: Stats and the v1 Windows build
+- **Stats** (from the real ledger only, filterable by mode): trades, win rate, expectancy, average win and loss, profit factor, total P/L with max drawdown, and alpha vs the SPY benchmark; an equity curve against the benchmark (hover for each trade); a calibration chart (your confidence vs your hit rate, with Brier score and grade); breakdowns by structure, desk, ticker, VIX regime, IV rank, trend and earnings; mistake-tag trends per 10 trades.
+- **Export CSV** writes an Excel-ready file (UTF-8 with BOM, CRLF lines, properly quoted fields).
+- **Settings:** starting capital, default short delta, bucket mode, fast-forward speed, which decision points pause, Pure Market; every realism rule as its own toggle; blind-mode options; CRT, UI scale, shake, reduced motion, colorblind palette, terminal theme (indigo, amber, phosphor); audio levels and music style; remappable hotkeys with a reset to thinkorswim defaults; and **Data** (build real data, sync, rebuild SIM, view the data report). Settings persist.
+- **Credits** with the CC BY-SA 4.0 notice for the options data, TradingView Lightweight Charts, the fonts, and "not financial advice".
+- **v1 Windows build:** `SpreadTradingGame-Setup-0.1.0.exe` and `SpreadTradingGame-Portable-0.1.0.exe`, cross-built from Linux with an original pixel-art icon. Checked that the Windows binary runs the built-in SQLite. (Trading, drills and stats are playable; Career arrives in Phase 6.)
+- Chart colors for Stats were checked with a colorblind-safety validator against the dark background.
+
 
 ### Phase 4: Drills
 - **60-Second Blind Call:** a blind chart (codename, rescaled prices, sometimes flipped), a ticking timer, five buckets and a confidence level; scored with the Brier score, streaks tracked, the reveal animates the next 10 days.
@@ -83,10 +91,13 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Known issues
 
+- **Three realism toggles are placeholders until the run loop lands:** liquidity limits, taxes and broker approval levels are in Settings but don't act yet (Phase 6 wires them in).
+- The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
+
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
 - **FOMC and CPI dates were compiled offline** (the official sites were unreachable), so they're marked unverified in the database. They match the published schedules to the best of my knowledge.
 - The DoltHub table layouts were written from documentation and checked against a local imitation, not against the live repositories. The pipeline inspects the real column names when it runs and stops with a plain message if something doesn't match.
 
 ## Next
 
-Phase 5: the Stats dashboard with CSV export, then the first Windows build (v1: trading, drills, stats).
+Phase 6: the Career run loop (desks, lineup, calls, tickets, targets, Max-Loss Line, stress, skips and tags, tally, shop, Reviews, victory and defeat, autosave).

@@ -7,12 +7,18 @@ import { SandboxSetup, SandboxTrading } from './screens/Sandbox';
 import { HelpModal } from './trading/TradingScreen';
 import { PlaceholderScreen } from './screens/Placeholder';
 import { DrillsScreen } from './screens/Drills';
+import { StatsScreen } from './screens/Stats';
+import { SettingsScreen } from './screens/Settings';
+import { CreditsScreen } from './screens/Credits';
 
 const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   title: TitleScreen,
   sandboxSetup: SandboxSetup,
   trading: SandboxTrading,
   drills: DrillsScreen,
+  stats: StatsScreen,
+  settings: SettingsScreen,
+  credits: CreditsScreen,
 };
 
 export function App() {
