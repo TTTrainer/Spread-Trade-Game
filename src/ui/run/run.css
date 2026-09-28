@@ -691,6 +691,17 @@
   top: auto;
   bottom: 24px;
 }
+.dialogue.at-corner {
+  top: 10px;
+  right: 12px;
+  left: auto;
+  margin: 0;
+  width: min(460px, 36vw);
+  padding: 6px 10px;
+}
+.dialogue.at-corner .dlg-text {
+  font-size: 15px;
+}
 .dialogue {
   position: fixed;
   top: 104px;
@@ -874,4 +885,42 @@
     width: 238px;
     min-height: 230px;
   }
+}
+
+/* Item art: the picture sits beside the name on shop cards. */
+.item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.item-top .item-name {
+  flex: 1;
+}
+.memo-btn.with-art {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cart-chip .cart-art {
+  margin: 0 4px 0 2px;
+}
+.client-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.score-preview {
+  cursor: help;
+  font-size: 14px;
+  padding: 5px 8px;
+}
+.score-preview .sp-points {
+  font-size: 22px;
+  color: var(--amber);
 }

@@ -33,8 +33,8 @@ export function CallCards() {
   const locked = ff !== 'idle' || !!card?.positionIds.length;
   return (
     <div className="tray-section calls" data-testid="call-cards">
-      <div className="section-title">
-        Call your shot <Kbd>1-5</Kbd> <Kbd>Shift+1-5</Kbd>
+      <div className="section-title" data-tip="g:call">
+        Call your shot <Kbd>1-5</Kbd>
       </div>
       <div className="call-row">
         {([0, 1, 2, 3, 4] as Bucket[]).map((b) => (
@@ -45,6 +45,7 @@ export function CallCards() {
             onClick={() => !locked && void setCall(b)}
             testId={`call-${b}`}
             disabled={locked && card?.call?.bucket !== b}
+            title={`${BUCKET_NAMES[b]}: the stock ends ${labels[b]} by expiration. Hotkey ${b + 1}.`}
           >
             <div className="call-glyph">{BUCKET_GLYPHS[b]}</div>
             <div className="call-name">{BUCKET_NAMES[b]}</div>
@@ -54,6 +55,7 @@ export function CallCards() {
       </div>
       <div
         className="conf-row"
+        data-tip="g:confidence"
         onWheel={(e) =>
           !locked &&
           void setConfidence(
@@ -88,8 +90,8 @@ export function StructureCards({
   const ids = allowed ?? (Object.keys(STRUCTURES) as StructureId[]);
   return (
     <div className="tray-section structures" data-testid="structure-cards">
-      <div className="section-title">
-        Structure <Kbd>Alt+R</Kbd> reverse
+      <div className="section-title" data-tip="g:structure">
+        Structure
       </div>
       <div className="structure-row">
         {ids.map((id) => (
@@ -99,7 +101,7 @@ export function StructureCards({
             selected={builder.structureId === id}
             onClick={() => setStructure(id)}
             testId={`structure-${id}`}
-            title={STRUCTURES[id].blurb}
+            tip={`struct:${id}`}
           >
             <div className="st-name">{STRUCTURES[id].short}</div>
             <div className={`st-kind num ${STRUCTURES[id].credit ? 'credit' : 'debit'}`}>
@@ -130,7 +132,9 @@ export function ExpiryChips() {
   const backs = exps.filter((e) => builder.expiration && diffDays(builder.expiration, e) >= 14);
   return (
     <div className="tray-section expiries" data-testid="expiry-chips">
-      <div className="section-title">Expiration</div>
+      <div className="section-title" data-tip="g:expiration">
+        Expiration
+      </div>
       <div className="chip-row">
         {shown.map((e) => {
           const d = diffDays(now, e);
@@ -192,9 +196,8 @@ export function SizeControls() {
   const risk = plan?.riskPct ?? 0;
   return (
     <div className="tray-section size" data-testid="size-controls">
-      <div className="section-title">Build</div>
       <div className="ctl-grid num">
-        <label>Δ short</label>
+        <label data-tip="g:delta">Δ short</label>
         <input
           type="range"
           min={0.1}
@@ -207,7 +210,7 @@ export function SizeControls() {
         <span>{builder.anchor !== null ? `K ${builder.anchor}` : builder.delta.toFixed(2)}</span>
         {hasWidth && (
           <>
-            <label>Width</label>
+            <label data-tip="g:width">Width</label>
             <div
               className="stepper"
               onWheel={(e) =>
@@ -233,7 +236,7 @@ export function SizeControls() {
             <span>{builder.width} str</span>
           </>
         )}
-        <label>Contracts</label>
+        <label data-tip="g:contracts">Contracts</label>
         <div className="stepper">
           <button onClick={() => setBuilder({ qty: Math.max(1, builder.qty - 1) })} data-testid="qty-minus">
             −
@@ -246,6 +249,7 @@ export function SizeControls() {
         <span
           className={risk > cap ? 'down' : risk > cap * 0.6 ? 'warn-text' : ''}
           data-testid="risk-readout"
+          data-tip="g:risk_cap"
         >
           {pct(risk)} / {pct(cap, 0)}
         </span>
@@ -315,14 +319,17 @@ export function OrderTicket() {
   return (
     <div className="tray-section ticket" data-testid="order-ticket">
       <div className="section-title">
-        Order <Kbd>Alt+S</Kbd> sell <Kbd>Alt+B</Kbd> buy <Kbd>Alt+A</Kbd> auto-send{' '}
-        {builder.autoSend ? 'ON' : 'off'}
+        Order{' '}
+        <span className="dim" data-tip="g:auto_send">
+          {builder.autoSend ? 'sends at once' : 'confirms first'} <Kbd>Alt+A</Kbd>
+        </span>
       </div>
       <div className="ticket-grid num">
         <div className="seg">
           <button
             className={builder.orderType === 'limit' ? 'sel' : ''}
             onClick={() => setBuilder({ orderType: 'limit' })}
+            data-tip="g:order_limit"
           >
             LIMIT
           </button>
@@ -330,6 +337,7 @@ export function OrderTicket() {
             className={builder.orderType === 'market' ? 'sel' : ''}
             onClick={() => setBuilder({ orderType: 'market' })}
             data-testid="order-market"
+            data-tip="g:order_market"
           >
             MARKET
           </button>
@@ -346,26 +354,26 @@ export function OrderTicket() {
             data-testid="limit-slider"
           />
           <div className="limit-labels">
-            <span>MID {price(mid !== null ? Math.abs(mid) : null)}</span>
-            <span className="limit-now">
+            <span data-tip="g:mid">MID {price(mid !== null ? Math.abs(mid) : null)}</span>
+            <span className="limit-now" data-tip="g:fill_chance">
               {builder.orderType === 'market'
                 ? 'NATURAL'
                 : `LMT ${price(limit !== null ? Math.abs(limit) : null)}`}{' '}
               · fill {Math.round(prob * 100)}%
             </span>
-            <span>NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
+            <span data-tip="g:natural">NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
           </div>
         </div>
-        <label className="toggle">
+        <label className="toggle" data-tip="g:brackets">
           <input
             type="checkbox"
             checked={builder.bracketsOn}
             onChange={(e) => setBuilder({ bracketsOn: e.target.checked })}
           />{' '}
-          Brackets
+          Plan
           {builder.bracketsOn && credit && (
             <span className="bracket-edit">
-              target
+              <span data-tip="g:bracket_target">target</span>
               <select
                 value={builder.targetPct}
                 onChange={(e) => setBuilder({ targetPct: Number(e.target.value) })}
@@ -376,7 +384,7 @@ export function OrderTicket() {
                   </option>
                 ))}
               </select>
-              stop
+              <span data-tip="g:bracket_stop">stop</span>
               <select
                 value={builder.stopMult}
                 onChange={(e) => setBuilder({ stopMult: Number(e.target.value) })}
@@ -391,7 +399,7 @@ export function OrderTicket() {
           )}
         </label>
         {earnings && (
-          <label className="toggle warn-text" data-testid="earnings-ack">
+          <label className="toggle warn-text" data-testid="earnings-ack" data-tip="g:earnings_ack">
             <input
               type="checkbox"
               checked={builder.earningsAck}
@@ -406,16 +414,30 @@ export function OrderTicket() {
             disabled={disabled || !credit}
             onClick={() => go('sell')}
             data-testid="sell-button"
+            data-tip="g:sell"
           >
             SELL {credit && mid !== null ? `+${price(-mid)}` : ''}
+            {credit && plan?.ok && (
+              <span className="btn-sub num">
+                risk ${Math.round(plan.maxLossCents / 100).toLocaleString()} · POP{' '}
+                {pct(plan.metrics?.pop ?? 0, 0)}
+              </span>
+            )}
           </button>
           <button
             className="pixel-btn buy"
             disabled={disabled || credit}
             onClick={() => go('buy')}
             data-testid="buy-button"
+            data-tip="g:buy"
           >
             BUY {!credit && mid !== null ? `−${price(mid)}` : ''}
+            {!credit && plan?.ok && (
+              <span className="btn-sub num">
+                risk ${Math.round(plan.maxLossCents / 100).toLocaleString()} · POP{' '}
+                {pct(plan.metrics?.pop ?? 0, 0)}
+              </span>
+            )}
           </button>
         </div>
       </div>

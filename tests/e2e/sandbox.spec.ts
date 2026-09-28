@@ -42,7 +42,8 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
     const stg = (window as unknown as { __stg: Stg }).__stg;
     stg.app.getState().updateSettings((s) => ({
       ...(s as object),
-      game: { ...(s as { game: object }).game, ffSecondsPerDay: 0.06 },
+      // This test also covers the optional confirm box.
+      game: { ...(s as { game: object }).game, ffSecondsPerDay: 0.06, confirmOrders: true },
     }));
   });
   await page.getByTestId('menu-sandboxSetup').click();
@@ -53,12 +54,21 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   await shot(page, '03-sandbox-setup-1920');
   await page.getByTestId('sandbox-start').click();
   await expect(page.getByTestId('trading-screen')).toBeVisible();
-  await expect(page.getByTestId('payoff-chart')).toBeVisible();
+  // A fresh card opens on the news brief: the street read, the backdrop and recent headlines.
+  await expect(page.getByTestId('news-brief')).toBeVisible();
+  await expect(page.getByTestId('street-chip').first()).toBeVisible();
+  await page.getByTestId('street-chip').first().hover();
+  await expect(page.getByTestId('tooltip')).toContainText('Street read');
+  await shot(page, '03-brief-1920');
+  await shot(page, '03-brief-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
 
-  // Call the shot (up, 70%) with hotkeys, then sell the default ~30-delta bull put at market.
+  // Call the shot (up, 70%) with hotkeys; the panel flips to the trade view. Then sell the
+  // default ~30-delta bull put at market.
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+3');
   await expect(page.getByTestId('call-3')).toHaveClass(/selected/);
+  await expect(page.getByTestId('payoff-chart')).toBeVisible();
   await expect(page.getByTestId('stat-pop')).toBeVisible();
   await page.getByTestId('order-market').click();
   await shot(page, '03-builder-1920');

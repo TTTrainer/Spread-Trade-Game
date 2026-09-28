@@ -77,7 +77,6 @@ test('fast-forward stays smooth: frame times and main-thread stalls', async () =
   await page.keyboard.press('Shift+3');
   await page.getByTestId('order-market').click();
   await page.keyboard.press('Alt+S');
-  await page.getByTestId('confirm-send').click();
   await expect(page.getByTestId('toasts')).toContainText('Filled');
   await page.keyboard.press('Space');
   await page.waitForTimeout(300);

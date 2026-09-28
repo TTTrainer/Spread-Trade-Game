@@ -1,5 +1,6 @@
 import { motion, useAnimationControls } from 'motion/react';
 import { burstAt, fx } from '../../fx/overlay';
+import { ArtIcon, artUrl } from '../art';
 import { useEffect, useMemo, useState } from 'react';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
@@ -291,9 +292,24 @@ function ItemCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number 
       rarity={rarity}
       disabled={it.sold}
       testId={`shop-item-${index}`}
-      title={itemTitle(it)}
+      tip={
+        it.kind === 'cartridge'
+          ? `cart:${it.id}`
+          : it.kind === 'page'
+            ? `struct:${it.id}`
+            : `${it.kind}:${it.id}`
+      }
     >
-      <div className="item-name">{itemTitle(it)}</div>
+      <div className="item-top">
+        <ArtIcon
+          category={it.kind === 'page' ? 'page' : it.kind}
+          id={it.id}
+          name={itemTitle(it)}
+          tone={rarity}
+          className="item-art"
+        />
+        <div className="item-name">{itemTitle(it)}</div>
+      </div>
       {body}
       <div className="item-buy">
         {it.sold ? (
@@ -393,6 +409,7 @@ export function ShopView({ e }: { e: RunEngine }) {
               onClick={() => (sfx('deal'), void act({ t: 'rerollShop' }))}
               disabled={st.cash < cost}
               data-testid="shop-reroll"
+              data-tip="g:shop_reroll"
             >
               REROLL {cost === 0 ? 'FREE' : `$${cost}`} <Kbd>R</Kbd>
             </button>
@@ -488,11 +505,15 @@ export function ReviewIntro({ e }: { e: RunEngine }) {
   return (
     <div className="screen run-review" data-testid="review-intro">
       <div className="comply panel">
-        <div className="comply-face" aria-hidden="true">
-          <div className="eye" />
-          <div className="eye" />
-          <div className="mouth" />
-        </div>
+        {artUrl('review', id) ? (
+          <ArtIcon category="review" id={id} name={rv.name} scale={2} />
+        ) : (
+          <div className="comply-face" aria-hidden="true">
+            <div className="eye" />
+            <div className="eye" />
+            <div className="mouth" />
+          </div>
+        )}
         <div className="comply-body">
           <div className="dim num">COMPLY-3000 // QUARTER-END REVIEW // {quarterLabel(st.quarter)}</div>
           <h1 className="screen-title">{rv.name.toUpperCase()}</h1>
@@ -590,17 +611,17 @@ export function RunEnd({
         <div>
           <span className="dim">Real P/L</span> <Pnl cents={res.realizedCents} />
         </div>
-        <div>
+        <div data-tip="g:alpha">
           <span className="dim">Alpha vs SPY</span> <Pnl cents={res.alphaCents} />
         </div>
-        <div>
+        <div data-tip="g:calibration">
           <span className="dim">Calibration</span> <b className="amber-text">{res.calGrade}</b>{' '}
           {res.meanBrier !== null ? `(Brier ${res.meanBrier.toFixed(3)})` : ''}
         </div>
-        <div>
+        <div data-tip="g:xp">
           <span className="dim">Career XP</span> +{res.xp}
         </div>
-        <div>
+        <div data-tip="g:bonus">
           <span className="dim">Bonus</span> +{res.bonus}
         </div>
       </div>

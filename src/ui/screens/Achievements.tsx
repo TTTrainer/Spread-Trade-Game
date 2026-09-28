@@ -4,6 +4,7 @@ import { checkAchievements, loadAchievementCtx, type Unlocked } from '../achieve
 import { hasBridge } from '../bridge';
 import { Meter } from '../components/ui';
 import { useApp } from '../store/app';
+import { ArtIcon } from '../art';
 import './screens.css';
 import './achievements.css';
 
@@ -36,6 +37,9 @@ export function AchievementsScreen() {
           const secret = def.hidden && !ok;
           return (
             <div key={def.id} className={`ach panel ${ok ? 'done' : ''}`} data-testid={`ach-${def.id}`}>
+              {!secret && (
+                <ArtIcon category="achievement" id={def.id} name={def.name} onlyIfUploaded scale={2} />
+              )}
               <div className="ach-name">{secret ? '???' : def.name}</div>
               <div className="ach-text">{secret ? 'A hidden achievement.' : def.text}</div>
               <Meter

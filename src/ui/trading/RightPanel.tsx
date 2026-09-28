@@ -11,7 +11,7 @@ import { optionLegsOf } from '../../engine/lifecycle/position';
 import type { Leg, OptionLeg } from '../../engine/strategies/types';
 import { RR_RULES } from '../../content/structureRules';
 import { money, pct, price } from '../format';
-import { Meter, Pnl } from '../components/ui';
+import { Pnl } from '../components/ui';
 import { useTrading } from '../store/trading';
 
 interface Curve {
@@ -180,7 +180,7 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
           </>
         )}
       </svg>
-      <div className="payoff-legend num">
+      <div className="payoff-legend num" data-tip="g:payoff">
         <span className="cyan-text">— at expiration</span>{' '}
         <span className="amber-text">- - today{curve && whatIf.days ? ` +${whatIf.days}d` : ''}</span>
       </div>
@@ -188,11 +188,33 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
   );
 }
 
-function Row({ k, v, testId }: { k: string; v: ReactNode; testId?: string }) {
+function Stat({
+  k,
+  v,
+  tip,
+  tone,
+  testId,
+}: {
+  k: string;
+  v: ReactNode;
+  tip: string;
+  tone?: 'up' | 'down';
+  testId?: string;
+}) {
   return (
-    <div className="stat-row num" data-testid={testId}>
-      <span className="k">{k}</span>
-      <span className="v">{v}</span>
+    <div className="kstat" data-tip={tip} data-testid={testId}>
+      <div className="kstat-k">{k}</div>
+      <div className={`kstat-v num ${tone ?? ''}`}>{v}</div>
+    </div>
+  );
+}
+
+/** The Greeks in plain words, tucked into one hover line so the panel stays clean. */
+function GreeksLine({ g, units }: { g: Parameters<typeof plainGreeks>[0]; units: number }) {
+  const lines = plainGreeks(g, units);
+  return (
+    <div className="greeks-line num" data-tip-title="What moves this trade" data-tip-body={lines.join(' ')}>
+      <span className="ginfo">ⓘ</span> {lines[0]}
     </div>
   );
 }
@@ -209,94 +231,93 @@ export function StatsBlock() {
   if (pos) {
     const mark = pos.marks[pos.marks.length - 1];
     const greeks = mark?.greeks ?? { delta: 0, gamma: 0, theta: 0, vega: 0 };
+    const pl = mark?.plCents ?? 0;
     return (
       <div className="stats" data-testid="stats-block">
-        <Row k="P/L" v={<Pnl cents={mark?.plCents ?? 0} />} testId="stat-pl" />
-        <Row k="% of risk" v={pct((mark?.plCents ?? 0) / Math.max(1, pos.entry.maxLossCents))} />
-        <Row k="Max loss" v={money(pos.entry.maxLossCents)} />
-        <Row k="DTE" v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)} />
-        <div className="greeks-plain">
-          {plainGreeks(greeks, pos.qty).map((l) => (
-            <div key={l}>{l}</div>
-          ))}
+        <div className="key-stats">
+          <Stat k="OPEN P/L" v={<Pnl cents={pl} />} tip="g:pl_open" testId="stat-pl" />
+          <Stat k="% OF RISK" v={pct(pl / Math.max(1, pos.entry.maxLossCents))} tip="g:pct_risk" />
+          <Stat k="MAX LOSS" v={money(pos.entry.maxLossCents)} tip="g:max_loss_trade" tone="down" />
+          <Stat k="DTE" v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)} tip="g:dte" />
         </div>
+        <GreeksLine g={greeks} units={pos.qty} />
       </div>
     );
   }
-  if (!plan) return <div className="stats num">Pick an expiration to start building.</div>;
+  if (!plan) return <div className="stats num dim">Pick an expiration to start building.</div>;
   const m = plan.metrics;
   const edge = plan.edge;
   const rule = RR_RULES[builder.structureId];
+  const edgeText = edge
+    ? edge.tier === 'top10'
+      ? 'TOP 10% ×1.5'
+      : edge.tier === 'top25'
+        ? 'TOP 25% ×1.25'
+        : `${Math.round(edge.percentile * 100)}th pct`
+    : 'n/a';
   return (
     <div className="stats" data-testid="stats-block">
       {m && (
-        <>
-          <Row
-            k={m.entryNet < 0 ? 'Credit (mid)' : 'Debit (mid)'}
-            v={`${price(Math.abs(m.entryNet))} × ${builder.qty}`}
+        <div className="key-stats">
+          <Stat
+            k={m.entryNet < 0 ? 'CREDIT' : 'DEBIT'}
+            v={`${price(Math.abs(m.entryNet))}${builder.qty > 1 ? ` ×${builder.qty}` : ''}`}
+            tip={m.entryNet < 0 ? 'g:credit' : 'g:debit'}
             testId="stat-net"
           />
-          <Row
-            k="Max profit"
-            v={plan.maxProfitCents === null ? 'unlimited' : money(plan.maxProfitCents)}
+          <Stat
+            k="MAX PROFIT"
+            v={plan.maxProfitCents === null ? '∞' : money(plan.maxProfitCents)}
+            tip="g:max_profit"
+            tone="up"
             testId="stat-maxprofit"
           />
-          <Row k="Max loss" v={money(plan.maxLossCents)} testId="stat-maxloss" />
-          <Row k="Breakeven" v={m.breakevens.map((b) => price(b)).join(' / ') || '—'} />
-          <Row k="POP" v={pct(m.pop, 0)} testId="stat-pop" />
-          <Row
-            k="R:R"
-            v={m.rewardToRisk === null ? '—' : `1 : ${(1 / Math.max(1e-9, m.rewardToRisk)).toFixed(2)}`}
+          <Stat
+            k="MAX LOSS"
+            v={money(plan.maxLossCents)}
+            tip="g:max_loss_trade"
+            tone="down"
+            testId="stat-maxloss"
           />
-          <Row
-            k="Exp. move"
-            v={
-              m.expectedMove === null ? '—' : `±${price(m.expectedMove)} (${pct(m.expectedMove / ctx.spot)})`
-            }
+          <Stat k="POP" v={pct(m.pop, 0)} tip="g:pop" testId="stat-pop" />
+          <Stat k="BREAKEVEN" v={m.breakevens.map((b) => price(b)).join(' / ') || '—'} tip="g:breakeven" />
+          <Stat
+            k="EXP. MOVE"
+            v={m.expectedMove === null ? '—' : `±${pct(m.expectedMove / ctx.spot)}`}
+            tip="g:expected_move"
           />
-        </>
-      )}
-      <Row
-        k="IV rank"
-        v={
-          ctx.ivr === null ? '—' : `${ctx.ivr.toFixed(0)} · IV ${pct(ctx.iv30, 0)} vs HV ${pct(ctx.hv20, 0)}`
-        }
-        testId="stat-ivr"
-      />
-      <div className={`rr-rule num ${plan.goodRR ? 'good' : ''}`}>
-        {plan.goodRR ? '✔' : '✘'} {rule.text}
-      </div>
-      <div className="edge" data-testid="edge-meter">
-        <div className="section-title">Edge Rank</div>
-        {edge ? (
-          <>
-            <Meter
-              value={edge.percentile}
-              max={1}
-              tone={edge.tier === 'top10' ? 'amber' : edge.tier === 'top25' ? 'magenta' : 'cyan'}
-            />
-            <div className="edge-label num">
-              beats {Math.round(edge.percentile * 100)}% of {edge.of} comparable spreads ·{' '}
-              <span className={edge.tier === 'none' ? 'dim' : 'amber-text'}>
-                {edge.tier === 'top10'
-                  ? 'TOP 10% ×1.5'
-                  : edge.tier === 'top25'
-                    ? 'TOP 25% ×1.25'
-                    : 'no bonus'}
-              </span>
-            </div>
-          </>
-        ) : (
-          <div className="num dim">No comparable spreads to rank.</div>
-        )}
-      </div>
-      {m && (
-        <div className="greeks-plain">
-          {plainGreeks(m.greeks, builder.qty).map((l) => (
-            <div key={l}>{l}</div>
-          ))}
         </div>
       )}
+      <div className="stat-chips num">
+        <span
+          className={`chip ${plan.goodRR ? 'good' : 'bad'}`}
+          data-tip-title="Reward : risk"
+          data-tip-body={`${m?.rewardToRisk ? `This trade: 1 : ${(1 / Math.max(1e-9, m.rewardToRisk)).toFixed(2)}. ` : ''}${rule.text} ${plan.goodRR ? 'It passes: +1 mult if it wins.' : 'It misses the rule, so no R:R bonus.'}`}
+        >
+          R:R {plan.goodRR ? '✔' : '✘'}
+        </span>
+        <span
+          className={`chip ${ctx.ivr !== null && ctx.ivr >= 50 ? 'magenta' : ''}`}
+          data-testid="stat-ivr"
+          data-tip-title="IV rank and IV vs HV"
+          data-tip-body={`IV rank ${ctx.ivr === null ? 'n/a' : ctx.ivr.toFixed(0)} (0–100 over the last year). Implied volatility ${pct(ctx.iv30, 0)} against ${pct(ctx.hv20, 0)} realized: options look ${ctx.iv30 !== null && ctx.hv20 !== null && ctx.iv30 > ctx.hv20 ? 'rich (good for selling)' : 'cheap (good for buying)'}.`}
+        >
+          IVR {ctx.ivr === null ? '—' : ctx.ivr.toFixed(0)}
+        </span>
+        <span
+          className={`chip ${edge && edge.tier !== 'none' ? 'warn' : ''}`}
+          data-testid="edge-meter"
+          data-tip-title="Edge Rank"
+          data-tip-body={
+            edge
+              ? `Your price beats ${Math.round(edge.percentile * 100)}% of ${edge.of} similar spreads on this chain today. Top 25% scores ×1.25, top 10% ×1.5.`
+              : 'No comparable spreads to rank against.'
+          }
+        >
+          EDGE {edgeText}
+        </span>
+      </div>
+      {m && <GreeksLine g={m.greeks} units={builder.qty} />}
     </div>
   );
 }

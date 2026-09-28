@@ -20,6 +20,8 @@ import {
   type CardBadges,
 } from './Panels';
 import { PayoffChart, StatsBlock } from './RightPanel';
+import { NewsBriefPanel } from './NewsBrief';
+import type { BriefAccess } from '../../engine/news/brief';
 import { DebriefStrip } from './Debrief';
 import './trading.css';
 
@@ -230,8 +232,11 @@ export function TradingLayout({
   rightExtra,
   badges,
   levels,
+  briefAccess,
 }: {
   top: ReactNode;
+  /** What the news brief may show (Career unlocks detail through analysts). */
+  briefAccess?: BriefAccess;
   levels?: Partial<Record<StructureId, number>>;
   allowedStructures?: StructureId[];
   onDone?: ReactNode;
@@ -249,6 +254,13 @@ export function TradingLayout({
   const setCall = useTrading((s) => s.setCall);
   const setConfidence = useTrading((s) => s.setConfidence);
   const setHelp = useApp((s) => s.setHelp);
+  const rightTab = useTrading((s) => s.rightTab);
+  const setRightTab = useTrading((s) => s.setRightTab);
+  // Only this yes/no is watched, so the layout doesn't re-render on every tick.
+  const engaged = useTrading((s) => {
+    const card = s.session && s.selectedCardId ? s.session.card(s.selectedCardId) : null;
+    return !!card && (!!card.call || s.session!.openPositions().some((p) => p.cardId === card.id));
+  });
   const controls = useAnimationControls();
   const [studiesOpen, setStudiesOpen] = useStudyPicker();
 
@@ -293,19 +305,50 @@ export function TradingLayout({
     );
   }
 
+  // Read the news first; once there's a call (or a trade) on the card, show the trade.
+  const tab = rightTab ?? (engaged ? 'trade' : 'brief');
+
   return (
     <motion.div className="trading" animate={controls} data-testid="trading-screen">
       <div className="t-top">{top}</div>
       <div className="t-left">
-        <LineupColumn extra={leftExtra} badges={badges} />
+        <LineupColumn extra={leftExtra} badges={badges} briefAccess={briefAccess} />
       </div>
       <div className="t-center">
         <ChartPanel />
         <NewsTicker />
       </div>
       <div className="t-right panel">
-        <PayoffChart />
-        <StatsBlock />
+        <div className="rp-tabs num" role="tablist">
+          <button
+            className={tab === 'brief' ? 'sel' : ''}
+            onClick={() => setRightTab('brief')}
+            data-testid="rtab-brief"
+            data-tip="g:brief_tab"
+            role="tab"
+            aria-selected={tab === 'brief'}
+          >
+            BRIEF
+          </button>
+          <button
+            className={tab === 'trade' ? 'sel' : ''}
+            onClick={() => setRightTab('trade')}
+            data-testid="rtab-trade"
+            data-tip="g:trade_tab"
+            role="tab"
+            aria-selected={tab === 'trade'}
+          >
+            TRADE
+          </button>
+        </div>
+        {tab === 'brief' ? (
+          <NewsBriefPanel access={briefAccess} />
+        ) : (
+          <>
+            <PayoffChart />
+            <StatsBlock />
+          </>
+        )}
         {rightExtra}
       </div>
       <div className="t-tray panel">

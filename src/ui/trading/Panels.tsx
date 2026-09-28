@@ -12,7 +12,10 @@ import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useTrading } from '../store/trading';
 import { useApp } from '../store/app';
+import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
+import { briefFor, StreetChip } from './NewsBrief';
+import type { BriefAccess } from '../../engine/news/brief';
 
 /** What a lineup card may show. Sandbox shows everything; Career earns badges through analysts. */
 export interface CardBadges {
@@ -24,9 +27,11 @@ export interface CardBadges {
 export function LineupColumn({
   extra,
   badges,
+  briefAccess,
 }: {
   extra?: React.ReactNode;
   badges?: (cardId: string) => CardBadges;
+  briefAccess?: BriefAccess;
 }) {
   const session = useTrading((s) => s.session);
   useTrading((s) => s.version);
@@ -61,6 +66,7 @@ export function LineupColumn({
           : closed.reduce((a, p) => a + (p?.realizedCents ?? 0), 0);
         const earnDays = ctx.nextEarnings ? diffDays(view.now, ctx.nextEarnings.date) : null;
         const b = badges ? badges(c.id) : { ivr: true, earnings: true };
+        const brief = briefFor(session, c.id, briefAccess);
         return (
           <TiltCard
             key={c.id}
@@ -72,10 +78,10 @@ export function LineupColumn({
             <div
               key={`deal-${c.id}`}
               className={`deal-back cardback cardback-${cardBack}`}
-              style={{ animationDelay: `${i * 90}ms` }}
+              style={{ animationDelay: `${i * 90}ms`, ...cardBackImage(cardBack) }}
               aria-hidden="true"
             />
-            <div className="lc-top">
+            <div className="lc-top" data-tip="g:lineup_card">
               <span className="lc-sym">{c.displaySymbol}</span>
               <span className="lc-px num">{view.spot().toFixed(2)}</span>
             </div>
@@ -84,20 +90,38 @@ export function LineupColumn({
             )}
             <Sparkline closes={bars.slice(-60).map((b) => b.close)} />
             <div className="lc-badges">
-              <span className="chip">{view.dayLabel()}</span>
-              {b.ivr && ctx.ivr !== null && (
-                <span className={`chip ${ctx.ivr >= 50 ? 'magenta' : ''}`}>IVR {ctx.ivr.toFixed(0)}</span>
-              )}
-              {b.earnings && earnDays !== null && earnDays <= 45 && (
-                <span className="chip warn">ERN {earnDays}d</span>
-              )}
-              {b.extra}
-              {bars[bars.length - 1]?.source !== 'real' && (
-                <span className="chip model">
-                  {bars[bars.length - 1]?.source === 'synthetic' ? 'SIM' : 'MODEL'}
+              {/* Blind cards all share the same "Day N" (the clock shows it), so only real dates earn a chip. */}
+              {!view.transform.hideDates && (
+                <span
+                  className="chip"
+                  data-tip-title="Date"
+                  data-tip-body={`Today on this card, with ${bars.length - 1} trading days of chart behind it.`}
+                >
+                  {view.dayLabel()}
                 </span>
               )}
-              <span className="chip">{bars.length - 1}d hist</span>
+              {brief && <StreetChip brief={brief} />}
+              {b.ivr && ctx.ivr !== null && (
+                <span className={`chip ${ctx.ivr >= 50 ? 'magenta' : ''}`} data-tip="g:ivr_chip">
+                  IVR {ctx.ivr.toFixed(0)}
+                </span>
+              )}
+              {b.earnings && earnDays !== null && earnDays <= 45 && (
+                <span className="chip warn" data-tip="g:ern_chip">
+                  ERN {earnDays}d
+                </span>
+              )}
+              {b.extra}
+              {bars[bars.length - 1]?.source !== 'real' &&
+                (bars[bars.length - 1]?.source === 'synthetic' ? (
+                  <span className="chip model" data-tip="g:sim_chip">
+                    SIM
+                  </span>
+                ) : (
+                  <span className="chip model" data-tip="g:model_chip">
+                    MODEL
+                  </span>
+                ))}
             </div>
             <div className="lc-bottom num">
               {c.call ? (
@@ -155,18 +179,18 @@ export function PositionsDock() {
         <thead>
           <tr>
             <th>Sym</th>
-            <th>Structure</th>
-            <th>Qty</th>
-            <th>Open</th>
-            <th>Mark</th>
-            <th>P/L</th>
-            <th>% risk</th>
-            <th>DTE</th>
-            <th>Δ</th>
-            <th>Θ/day</th>
-            <th>Vega</th>
-            <th>Brackets</th>
-            <th>To short</th>
+            <th data-tip="g:structure">Structure</th>
+            <th data-tip="g:contracts">Qty</th>
+            <th data-tip="g:open_price">Open</th>
+            <th data-tip="g:mark">Mark</th>
+            <th data-tip="g:pl_open">P/L</th>
+            <th data-tip="g:pct_risk">% risk</th>
+            <th data-tip="g:dte">DTE</th>
+            <th data-tip="g:pos_delta">Δ</th>
+            <th data-tip="g:pos_theta">Θ/day</th>
+            <th data-tip="g:pos_vega">Vega</th>
+            <th data-tip="g:brackets">Plan</th>
+            <th data-tip="g:to_short">To short</th>
             <th></th>
           </tr>
         </thead>
@@ -225,10 +249,11 @@ export function PositionsDock() {
                         className="mini-btn"
                         onClick={() => void closePosition(p.id)}
                         data-testid={`close-${p.id}`}
+                        data-tip="g:close_pos"
                       >
                         CLOSE
                       </button>
-                      <button className="mini-btn" onClick={() => setRolling(p)}>
+                      <button className="mini-btn" onClick={() => setRolling(p)} data-tip="g:roll">
                         ROLL
                       </button>
                     </>
@@ -496,6 +521,7 @@ export function FastForwardBar() {
         onClick={() => toggle()}
         disabled={ff === 'decision' || ff === 'done'}
         data-testid="play-button"
+        data-tip="g:start_clock"
       >
         {ff === 'running' ? '❚❚ PAUSE' : '▶ START CLOCK'} <span className="kbd">Space</span>
       </button>
@@ -503,6 +529,7 @@ export function FastForwardBar() {
         className="pixel-btn"
         onClick={() => void step()}
         disabled={ff === 'running' || ff === 'decision' || ff === 'done' || !session?.clockStarted}
+        data-tip="g:step_day"
       >
         STEP 1 DAY
       </button>

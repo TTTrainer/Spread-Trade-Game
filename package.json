@@ -1,7 +1,7 @@
 {
   "name": "spread-trading-game",
   "productName": "Spread Trading Game",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A roguelite about trading options spreads on real historical market data.",
   "author": "Spread Trading Game",
   "license": "UNLICENSED",
@@ -23,7 +23,8 @@
     "data:sync": "tsx data-pipeline/cli.ts sync",
     "data:report": "tsx data-pipeline/cli.ts report",
     "sim": "tsx tools/sim/cli.ts",
-    "build:win": "electron-vite build && electron-builder --win --x64 --publish never"
+    "build:win": "electron-vite build && electron-builder --win --x64 --publish never",
+    "assets:list": "tsx tools/assets/list.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

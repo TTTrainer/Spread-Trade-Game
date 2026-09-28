@@ -303,3 +303,92 @@ select:focus-visible,
   outline: 2px dashed var(--amber);
   outline-offset: 2px;
 }
+
+/* Art slots: uploaded pixel art, or a placeholder tile with the item's initials. */
+.art-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.art-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  color: var(--art-tone);
+  border: 2px solid var(--art-tone);
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 3px, transparent 3px 6px),
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 60%), var(--bg-1);
+  text-shadow: 0 0 6px var(--art-tone);
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+/* Hover explanations (Balatro-style): a crisp panel with a colored title. */
+.tooltip {
+  position: fixed;
+  z-index: 9500;
+  pointer-events: none;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 340px;
+  padding: 8px 11px;
+  background: rgba(10, 7, 30, 0.97);
+  border: 2px solid var(--line-bright);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 14px rgba(0, 0, 0, 0.6);
+  animation: tip-in 0.1s steps(2) both;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+:root[data-reduced-motion='true'] .tooltip {
+  animation: none;
+}
+.tooltip.tone-U {
+  border-color: var(--rar-uncommon);
+}
+.tooltip.tone-R {
+  border-color: var(--rar-rare);
+}
+.tooltip.tone-L {
+  border-color: var(--rar-legendary);
+}
+.tooltip.tone-bad {
+  border-color: var(--down);
+}
+.tip-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--amber);
+  margin-bottom: 2px;
+}
+.tooltip.tone-U .tip-title {
+  color: var(--rar-uncommon);
+}
+.tooltip.tone-R .tip-title {
+  color: var(--rar-rare);
+}
+.tip-meta {
+  font-size: 14px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.tip-body {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.tip-real {
+  margin-top: 5px;
+  font-size: 13px;
+  color: var(--cyan);
+}

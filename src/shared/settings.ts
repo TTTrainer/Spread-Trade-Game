@@ -148,6 +148,8 @@ export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
 };
 
 export interface Settings {
+  /** Bumped when defaults change in a way saved settings should pick up. */
+  version: number;
   game: {
     startingCapitalCents: number;
     shortDelta: number;
@@ -156,6 +158,8 @@ export interface Settings {
     pause: Record<DecisionKind, boolean>;
     pureMarket: boolean;
     tutorialDone: boolean;
+    /** Show a confirm box before each order (off: orders go out on Sell/Buy). */
+    confirmOrders: boolean;
   };
   realism: {
     bidAsk: boolean;
@@ -184,17 +188,22 @@ export interface Settings {
   data: { gameDbPath: string | null };
 }
 
+export const SETTINGS_VERSION = 2;
+
 export const DEFAULT_SETTINGS: Settings = {
+  version: SETTINGS_VERSION,
   game: {
     startingCapitalCents: 500_000,
     shortDelta: 0.3,
     bucketMode: 'em',
     ffSecondsPerDay: 0.35,
+    // Only the moments that need a real decision stop the clock. Targets close at plan by
+    // themselves; a touched short strike and 21 DTE show up as notices.
     pause: {
-      target_hit: true,
+      target_hit: false,
       stop_hit: true,
-      short_touched: true,
-      dte21: true,
+      short_touched: false,
+      dte21: false,
       earnings_tomorrow: true,
       exdiv_itm_call: true,
       pin_risk: true,
@@ -202,6 +211,7 @@ export const DEFAULT_SETTINGS: Settings = {
     },
     pureMarket: false,
     tutorialDone: false,
+    confirmOrders: false,
   },
   realism: {
     bidAsk: true,
@@ -233,11 +243,14 @@ export const DEFAULT_SETTINGS: Settings = {
 /** Deep-merge saved settings over defaults so new settings get sane values after updates. */
 export function mergeSettings(saved: unknown): Settings {
   const s = (saved ?? {}) as Partial<Settings>;
+  // Version 2 (playtest feedback): fewer clock stops. Older saves take the new pause defaults.
+  const old = (s.version ?? 1) < 2;
   return {
+    version: SETTINGS_VERSION,
     game: {
       ...DEFAULT_SETTINGS.game,
       ...s.game,
-      pause: { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
+      pause: old ? { ...DEFAULT_SETTINGS.game.pause } : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
     },
     realism: { ...DEFAULT_SETTINGS.realism, ...s.realism },
     blind: { ...DEFAULT_SETTINGS.blind, ...s.blind },

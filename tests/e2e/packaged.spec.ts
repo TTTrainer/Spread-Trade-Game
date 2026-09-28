@@ -1,8 +1,11 @@
 import { _electron as electron, expect, test } from '@playwright/test';
-import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const dir = join(process.cwd(), 'release', 'linux-unpacked');
+const pkgVersion = (
+  JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version: string }
+).version;
 
 /** Runs only after a packaged build (npx electron-builder --linux dir): the same app.asar as the Windows exe. */
 test('packaged app boots, shows its version, and deals a Career round', async () => {
@@ -24,7 +27,7 @@ test('packaged app boots, shows its version, and deals a Career round', async ()
   page.on('pageerror', (e) => errors.push(e.message));
   await expect(page.getByTestId('title-screen')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('data-status')).toContainText('SIM');
-  await expect(page.locator('.title-foot')).toContainText('v1.0.0');
+  await expect(page.locator('.title-foot')).toContainText(`v${pkgVersion}`);
   await page.getByTestId('menu-career').click();
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });

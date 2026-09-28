@@ -8,8 +8,8 @@ If you received the game in pieces (`...exe.part1` to `part4` plus a `Join-Porta
 
 Then you have two ways to run the game. Use either one.
 
-- **`SpreadTradingGame-Setup-1.0.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
-- **`SpreadTradingGame-Portable-1.0.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
+- **`SpreadTradingGame-Setup-1.1.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
+- **`SpreadTradingGame-Portable-1.1.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 

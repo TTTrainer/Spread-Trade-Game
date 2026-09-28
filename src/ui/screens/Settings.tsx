@@ -6,9 +6,11 @@ import { bridge, hasBridge } from '../bridge';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
+import { useTrading } from '../store/trading';
 import { useProfile } from '../store/profile';
 import { COSMETICS, unlockText, type CosmeticKind } from '../../content/meta';
 import { cosmeticUnlocked } from '../../engine/meta/profile';
+import { cardBackImage } from '../art';
 import './screens.css';
 import './settings.css';
 
@@ -173,7 +175,20 @@ export function SettingsScreen() {
                 hint="Only powerups that mirror real edges"
                 testId="set-pure"
               />
+              <Toggle
+                label="Confirm each order before it's sent"
+                value={settings.game.confirmOrders}
+                onChange={(v) => {
+                  set((s) => ({ ...s, game: { ...s.game, confirmOrders: v } }));
+                  useTrading.getState().setBuilder({ autoSend: !v });
+                }}
+                hint="Off: Sell and Buy send the order at once (Alt+A switches during a round)"
+                testId="set-confirm"
+              />
               <div className="section-title">Decision points that pause the fast-forward</div>
+              <p className="dim small">
+                Off: targets close at your plan by themselves, and the rest show up as short notices.
+              </p>
               {(Object.keys(DP_LABELS) as DecisionKind[]).map((k) => (
                 <Toggle
                   key={k}
@@ -610,7 +625,9 @@ function CosmeticPicker({
               onClick={() => onPick(c.value)}
               data-testid={`cos-${c.id}`}
             >
-              {preview && <span className={`cb-swatch cardback cardback-${c.value}`} />}
+              {preview && (
+                <span className={`cb-swatch cardback cardback-${c.value}`} style={cardBackImage(c.value)} />
+              )}
               {open ? c.name.toUpperCase() : `🔒 ${c.name.toUpperCase()}`}
             </button>
           );

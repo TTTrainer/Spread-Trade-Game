@@ -52,8 +52,11 @@ export function TiltCard({
   testId,
   disabled,
   title,
+  tip,
 }: {
   children: ReactNode;
+  /** A hover-explanation key (see Tooltip.tsx). */
+  tip?: string;
   selected?: boolean;
   onClick?: () => void;
   rarity?: 'C' | 'U' | 'R' | 'L';
@@ -73,6 +76,7 @@ export function TiltCard({
       title={title}
       disabled={disabled}
       data-testid={testId}
+      data-tip={tip}
       className={`tilt-card ${selected ? 'selected' : ''} ${rarity ? `rar-${rarity}` : ''} ${className}`}
       style={reduced ? undefined : { rotateX: rx, rotateY: ry, transformPerspective: 600 }}
       onMouseMove={(e) => {

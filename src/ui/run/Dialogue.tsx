@@ -10,8 +10,11 @@ export function DialogueBox() {
   const speech = useRun((s) => s.speech);
   const clear = useRun((s) => s.clearSpeech);
   const reduced = useApp((s) => s.settings.display.reducedMotion);
-  // Over the chart during a round; at the bottom elsewhere, clear of stamps and shop cards.
-  const bottom = useRun((s) => s.engine?.state.phase !== 'round') || useApp.getState().screen !== 'run';
+  // Over the chart during a round; a small corner box in the shop (clear of the offers and the
+  // NEXT button); at the bottom elsewhere, clear of stamps.
+  const phase = useRun((s) => s.engine?.state.phase);
+  const inRun = useApp((s) => s.screen === 'run');
+  const place = inRun && phase === 'round' ? '' : inRun && phase === 'shop' ? 'at-corner' : 'at-bottom';
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {
@@ -30,13 +33,13 @@ export function DialogueBox() {
       {speech && (
         <motion.div
           key={speech.n}
-          className={`dialogue who-${speech.line.who} ${bottom ? 'at-bottom' : ''}`}
+          className={`dialogue who-${speech.line.who} ${place}`}
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -10, opacity: 0 }}
           data-testid="dialogue"
         >
-          <Portrait id={speech.line.who} mood={speech.line.mood} scale={1.5} />
+          <Portrait id={speech.line.who} mood={speech.line.mood} scale={place === 'at-corner' ? 1 : 1.5} />
           <span className="dlg-body">
             <span className="dlg-name">
               {CHARACTERS[speech.line.who].name}{' '}

@@ -92,6 +92,7 @@ export const useLive = create<LiveStore>((set, get) => ({
           startEquityCents: settings.game.startingCapitalCents,
           realism: { ...settings.realism },
           pause: { ...settings.game.pause },
+          trustEarningsAck: true,
           benchmark: meta.benchmark,
           callMode: settings.game.bucketMode,
           blind: false,

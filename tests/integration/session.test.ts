@@ -168,3 +168,46 @@ describe('trading session', () => {
     expect(ern[0].text).toContain(s.card('c1').displaySymbol);
   });
 });
+
+describe('holding through earnings on purpose', () => {
+  /** Sell a put spread over the next report with the tick on; count the night-before questions. */
+  async function asked(trust: boolean): Promise<number> {
+    for (const w of src.allWindows().filter((x) => x.symbol === 'ORGR')) {
+      const s = new TradingSession(
+        src,
+        defaultSessionConfig({ seed: 'ack', benchmark: 'MKTX', trustEarningsAck: trust }),
+      );
+      await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
+      const next = s.view('c1').earnings().upcoming[0];
+      const chain = s.chain('c1');
+      if (!next || !chain || Date.parse(next.date) - Date.parse(chain.date) > 20 * 86400000) continue;
+      const exp = expirationsOf(chain).find((e) => e > next.reactionDate);
+      if (!exp) continue;
+      await s.dispatch({ t: 'call', cardId: 'c1', bucket: 3, confidence: 0.7 });
+      const res = await s.dispatch({
+        t: 'place',
+        cardId: 'c1',
+        structureId: 'bull_put',
+        params: { expiration: exp, delta: 0.2, width: 1 },
+        qty: 1,
+        order: { type: 'market' },
+        brackets: null,
+        earningsAck: true,
+      });
+      if (!res?.filled) continue;
+      let guard = 0;
+      while (!s.isDone() && guard++ < 80) {
+        await s.dispatch({ t: 'begin' });
+        for (const d of s.decisions.slice()) await s.dispatch({ t: 'decide', dpId: d.id, action: 'hold' });
+        await s.dispatch({ t: 'end' });
+      }
+      return s.decisionHistory.filter((d) => d.dp.kind === 'earnings_tomorrow').length;
+    }
+    throw new Error('no window with a report inside a trade');
+  }
+
+  it("doesn't ask the night before when the game trusts the tick, and still asks the bots' way", async () => {
+    expect(await asked(true)).toBe(0);
+    expect(await asked(false)).toBeGreaterThan(0);
+  });
+});

@@ -70,6 +70,7 @@ export function SandboxSetup() {
           startEquityCents: Math.round(capital * 100),
           realism: { ...settings.realism },
           pause: { ...settings.game.pause },
+          trustEarningsAck: true,
           benchmark: meta.benchmark,
           callMode: settings.game.bucketMode,
           blind: false,

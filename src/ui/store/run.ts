@@ -345,7 +345,7 @@ export const useRun = create<RunStore>((set, get) => {
         // The Daily is the same challenge for everyone (and Bradley's ghost): default rules.
         const daily = mode === 'daily' ? await dailyConfig(seed ?? '', deskId) : null;
         const config: RunConfig = daily
-          ? { ...daily, pause: { ...settings.game.pause } }
+          ? { ...daily, pause: { ...settings.game.pause }, trustEarningsAck: true }
           : {
               seed: seed?.trim() || `${Date.now().toString(36)}`,
               deskId,
@@ -355,6 +355,7 @@ export const useRun = create<RunStore>((set, get) => {
               pureMarket: settings.game.pureMarket,
               realism: { ...settings.realism },
               pause: { ...settings.game.pause },
+              trustEarningsAck: true,
               callMode: settings.game.bucketMode,
               rescale: settings.blind.rescale,
               quarters,

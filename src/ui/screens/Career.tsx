@@ -17,6 +17,7 @@ import { buyPack, deskPrice, packUnlocked, unlockDesk } from '../../engine/meta/
 import { useProfile } from '../store/profile';
 import { Portrait } from '../components/Portrait';
 import { TutorialCoach } from '../run/Tutorial';
+import { ArtIcon } from '../art';
 import type { DeskId } from '../../content/types';
 import { sfx } from '../../audio/sfx';
 import { Meter, Modal, TiltCard } from '../components/ui';
@@ -26,7 +27,7 @@ import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { TradingLayout } from '../trading/TradingScreen';
 import { RunEnd, ReviewIntro, ShopView, TallyView } from '../run/RunPhases';
-import { careerBadges, RunLeftExtra, RunRightExtra, RunTopBar } from '../run/RunParts';
+import { careerBadges, careerBriefAccess, RunLeftExtra, RunRightExtra, RunTopBar } from '../run/RunParts';
 import './screens.css';
 import '../run/run.css';
 
@@ -157,8 +158,16 @@ export function CareerScreen() {
                 disabled={locked}
                 onClick={() => !locked && setDesk(id)}
                 testId={`desk-${id}`}
+                tip={`desk:${id}`}
                 rarity={id === 'verticals' ? 'U' : undefined}
               >
+                <ArtIcon
+                  category="desk"
+                  id={id}
+                  name={d.name}
+                  onlyIfUploaded
+                  style={{ width: '100%', height: 'auto' }}
+                />
                 <div className="desk-name">{d.name.toUpperCase()}</div>
                 <div className="desk-blurb">{d.blurb}</div>
                 <div className="desk-plays num">
@@ -196,7 +205,9 @@ export function CareerScreen() {
       </div>
       <div className="career-options">
         <div className="panel career-opt">
-          <div className="section-title">Risk Tier</div>
+          <div className="section-title" data-tip="g:risk_tier">
+            Risk Tier
+          </div>
           <div className="seg num" data-testid="tier-picker">
             {RISK_TIERS.map((t) => (
               <button
@@ -223,7 +234,7 @@ export function CareerScreen() {
         <div className="panel career-opt">
           <div className="section-title">
             Compliance Rules{' '}
-            <span className="chip warn" data-testid="heat-total">
+            <span className="chip warn" data-testid="heat-total" data-tip="g:heat">
               HEAT {heat}
             </span>
           </div>
@@ -402,6 +413,7 @@ export function RunScreen() {
         allowedStructures={desk.structures}
         levels={engine.state.levels}
         badges={careerBadges(engine, (sym) => sectors[sym] ?? null)}
+        briefAccess={careerBriefAccess(engine)}
         leftExtra={<RunLeftExtra e={engine} />}
         rightExtra={<RunRightExtra e={engine} />}
       />

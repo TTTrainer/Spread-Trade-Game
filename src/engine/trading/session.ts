@@ -82,6 +82,11 @@ export interface SessionConfig {
    * the next sync, which moves the edge forward.
    */
   liveEdge: ISODate | null;
+  /**
+   * The player's "holding through earnings on purpose" tick also means "don't ask me the night
+   * before". Off for the balance bots, which tick it only to be allowed to trade over a report.
+   */
+  trustEarningsAck: boolean;
 }
 
 export function defaultSessionConfig(over: Partial<SessionConfig> = {}): SessionConfig {
@@ -92,6 +97,7 @@ export function defaultSessionConfig(over: Partial<SessionConfig> = {}): Session
     riskCapPct: 0.1,
     realism: { ...DEFAULT_REALISM },
     pause: defaultPause(),
+    trustEarningsAck: false,
     autoBrackets: false,
     suppressOnGap: false,
     execution: { ...BASE_EXECUTION },
@@ -188,7 +194,8 @@ export interface DecisionRecord {
 }
 
 export interface SessionEvent {
-  kind: 'fill' | 'rest' | 'close' | 'decision' | 'expired' | 'assigned' | 'headline' | 'gap' | 'reject';
+  kind:
+    'fill' | 'rest' | 'close' | 'decision' | 'expired' | 'assigned' | 'headline' | 'gap' | 'reject' | 'alert';
   cardId: string;
   positionId?: string;
   text: string;
@@ -845,7 +852,25 @@ export class TradingSession {
         const r = atClose(p, book, this.dayCtx(cardId));
         this.replace(r.pos);
         if (r.pos.status === 'closed') this.onClosed(r.pos);
-        this.decisions.push(...r.decisions);
+        // Moments that don't stop the clock become short notices instead of pop-ups.
+        const sym = this.card(cardId).displaySymbol;
+        if (!p.flags.shortTouched && r.pos.flags.shortTouched && !this.config.pause.short_touched)
+          this.lastEvents.push({
+            kind: 'alert',
+            cardId,
+            positionId: p.id,
+            text: `${sym}: the stock touched your short strike.`,
+          });
+        if (!p.flags.dte21 && r.pos.flags.dte21 && !this.config.pause.dte21)
+          this.lastEvents.push({
+            kind: 'alert',
+            cardId,
+            positionId: p.id,
+            text: `${sym}: 21 days to expiration.`,
+          });
+        // You already said you're holding through earnings on purpose: no need to ask again.
+        const acked = this.config.trustEarningsAck && this.card(cardId).earningsAck;
+        this.decisions.push(...r.decisions.filter((d) => !(acked && d.kind === 'earnings_tomorrow')));
       }
     }
   }

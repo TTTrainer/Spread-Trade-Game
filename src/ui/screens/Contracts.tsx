@@ -23,6 +23,7 @@ import { useTrading } from '../store/trading';
 import { TradingLayout, TradingTopBar } from '../trading/TradingScreen';
 import './screens.css';
 import './modes.css';
+import { ArtIcon } from '../art';
 
 const src = ipcSource();
 
@@ -89,6 +90,7 @@ export function ContractsScreen() {
           startEquityCents: settings.game.startingCapitalCents,
           realism: { ...settings.realism },
           pause: { ...settings.game.pause },
+          trustEarningsAck: true,
           benchmark: meta.benchmark,
           callMode: settings.game.bucketMode,
           blind: true,
@@ -135,7 +137,15 @@ export function ContractsScreen() {
               className={`panel contract ${res ? 'done' : ''}`}
               data-testid={`contract-${c.clientId}`}
             >
-              <div className="client-name">{def.name}</div>
+              <div className="client-who" data-tip={`client:${c.clientId}`}>
+                <ArtIcon
+                  category="client"
+                  id={c.clientId}
+                  name={def.name}
+                  style={{ width: 40, height: 40, fontSize: 15 }}
+                />
+                <div className="client-name">{def.name}</div>
+              </div>
               <div className="persona">{def.persona}</div>
               <div className="ask">“{def.ask}”</div>
               <ul className="num">

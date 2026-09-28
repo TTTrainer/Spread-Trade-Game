@@ -24,6 +24,8 @@ const VARS = {
   event: 'FOMC',
   vix: '31.0',
   vixchg: '+24.0%',
+  volx: '3.2x',
+  days: '6',
 };
 
 describe('headline library', () => {
@@ -38,6 +40,14 @@ describe('headline library', () => {
       ),
       'vix:spike:up',
       'vix:panic:up',
+      'high:new:up',
+      'low:new:down',
+      'volume:surge:up',
+      'volume:surge:down',
+      'streak:run:up',
+      'streak:run:down',
+      'cross:golden:up',
+      'cross:death:down',
     ];
     expect([...HEADLINE_KEYS].sort()).toEqual(expected.sort());
     for (const k of HEADLINE_KEYS) {

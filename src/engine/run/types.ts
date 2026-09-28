@@ -25,6 +25,8 @@ export interface RunConfig {
   pureMarket: boolean;
   realism: RealismToggles;
   pause: Record<DecisionKind, boolean>;
+  /** Trust the earnings tick as "don't ask" (see SessionConfig). Absent in older saves. */
+  trustEarningsAck?: boolean;
   callMode: 'em' | 'fixed';
   rescale: boolean;
   quarters: number;

@@ -86,6 +86,8 @@ interface TradingState {
   builder: BuilderState;
   ff: FFState;
   panel: Panel;
+  /** The right panel: the news brief or the trade view (null follows the card: brief until a call). */
+  rightTab: 'brief' | 'trade' | null;
   feed: FeedItem[];
   whatIf: { pricePct: number; days: number; ivPts: number };
   studies: StudyId[];
@@ -138,6 +140,7 @@ interface TradingState {
   closePosition: (id: string, order?: OrderSpec) => Promise<void>;
   rollPosition: (id: string, legs: OptionLeg[], order?: OrderSpec) => Promise<void>;
   setPanel: (p: Panel) => void;
+  setRightTab: (t: 'brief' | 'trade' | null) => void;
   setWhatIf: (patch: Partial<TradingState['whatIf']>) => void;
   toggleStudy: (s: StudyId) => void;
   setTimeframe: (t: 'D' | 'W') => void;
@@ -157,7 +160,7 @@ const defaultBuilder = (): BuilderState => ({
   legs: null,
   orderType: 'limit',
   limitFrac: 0.5,
-  autoSend: false,
+  autoSend: !useApp.getState().settings.game.confirmOrders,
   bracketsOn: true,
   targetPct: 0.5,
   stopMult: 2,
@@ -257,7 +260,7 @@ export const useTrading = create<TradingState>((set, get) => {
     const items: FeedItem[] = [];
     for (const e of events) {
       const tone: FeedItem['tone'] =
-        e.kind === 'reject'
+        e.kind === 'reject' || e.kind === 'alert'
           ? 'warn'
           : e.kind === 'gap'
             ? 'warn'
@@ -281,6 +284,10 @@ export const useTrading = create<TradingState>((set, get) => {
         case 'reject':
           sfx('error');
           useApp.getState().toast(e.text, 'warn');
+          break;
+        case 'alert':
+          sfx('decision', 1.3, 0.5);
+          useApp.getState().toast(e.text, 'info');
           break;
         case 'gap':
           sfx('boom');
@@ -353,9 +360,11 @@ export const useTrading = create<TradingState>((set, get) => {
     builder: defaultBuilder(),
     ff: 'idle',
     panel: 'builder',
+    rightTab: null,
     feed: [],
     whatIf: { pricePct: 0, days: 0, ivPts: 0 },
-    studies: ['bb', 'rsi', 'macd', 'vol', 'em'],
+    // MACD is one click away in Studies; by default the chart keeps to what a spread seller reads.
+    studies: ['bb', 'rsi', 'vol', 'em'],
     lockedStudies: [],
     timeframe: 'D',
     drawings: {},
@@ -382,6 +391,7 @@ export const useTrading = create<TradingState>((set, get) => {
         builder: defaultBuilder(),
         ff: 'idle',
         panel: 'builder',
+        rightTab: null,
         feed: [],
         debriefs: [],
         drawings: {},
@@ -428,6 +438,7 @@ export const useTrading = create<TradingState>((set, get) => {
       sfx('select');
       set({
         selectedCardId: cardId,
+        rightTab: null,
         builder: {
           ...get().builder,
           expiration: pick,
@@ -648,6 +659,7 @@ export const useTrading = create<TradingState>((set, get) => {
       await dispatch({ t: 'roll', positionId: id, legs, order });
     },
     setPanel: (p) => set({ panel: p }),
+    setRightTab: (t) => set({ rightTab: t }),
     setWhatIf: (patch) => set({ whatIf: { ...get().whatIf, ...patch } }),
     toggleStudy: (st) => {
       if (get().lockedStudies.includes(st)) {

@@ -4,15 +4,45 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done. Next is your playtest (`PLAYTEST.md`).
+**Current phase:** All phases (0–11) are done, plus the fixes from your playtest notes (part 1). Version 1.1.0. Next: upload art (`ASSETS_NEEDED.md`) and keep playtesting.
 
 ## How to run (on your PC)
 
-- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.0.0.exe`, or run `SpreadTradingGame-Portable-1.0.0.exe` directly.
+- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.1.0.exe`, or run `SpreadTradingGame-Portable-1.1.0.exe` directly.
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Playtest round 1: art slots, hover help, fewer clicks, the news brief
+From your notes: assets need work; too cluttered and too many needy clicks; hover explanations like Balatro; more news for predictions.
+
+- **Art slots and your upload list.** Every item that can have a picture now has a named slot: 193 in all, covering cartridges, memos, vouchers, analysts, tags, playbook pages, reviews, desks, clients, family badges, card backs and achievements.
+  - `ASSETS_NEEDED.md` lists every file name, its size, the upload steps (GitHub website, no coding) and a drawing idea for each first-priority item.
+  - Anything not uploaded yet shows a clean placeholder tile with the item's initials, so you can upload in any order.
+  - `npm run assets:list` refreshes the list and flags wrong sizes.
+- **Hover explanations everywhere (Balatro-style).** Rest the mouse on almost anything for a short, plain explanation. Where it maps to real trading, a second line says what it is at a real broker.
+  - Items: cartridges, memos, vouchers, analysts, tags, reviews, desks, structures and clients. Each shows its picture, rarity and effect.
+  - Screens and numbers: the top bar, lineup chips, builder controls, key trade numbers, the positions table, the clock buttons, the payoff chart, the shop, Career options and the run-end stats.
+  - The old plain browser hints now use the same styled panel.
+- **Fewer clicks, less clutter.**
+  - Orders send immediately by default. A confirm box is optional in Settings.
+  - "Target hit" closes at your plan without asking. "Short strike touched" and "21 days left" are now small alerts instead of pop-ups that stop the clock. Stop hits, earnings (unless you ticked "holding through earnings on purpose"), ex-dividend, pin risk and assignment still ask.
+  - Existing saves get these new defaults once.
+  - The right panel now shows six big numbers (credit, max profit, max loss, POP, breakeven, expected move) and three chips (R:R, IV rank, Edge Rank). The rest lives in hover text.
+  - The score preview is one line. The SELL and BUY buttons show risk and POP right on them.
+  - Lineup cards lost the "days of history" chip, and blind cards lost the "Day 1" chip (every card showed the same one).
+  - The chart no longer opens with MACD. It's one click away in Studies.
+  - On laptop screens (1366 wide) the structure picker keeps two columns.
+  - In the shop, character lines now appear as a small box in the top corner instead of covering the NEXT button.
+- **The news brief (new).** Every stock now has a one-screen overview of where the market and the news stand, so you don't have to research made-up companies:
+  - **Street read:** Bullish, Leans bullish, Mixed, Leans bearish or Bearish, with the top three reasons (▲/▼). It's built from the trend, the last month's moves, recent news and the market. It also shows as a chip on every lineup card, with the reasons on hover.
+  - **Coming up:** earnings, ex-dividend, Fed decisions and CPI. In Career the exact earnings date still comes from the Earnings Whisperer (or the Event family, or the Volatility desk). Without it the brief says "in about 2 weeks".
+  - **News, last 30 days:** up to six headlines. They cover earnings reactions against the implied move, gaps, heavy volume, win and loss streaks, new 52-week highs and lows, golden and death crosses, and Fed or CPI days that moved it. There are 64 new satirical headlines; real companies by name get plain facts only.
+  - **Market** (SPY's month and the VIX mood), **the stock** (moves, trend, RSI, 52-week range) and **options** (the expected move; IV rank detail comes with the Quant or the Vol Surfer).
+  - A fresh card opens on BRIEF. Once you make your call, the panel flips to TRADE (payoff and numbers). You can switch either way any time.
+  - It only uses what was known on that day. A test proves the brief is identical whether or not the future exists.
+- **Bug found while testing:** the Stats screen's chart hint shared a style name with the new hover panel and stretched it to full screen height. Renamed.
 
 ### Phase 11: Package and hand off
 - **Windows builds, version 1.0.0:** `SpreadTradingGame-Setup-1.0.0.exe` (installer: pick a folder, desktop and Start-menu shortcuts, uninstall from Windows settings) and `SpreadTradingGame-Portable-1.0.0.exe` (no install). Both use the original pixel-art icon and are cross-built from Linux with electron-builder.
@@ -279,4 +309,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Your playtest: install from the two exe files, then work through `PLAYTEST.md` and send back the scores and notes. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
+Upload art whenever you like (`ASSETS_NEEDED.md`), then say "I uploaded art" and I'll pull it in and rebuild. Keep playtesting with the 1.1.0 exe files and send part 2 of your notes. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).

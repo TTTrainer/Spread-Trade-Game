@@ -1126,6 +1126,7 @@ export class RunEngine {
         expirationMechanics: cfg.realism.expirationMechanics || tier.assignmentAlways,
       },
       pause: cfg.pause,
+      trustEarningsAck: !!cfg.trustEarningsAck,
       autoBrackets: p.autoBrackets && !p.losersLocked,
       suppressOnGap: !!rule.noDecisionsOnGap,
       execution: {

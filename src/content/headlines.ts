@@ -10,7 +10,19 @@
 
 import type { Rng } from '../engine/rng';
 
-export type HeadlineKind = 'earnings' | 'gap' | 'exdiv' | 'fomc' | 'cpi' | 'vix';
+export type HeadlineKind =
+  | 'earnings'
+  | 'gap'
+  | 'exdiv'
+  | 'fomc'
+  | 'cpi'
+  | 'vix'
+  // Price-action news for the pre-trade brief (no scheduled event behind them).
+  | 'high'
+  | 'low'
+  | 'volume'
+  | 'streak'
+  | 'cross';
 export type Magnitude =
   | 'inside'
   | 'beyond'
@@ -23,14 +35,22 @@ export type Magnitude =
   | 'move'
   | 'shock'
   | 'spike'
-  | 'panic';
+  | 'panic'
+  | 'new'
+  | 'surge'
+  | 'run'
+  | 'golden'
+  | 'death';
 export type Direction = 'up' | 'down' | 'none';
 
 export interface HeadlineEvent {
   kind: HeadlineKind;
   magnitude: Magnitude;
   direction: Direction;
-  /** Placeholder values: sym, move, absmove, implied, ratio, gap, yield, event, vix, vixchg. */
+  /**
+   * Placeholder values: sym, move, absmove, implied, ratio, gap, yield, event, vix, vixchg,
+   * volx (volume multiple), days (streak length), side (above/below, facts only).
+   */
   vars: Record<string, string>;
 }
 
@@ -309,6 +329,87 @@ export const TEMPLATES: Partial<Record<Key, string[]>> = {
     'VIX {vix} ({vixchg}). Every short put is now a character-building exercise.',
     'The fear gauge prints {vix}. Somewhere, a volatility fund buys a yacht.',
   ],
+  // ---------------- price action (brief only) ----------------
+  'high:new:up': [
+    '{sym} closes at a 52-week high. Everyone who sold last month is "taking a break from screens."',
+    'New 52-week high for {sym} ({move} on the day). Momentum desks pretend they were early.',
+    '{sym} prints its best close in a year. Chart watchers redraw the same line, higher.',
+    '{sym} at a one-year high. Short sellers describe the valuation using a lot of words.',
+    'Fresh 52-week high in {sym}. Call buyers upgrade their headphones.',
+    '{sym} breaks out to a yearly high on {move}. The resistance line resigns.',
+    '{sym} tops its 52-week range. The research note calls it "constructive," which means up.',
+    'Year high for {sym}. Retail forums rename it a "generational buy," as they do.',
+  ],
+  'low:new:down': [
+    '{sym} closes at a 52-week low. The bull case moves to a smaller conference room.',
+    'New 52-week low for {sym} ({move}). Dip buyers check whether it is still a dip.',
+    '{sym} sinks to its worst close in a year. Support levels file for relocation.',
+    '{sym} at a one-year low. The CEO buys a symbolic amount of stock, symbolically.',
+    'Fresh 52-week low in {sym}. Put sellers who sold "just below support" reread the fine print.',
+    '{sym} breaks down to a yearly low on {move}. The chart now needs a lower floor.',
+    '{sym} slides under its 52-week range. Analysts start saying "value," quietly.',
+    'Year low for {sym}. Every bottom-caller in the building has now called it twice.',
+  ],
+  'volume:surge:up': [
+    'Heavy buying in {sym}: {volx} normal volume, shares {move}.',
+    '{sym} trades {volx} its usual volume and closes {move}. Someone knows something, or thinks so.',
+    'Big blocks cross in {sym}: volume {volx} average, stock {move}. The tape gets interesting.',
+    '{sym} {move} on {volx} volume. Institutions arrive, fashionably unannounced.',
+    'Volume spike in {sym} ({volx} normal) with a {move} close. Rumor mill fully staffed.',
+    '{sym} sees {volx} normal turnover on a green day. Market makers stop yawning.',
+    'Accumulation day for {sym}: {move}, on volume {volx} its average.',
+    '{sym} lifts {absmove} on heavy volume ({volx}). The chat rooms claim credit in advance.',
+  ],
+  'volume:surge:down': [
+    'Heavy selling in {sym}: {volx} normal volume, shares {move}.',
+    '{sym} trades {volx} its usual volume and closes {move}. Somebody large wanted out.',
+    'Big blocks hit {sym}: volume {volx} average, stock {move}. The bid gets shy.',
+    '{sym} {move} on {volx} volume. A fund "rebalances," which is a nice word for it.',
+    'Volume spike in {sym} ({volx} normal) with a {move} close. The exits get crowded.',
+    '{sym} sees {volx} normal turnover on a red day. Support gets tested by professionals.',
+    'Distribution day for {sym}: {move}, on volume {volx} its average.',
+    '{sym} drops {absmove} on heavy volume ({volx}). Nobody on the call will say who sold.',
+  ],
+  'streak:run:up': [
+    '{sym} rises {days} sessions straight, {move} over the run. Trees, sky, etc.',
+    '{days} green days in a row for {sym} ({move}). Overbought is now a personality trait.',
+    '{sym} extends its win streak to {days} days, {move} in total. Short sellers take up yoga.',
+    'Up {days} days running: {sym} gains {absmove}. The pullback is "any day now."',
+    '{sym} closes higher again: {days} straight sessions. Momentum funds stop asking why.',
+    '{sym} on a {days}-day heater: {move}. Call sellers start using the word "unusual."',
+    'Relentless bid in {sym}: {days} up closes, {move}. Nobody wants to be the one who sold.',
+    '{sym} rallies {days} days in a row. COMPLY-3000 notes that trees do not grow to the sky. Usually.',
+  ],
+  'streak:run:down': [
+    '{sym} falls {days} sessions straight, {move} over the run. The bottom remains theoretical.',
+    '{days} red days in a row for {sym} ({move}). Oversold is now a lifestyle.',
+    '{sym} extends its losing streak to {days} days, {move} in total. Dip buyers need more dips.',
+    'Down {days} days running: {sym} loses {absmove}. The bounce is "any day now."',
+    '{sym} closes lower again: {days} straight sessions. The bull case goes to voicemail.',
+    '{sym} on a {days}-day slide: {move}. Put sellers start using the word "unusual."',
+    'Relentless offer in {sym}: {days} down closes, {move}. Nobody wants to catch this knife.',
+    '{sym} drops {days} days in a row. COMPLY-3000 recommends reviewing your stop. Please.',
+  ],
+  'cross:golden:up': [
+    'Golden cross on {sym}: the 50-day average climbs over the 200-day. Chart people become unbearable.',
+    '{sym} 50-day moves above its 200-day. Technicians call it bullish; everyone else calls it a line.',
+    'Golden cross in {sym}. Trend followers pile in, as the name of their strategy requires.',
+    '{sym} flashes a golden cross. The newsletter subject line writes itself in capitals.',
+    'Long-term trend turns up for {sym}: 50-day over 200-day. Backtests everywhere nod.',
+    '{sym} completes a golden cross. Somebody frames the chart.',
+    'The averages cross upward on {sym}. Lagging by design, bullish by tradition.',
+    '{sym} golden cross confirmed. Momentum desks upgrade their mood, not their models.',
+  ],
+  'cross:death:down': [
+    'Death cross on {sym}: the 50-day average sinks under the 200-day. The name does the marketing.',
+    '{sym} 50-day slips below its 200-day. Technicians call it bearish; the stock was already down.',
+    'Death cross in {sym}. Trend followers head for the exit, as their strategy requires.',
+    '{sym} flashes a death cross. The newsletter subject line arrives in red.',
+    'Long-term trend turns down for {sym}: 50-day under 200-day. Backtests everywhere frown.',
+    '{sym} completes a death cross. Dip buyers pretend not to have seen it.',
+    'The averages cross downward on {sym}. Lagging by design, ominous by tradition.',
+    '{sym} death cross confirmed. Bulls call it "just a moving average," loudly.',
+  ],
 };
 
 /** Plain facts about real, named companies (open mode): no satire, no characterization. */
@@ -319,6 +420,11 @@ const FACTS: Record<HeadlineKind, string[]> = {
   fomc: ['FOMC decision day. {sym} closed {move}.'],
   cpi: ['CPI release day. {sym} closed {move}.'],
   vix: ['VIX closed at {vix}, {vixchg} over five sessions.'],
+  high: ['{sym} closed at a 52-week high ({move} on the day).'],
+  low: ['{sym} closed at a 52-week low ({move} on the day).'],
+  volume: ['{sym} traded about {volx} its 20-day average volume and closed {move}.'],
+  streak: ['{sym} closed {dir} for {days} sessions in a row ({move} over the run).'],
+  cross: ["{sym}'s 50-day average crossed {side} its 200-day average."],
 };
 
 function fill(t: string, vars: Record<string, string>): string {

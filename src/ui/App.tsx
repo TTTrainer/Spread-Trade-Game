@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Toasts } from './components/ui';
+import { TooltipLayer } from './components/Tooltip';
 import { useHotkeys } from './hotkeys';
 import { useMusicDirector } from './musicDirector';
 import { useApp, type Screen } from './store/app';
@@ -69,6 +70,7 @@ export function App() {
       <HelpModal />
       {(screen === 'run' || screen === 'career') && <DialogueBox />}
       <Toasts />
+      <TooltipLayer />
       <div className="crt-overlay" aria-hidden="true" />
     </>
   );

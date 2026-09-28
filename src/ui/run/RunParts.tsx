@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react';
+import type { BriefAccess } from '../../engine/news/brief';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { burstAt } from '../../fx/overlay';
+import { ArtIcon } from '../art';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
-import { ALL_FAMILIES, FAMILY_NAMES, FAMILY_TEXT } from '../../content/families';
+import { ALL_FAMILIES, FAMILY_NAMES } from '../../content/families';
 import { MEMOS, TAGS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
 import type { AnalystId, CartridgeDef, Family } from '../../content/types';
@@ -31,8 +33,6 @@ import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
 import './run.css';
 
-const RAR_NAME = { C: 'Common', U: 'Uncommon', R: 'Rare', L: 'Legendary' } as const;
-
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
 }
@@ -49,17 +49,21 @@ export function CartridgeChip({
   extra?: ReactNode;
 }) {
   return (
-    <div
-      className={`cart-chip rar-${def.rarity}`}
-      title={`${def.name} (${RAR_NAME[def.rarity]} · ${def.families.join('/')} · ${def.tag})\n${def.text}`}
-      data-testid={`cart-${def.id}`}
-    >
+    <div className={`cart-chip rar-${def.rarity}`} data-tip={`cart:${def.id}`} data-testid={`cart-${def.id}`}>
       {onMove && (
         <button className="cart-move" onClick={() => onMove(-1)} aria-label="Move left">
           ◀
         </button>
       )}
       <span className="cart-slot num">{index !== undefined ? index + 1 : ''}</span>
+      <ArtIcon
+        category="cartridge"
+        id={def.id}
+        name={def.name}
+        tone={def.rarity}
+        className="cart-art"
+        style={{ width: 20, height: 20, fontSize: 9 }}
+      />
       <span className="cart-name">{def.name}</span>
       <span className="cart-fam num">{def.families.join('·')}</span>
       {onMove && (
@@ -78,7 +82,7 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
   const fam = e.families();
   const owned = e.state.cartridges;
   return (
-    <div className="cart-rail" data-testid="cartridge-rail">
+    <div className="cart-rail" data-testid="cartridge-rail" data-tip="g:cartridge_rail">
       <div className="cart-slots">
         {Array.from({ length: slots }, (_, i) => {
           const id = owned[i];
@@ -101,14 +105,7 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
       </div>
       <div className="fam-counters num">
         {ALL_FAMILIES.filter((f) => fam[f] > 0).map((f) => (
-          <span
-            key={f}
-            className={`fam ${fam[f] >= 2 ? 'on' : ''}`}
-            title={FAMILY_TEXT[f]
-              .map((t, i) => (t ? `${i + 2}: ${t}` : ''))
-              .filter(Boolean)
-              .join('\n')}
-          >
+          <span key={f} className={`fam ${fam[f] >= 2 ? 'on' : ''}`} data-tip={`family:${f}`}>
             {FAMILY_NAMES[f].toUpperCase()} {fam[f]}
           </span>
         ))}
@@ -170,12 +167,16 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         </button>
         <div className="tb-item rtb-round">
           <span className="amber-text">{quarterLabel(st.quarter)}</span> {ROUND_NAMES[r.index].toUpperCase()}
-          {review && <span className="chip magenta">{review.name.toUpperCase()}</span>}
+          {review && (
+            <span className="chip magenta" data-tip={`review:${review.id}`}>
+              {review.name.toUpperCase()}
+            </span>
+          )}
           <ModeChips e={e} />
           <MeterJuice meter={r.meter} target={r.target} />
           {r.memo.waiver && <span className="chip warn">WAIVER</span>}
         </div>
-        <div className="rtb-meter" title="Round meter: points from closed trades against the target">
+        <div className="rtb-meter" data-tip="g:meter">
           <Meter
             value={Math.max(0, r.meter)}
             max={r.target}
@@ -203,7 +204,8 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         </div>
         <div
           className="rtb-line"
-          title={`Max-Loss Line: equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start).`}
+          data-tip-title="Max-Loss Line"
+          data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
         >
           <span className="dim">MAX-LOSS</span>
           <Meter
@@ -218,7 +220,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           className="tb-item rtb-stress"
           onClick={() => setStressOpen(true)}
           data-testid="stress"
-          title="Click for every change and its cause"
+          data-tip="g:stress"
         >
           <span className="dim">STRESS</span>
           <Meter
@@ -228,10 +230,10 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             label={`${st.stress}`}
           />
         </button>
-        <div className="tb-item num" data-testid="cash">
+        <div className="tb-item num" data-testid="cash" data-tip="g:cash">
           <span className="dim">CASH</span> <span className="amber-text">${st.cash}</span>
         </div>
-        <div className="tb-item num" data-testid="tickets" title="Trades you may place this round">
+        <div className="tb-item num" data-testid="tickets" data-tip="g:tickets">
           <span className="dim">TICKETS</span>{' '}
           {Array.from({ length: r.tickets }, (_, i) => (
             <span key={i} className={i < r.ticketsUsed ? 'tk-pip used' : 'tk-pip'}>
@@ -239,7 +241,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             </span>
           ))}
         </div>
-        <div className="tb-item num">
+        <div className="tb-item num" data-tip="g:equity">
           <span className="dim">EQUITY</span> {money(eq)}
         </div>
         <div className="tb-spacer" />
@@ -252,18 +254,31 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
 }
 
 /** Lineup badges earned through analysts and cartridges. */
+/** Exact earnings dates are an Event-desk edge: the Whisperer, its cartridge, the family or the desk. */
+function hasEarningsDetail(e: RunEngine): boolean {
+  return (
+    e.hasAnalyst('earnings_whisperer') ||
+    e.activeCartridges().includes('earnings_whisper') ||
+    e.families().EVENT >= 2 ||
+    e.state.config.deskId === 'volatility'
+  );
+}
+
+/** The news brief is free for everyone; its finer detail comes from the same analysts as the badges. */
+export function careerBriefAccess(e: RunEngine): BriefAccess {
+  return {
+    earningsDetail: hasEarningsDetail(e),
+    ivDetail: e.hasAnalyst('quant') || e.hasAnalyst('vol_surfer'),
+  };
+}
+
 export function careerBadges(
   e: RunEngine,
   symbolSector: (sym: string) => string | null,
 ): (cardId: string) => CardBadges {
   const fam = e.families();
-  const owned = e.activeCartridges();
   const quant = e.hasAnalyst('quant');
-  const whisper =
-    e.hasAnalyst('earnings_whisperer') ||
-    owned.includes('earnings_whisper') ||
-    fam.EVENT >= 2 ||
-    e.state.config.deskId === 'volatility';
+  const whisper = hasEarningsDetail(e);
   const scout = e.hasAnalyst('scout') || e.state.round.memo.lens;
   const trend = fam.DELTA >= 2;
   return (cardId: string) => {
@@ -362,7 +377,7 @@ function ClientCard({ e }: { e: RunEngine }) {
       : null;
   const checks = clientChecks(def.request, facts, e.state.round.startEquityCents);
   return (
-    <div className={`client-card ${c.status}`} data-testid="client-card" title={def.persona}>
+    <div className={`client-card ${c.status}`} data-testid="client-card" data-tip={`client:${c.id}`}>
       <div className="section-title">
         Client{' '}
         {c.status === 'filled' ? (
@@ -371,7 +386,15 @@ function ClientCard({ e }: { e: RunEngine }) {
           <span className="chip">+${def.cash}</span>
         )}
       </div>
-      <b className="client-name">{def.name}</b>
+      <div className="client-who">
+        <ArtIcon
+          category="client"
+          id={c.id}
+          name={def.name}
+          style={{ width: 32, height: 32, fontSize: 12 }}
+        />
+        <b className="client-name">{def.name}</b>
+      </div>
       <div className="client-ask">{def.ask}</div>
       {c.status === 'open' && (
         <ul className="client-checks num">
@@ -422,7 +445,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
           disabled={r.clockStarted || r.rerollsUsed >= r.rerolls}
           onClick={() => (sfx('deal'), void act({ t: 'reroll' }))}
           data-testid="reroll"
-          title="Redraw every card you have not traded"
+          data-tip="g:reroll"
         >
           REROLL {r.rerolls - r.rerollsUsed} <Kbd>R</Kbd>
         </button>
@@ -432,11 +455,8 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
             disabled={!canSkip}
             onClick={() => void act({ t: 'skip' })}
             data-testid="skip"
-            title={
-              r.skipTag
-                ? `Skip this round: -10 stress and the ${TAGS[r.skipTag].name} (${TAGS[r.skipTag].text})`
-                : 'Skip this round'
-            }
+            data-tip-title="Skip the round (K)"
+            data-tip-body={`Skip before trading: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a skip; Reviews can't be skipped.`}
           >
             SKIP → {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
           </button>
@@ -459,27 +479,38 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
           {st.memos.map((m, i) => (
             <button
               key={`${m}${i}`}
-              className="memo-btn"
+              className="memo-btn with-art"
               onClick={() => playMemo(m)}
-              title={MEMOS[m].text}
+              data-tip={`memo:${m}`}
               data-testid={`memo-${m}`}
             >
+              <ArtIcon
+                category="memo"
+                id={m}
+                name={MEMOS[m].name}
+                style={{ width: 32, height: 32, fontSize: 12 }}
+              />
               <b>{MEMOS[m].name}</b>
-              <span className="dim">{MEMOS[m].text}</span>
             </button>
           ))}
         </div>
       )}
       <div className="analyst-seats">
-        <div className="section-title">
+        <div className="section-title" data-tip="g:analysts">
           Analysts {e.activeAnalysts().length}/{e.analystSeats()}
         </div>
         {st.analysts.map((a) => (
           <div
             key={a.id}
             className={`seat ${r.silentAnalyst === a.id ? 'silent' : ''}`}
-            title={ANALYSTS[a.id].reveals}
+            data-tip={`analyst:${a.id}`}
           >
+            <ArtIcon
+              category="analyst"
+              id={a.id}
+              name={ANALYSTS[a.id].name}
+              style={{ width: 24, height: 24, fontSize: 10 }}
+            />
             {ANALYSTS[a.id].name}
             {a.level > 1 && <span className="chip">L2</span>}
             {r.silentAnalyst === a.id && <span className="chip bad">SILENT</span>}
@@ -527,31 +558,25 @@ export function ScorePreviewBox({ e }: { e: RunEngine }) {
   const card = session.cards.find((c) => c.id === cardId);
   const p = previewScore(e, plan, builder.structureId, cardId, card?.call ?? null);
   if (!p) return null;
+  const steps = p.steps
+    .filter((st) => st.op !== 'meter')
+    .map(
+      (st) =>
+        `${st.op === 'chips' ? `+${Math.round(st.value)} chips` : st.op === 'add' ? `+${st.value} mult` : `×${st.value}`} ${st.label}`,
+    )
+    .join(' · ');
   return (
-    <div className="score-preview" data-testid="score-preview">
-      <div className="section-title">Score preview (at max profit)</div>
-      <div className="sp-formula num">
-        <span className="chips-text">{p.chips}</span> chips ×{' '}
-        <span className="mult-text">{p.mult.toFixed(2)}</span> mult = <b>{p.points.toLocaleString()}</b>
-      </div>
-      <div className="dim num">
-        exact call: <b className="cyan-text">{p.pointsIfExact.toLocaleString()}</b> · round needs{' '}
-        {p.targetLeft.toLocaleString()} more
-      </div>
-      <div className="sp-steps num">
-        {p.steps
-          .filter((s) => s.op !== 'meter')
-          .map((s, i) => (
-            <span key={i} className={`sp-step op-${s.op}`}>
-              {s.op === 'chips'
-                ? `+${Math.round(s.value)}c`
-                : s.op === 'add'
-                  ? `+${s.value}m`
-                  : `×${s.value}`}{' '}
-              {s.label}
-            </span>
-          ))}
-      </div>
+    <div
+      className="score-preview"
+      data-testid="score-preview"
+      data-tip-title="Score preview (at max profit)"
+      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round needs ${p.targetLeft.toLocaleString()} more. ${steps}`}
+    >
+      <span className="dim">SCORE IF IT WINS</span>{' '}
+      <b className="num sp-points">{p.points.toLocaleString()}</b>{' '}
+      <span className="dim num">
+        ({p.chips}c × {p.mult.toFixed(1)}) · needs {p.targetLeft.toLocaleString()}
+      </span>
     </div>
   );
 }

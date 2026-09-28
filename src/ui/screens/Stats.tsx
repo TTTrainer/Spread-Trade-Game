@@ -150,7 +150,7 @@ function EquityChart({ rows }: { rows: LedgerTrade[] }) {
         )}
       </svg>
       {hp && (
-        <div className="tooltip num" data-testid="equity-tooltip">
+        <div className="eq-tooltip num" data-testid="equity-tooltip">
           Trade {hp.index} · {hp.date} · You {money(hp.cumCents)} · SPY {money(hp.benchCents)} · alpha{' '}
           {money(hp.alphaCents, true)}
         </div>

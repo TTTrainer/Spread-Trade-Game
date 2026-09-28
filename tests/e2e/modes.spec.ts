@@ -33,8 +33,7 @@ async function placeDefault(page: Page): Promise<void> {
   await page.waitForTimeout(300);
   const credit = await page.evaluate(() => ((window as Any).__stg.trading.getState().plan()?.mid ?? 0) < 0);
   await page.keyboard.press(credit ? 'Alt+S' : 'Alt+B');
-  await expect(page.getByTestId('confirm-order')).toBeVisible();
-  await page.getByTestId('confirm-send').click();
+  // Orders send straight away by default (no confirm box).
   await expect(page.getByTestId('toasts')).toContainText('Filled');
 }
 

@@ -67,8 +67,7 @@ async function sellBullPut(page: Page): Promise<void> {
   await page.getByTestId('order-market').click();
   await expect(page.getByTestId('score-preview')).toBeVisible();
   await page.keyboard.press('Alt+S');
-  await expect(page.getByTestId('confirm-order')).toBeVisible();
-  await page.getByTestId('confirm-send').click();
+  // Orders send straight away by default (no confirm box).
   await expect(page.getByTestId('toasts')).toContainText('Filled');
 }
 
