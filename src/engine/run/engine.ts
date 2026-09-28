@@ -18,6 +18,7 @@ import { emptyFamilies, familyPassives } from '../../content/families';
 import { MEMOS, TAG_IDS, VOUCHERS } from '../../content/items';
 import { ANNUAL_MIX, QUARTER_REVIEWS, REVIEWS } from '../../content/reviews';
 import { tierMods } from '../../content/tiers';
+import { pickLine, type CharacterId, type Trigger } from '../../content/characters';
 import type {
   AnalystId,
   CartState,
@@ -59,7 +60,18 @@ import {
   rerollCost,
   sellPrice,
 } from './shop';
-import type { RoundState, RunAction, RunConfig, RunEvent, RunResult, RunSave, RunState } from './types';
+import type {
+  RoundState,
+  RunAction,
+  RunConfig,
+  RunEvent,
+  RunResult,
+  RunSave,
+  RunState,
+  RunStats,
+} from './types';
+import { CLIENTS, CLIENT_BY_ID } from '../../content/clients';
+import { clientChecks, clientFitsDesk } from './clients';
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 
@@ -130,6 +142,32 @@ function emptyRound(): RoundState {
     taxCents: 0,
     filterRelaxed: false,
     scored: [],
+    client: null,
+  };
+}
+
+export function emptyStats(): RunStats {
+  return {
+    cartTriggers: {},
+    maxStress: 0,
+    stopDeclines: 0,
+    burnouts: 0,
+    skips: 0,
+    reviewsPassed: [],
+    maxMult: 0,
+    maxPoints: 0,
+    maxCartridges: 0,
+    maxAnalysts: 0,
+    ladderBest: 0,
+    clientsFilled: 0,
+    wheel: 0,
+    cspAssigned: false,
+    ivCrushWins: 0,
+    closes50: 0,
+    plannedStops: 0,
+    edgeTop10: 0,
+    duoOwned: false,
+    parachuteSaves: 0,
   };
 }
 
@@ -176,6 +214,12 @@ export function initialState(config: RunConfig, startedAt = ''): RunState {
     usedWindows: [],
     result: null,
     startedAt,
+    reputation: 0,
+    stats: {
+      ...emptyStats(),
+      maxCartridges: desk.startingCartridges.length,
+      maxAnalysts: desk.startingAnalysts.length,
+    },
   };
 }
 
@@ -210,6 +254,12 @@ export class RunEngine {
   sessionEvents: SessionEvent[] = [];
   private pending: RunAction[] = [];
   private checkpointState: RunState;
+  private speech: {
+    trigger: Trigger;
+    pri: number;
+    vars: Record<string, string | number>;
+    who?: CharacterId;
+  } | null = null;
   private sessionDirty = false;
   private allWindows: WindowDef[] | null = null;
   private windowById = new Map<number, WindowDef>();
@@ -225,6 +275,10 @@ export class RunEngine {
   static async create(source: MarketDataSource, config: RunConfig, startedAt = ''): Promise<RunEngine> {
     const e = new RunEngine(source, initialState(config, startedAt));
     await e.enterRound(null);
+    e.events = e.events.filter((x) => x.kind !== 'say');
+    e.speech = null;
+    e.say('run_start', 3, { desk: DESKS[config.deskId].name, target: e.state.round.target });
+    e.flushSpeech('boot');
     e.checkpoint();
     return e;
   }
@@ -418,8 +472,27 @@ export class RunEngine {
           this.finishRun('forfeit', 'You walked away from the desk.');
           break;
       }
+    this.flushSpeech(String(this.log.length));
     if (!this.session || !this.sessionDirty) this.checkpoint();
     return out;
+  }
+
+  /** Queue a line; only the highest-priority line of an action is spoken. */
+  private say(
+    trigger: Trigger,
+    pri: number,
+    vars: Record<string, string | number> = {},
+    who?: CharacterId,
+  ): void {
+    if (!this.speech || pri > this.speech.pri) this.speech = { trigger, pri, vars, who };
+  }
+
+  private flushSpeech(label: string): void {
+    const s = this.speech;
+    this.speech = null;
+    if (!s) return;
+    const line = pickLine(s.trigger, this.rng(`line:${label}:${s.trigger}`), s.vars, s.who);
+    this.events.push({ kind: 'say', text: line.text, line });
   }
 
   private checkpoint(): void {
@@ -525,6 +598,10 @@ export class RunEngine {
         action = { ...sa, action: act, order };
         if (dp.kind === 'stop_hit' && act === 'hold')
           this.addStress(BALANCE.stress.declineStop, 'Declined your own stop');
+        if (dp.kind === 'stop_hit' && act === 'hold') {
+          this.say('decline_stop', 7);
+          this.state.stats.stopDeclines++;
+        }
         for (const id of this.activeCartridges()) {
           const eff = CARTRIDGE_BY_ID[id]?.onDecisionPoint?.({
             kind: dp.kind,
@@ -566,6 +643,31 @@ export class RunEngine {
     if (r.memo.doubleDown) {
       r.doubleDownFor = p.id;
       r.memo.doubleDown = false;
+    }
+    const cl = r.client;
+    if (cl && cl.status === 'open') {
+      const def = CLIENT_BY_ID[cl.id];
+      const checks = clientChecks(
+        def.request,
+        {
+          structureId: p.structureId,
+          maxLossCents: p.entry.maxLossCents,
+          pop: p.entry.pop,
+          dte: p.entry.dte,
+          credit: p.openNet < 0,
+          rewardToRisk: p.entry.rewardToRisk,
+          edgeTier: p.entry.edgeTier,
+        },
+        r.startEquityCents,
+      );
+      if (checks.every((c) => c.pass)) {
+        cl.status = 'filled';
+        this.state.stats.clientsFilled++;
+        this.events.push({
+          kind: 'good',
+          text: `${def.name}: request filled. +$${def.cash} and reputation at round end.`,
+        });
+      }
     }
     for (const id of this.activeCartridges()) {
       const eff = CARTRIDGE_BY_ID[id]?.onEntry?.({
@@ -684,8 +786,12 @@ export class RunEngine {
     const sym = card.displaySymbol;
     if (!facts.win && !(facts.assigned && st.config.deskId === 'income'))
       this.addStress(BALANCE.stress.perLoser, `Losing trade on ${sym}`, true);
+    if (res.points <= -0.4 * r.target || facts.realizedCents <= -0.03 * r.startEquityCents)
+      this.say('big_loss', 6, { points: res.points });
+    else if (res.points >= 0.5 * r.target) this.say('big_win', 6, { points: res.points });
     if (facts.closedAtPlan)
       this.addStress(BALANCE.stress.closeAtPlan, `Closed ${sym} at plan (${facts.closedAtPlan})`);
+    if (facts.closedAtPlan && this.rng(`plan:${p.id}`).chance(0.5)) this.say('closed_at_plan', 3);
     if (facts.assigned && st.config.deskId !== 'income' && !carts.includes('assignment_artist'))
       this.addStress(BALANCE.stress.assignment, `Assigned on ${sym}`);
     const call = card.call;
@@ -700,6 +806,24 @@ export class RunEngine {
     st.totals.trades++;
     if (facts.win) st.totals.wins++;
     st.totals.points += res.points;
+    const ss = st.stats;
+    for (const stp of steps)
+      if (stp.kind === 'cartridge' && stp.source && res.trace.some((t) => t.label === stp.label))
+        ss.cartTriggers[stp.source] = (ss.cartTriggers[stp.source] ?? 0) + 1;
+    if (res.winner) {
+      ss.maxMult = Math.max(ss.maxMult, res.mult);
+      ss.maxPoints = Math.max(ss.maxPoints, res.points);
+    }
+    if (facts.ivCrushWin) ss.ivCrushWins++;
+    if (facts.win && (facts.pctOfMaxProfit ?? 0) >= 0.5 && facts.exitReason !== 'expired') ss.closes50++;
+    if (facts.closedAtPlan === 'stop') ss.plannedStops++;
+    if (p.entry.edgeTier === 'top10') ss.edgeTop10++;
+    ss.ladderBest = Math.max(ss.ladderBest, st.cartState.ladder_up?.streak ?? 0);
+    if (facts.cspAssigned) ss.cspAssigned = true;
+    if (facts.win && facts.structureId === 'covered_call' && ss.cspAssigned) {
+      ss.wheel++;
+      ss.cspAssigned = false;
+    }
   }
 
   private async checkLine(): Promise<void> {
@@ -747,6 +871,8 @@ export class RunEngine {
     }
     st.equityCents = equity;
     r.status = !r.breached && r.meter >= r.target ? 'passed' : 'failed';
+    if (r.breached) this.say('breach', 9);
+    else this.say(r.status === 'passed' ? 'target_met' : 'target_missed', 5);
     const unused = Math.max(0, r.tickets - r.ticketsUsed);
     if (this.activeCartridges().includes('patience_pays'))
       st.patienceStacks = Math.min(3, st.patienceStacks + unused);
@@ -803,6 +929,18 @@ export class RunEngine {
       r.payouts.push({ label: 'Investment Tag', cash: st.tagEffects.investment });
       st.tagEffects.investment = 0;
     }
+    if (r.client) {
+      const def = CLIENT_BY_ID[r.client.id];
+      if (r.client.status === 'filled') {
+        r.payouts.push({ label: `Client: ${def.name}`, cash: def.cash });
+        st.reputation += def.reputation;
+      } else {
+        r.client.status = 'missed';
+        st.reputation -= 1;
+      }
+    }
+    if (passed && r.reviewId && !st.stats.reviewsPassed.includes(r.reviewId))
+      st.stats.reviewsPassed.push(r.reviewId);
     st.cash = Math.max(0, st.cash + r.payouts.reduce((a, p) => a + p.cash, 0));
     st.history.push({
       quarter: st.quarter,
@@ -823,6 +961,8 @@ export class RunEngine {
           kind: 'good',
           text: 'GOLDEN PARACHUTE DEPLOYED. You survive this one. The cartridge is gone.',
         });
+        this.say('parachute', 9);
+        st.stats.parachuteSaves++;
       } else if (st.config.practice) {
         this.events.push({ kind: 'info', text: 'Practice run: a missed round does not end the run.' });
       } else {
@@ -881,6 +1021,7 @@ export class RunEngine {
       roundsCleared: cleared,
     };
     st.phase = won || survived ? 'victory' : 'defeat';
+    this.say(won ? 'victory' : survived ? 'survived' : 'defeat', 10);
     st.shop = null;
     this.session = null;
     this.sessionDirty = false;
@@ -1006,8 +1147,15 @@ export class RunEngine {
       ghostScore: Math.round(target * rng.range(0.75, 1.35)),
       skipTag: idx < 2 ? rng.pick(TAG_IDS) : null,
     };
+    if (!reviewId && rng.chance(1 / 3)) {
+      const fits = CLIENTS.filter((c) => clientFitsDesk(c, cfg.deskId));
+      if (fits.length) st.round.client = { id: rng.pick(fits).id, status: 'open' };
+    }
     if (reviewId) st.reviewsSeen.push(reviewId);
     st.phase = 'round';
+    if (this.activeCartridges().includes('rivals_bet')) this.say('rival', 2, {}, 'bradley');
+    else if (!reviewId && (idx === 0 || rng.chance(0.4)))
+      this.say('round_start', 2, { target, tickets: st.round.tickets });
     if (burnout)
       this.events.push({
         kind: 'bad',
@@ -1096,6 +1244,8 @@ export class RunEngine {
         r.index === 2 ? 'Reviews cannot be skipped.' : 'You can only skip before placing any trade.',
       );
     this.addStress(BALANCE.stress.skipRound, 'Skipped a round');
+    this.say('skip', 5);
+    st.stats.skips++;
     if (this.activeCartridges().includes('patience_pays'))
       st.patienceStacks = Math.min(3, st.patienceStacks + 1);
     r.status = 'skipped';
@@ -1183,6 +1333,12 @@ export class RunEngine {
       }
       st.nextReview = review;
       st.phase = 'review_intro';
+      this.say(
+        'review_intro',
+        4,
+        { target: st.round.target || computeTarget(q, 2, review, st.config) },
+        'kessler',
+      );
       st.round = {
         ...emptyRound(),
         quarter: q,
@@ -1305,6 +1461,7 @@ export class RunEngine {
     st.shop = { items, rerolls: 0, freeRerolls: fx.freeRerolls };
     fx.freeRerolls = 0;
     st.phase = 'shop';
+    if (this.rng(`shopline:${st.quarter}:${st.roundIndex}`).chance(0.4)) this.say('shop', 2);
   }
 
   shopRerollCost(): number {
@@ -1369,6 +1526,9 @@ export class RunEngine {
     }
     st.cash -= item.price;
     item.sold = true;
+    st.stats.maxCartridges = Math.max(st.stats.maxCartridges, st.cartridges.length);
+    st.stats.maxAnalysts = Math.max(st.stats.maxAnalysts, st.analysts.length);
+    if (st.cartridges.some((c) => CARTRIDGE_BY_ID[c]?.duoOf)) st.stats.duoOwned = true;
     this.events.push({ kind: 'good', text: 'Bought.' });
   }
 
@@ -1414,6 +1574,9 @@ export class RunEngine {
     }
     const before = st.stress;
     st.stress = Math.max(0, Math.min(BALANCE.stress.burnoutAt, st.stress + d));
+    if (before < 75 && st.stress >= 75 && st.stress < BALANCE.stress.burnoutAt)
+      this.say('high_stress', 4, { stress: st.stress });
+    st.stats.maxStress = Math.max(st.stats.maxStress, st.stress);
     const at = `Q${st.quarter} ${ROUND_NAMES[st.roundIndex]}`;
     if (st.stress !== before) {
       st.stressLog.push({ delta: st.stress - before, reason, at });
@@ -1434,6 +1597,8 @@ export class RunEngine {
         kind: 'bad',
         text: 'BURNOUT. Next round: one fewer ticket, and one analyst stops answering.',
       });
+      this.say('burnout', 8);
+      st.stats.burnouts++;
     }
   }
 }

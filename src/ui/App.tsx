@@ -11,6 +11,8 @@ import { StatsScreen } from './screens/Stats';
 import { SettingsScreen } from './screens/Settings';
 import { CreditsScreen } from './screens/Credits';
 import { CareerScreen, RunScreen } from './screens/Career';
+import { DialogueBox } from './run/Dialogue';
+import { AchievementsScreen } from './screens/Achievements';
 
 const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   title: TitleScreen,
@@ -22,6 +24,7 @@ const SCREENS: Partial<Record<Screen, () => React.ReactElement>> = {
   credits: CreditsScreen,
   career: CareerScreen,
   run: RunScreen,
+  achievements: AchievementsScreen,
 };
 
 export function App() {
@@ -51,6 +54,7 @@ export function App() {
     <>
       {settingsLoaded && <Comp />}
       <HelpModal />
+      {(screen === 'run' || screen === 'career') && <DialogueBox />}
       <Toasts />
       <div className="crt-overlay" aria-hidden="true" />
     </>

@@ -10,8 +10,8 @@ import { diffDays } from '../calendar';
 import type { DecisionAction, DecisionPoint, Position } from '../lifecycle/types';
 import { streamFor, type Rng } from '../rng';
 import type { Bucket } from '../scoring/calls';
-import { expirationsOf } from '../strategies/structures';
-import type { StructureId } from '../strategies/types';
+import { expirationsOf, STRUCTURES } from '../strategies/structures';
+import type { BuildParams, StructureId } from '../strategies/types';
 import { maxContracts, type TradePlan } from '../trading/plan';
 import type { OrderSpec, TradingSession } from '../trading/session';
 import type { RunEngine } from '../run/engine';
@@ -37,9 +37,7 @@ const send = (engine: RunEngine, o: BotOptions, a: RunAction) =>
 interface Pick {
   structureId: StructureId;
   plan: TradePlan;
-  expiration: string;
-  delta: number;
-  width: number;
+  params: BuildParams;
   bucket: Bucket;
 }
 
@@ -47,15 +45,45 @@ function planFor(
   engine: RunEngine,
   cardId: string,
   structureId: StructureId,
-  expiration: string,
-  delta: number,
-  width: number,
+  params: BuildParams,
   qty: number,
 ): TradePlan | null {
   try {
-    return engine.session?.planFor(cardId, structureId, { expiration, delta, width }, qty) ?? null;
+    return engine.session?.planFor(cardId, structureId, params, qty) ?? null;
   } catch {
     return null;
+  }
+}
+
+/** What each desk's bot reaches for, given the lean of the chart and the calendar. */
+function deskStructure(
+  engine: RunEngine,
+  cardId: string,
+  o: BotOptions,
+  bullish: boolean,
+  rng: Rng,
+): { id: StructureId; bucket: Bucket } {
+  const s = engine.session as TradingSession;
+  const desk = DESKS[engine.state.config.deskId];
+  const ctx = s.context(cardId);
+  if (o.kind === 'random') return { id: rng.pick(desk.structures), bucket: rng.int(0, 4) as Bucket };
+  const lean: Bucket = bullish ? 3 : 1;
+  switch (desk.id) {
+    case 'verticals': {
+      const sell = o.kind !== 'disciplined' || (ctx.ivr ?? 50) >= 30;
+      return {
+        id: sell ? (bullish ? 'bull_put' : 'bear_call') : bullish ? 'bull_call' : 'bear_put',
+        bucket: lean,
+      };
+    }
+    case 'income':
+      return { id: 'cash_secured_put', bucket: 3 };
+    case 'condor':
+      return { id: (ctx.ivr ?? 50) >= 50 ? 'iron_fly' : 'iron_condor', bucket: 2 };
+    case 'volatility':
+      return { id: ctx.nextEarnings ? 'long_straddle' : 'long_strangle', bucket: bullish ? 4 : 0 };
+    case 'calendar':
+      return { id: bullish ? 'diagonal' : 'calendar', bucket: bullish ? 3 : 2 };
   }
 }
 
@@ -67,34 +95,33 @@ function chooseTrade(engine: RunEngine, cardId: string, o: BotOptions, rng: Rng)
   const ctx = s.context(cardId);
   const now = s.view(cardId).now;
   const exps = expirationsOf(chain);
-  const desk = DESKS[engine.state.config.deskId];
   const slope = ctx.sma50Slope ?? 0;
   const bullish = o.kind === 'random' ? rng.chance(0.5) : slope >= 0;
-  let structureId: StructureId;
-  if (o.kind === 'random') structureId = rng.pick(desk.structures);
-  else if (desk.id === 'verticals') {
-    const ivr = ctx.ivr ?? 50;
-    const sell = o.kind !== 'disciplined' || ivr >= 30;
-    structureId = sell ? (bullish ? 'bull_put' : 'bear_call') : bullish ? 'bull_call' : 'bear_put';
-  } else structureId = desk.structures[0];
+  const { id: structureId, bucket } = deskStructure(engine, cardId, o, bullish, rng);
+  const inRange = exps.filter((e) => diffDays(now, e) >= 5 && diffDays(now, e) <= 50);
   const exp =
     o.kind === 'random'
-      ? rng.pick(
-          exps.filter((e) => diffDays(now, e) >= 5 && diffDays(now, e) <= 50).length
-            ? exps.filter((e) => diffDays(now, e) >= 5 && diffDays(now, e) <= 50)
-            : exps,
-        )
+      ? rng.pick(inRange.length ? inRange : exps)
       : (exps.find((e) => diffDays(now, e) >= 28 && diffDays(now, e) <= 45) ??
         exps.find((e) => diffDays(now, e) >= 14) ??
         exps[exps.length - 1]);
   if (!exp) return null;
+  const back = STRUCTURES[structureId].twoExpiries ? exps.find((e) => diffDays(exp, e) >= 21) : undefined;
+  if (STRUCTURES[structureId].twoExpiries && !back) return null;
+  const def = STRUCTURES[structureId].defaults;
   const delta =
-    o.kind === 'random' ? rng.pick([0.15, 0.2, 0.3, 0.4, 0.5]) : o.kind === 'greedy' ? 0.35 : 0.25;
-  const widths = o.kind === 'random' ? rng.shuffle([1, 2, 5]) : [5, 2.5, 2, 1];
+    o.kind === 'random'
+      ? rng.pick([0.15, 0.2, 0.3, 0.4, 0.5])
+      : STRUCTURES[structureId].family === 'vertical'
+        ? o.kind === 'greedy'
+          ? 0.35
+          : 0.25
+        : def.delta;
+  const widths = o.kind === 'random' ? rng.shuffle([1, 2, 5]) : def.width === 0 ? [0] : [5, 2.5, 2, 1];
   for (const width of widths) {
-    const plan = planFor(engine, cardId, structureId, exp, delta, width, 1);
-    if (plan?.ok)
-      return { structureId, plan, expiration: exp, delta, width, bucket: (bullish ? 3 : 1) as Bucket };
+    const params: BuildParams = { expiration: exp, backExpiration: back, delta, width, skip: def.skip };
+    const plan = planFor(engine, cardId, structureId, params, 1);
+    if (plan?.ok) return { structureId, plan, params, bucket };
   }
   return null;
 }
@@ -166,7 +193,7 @@ export async function playRound(engine: RunEngine, o: BotOptions, rng: Rng): Pro
         t: 'place',
         cardId: c.id,
         structureId: pick.structureId,
-        params: { expiration: pick.expiration, delta: pick.delta, width: pick.width },
+        params: pick.params,
         qty,
         order: { ...ord, limit },
         brackets: o.kind === 'disciplined' ? undefined : null,

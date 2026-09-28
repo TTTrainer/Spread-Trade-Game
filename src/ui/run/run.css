@@ -680,3 +680,103 @@
     width: 290px;
   }
 }
+
+/* ---------- dialogue ---------- */
+.portrait {
+  image-rendering: pixelated;
+  display: block;
+}
+.dialogue {
+  position: fixed;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: min(640px, 70vw);
+  padding: 8px 12px;
+  background: rgba(14, 10, 43, 0.96);
+  border: 2px solid var(--line-bright);
+  box-shadow: 4px 4px 0 #000;
+  color: var(--text);
+  text-align: left;
+  pointer-events: none;
+}
+.dlg-close {
+  pointer-events: auto;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+.dlg-close:hover {
+  color: var(--cyan);
+}
+.dialogue.who-kessler {
+  border-color: var(--amber);
+}
+.dialogue.who-ines {
+  border-color: var(--cyan);
+}
+.dialogue.who-bradley {
+  border-color: var(--magenta);
+}
+.dialogue.who-comply {
+  border-color: var(--violet);
+}
+.dialogue .portrait {
+  border: 2px solid #000;
+  background: var(--bg-2);
+  flex: none;
+}
+.dlg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dlg-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--amber);
+}
+.dlg-text {
+  font-size: 17px;
+  line-height: 1.35;
+  min-height: 44px;
+}
+
+/* ---------- clients ---------- */
+.client-card {
+  border: 2px dashed var(--violet);
+  padding: 4px 6px;
+  font-size: 13px;
+  background: rgba(157, 107, 255, 0.06);
+}
+.client-card.filled {
+  border-style: solid;
+  border-color: var(--up);
+}
+.client-name {
+  font-size: 14px;
+  color: var(--violet);
+}
+.client-ask {
+  color: var(--text-dim);
+}
+.client-checks {
+  list-style: none;
+  margin: 3px 0 0;
+  padding: 0;
+  font-size: 14px;
+}
+.client-checks .pass {
+  color: var(--up);
+}
+.client-checks .fail {
+  color: var(--text-faint);
+}

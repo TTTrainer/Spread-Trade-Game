@@ -31,6 +31,7 @@ import { Kbd, Meter, TiltCard } from '../components/ui';
 import { MiniChart } from '../components/MiniChart';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
+import { checkAchievements } from '../achievements';
 import './screens.css';
 import './drills.css';
 
@@ -189,23 +190,25 @@ function DrillSession({
     const all = [...results];
     const s = summarize(all);
     if (hasBridge())
-      void bridge().invoke('user.recordDrill', {
-        id: `drill-${Date.now()}`,
-        kind: mode,
-        at: new Date().toISOString(),
-        score: s.avgScore,
-        detail: {
-          summary: s,
-          results: all.map((r) => ({
-            kind: r.kind,
-            score: r.score,
-            correct: r.correct,
-            regime: r.detail.regime ?? null,
-            brier: r.brier ?? null,
-            confidence: r.detail.confidence ?? null,
-          })),
-        },
-      });
+      void bridge()
+        .invoke('user.recordDrill', {
+          id: `drill-${Date.now()}`,
+          kind: mode,
+          at: new Date().toISOString(),
+          score: s.avgScore,
+          detail: {
+            summary: s,
+            results: all.map((r) => ({
+              kind: r.kind,
+              score: r.score,
+              correct: r.correct,
+              regime: r.detail.regime ?? null,
+              brier: r.brier ?? null,
+              confidence: r.detail.confidence ?? null,
+            })),
+          },
+        })
+        .then(() => checkAchievements());
     sfx('win');
   }, [done]);
 

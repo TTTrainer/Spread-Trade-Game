@@ -124,4 +124,47 @@ describe('trading session', () => {
     });
     expect(r2?.reason).toMatch(/at most 10 contracts/);
   });
+
+  it('headlines appear on the day an earnings reaction happens, not before', async () => {
+    const w =
+      src.allWindows().find((x) => x.tags.hasEarnings && x.symbol === 'HLXR') ??
+      src.allWindows().find((x) => x.tags.hasEarnings)!;
+    const s = new TradingSession(
+      src,
+      defaultSessionConfig({ seed: 'news', blind: true, rescale: true, mode: 'run', riskCapPct: 1 }),
+    );
+    await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
+    await s.dispatch({ t: 'call', cardId: 'c1', bucket: 3, confidence: 0.6 });
+    const chain = s.chain('c1')!;
+    const exp =
+      expirationsOf(chain).filter((e) => Date.parse(e) - Date.parse(chain.date) >= 40 * 86400000)[0] ??
+      expirationsOf(chain).at(-1)!;
+    const r = await s.dispatch({
+      t: 'place',
+      cardId: 'c1',
+      structureId: 'long_straddle',
+      params: { expiration: exp, delta: 0.5, width: 0 },
+      qty: 1,
+      order: { type: 'market' },
+      earningsAck: true,
+    });
+    expect(r?.ok).toBe(true);
+    const seen: { day: string; text: string }[] = [];
+    let guard = 0;
+    while (!s.isDone() && guard++ < 60) {
+      await s.dispatch({ t: 'begin' });
+      for (const e of s.lastEvents)
+        if (e.kind === 'headline') seen.push({ day: s.view('c1').now, text: e.text });
+      for (const d of s.decisions.slice()) await s.dispatch({ t: 'decide', dpId: d.id, action: 'hold' });
+      await s.dispatch({ t: 'end' });
+    }
+    const reaction = s
+      .view('c1')
+      .earnings()
+      .past.map((e) => e.reactionDate);
+    const ern = seen.filter((h) => reaction.includes(h.day));
+    expect(ern.length).toBeGreaterThan(0);
+    for (const h of seen) expect(h.text).not.toContain(w.symbol);
+    expect(ern[0].text).toContain(s.card('c1').displaySymbol);
+  });
 });

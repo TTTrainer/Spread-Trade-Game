@@ -20,7 +20,8 @@ export type Screen =
   | 'daily'
   | 'live'
   | 'contracts'
-  | 'tutorial';
+  | 'tutorial'
+  | 'achievements';
 
 export interface Toast {
   id: number;

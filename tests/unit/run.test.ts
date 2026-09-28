@@ -5,9 +5,9 @@ import { DESKS } from '../../src/content/desks';
 import { emptyFamilies, familyPassives } from '../../src/content/families';
 import { ANALYSTS } from '../../src/content/analysts';
 import { REVIEWS, QUARTER_REVIEWS } from '../../src/content/reviews';
-import type { TradeFacts } from '../../src/content/types';
 import { computeTarget, initialState } from '../../src/engine/run/engine';
-import { scoreSteps, type PipelineInput } from '../../src/engine/run/score';
+import { scoreSteps } from '../../src/engine/run/score';
+import { cfg, facts, pipe } from './fixtures';
 import {
   cartridgePool,
   cartridgePrice,
@@ -19,132 +19,9 @@ import {
 } from '../../src/engine/run/shop';
 import { dealWindows } from '../../src/engine/run/deal';
 import { baseRate, skew25, termStructure } from '../../src/engine/run/analystTools';
-import type { RunConfig } from '../../src/engine/run/types';
 import { runScore } from '../../src/engine/scoring/mult';
 import { Rng } from '../../src/engine/rng';
-import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
 import type { WindowDef } from '../../src/engine/market/types';
-
-const cfg: RunConfig = {
-  seed: 'u',
-  deskId: 'verticals',
-  mode: 'career',
-  tier: 0,
-  startEquityCents: 500_000,
-  pureMarket: false,
-  realism: { ...DEFAULT_REALISM },
-  pause: defaultPause(),
-  callMode: 'em',
-  rescale: true,
-  quarters: 4,
-  benchmark: null,
-  startingStress: 0,
-  extraRerolls: 0,
-  practice: false,
-};
-
-function facts(over: Partial<TradeFacts> = {}): TradeFacts {
-  return {
-    positionId: 'p1',
-    cardId: 'c1',
-    structureId: 'bull_put',
-    family: 'vertical',
-    bias: 'bull',
-    win: true,
-    realizedCents: 10_000, // +2% of $5,000 = 200 chips
-    riskPct: 0.05,
-    shortPremium: true,
-    credit: true,
-    creditOfWidth: 0.34,
-    pctOfMaxProfit: 0.6,
-    closedAtPlan: null,
-    exitReason: 'manual',
-    expiredWorthless: false,
-    dteAtEntry: 30,
-    dteAtClose: 15,
-    daysOpen: 10,
-    daysInProfit: 6,
-    heldOverWeekend: true,
-    ivrAtEntry: 40,
-    ivChangePct: -0.1,
-    ivMinusHvAtEntry: 2,
-    heldThroughEarnings: false,
-    moveVsEm: 0.3,
-    stayedInsideEm: true,
-    rsiAtEntry: 50,
-    shortOutsideBollinger: false,
-    macdCrossWithin2: false,
-    trendAligned: true,
-    counterTrend: false,
-    against5dTrend: false,
-    callExact: false,
-    callAdjacent: false,
-    callDirectionRight: false,
-    callBucket: 3,
-    callActual: 2,
-    callBigBucket: false,
-    callFlat: false,
-    rollsForCredit: 0,
-    closedDayAfterMacro: false,
-    eventDayWin: false,
-    assigned: false,
-    cspAssigned: false,
-    coveredCallDividend: false,
-    coveredCallExpiredOtm: false,
-    pinnedFly: false,
-    straddleBeatEm: false,
-    condorOutsideEm: false,
-    gappedThroughShort: false,
-    earningsMoveRatio: null,
-    highIv: false,
-    portfolioDeltaAtClose: 0,
-    frontIvAboveBack: null,
-    isDoubleCalendar: false,
-    diagonalWithTrend: false,
-    thetaChips: 0,
-    callBonus: 0,
-    stopDeclined: false,
-    lossWithinStop: false,
-    dividendsCollected: 0,
-    longPremiumThroughEvent: false,
-    debitDirectional: false,
-    ivCrushWin: false,
-    straddlesBefore: 0,
-    isStraddle: false,
-    shortDte: 15,
-    ...over,
-  };
-}
-
-function pipe(over: Partial<PipelineInput> = {}): PipelineInput {
-  return {
-    facts: facts(),
-    deskId: 'verticals',
-    level: 1,
-    goodRR: false,
-    edgeTier: null,
-    reviewId: null,
-    families: emptyFamilies(),
-    cartridges: [],
-    cartState: {},
-    run: {
-      quarter: 1,
-      roundIndex: 0,
-      reviewId: null,
-      deskId: 'verticals',
-      families: emptyFamilies(),
-      ownedCartridges: [],
-      patienceStacks: 0,
-      rollArtistStacks: 0,
-      deltaNeutralOk: true,
-      gapInsuranceUsed: false,
-      ghostScore: 100,
-    },
-    doubleDown: false,
-    hedge: false,
-    ...over,
-  };
-}
 
 describe('round targets', () => {
   it('follows 150/250/400, x1.6 a quarter, Annual x1.25, tiers', () => {
@@ -447,5 +324,30 @@ describe('analyst tools', () => {
     const ts = termStructure(chain);
     expect(ts[0].iv).toBeGreaterThan(ts[1].iv);
     expect(skew25(chain, '2024-01-19')?.richer).toBe('puts');
+  });
+});
+
+describe('reachability', () => {
+  it('every cartridge, analyst, memo, Playbook Page and voucher can show up in a shop', async () => {
+    const { ANALYST_IDS } = await import('../../src/content/analysts');
+    const { MEMO_IDS, VOUCHER_IDS } = await import('../../src/content/items');
+    const seen = new Set<string>();
+    for (const deskId of ['verticals', 'income', 'condor', 'volatility', 'calendar'] as const) {
+      const base = initialState({ ...cfg, deskId });
+      for (const owned of [[], ['theta_engine', 'fifty_percent_club']]) {
+        const st = { ...base, cartridges: owned };
+        const rng = new Rng(`reach-${deskId}-${owned.length}`);
+        for (let i = 0; i < 1500; i++)
+          for (const it of generateShop(st, rng, { priceMult: 1, cartridgeOffers: 2, analystOffers: 1 }))
+            seen.add(`${it.kind}:${it.id}`);
+      }
+      for (const c of DESKS[deskId].startingCartridges) seen.add(`cartridge:${c}`);
+    }
+    for (const c of CARTRIDGES) expect(seen.has(`cartridge:${c.id}`), c.id).toBe(true);
+    for (const a of ANALYST_IDS) expect(seen.has(`analyst:${a}`), a).toBe(true);
+    for (const m of MEMO_IDS) expect(seen.has(`memo:${m}`), m).toBe(true);
+    for (const v of VOUCHER_IDS) expect(seen.has(`voucher:${v}`), v).toBe(true);
+    for (const d of Object.values(DESKS))
+      for (const s of d.structures) expect(seen.has(`page:${s}`), s).toBe(true);
   });
 });

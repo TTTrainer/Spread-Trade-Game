@@ -337,6 +337,13 @@ export function StatsScreen() {
             ))}
           </div>
           <button
+            className="pixel-btn"
+            onClick={() => useApp.getState().go('achievements')}
+            data-testid="open-achievements"
+          >
+            ACHIEVEMENTS
+          </button>
+          <button
             className="pixel-btn primary"
             onClick={() => void exportCsv()}
             disabled={rows.length === 0}

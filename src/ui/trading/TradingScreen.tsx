@@ -9,6 +9,7 @@ import { useApp } from '../store/app';
 import { useTrading, type Panel, type StudyId } from '../store/trading';
 import { BUCKET_NAMES, CONFIDENCES } from '../../engine/scoring/calls';
 import { ChartPanel } from './ChartPanel';
+import { NewsTicker } from './NewsTicker';
 import { CallCards, ExpiryChips, OrderTicket, SizeControls, StructureCards } from './BuilderTray';
 import {
   AnalyzePanel,
@@ -300,6 +301,7 @@ export function TradingLayout({
       </div>
       <div className="t-center">
         <ChartPanel />
+        <NewsTicker />
       </div>
       <div className="t-right panel">
         <PayoffChart />

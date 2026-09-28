@@ -15,6 +15,8 @@ import {
   termStructure,
 } from '../../engine/run/analystTools';
 import { ROUND_NAMES, type RunEngine } from '../../engine/run/engine';
+import { clientChecks } from '../../engine/run/clients';
+import { CLIENT_BY_ID } from '../../content/clients';
 import { previewScore } from '../../engine/run/preview';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
@@ -295,6 +297,51 @@ export function careerBadges(
   };
 }
 
+function ClientCard({ e }: { e: RunEngine }) {
+  const plan = useTrading((s) => s.plan)();
+  const builder = useTrading((s) => s.builder);
+  useTrading((s) => s.version);
+  const c = e.state.round.client;
+  if (!c) return null;
+  const def = CLIENT_BY_ID[c.id];
+  const facts =
+    plan?.ok && plan.entry
+      ? {
+          structureId: builder.structureId,
+          maxLossCents: plan.entry.maxLossCents,
+          pop: plan.entry.pop,
+          dte: plan.entry.dte,
+          credit: (plan.mid ?? 0) < 0,
+          rewardToRisk: plan.entry.rewardToRisk,
+          edgeTier: plan.entry.edgeTier,
+        }
+      : null;
+  const checks = clientChecks(def.request, facts, e.state.round.startEquityCents);
+  return (
+    <div className={`client-card ${c.status}`} data-testid="client-card" title={def.persona}>
+      <div className="section-title">
+        Client{' '}
+        {c.status === 'filled' ? (
+          <span className="chip good">FILLED</span>
+        ) : (
+          <span className="chip">+${def.cash}</span>
+        )}
+      </div>
+      <b className="client-name">{def.name}</b>
+      <div className="client-ask">{def.ask}</div>
+      {c.status === 'open' && (
+        <ul className="client-checks num">
+          {checks.map((k) => (
+            <li key={k.label} className={k.pass ? 'pass' : 'fail'}>
+              {k.pass ? '✔' : '✘'} {k.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function RunLeftExtra({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   useRun((s) => s.version);
@@ -361,6 +408,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
           </div>
         )}
       </div>
+      <ClientCard e={e} />
       {st.memos.length > 0 && (
         <div className="memo-list">
           <div className="section-title">Memos</div>

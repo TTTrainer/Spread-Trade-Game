@@ -31,6 +31,8 @@ export interface ScoreStep {
   op: 'chips' | 'add' | 'mul' | 'chipsMul' | 'meter';
   value: number;
   tag?: 'REAL' | 'ARCADE';
+  /** Which cartridge produced it (for trigger counts). */
+  source?: string;
 }
 
 export interface TraceRow {

@@ -8,6 +8,7 @@ import type {
 } from '../../engine/trading/session';
 import type { TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
+import { computeFacts } from '../../engine/run/facts';
 import { STRUCTURES, expirationsOf, reverseOf } from '../../engine/strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../../engine/strategies/types';
 import type { Bucket } from '../../engine/scoring/calls';
@@ -17,6 +18,7 @@ import { diffDays } from '../../engine/calendar';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
 import { useApp } from './app';
+import { checkAchievements } from '../achievements';
 import type { TradeRow } from '../../shared/userData';
 
 export interface BuilderState {
@@ -46,6 +48,8 @@ export interface FeedItem {
   text: string;
   tone: 'info' | 'good' | 'bad' | 'warn';
   day: number;
+  kind: SessionEvent['kind'];
+  cardId: string;
 }
 
 export interface Drawing {
@@ -166,6 +170,7 @@ export function tradeRow(
   if (!pos) return null;
   const card = s.card(d.cardId);
   const w = s.window(d.cardId);
+  const facts = computeFacts(s, pos, { thetaChips: 0, straddlesBefore: 0, portfolioDelta: 0 });
   return {
     id: `${s.config.seed}:${d.positionId}`,
     mode,
@@ -203,6 +208,9 @@ export function tradeRow(
       dte: pos.entry.dte,
       riskPct: pos.entry.riskPct,
       process: d.grade.score,
+      pctMax: facts.pctOfMaxProfit,
+      ivCrushWin: facts.ivCrushWin,
+      closedAtPlan: facts.closedAtPlan,
     },
   };
 }
@@ -248,7 +256,7 @@ export const useTrading = create<TradingState>((set, get) => {
                 ? 'good'
                 : 'bad'
               : 'info';
-      items.push({ id: ++feedId, text: e.text, tone, day });
+      items.push({ id: ++feedId, text: e.text, tone, day, kind: e.kind, cardId: e.cardId });
       switch (e.kind) {
         case 'fill':
           sfx('stamp');
@@ -256,6 +264,9 @@ export const useTrading = create<TradingState>((set, get) => {
           break;
         case 'rest':
           sfx('click');
+          break;
+        case 'headline':
+          sfx('reveal', 1.2);
           break;
         case 'reject':
           sfx('error');
@@ -302,6 +313,7 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     }
     set({ debriefs, version: get().version + 1 });
+    void checkAchievements();
     get().onSessionEnd?.();
     return true;
   };

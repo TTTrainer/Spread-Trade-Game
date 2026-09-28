@@ -90,7 +90,9 @@ export function scoreSteps(i: PipelineInput): ScoreStep[] {
   for (const id of i.cartridges) {
     const c = CARTRIDGE_BY_ID[id];
     if (!c?.score) continue;
-    steps.push(...c.score({ facts: f, run: i.run, state: i.cartState[id] ?? {} }));
+    steps.push(
+      ...c.score({ facts: f, run: i.run, state: i.cartState[id] ?? {} }).map((s) => ({ ...s, source: id })),
+    );
   }
 
   // 5. Memos.

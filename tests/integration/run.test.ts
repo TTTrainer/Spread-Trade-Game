@@ -254,4 +254,14 @@ describe('career run loop', () => {
     const winners = a.state.round.tallies.filter((t) => t.winner).length;
     if (winners > 0) expect(b.state.round.meter).toBeGreaterThan(a.state.round.meter);
   }, 60_000);
+
+  it('every desk plays a full practice year with its own playbook', async () => {
+    for (const deskId of ['verticals', 'income', 'condor', 'volatility', 'calendar'] as const) {
+      const e = await RunEngine.create(src, config({ seed: `desk-${deskId}`, deskId, practice: true }));
+      const result = await playRun(e, { kind: 'disciplined' }, 400);
+      expect(result, deskId).not.toBeNull();
+      expect(e.state.history.length, deskId).toBe(12);
+      expect(e.state.totals.trades, deskId).toBeGreaterThan(5);
+    }
+  }, 240_000);
 });

@@ -101,6 +101,11 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('round-meter')).toContainText('0 / 150');
+  // Director Kessler (or a colleague) greets the new run.
+  await expect(page.getByTestId('dialogue')).toBeVisible();
+  await expect(page.getByTestId('dialogue').locator('canvas')).toBeVisible();
+  await page.waitForTimeout(1500);
+  await shot(page, '07-dialogue-1920');
   const before = await runState(page);
   expect(before?.round.cards.length).toBe(3);
   // Rerolling swaps every untraded card.
@@ -245,5 +250,10 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   // The finished run leaves no save behind and its trades reach Stats.
   await page.getByRole('button', { name: 'STATS' }).click();
   await expect(page.getByTestId('stats-screen')).toBeVisible();
+  await page.getByTestId('open-achievements').click();
+  await expect(page.getByTestId('achievements-screen')).toBeVisible();
+  await expect(page.getByTestId('ach-first_blood')).toBeVisible();
+  await page.waitForTimeout(500);
+  await shot(page, '07-achievements-1920');
   await app.close();
 });

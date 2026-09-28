@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 7 (all the content: characters, headlines, achievements, the other desks' flows) is next.
+**Current phase:** Phase 8 (the balance simulator and tuning) is next.
 
 ## How to run (on your PC)
 
@@ -12,6 +12,16 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 7: Content
+- **Characters:** Director Kessler (Head of Desk), Ines Ortiz (mentor, ex-market-maker), Bradley Stroud IV (rival) and COMPLY-3000 (AI compliance). Each has a 64×64 pixel portrait drawn in code with four expressions (neutral, pleased, angry, worried).
+- **174 lines of dialogue**, dark and dry, triggered by what happens: run start, round start, Review intro, big wins and losses, declining a stop, closing at plan, skipping, high stress, burnout, hitting or missing a target, crossing the Max-Loss Line, the shop, victory, "why didn't you just buy SPY", defeat, Rival's Bet, the Golden Parachute, and Endless (Phase 9). Only the most important line of each moment is spoken, it types out in a box with the portrait, and it never blocks a click.
+- **Headlines:** 208 templates (8+ for every event type × size × direction): earnings reactions (inside, beyond, or blowing through the implied move), unscheduled gaps, ex-dividend days, FOMC and CPI days, VIX spikes. They're filled from the real event data on the day it happens (never before) and slide in over the chart. Blind mode uses the codename; open mode about real companies uses plain facts only. Everything goes through a `HeadlineProvider`, so a live writer can replace the library later.
+- **Clients:** 14 satirical clients (a treasury bot, a dentist with a spreadsheet, a pension fund for bus drivers, Crypto Kyle…). About 1 round in 3 one asks for a specific trade (direction, max loss in dollars, POP, days to expiration, structure, reward/risk, Edge Rank). The card shows a live ✔/✘ checklist against what's on the builder; filling it pays cash and reputation, missing it costs reputation. (The Contracts board mode comes in Phase 9.)
+- **47 achievements** (50 spreads closed at 50%+, 10 IV crushes, 25 planned stops, calibration A over 100 calls, beat SPY in 5 runs, win on every desk, Tier 8, Pin Master, complete the wheel…), computed from the real ledger, finished runs and drills, with an Achievements screen (from Stats or Career). A few depend on Phase 9 modes. Practice runs don't count.
+- **Every desk plays:** Income (cash-secured puts and covered calls, now dealt on affordable $6–$18 stocks), Condor, Volatility and Calendar all run full years through the engine and the bots. They unlock with Bonus in Phase 9.
+- **Every item is reachable:** a test generates thousands of shops across all desks and confirms every cartridge, analyst, memo, Playbook Page and voucher can appear.
+- Tests: 258 unit/integration tests, including one per cartridge (triggers when it should, stays quiet otherwise), every memo, voucher, tag and Review against the engine, client fills, headline timing, dialogue and portrait checks, achievements. E2E adds the run-start dialogue and the Achievements screen; screenshots reviewed.
 
 ### Phase 6: The Career run loop
 - **Career menu:** pick a desk (Verticals is open; the other four show their Bonus price and unlock in Phase 9), an optional seed, and START RUN. A run in progress shows up with CONTINUE and ABANDON (with a no-undo warning).
@@ -121,7 +131,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 ## Known issues
 
 - **Balance is untuned.** The simple disciplined bot clears only a few rounds a year right now, so targets, payouts and cartridge strengths will move in Phase 8 (the simulator), not by feel.
-- The other four desks exist as content (structures, passives, cartridges) but stay locked until Phase 9's Bonus unlocks; their special flows (the wheel, condor management) get their E2E coverage then.
+- The other four desks play fully in the engine but stay locked until Phase 9's Bonus unlocks. Early balance numbers vary a lot by desk (condors clear most rounds, income very few), which Phase 8 fixes.
 - The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
 
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
@@ -130,4 +140,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 7: content. Characters (Director Kessler, Ines Ortiz, Bradley Stroud IV, COMPLY-3000) with 150+ lines and pixel portraits, headline template libraries for real events, clients, achievements, per-cartridge tests, and making every item reachable in play.
+Phase 8: the balance simulator (`npm run sim`) with the Disciplined Seller, Hold-to-Expiry, Random and Greedy bots, tuned until skill clearly beats luck (section 17 targets), with `sim/REPORT.md`.

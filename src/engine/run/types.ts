@@ -11,6 +11,7 @@ import type { Grade } from '../scoring/calls';
 import type { StructureId } from '../strategies/types';
 import type { SessionAction } from '../trading/session';
 import type { TradeDebrief } from '../trading/debrief';
+import type { Line } from '../../content/characters';
 
 export type RunPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'victory' | 'defeat';
 
@@ -104,6 +105,7 @@ export interface RoundState {
   taxCents: number;
   filterRelaxed: boolean;
   scored: string[]; // position ids already tallied
+  client: { id: string; status: 'open' | 'filled' | 'missed' } | null;
 }
 
 export type ShopItem =
@@ -190,6 +192,32 @@ export interface RunState {
   usedWindows: number[];
   result: RunResult | null;
   startedAt: string;
+  reputation: number;
+  /** Counters for achievements and the end screen. */
+  stats: RunStats;
+}
+
+export interface RunStats {
+  cartTriggers: Record<string, number>;
+  maxStress: number;
+  stopDeclines: number;
+  burnouts: number;
+  skips: number;
+  reviewsPassed: string[];
+  maxMult: number;
+  maxPoints: number;
+  maxCartridges: number;
+  maxAnalysts: number;
+  ladderBest: number;
+  clientsFilled: number;
+  wheel: number;
+  cspAssigned: boolean;
+  ivCrushWins: number;
+  closes50: number;
+  plannedStops: number;
+  edgeTop10: number;
+  duoOwned: boolean;
+  parachuteSaves: number;
 }
 
 export type RunAction =
@@ -209,9 +237,11 @@ export type RunAction =
   | { t: 'forfeit' };
 
 export interface RunEvent {
-  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase';
+  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say';
   text: string;
   points?: number;
+  /** For 'say': who speaks and how they look. */
+  line?: Line;
 }
 
 export interface RunSave {

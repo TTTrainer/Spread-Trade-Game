@@ -119,6 +119,9 @@ export function CareerScreen() {
         >
           {busy ? 'DEALING…' : 'START RUN ▶'}
         </button>
+        <button className="pixel-btn" onClick={() => go('achievements')} data-testid="career-achievements">
+          ACHIEVEMENTS
+        </button>
         <button className="pixel-btn" onClick={back}>
           BACK
         </button>

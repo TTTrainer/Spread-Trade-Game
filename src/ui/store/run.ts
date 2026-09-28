@@ -3,6 +3,7 @@ import { RunEngine } from '../../engine/run/engine';
 import type { RunAction, RunConfig, RunEvent, RunSave } from '../../engine/run/types';
 import type { SessionAction, PlaceResult, SessionEvent } from '../../engine/trading/session';
 import type { DeskId } from '../../content/types';
+import type { Line } from '../../content/characters';
 import { DESKS } from '../../content/desks';
 import type { MarketDataSource } from '../../engine/market/source';
 import { sfx } from '../../audio/sfx';
@@ -10,6 +11,7 @@ import { bridge, hasBridge } from '../bridge';
 import { ipcSource } from '../data/ipcSource';
 import { useApp } from './app';
 import { tradeRow, useTrading, type StudyId } from './trading';
+import { checkAchievements } from '../achievements';
 
 export const CAREER_SLOT = 'career';
 const CHARTIST_STUDIES: StudyId[] = [
@@ -51,6 +53,9 @@ interface RunStore {
   /** Sector and size per real symbol (the Scout and the Lens memo reveal them). */
   sectors: Record<string, string>;
   loadSectors: () => Promise<void>;
+  /** The line currently on screen (n changes each time so repeats still animate). */
+  speech: { line: Line; n: number } | null;
+  clearSpeech: () => void;
   checkSave: () => Promise<void>;
   newRun: (opts: { deskId: DeskId; seed?: string; tier?: number; practice?: boolean }) => Promise<boolean>;
   resume: () => Promise<boolean>;
@@ -157,6 +162,8 @@ export const useRun = create<RunStore>((set, get) => {
     const e = get().engine;
     if (!e) return;
     toastEvents(e.events);
+    const said = e.events.filter((x) => x.kind === 'say' && x.line).at(-1);
+    if (said?.line) set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
     const pts = e.events.filter((x) => x.kind === 'score');
     if (pts.length)
       set({
@@ -172,7 +179,7 @@ export const useRun = create<RunStore>((set, get) => {
       const r = e.state.result;
       await bridge().invoke('user.recordRun', {
         id: e.state.id,
-        mode: e.state.config.mode,
+        mode: e.state.config.practice ? 'practice' : e.state.config.mode,
         desk: e.state.config.deskId,
         seed: e.state.config.seed,
         tier: e.state.config.tier,
@@ -190,10 +197,13 @@ export const useRun = create<RunStore>((set, get) => {
           realizedCents: r.realizedCents,
           roundsCleared: r.roundsCleared,
           history: e.state.history,
+          stats: e.state.stats,
+          reputation: e.state.reputation,
         },
       });
     }
     await persist(e);
+    if (e.over || e.state.phase === 'tally') void checkAchievements();
     set({ version: get().version + 1, saveSummary: e.over ? null : summaryOf(e) });
   };
 
@@ -223,6 +233,8 @@ export const useRun = create<RunStore>((set, get) => {
     saveSummary: null,
     lastPoints: null,
     sectors: {},
+    speech: null,
+    clearSpeech: () => set({ speech: null }),
     loadSectors: async () => {
       if (Object.keys(get().sectors).length || !hasBridge()) return;
       const syms = await src().symbols();
@@ -261,6 +273,8 @@ export const useRun = create<RunStore>((set, get) => {
         const e = await RunEngine.create(src(), config, new Date().toISOString());
         set({ engine: e, lastPoints: null });
         attach(e);
+        const hello = e.events.find((x) => x.kind === 'say' && x.line);
+        if (hello?.line) set({ speech: { line: hello.line, n: (get().speech?.n ?? 0) + 1 } });
         await persist(e);
         set({ version: get().version + 1, saveSummary: summaryOf(e) });
         return true;

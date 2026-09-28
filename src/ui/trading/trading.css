@@ -875,3 +875,29 @@
     font-size: 17px;
   }
 }
+
+/* headlines */
+.news-ticker {
+  position: absolute;
+  left: 8px;
+  top: 28px;
+  right: 200px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+.news-item {
+  align-self: flex-start;
+  max-width: 100%;
+  background: rgba(7, 5, 26, 0.9);
+  border-left: 3px solid var(--amber);
+  padding: 2px 8px;
+  font-size: 17px;
+  color: var(--text);
+}
+.news-tag {
+  color: var(--amber);
+  margin-right: 4px;
+}

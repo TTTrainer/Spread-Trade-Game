@@ -45,6 +45,14 @@ import type {
 } from '../lifecycle/types';
 import type { Bucket, Call } from '../scoring/calls';
 import { dayBook } from './book';
+import {
+  earningsMagnitude,
+  macroMagnitude,
+  pctText,
+  templateHeadlines,
+  type HeadlineEvent,
+  type HeadlineProvider,
+} from '../../content/headlines';
 import { planTrade, type TradePlan } from './plan';
 
 export interface SessionConfig {
@@ -200,6 +208,8 @@ export class TradingSession {
   private books = new Map<string, DayBook>();
   private windows = new Map<string, WindowDef>();
   private counter = 0;
+  /** Swappable, so a live writer can replace the template library later. */
+  headlines: HeadlineProvider = templateHeadlines;
   private readonly source: MarketDataSource;
   private readonly rng: Rng;
 
@@ -742,6 +752,9 @@ export class TradingSession {
           cardId,
           text: `${this.card(cardId).displaySymbol} gapped ${book.open > (view.bars().at(-2)?.close ?? book.open) ? 'up' : 'down'} hard at the open.`,
         });
+      if (moved)
+        for (const h of this.headlinesFor(cardId, book))
+          this.lastEvents.push({ kind: 'headline', cardId, text: h });
       this.contexts.set(cardId, this.buildCtx(view));
       // Resting limits fill only if today's market crosses them.
       for (const o of this.orders.filter((x) => x.cardId === cardId)) {
@@ -772,6 +785,89 @@ export class TradingSession {
         this.decisions.push(...r.decisions);
       }
     }
+  }
+
+  /**
+   * Headlines for what happened on this card today, from its own visible data: an earnings
+   * reaction, an unscheduled gap, an ex-dividend date, an FOMC or CPI day, or a VIX spike.
+   * Outcomes only appear on the day they happen.
+   */
+  private headlinesFor(cardId: string, book: DayBook): string[] {
+    const view = this.view(cardId);
+    const card = this.card(cardId);
+    const now = view.now;
+    const bars = view.bars();
+    const last = bars[bars.length - 1];
+    const prev = bars[bars.length - 2];
+    if (!last || !prev) return [];
+    const dayMove = last.close / prev.close - 1;
+    const dir = dayMove >= 0 ? 'up' : 'down';
+    const synthetic = last.source === 'synthetic';
+    const mode = this.config.blind || synthetic ? 'blind' : 'open';
+    const base = {
+      sym: card.displaySymbol,
+      move: pctText(dayMove),
+      absmove: pctText(Math.abs(dayMove), false),
+    };
+    const out: HeadlineEvent[] = [];
+    const ern = view.earnings().past.find((e) => e.reactionDate === now);
+    if (ern) {
+      const mv = ern.movePct ?? dayMove * 100;
+      const implied = ern.impliedMovePct;
+      out.push({
+        kind: 'earnings',
+        magnitude: earningsMagnitude(mv, implied),
+        direction: mv >= 0 ? 'up' : 'down',
+        vars: {
+          ...base,
+          move: pctText(mv / 100),
+          absmove: pctText(Math.abs(mv) / 100, false),
+          implied: implied ? `±${implied.toFixed(1)}%` : 'an unknown amount',
+          ratio: implied ? `${(Math.abs(mv) / implied).toFixed(1)}x` : 'several times',
+        },
+      });
+    } else if (book.gapDay && book.atr) {
+      const g = Math.abs(last.open - prev.close) / book.atr;
+      out.push({
+        kind: 'gap',
+        magnitude: g > 3 ? 'huge' : 'big',
+        direction: last.open >= prev.close ? 'up' : 'down',
+        vars: { ...base, gap: g.toFixed(1) },
+      });
+    }
+    if (book.exDivToday && book.spot > 0) {
+      const y = book.exDivToday.amount / book.spot;
+      out.push({
+        kind: 'exdiv',
+        magnitude: y > 0.01 ? 'rich' : 'regular',
+        direction: 'none',
+        vars: { ...base, yield: pctText(y, false) },
+      });
+    }
+    const macro = view.macro().find((m) => m.date === now);
+    if (macro)
+      out.push({
+        kind: macro.kind === 'FOMC' ? 'fomc' : 'cpi',
+        magnitude: macroMagnitude(dayMove),
+        direction: dir,
+        vars: { ...base, event: macro.kind },
+      });
+    const vix = view.vix();
+    if (vix.length > 7) {
+      const v = vix[vix.length - 1].close;
+      const chg = v / vix[vix.length - 6].close - 1;
+      const prevChg = vix[vix.length - 2].close / vix[vix.length - 7].close - 1;
+      if (chg >= 0.2 && prevChg < 0.2)
+        out.push({
+          kind: 'vix',
+          magnitude: v >= 35 ? 'panic' : 'spike',
+          direction: 'up',
+          vars: { ...base, vix: v.toFixed(1), vixchg: pctText(chg) },
+        });
+    }
+    return out.map((e, i) =>
+      this.headlines.headline(e, this.rng.fork(`news:${this.dayIndex}:${cardId}:${i}`), mode),
+    );
   }
 
   private restingQuote(o: RestingOrder, book: DayBook): { mid: number; natural: number } | null {

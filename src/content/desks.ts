@@ -27,7 +27,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     startingAnalysts: [],
     startingCartridges: ['dividend_radar'],
     unlockCost: 100,
-    priceRange: [8, 40],
+    priceRange: [6, 18],
     passive: (f) =>
       f.win && f.dividendsCollected > 0
         ? [
