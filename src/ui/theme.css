@@ -1,0 +1,379 @@
+@font-face {
+  font-family: 'DotGothic16';
+  src: url('../../assets/fonts/dotgothic16-latin-400-normal.woff2') format('woff2');
+  font-display: block;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'DotGothic16';
+  src: url('../../assets/fonts/dotgothic16-latin-ext-400-normal.woff2') format('woff2');
+  font-display: block;
+  unicode-range:
+    U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'VT323';
+  src: url('../../assets/fonts/vt323-latin-400-normal.woff2') format('woff2');
+  font-display: block;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'VT323';
+  src: url('../../assets/fonts/vt323-latin-ext-400-normal.woff2') format('woff2');
+  font-display: block;
+  unicode-range:
+    U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* A deliberately small palette: indigo ground, three neons, two P/L colors. */
+:root {
+  --bg-0: #07051a;
+  --bg-1: #0e0a2b;
+  --bg-2: #171042;
+  --bg-3: #221a5c;
+  --line: #3b2f86;
+  --line-bright: #5b4bc4;
+  --text: #ece9ff;
+  --text-dim: #a49de0;
+  --text-faint: #6c64a8;
+  --cyan: #3ef2ff;
+  --magenta: #ff3ea5;
+  --amber: #ffbf3e;
+  --violet: #9d6bff;
+  --up: #4dff9a;
+  --down: #ff4f6d;
+  --flat: #c9c3ff;
+  --rar-common: #9aa4c7;
+  --rar-uncommon: #3ef2ff;
+  --rar-rare: #ff3ea5;
+  --rar-legendary: #ffbf3e;
+  --crt-intensity: 0.55;
+  --ui-scale: 1;
+  --font-display: 'DotGothic16', 'MS Gothic', monospace;
+  --font-mono: 'VT323', 'Consolas', monospace;
+  --glow-cyan: 0 0 6px rgba(62, 242, 255, 0.55), 0 0 18px rgba(62, 242, 255, 0.25);
+  --glow-magenta: 0 0 6px rgba(255, 62, 165, 0.6), 0 0 18px rgba(255, 62, 165, 0.25);
+  --glow-amber: 0 0 6px rgba(255, 191, 62, 0.6), 0 0 18px rgba(255, 191, 62, 0.25);
+}
+
+/* Colorblind-safe: blue/orange instead of green/red; glyphs stay regardless. */
+:root[data-palette='colorblind'] {
+  --up: #4fb2ff;
+  --down: #ff9d2e;
+}
+:root[data-theme='amber'] {
+  --cyan: #ffcc66;
+  --magenta: #ff8a3d;
+  --violet: #d9a05b;
+  --bg-0: #0d0700;
+  --bg-1: #1a0f02;
+  --bg-2: #261705;
+  --bg-3: #36210a;
+  --line: #6b4414;
+  --line-bright: #a86a22;
+  --text: #ffe6c2;
+  --text-dim: #d2a870;
+  --text-faint: #8a6a40;
+}
+:root[data-theme='phosphor'] {
+  --cyan: #6bff8f;
+  --magenta: #c6ff5e;
+  --violet: #3bd18a;
+  --bg-0: #010a04;
+  --bg-1: #03140a;
+  --bg-2: #062010;
+  --bg-3: #0a2e18;
+  --line: #145c30;
+  --line-bright: #1f8f4a;
+  --text: #d8ffe0;
+  --text-dim: #8fd6a2;
+  --text-faint: #4f8a60;
+}
+/* Unlocked at Heat 10: a magenta and teal "audit" terminal. */
+:root[data-theme='vapor'] {
+  --cyan: #5effd8;
+  --magenta: #ff5ecb;
+  --violet: #b98cff;
+  --amber: #ffd35e;
+  --bg-0: #0d0214;
+  --bg-1: #1a0626;
+  --bg-2: #260a38;
+  --bg-3: #34104a;
+  --line: #5e1f7a;
+  --line-bright: #9a38b8;
+  --text: #ffe8fb;
+  --text-dim: #d59ae0;
+  --text-faint: #8c5a9c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--ui-scale));
+  -webkit-font-smoothing: none;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.flat {
+  color: var(--flat);
+}
+
+/* Particles and celebrations (PixiJS), above the UI and under the CRT glass. */
+.fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8500;
+  pointer-events: none;
+}
+
+/* CRT: scanlines + vignette + faint flicker. Intensity comes from settings. */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  opacity: var(--crt-intensity);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.28) 0px,
+      rgba(0, 0, 0, 0.28) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
+  mix-blend-mode: multiply;
+}
+.crt-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(120, 90, 255, 0.03);
+  animation: crt-flicker 6s infinite steps(1);
+}
+@keyframes crt-flicker {
+  0%,
+  96%,
+  100% {
+    opacity: 0;
+  }
+  97% {
+    opacity: 1;
+  }
+  98% {
+    opacity: 0.3;
+  }
+}
+:root[data-reduced-motion='true'] .crt-overlay::after {
+  animation: none;
+}
+/* CRT styles (cosmetics). */
+:root[data-crt='clean'] .crt-overlay {
+  background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.45) 100%);
+}
+:root[data-crt='clean'] .crt-overlay::after {
+  display: none;
+}
+:root[data-crt='aperture'] .crt-overlay {
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 0, 60, 0.1) 0px,
+      rgba(255, 0, 60, 0.1) 1px,
+      rgba(0, 255, 120, 0.1) 1px,
+      rgba(0, 255, 120, 0.1) 2px,
+      rgba(40, 80, 255, 0.1) 2px,
+      rgba(40, 80, 255, 0.1) 3px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.18) 0px,
+      rgba(0, 0, 0, 0.18) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
+}
+:root[data-crt='rolling'] .crt-overlay::after {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 48%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 56%
+  );
+  background-size: 100% 300%;
+  animation: crt-roll 7s linear infinite;
+  opacity: 1;
+}
+@keyframes crt-roll {
+  from {
+    background-position: 0 100%;
+  }
+  to {
+    background-position: 0 -200%;
+  }
+}
+:root[data-reduced-motion='true'][data-crt='rolling'] .crt-overlay::after {
+  animation: none;
+}
+
+/* Card backs (cosmetics): used by lineup cards while they deal in, and in previews. */
+.cardback {
+  --cb-a: var(--bg-3);
+  --cb-b: var(--line-bright);
+  background: repeating-linear-gradient(45deg, var(--cb-a) 0 6px, var(--bg-2) 6px 12px), var(--bg-2);
+  border: 2px solid var(--cb-b);
+}
+.cardback-ines {
+  background: repeating-linear-gradient(to bottom, #f4efe0 0 9px, #9fb4ff 9px 10px), #f4efe0;
+  border-color: #c04040;
+}
+.cardback-circuit {
+  background:
+    linear-gradient(90deg, transparent 45%, #2de2a6 45% 55%, transparent 55%) 0 0 / 16px 16px,
+    linear-gradient(0deg, transparent 45%, #2de2a6 45% 55%, transparent 55%) 8px 8px / 16px 16px,
+    #06301e;
+  border-color: #2de2a6;
+}
+.cardback-redacted {
+  background: repeating-linear-gradient(to bottom, #111 0 5px, #e8e4d8 5px 8px), #e8e4d8;
+  border-color: #111;
+}
+.cardback-tape {
+  background:
+    repeating-linear-gradient(to right, #0a2010 0 3px, #062010 3px 5px),
+    repeating-linear-gradient(to bottom, transparent 0 10px, rgba(107, 255, 143, 0.5) 10px 11px), #031008;
+  border-color: #6bff8f;
+}
+.cardback-hazard {
+  background: repeating-linear-gradient(-45deg, #ffcf1a 0 8px, #141414 8px 16px);
+  border-color: #ffcf1a;
+}
+.cardback-gold {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.5), transparent 40%),
+    repeating-linear-gradient(135deg, #b88a1a 0 4px, #e8c15a 4px 8px);
+  border-color: #fff0b0;
+}
+
+/* Ordered-dither texture for panels: a 4x4 Bayer pattern drawn with gradients. */
+.dither {
+  background-image:
+    radial-gradient(rgba(157, 107, 255, 0.12) 1px, transparent 1px),
+    radial-gradient(rgba(62, 242, 255, 0.06) 1px, transparent 1px);
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-position:
+    0 0,
+    2px 2px;
+}
+
+.panel {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 2px solid var(--line);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.8);
+  image-rendering: pixelated;
+}
+
+.pixel-btn {
+  background: var(--bg-3);
+  border: 2px solid var(--line-bright);
+  color: var(--text);
+  padding: 0.45em 1em;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 0 #000;
+  transition:
+    transform 60ms ease-out,
+    box-shadow 60ms ease-out,
+    border-color 80ms;
+}
+.pixel-btn:hover,
+.pixel-btn:focus-visible {
+  border-color: var(--cyan);
+  outline: none;
+  box-shadow:
+    3px 3px 0 0 #000,
+    var(--glow-cyan);
+}
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 #000;
+}
+.pixel-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pixel-btn.primary {
+  border-color: var(--magenta);
+  background: #3a0f3a;
+}
+.pixel-btn.primary:hover {
+  box-shadow:
+    3px 3px 0 0 #000,
+    var(--glow-magenta);
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  border: 1px solid var(--line-bright);
+  padding: 0 0.3em;
+  color: var(--text-dim);
+  background: var(--bg-1);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-1);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 2px solid var(--bg-1);
+}
+
+input[type='range'],
+input[type='checkbox'] {
+  accent-color: var(--magenta);
+}

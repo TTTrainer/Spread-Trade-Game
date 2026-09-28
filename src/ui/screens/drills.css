@@ -1,0 +1,142 @@
+.drill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.drill-card {
+  padding: 14px 16px;
+  min-height: 150px;
+}
+.drill-card.mixed {
+  grid-row: span 2;
+  border-color: var(--magenta);
+}
+.drill-name {
+  font-size: 24px;
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+}
+.drill-blurb {
+  color: var(--text-dim);
+  margin: 6px 0;
+  font-size: 15px;
+}
+.drill-weights {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 16px;
+}
+.drill-session {
+  padding: 16px 30px;
+}
+.drill-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.drill-timer {
+  flex: 1;
+  max-width: 400px;
+}
+.drill-loading {
+  font-size: 24px;
+  color: var(--text-dim);
+  padding: 60px;
+}
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.q-prompt {
+  font-size: 18px;
+}
+.q-answers {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.call-card.big {
+  width: 110px;
+  padding: 8px;
+}
+.call-card.big .call-glyph {
+  font-size: 30px;
+}
+.call-card.big .call-name {
+  font-size: 15px;
+}
+.conf-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.conf-col .conf-btn {
+  padding: 0 10px;
+}
+.iv-slider {
+  width: 500px;
+}
+.iv-guess {
+  font-size: 36px;
+  color: var(--amber);
+  min-width: 90px;
+}
+.greeks-card {
+  display: flex;
+  gap: 30px;
+  font-size: 28px;
+  color: var(--cyan);
+}
+.choice {
+  font-size: 20px;
+  min-width: 180px;
+}
+.choice.right {
+  border-color: var(--up);
+  box-shadow: 0 0 12px rgba(77, 255, 154, 0.6);
+}
+.drill-result {
+  margin-top: 12px;
+  padding: 10px 16px;
+  font-size: 18px;
+}
+.drill-result.good {
+  border-color: var(--up);
+}
+.drill-result.bad {
+  border-color: var(--down);
+}
+.dr-head {
+  font-size: 24px;
+}
+.minichart .axis {
+  fill: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 16px 0;
+  font-size: 19px;
+}
+.sum-box {
+  padding: 12px 16px;
+}
+.big-num {
+  font-size: 64px;
+  color: var(--amber);
+  text-shadow: var(--glow-amber);
+}
+.calib .axis {
+  fill: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}

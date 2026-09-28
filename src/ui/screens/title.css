@@ -1,0 +1,137 @@
+.title-screen {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 120%, #2a0d4f 0%, var(--bg-0) 60%);
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  align-items: center;
+  padding: 0 8vw;
+}
+
+.synth-grid {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: -10%;
+  height: 55%;
+  background-image:
+    linear-gradient(to right, rgba(255, 62, 165, 0.55) 2px, transparent 2px),
+    linear-gradient(to bottom, rgba(255, 62, 165, 0.55) 2px, transparent 2px);
+  background-size: 64px 40px;
+  transform: perspective(420px) rotateX(62deg);
+  transform-origin: 50% 0;
+  animation: grid-scroll 2.4s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 35%);
+}
+@keyframes grid-scroll {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 40px;
+  }
+}
+:root[data-reduced-motion='true'] .synth-grid {
+  animation: none;
+}
+
+.title-sun {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 360px;
+  height: 360px;
+  margin-left: -180px;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(to bottom, var(--amber) 0 14px, transparent 14px 20px),
+    linear-gradient(to bottom, var(--amber), var(--magenta));
+  background-blend-mode: multiply;
+  mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  opacity: 0.35;
+  filter: blur(0.5px);
+}
+
+.title-block {
+  position: relative;
+  z-index: 2;
+}
+.title-kicker {
+  font-family: var(--font-mono);
+  color: var(--cyan);
+  font-size: 1.4rem;
+  letter-spacing: 0.3em;
+  text-shadow: var(--glow-cyan);
+}
+.title-logo {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  line-height: 1;
+  margin: 0.2em 0;
+  color: var(--text);
+  text-shadow:
+    4px 4px 0 var(--magenta),
+    8px 8px 0 #2a0b47,
+    0 0 30px rgba(255, 62, 165, 0.35);
+}
+.title-sub {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  color: var(--amber);
+  text-shadow: var(--glow-amber);
+}
+
+.title-menu {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  justify-self: end;
+  min-width: 18rem;
+}
+.title-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 1.7rem;
+  padding: 0.1rem 0.5rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.title-item .caret {
+  display: inline-block;
+  width: 1.4em;
+  color: var(--magenta);
+}
+.title-item.sel {
+  color: var(--text);
+  text-shadow: var(--glow-cyan);
+  background: linear-gradient(90deg, rgba(62, 242, 255, 0.12), transparent);
+}
+
+.title-foot {
+  position: absolute;
+  left: 1.5rem;
+  bottom: 1rem;
+  font-size: 1.2rem;
+  color: var(--text-faint);
+  z-index: 2;
+}
+.title-data {
+  color: var(--cyan);
+}
+
+/* Drifting candles on the horizon (PixiJS), between the sun and the grid. */
+.backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 26%;
+  height: 28%;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, transparent 0%, black 14%, black 58%, transparent 76%);
+}

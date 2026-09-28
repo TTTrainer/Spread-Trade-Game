@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+out/
+dist/
+release/
+coverage/
+
+# test output
+test-results/
+playwright-report/
+
+# market data: never commit
+data/*.db
+data/*.db-*
+data/cache/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+dolt/
+SpreadTradingGameData/
+
+# logs and OS cruft
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*

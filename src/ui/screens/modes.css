@@ -1,0 +1,120 @@
+/* Shared layout for the Daily, Contracts, Live and tutorial screens. */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.mode-card {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.big-line {
+  font-size: 30px;
+  color: var(--cyan);
+}
+.ghost-card {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+}
+.daily-done {
+  font-size: 20px;
+}
+.small {
+  font-size: 13px;
+}
+.up-text {
+  color: var(--up);
+}
+.down-text {
+  color: var(--down);
+}
+
+/* Contracts board */
+.contract-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.contract {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  min-height: 250px;
+}
+.contract.done {
+  opacity: 0.7;
+}
+.contract .client-name {
+  font-size: 19px;
+  color: var(--amber);
+}
+.contract .persona {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.contract .ask {
+  font-size: 16px;
+}
+.contract ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 17px;
+}
+.contract .foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Live */
+.live-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 16px;
+}
+.live-positions td,
+.live-positions th {
+  padding: 2px 8px;
+  text-align: left;
+}
+.coach {
+  position: fixed;
+  /* Over the chart's lower studies, clear of the lineup, the builder and the order buttons. */
+  left: 262px;
+  bottom: 262px;
+  width: 420px;
+  z-index: 800;
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 2px solid var(--amber);
+  box-shadow: var(--glow-amber);
+}
+.coach .coach-step {
+  color: var(--amber);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+.coach p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+@media (max-width: 1500px) {
+  .mode-grid,
+  .live-grid {
+    grid-template-columns: 1fr;
+  }
+  .coach {
+    width: 380px;
+    left: 222px;
+    bottom: 240px;
+  }
+}
