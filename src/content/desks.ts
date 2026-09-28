@@ -45,10 +45,12 @@ export const DESKS: Record<DeskId, DeskDef> = {
     name: 'Condor',
     blurb: 'Iron condors, iron flies and broken wings. Sell the range and defend it.',
     structures: ['iron_condor', 'iron_fly', 'bwb_condor'],
-    passiveText: 'Correct "flat" calls pay double call bonus.',
+    passiveText: 'Correct "flat" calls pay double call bonus. +1 ticket and +1 card every round.',
     startingAnalysts: [],
     startingCartridges: ['wing_clipper'],
     unlockCost: 150,
+    ticketsAdd: 1,
+    lineupAdd: 1,
     passive: (f) =>
       f.win && f.callFlat && f.callExact && f.callBonus > 0
         ? [{ label: 'Condor desk (flat call x2)', kind: 'desk', op: 'add', value: f.callBonus }]
@@ -59,10 +61,15 @@ export const DESKS: Record<DeskId, DeskDef> = {
     name: 'Volatility',
     blurb: 'Long straddles and strangles. Buy movement before the market prices it.',
     structures: ['long_straddle', 'long_strangle'],
-    passiveText: 'Earnings events show the implied move. Long premium held through an event: +50 chips.',
+    passiveText:
+      'Earnings events show the implied move. Long premium held through an event: +50 chips. +3 tickets and +2 cards every round.',
     startingAnalysts: ['earnings_whisperer'],
     startingCartridges: [],
     unlockCost: 200,
+    ticketsAdd: 3,
+    lineupAdd: 2,
+    priceRange: [10, 50],
+    brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
     passive: (f) =>
       f.win && f.longPremiumThroughEvent
         ? [{ label: 'Volatility desk (held through the event)', kind: 'desk', op: 'chips', value: 50 }]
@@ -73,10 +80,14 @@ export const DESKS: Record<DeskId, DeskDef> = {
     name: 'Calendar',
     blurb: 'Calendars, diagonals and double calendars. Trade time and the volatility term structure.',
     structures: ['calendar', 'diagonal', 'double_calendar'],
-    passiveText: 'The IV term-structure panel is always on.',
+    passiveText: 'The IV term-structure panel is always on. +1 ticket and +1 card every round.',
     startingAnalysts: [],
     startingCartridges: ['term_structure_tap'],
     unlockCost: 250,
+    ticketsAdd: 1,
+    lineupAdd: 1,
+    priceRange: [10, 60],
+    brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },
 };
 

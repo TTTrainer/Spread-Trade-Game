@@ -78,6 +78,13 @@ export function scoreSteps(i: PipelineInput): ScoreStep[] {
       op: 'mul',
       value: rule.debitDirectionalWinMult,
     });
+  if (!f.win && (f.noStop || f.stopDeclined))
+    steps.push({
+      label: f.stopDeclined ? 'Stop declined' : 'No stop',
+      kind: 'discipline',
+      op: 'meter',
+      value: s.undisciplinedLossMult,
+    });
   if (rule.counterTrendLossMult !== undefined && !f.win && f.counterTrend)
     steps.push({
       label: 'Trend Train: counter-trend loss',

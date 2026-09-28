@@ -511,7 +511,7 @@ export const useTrading = create<TradingState>((set, get) => {
         ? isCredit
           ? {
               targetPl: -plan.mid * builder.targetPct,
-              stopPl: -plan.mid * (builder.stopMult - 1),
+              stopPl: -plan.mid * builder.stopMult,
               targetPct: builder.targetPct,
               stopMult: builder.stopMult,
             }

@@ -83,6 +83,7 @@ export function facts(over: Partial<TradeFacts> = {}): TradeFacts {
     thetaChips: 0,
     callBonus: 0,
     stopDeclined: false,
+    noStop: false,
     lossWithinStop: false,
     dividendsCollected: 0,
     longPremiumThroughEvent: false,

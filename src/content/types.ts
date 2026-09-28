@@ -76,6 +76,8 @@ export interface TradeFacts {
   thetaChips: number; // chips accumulated by day-close hooks (e.g. Theta Engine)
   callBonus: number; // the call-bonus mult this trade earned (for "call bonus x2" effects)
   stopDeclined: boolean;
+  /** Closed with no stop in place (never set, or declined). */
+  noStop: boolean;
   lossWithinStop: boolean; // a loser closed at or before its planned stop
   dividendsCollected: number;
   longPremiumThroughEvent: boolean;
@@ -196,6 +198,17 @@ export interface DeskDef {
   passive?: (f: TradeFacts) => ScoreStep[];
   /** Desk-specific price range for blind rescaling (income desks need affordable shares). */
   priceRange?: [number, number];
+  /** Extra tickets every round (desks that place many small bets). */
+  ticketsAdd?: number;
+  /** Extra lineup cards every round. */
+  lineupAdd?: number;
+  /** Desk default brackets (long-premium desks take profits sooner). */
+  brackets?: Partial<{
+    creditTargetPct: number;
+    creditStopMult: number;
+    debitTargetPct: number;
+    debitStopPct: number;
+  }>;
 }
 
 export type AnalystId =

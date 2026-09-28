@@ -65,8 +65,8 @@ export function runScore(
   roundStartEquityCents: Cents,
   steps: ScoreStep[],
 ): ScoreResult {
-  const base = pnlChips(realizedCents, roundStartEquityCents);
   const winner = realizedCents > 0;
+  const base = pnlChips(realizedCents, roundStartEquityCents) * (winner ? 1 : BALANCE.scoring.lossChipsScale);
   const trace: TraceRow[] = [{ label: 'P/L', op: 'chips', value: base, chips: base, mult: 1 }];
   let chips = base;
   let mult = 1;

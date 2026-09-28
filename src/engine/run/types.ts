@@ -218,6 +218,10 @@ export interface RunStats {
   edgeTop10: number;
   duoOwned: boolean;
   parachuteSaves: number;
+  /** Every cartridge held at some point this run (the simulator's pick-rate analysis). */
+  owned: string[];
+  /** Rounds finished when each cartridge was first picked up (0 = the starting kit). */
+  ownedAt: Record<string, number>;
 }
 
 export type RunAction =

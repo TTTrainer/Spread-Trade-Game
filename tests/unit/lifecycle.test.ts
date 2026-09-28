@@ -108,7 +108,7 @@ describe('opening and marking', () => {
     expect(Number.isInteger(p.marks[0].plCents)).toBe(true);
     expect(p.executionCents).toBe(-400); // filled 0.02 worse than mid on 2 contracts
     expect(plIfClosedAt(p, 0.5)).toBeCloseTo(1.0, 9);
-    expect(defaultBrackets(-1.5)).toEqual({ targetPl: 0.75, stopPl: 1.5, targetPct: 0.5, stopMult: 2 });
+    expect(defaultBrackets(-1.5)).toEqual({ targetPl: 0.75, stopPl: 3, targetPct: 0.5, stopMult: 2 });
     expect(defaultBrackets(2)).toMatchObject({ targetPl: 1, stopPl: 1 });
   });
 });
@@ -130,7 +130,8 @@ describe('brackets and decision points', () => {
 
   it('asks to confirm the stop, or stops out at the natural price', () => {
     const p = open();
-    const drop = day('2025-01-10', 88);
+    // The default 2x stop closes when the loss reaches twice the credit (3.00 on a 1.50 credit).
+    const drop = day('2025-01-10', 84);
     const r = atClose(p, drop, ctx());
     expect(r.decisions.map((d) => d.kind)).toContain('stop_hit');
     expect(r.decisions.map((d) => d.kind)).toContain('short_touched');

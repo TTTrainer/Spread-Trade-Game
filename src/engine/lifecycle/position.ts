@@ -246,7 +246,8 @@ export function defaultBrackets(
 ): Brackets {
   if (openNet < 0) {
     const credit = -openNet;
-    return { targetPl: credit * targetPct, stopPl: credit * (stopMult - 1), targetPct, stopMult };
+    // A 2x stop closes when the loss reaches twice the credit collected.
+    return { targetPl: credit * targetPct, stopPl: credit * stopMult, targetPct, stopMult };
   }
   return {
     targetPl: openNet * debitTarget,

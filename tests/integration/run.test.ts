@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
-import { RunEngine } from '../../src/engine/run/engine';
+import { computeTarget, RunEngine } from '../../src/engine/run/engine';
+import { BALANCE } from '../../src/content/balance';
 import type { RunConfig } from '../../src/engine/run/types';
 import { playRound, playRun, shopTurn } from '../../src/engine/sim/bot';
 import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
@@ -33,8 +34,8 @@ describe('career run loop', () => {
   it('plays a full 12-round Verticals year start to finish (practice)', async () => {
     const e = await RunEngine.create(src, config({ seed: 'full-year', practice: true }));
     expect(e.state.phase).toBe('round');
-    expect(e.session?.cards.length).toBe(3);
-    expect(e.state.round.target).toBe(150);
+    expect(e.session?.cards.length).toBe(BALANCE.run.lineupSize);
+    expect(e.state.round.target).toBe(computeTarget(1, 0, null, e.state.config));
     const result = await playRun(e, { kind: 'disciplined' }, 400);
     expect(result).not.toBeNull();
     expect(['victory', 'survived']).toContain(result?.outcome);
@@ -43,7 +44,7 @@ describe('career run loop', () => {
     expect(e.state.history.filter((h) => h.index === 2).map((h) => h.reviewId)).toContain('annual_review');
     expect(new Set(e.state.reviewsSeen).size).toBe(4);
     // Targets grow 1.6x a quarter.
-    expect(e.state.history[3].target).toBe(240);
+    expect(e.state.history[3].target).toBe(computeTarget(2, 0, null, e.state.config));
     expect(e.state.totals.trades).toBeGreaterThan(5);
     expect(e.state.brierScores.length).toBe(e.state.totals.trades);
   }, 240_000);
@@ -176,7 +177,7 @@ describe('career run loop', () => {
     expect(e.state.pendingTags).toContain(tag);
     expect(e.state.stress).toBeLessThanOrEqual(stress0);
     expect(e.state.history[0].status).toBe('skipped');
-    expect(e.state.round.target).toBe(250);
+    expect(e.state.round.target).toBe(computeTarget(1, 1, null, e.state.config));
   }, 60_000);
 
   it('rerolls untraded cards and never repeats a window', async () => {
@@ -187,9 +188,9 @@ describe('career run loop', () => {
     expect(after.some((w) => before.includes(w))).toBe(false);
     expect(e.session?.cards.map((c) => c.id)).toEqual(e.state.round.cards.map((c) => c.cardId));
     expect(e.state.round.rerollsUsed).toBe(1);
+    for (let k = 1; k < e.state.round.rerolls; k++) await e.dispatch({ t: 'reroll' });
+    expect(e.state.round.rerollsUsed).toBe(e.state.round.rerolls);
     await e.dispatch({ t: 'reroll' });
-    await e.dispatch({ t: 'reroll' });
-    expect(e.state.round.rerollsUsed).toBe(2);
     expect(e.events.some((x) => /No rerolls left/.test(x.text))).toBe(true);
   }, 60_000);
 
@@ -229,7 +230,7 @@ describe('career run loop', () => {
     await e.dispatch({ t: 'startReview' });
     expect(e.state.phase).toBe('round');
     expect(e.state.round.reviewId).toBe(id);
-    expect(e.state.round.target).toBe(400);
+    expect(e.state.round.target).toBe(computeTarget(1, 2, id, e.state.config));
     await e.dispatch({ t: 'skip' });
     expect(e.events.some((x) => /cannot be skipped/.test(x.text))).toBe(true);
   }, 60_000);

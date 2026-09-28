@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { launchGame, shot } from './helpers';
+import { BALANCE } from '../../src/content/balance';
+
+const Q1 = BALANCE.targets.q1;
 
 type RunState = {
   phase: string;
@@ -100,14 +103,14 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await page.getByTestId('seed-input').fill('menu-seed');
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('round-meter')).toContainText('0 / 150');
+  await expect(page.getByTestId('round-meter')).toContainText(`0 / ${Q1[0]}`);
   // Director Kessler (or a colleague) greets the new run.
   await expect(page.getByTestId('dialogue')).toBeVisible();
   await expect(page.getByTestId('dialogue').locator('canvas')).toBeVisible();
   await page.waitForTimeout(1500);
   await shot(page, '07-dialogue-1920');
   const before = await runState(page);
-  expect(before?.round.cards.length).toBe(3);
+  expect(before?.round.cards.length).toBe(BALANCE.run.lineupSize);
   // Rerolling swaps every untraded card.
   await page.getByTestId('reroll').click();
   await expect
@@ -174,7 +177,7 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   await expect(page.getByTestId('run-topbar')).toBeVisible();
   const r2 = await runState(page);
   expect(r2?.roundIndex).toBe(1);
-  expect(r2?.round.target).toBe(250);
+  expect(r2?.round.target).toBe(Q1[1]);
   expect(r2?.cash).toBe(cashBefore);
 
   // Round 2: trade, run a few days, then quit mid-round.

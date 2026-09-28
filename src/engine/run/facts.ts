@@ -228,6 +228,7 @@ export function computeFacts(session: TradingSession, pos: Position, extra: Fact
     thetaChips: extra.thetaChips,
     callBonus: call?.bonus ?? 0,
     stopDeclined: pos.flags.stopDeclined,
+    noStop: pos.brackets.stopPl === null,
     lossWithinStop,
     dividendsCollected,
     longPremiumThroughEvent: !def.credit && (pos.flags.earningsHeld || earningsPast.length > 0),

@@ -24,11 +24,15 @@ import { Rng } from '../../src/engine/rng';
 import type { WindowDef } from '../../src/engine/market/types';
 
 describe('round targets', () => {
-  it('follows 150/250/400, x1.6 a quarter, Annual x1.25, tiers', () => {
-    expect([0, 1, 2].map((i) => computeTarget(1, i, null, cfg))).toEqual([150, 250, 400]);
-    expect([0, 1, 2].map((i) => computeTarget(2, i, null, cfg))).toEqual([240, 400, 640]);
-    expect(computeTarget(4, 2, 'annual_review', cfg)).toBe(Math.round((400 * 1.6 ** 3 * 1.25) / 10) * 10);
-    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(Math.round((150 * 1.25) / 10) * 10);
+  it('follow the q1 schedule, grow by quarter, Annual x1.25, tiers', () => {
+    const t = BALANCE.targets;
+    const r10 = (x: number) => Math.round(x / 10) * 10;
+    expect([0, 1, 2].map((i) => computeTarget(1, i, null, cfg))).toEqual(t.q1.map(r10));
+    expect([0, 1, 2].map((i) => computeTarget(2, i, null, cfg))).toEqual(
+      t.q1.map((x) => r10(x * t.quarterGrowth)),
+    );
+    expect(computeTarget(4, 2, 'annual_review', cfg)).toBe(r10(t.q1[2] * t.quarterGrowth ** 3 * 1.25));
+    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25));
   });
 });
 
@@ -64,27 +68,34 @@ describe('scoring pipeline', () => {
   });
 
   it('never multiplies losers; only meter effects soften or amplify them', () => {
+    const L = -200 * BALANCE.scoring.lossChipsScale;
     const loser = facts({ win: false, realizedCents: -10_000, lossWithinStop: true, closedAtPlan: 'stop' });
     const plain = runScore(
       -10_000,
       500_000,
       scoreSteps(pipe({ facts: loser, edgeTier: 'top10', goodRR: true })),
     );
-    expect(plain.points).toBe(-200);
+    expect(plain.points).toBe(Math.round(L));
     const refund = runScore(
       -10_000,
       500_000,
       scoreSteps(pipe({ facts: loser, cartridges: ['stop_discipline'] })),
     );
-    expect(refund.points).toBe(-140);
+    expect(refund.points).toBe(Math.round(L * 0.7));
     const lev = runScore(
       -10_000,
       500_000,
       scoreSteps(pipe({ facts: loser, cartridges: ['two_x_leverage'] })),
     );
-    expect(lev.points).toBe(-400);
+    expect(lev.points).toBe(Math.round(L * 2));
     const hedge = runScore(-10_000, 500_000, scoreSteps(pipe({ facts: loser, hedge: true })));
-    expect(hedge.points).toBe(-100);
+    expect(hedge.points).toBe(Math.round(L * 0.5));
+    const held = runScore(
+      -10_000,
+      500_000,
+      scoreSteps(pipe({ facts: { ...loser, noStop: true, lossWithinStop: false } })),
+    );
+    expect(held.points).toBe(Math.round(L * BALANCE.scoring.undisciplinedLossMult));
   });
 
   it('call bonus: exact at 90% adds +2.5; Earnings Gauntlet multiplies it by 1.5', () => {

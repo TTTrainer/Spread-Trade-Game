@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
-import { RunEngine } from '../../src/engine/run/engine';
+import { computeTarget, RunEngine } from '../../src/engine/run/engine';
+import { BALANCE } from '../../src/content/balance';
 import type { RunConfig } from '../../src/engine/run/types';
 import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
 import { MEMO_IDS, TAG_IDS, VOUCHER_IDS } from '../../src/content/items';
@@ -179,7 +180,7 @@ describe('vouchers', () => {
     await e.dispatch({ t: 'buy', index: 1 });
     await e.dispatch({ t: 'leaveShop' });
     await e.dispatch({ t: 'startReview' });
-    expect(e.session?.cards.length).toBe(4);
+    expect(e.session?.cards.length).toBe(Math.min(BALANCE.run.lineupMax, BALANCE.run.lineupSize + 1));
   }, 30_000);
 });
 
@@ -195,7 +196,7 @@ describe('tags', () => {
     investment: (e) => expect(e.state.tagEffects.investment).toBe(15),
     double: (e) => expect(e.state.tagEffects.doubleNext).toBe(true),
     reroll: (e) => expect(e.state.tagEffects.freeRerolls).toBe(2),
-    calm: (e) => expect(e.state.round.maxLossLinePct).toBeCloseTo(0.12),
+    calm: (e) => expect(e.state.round.maxLossLinePct).toBeCloseTo(BALANCE.risk.maxLossLinePct + 0.02),
   };
   for (const tag of TAG_IDS)
     it(`${tag} tag`, async () => {
@@ -244,8 +245,9 @@ describe('reviews', () => {
       if (rv.rule.marketOrdersDisabled) expect(cfg.execution.marketOrdersDisabled).toBe(true);
       if (rv.rule.earlyAssignmentAlways) expect(cfg.realism.earlyAssignment).toBe(true);
       if (rv.rule.noDecisionsOnGap) expect(cfg.suppressOnGap).toBe(true);
-      if (rv.rule.maxLossLineDelta) expect(r.maxLossLinePct).toBeCloseTo(0.1 + rv.rule.maxLossLineDelta);
-      if (rv.rule.targetMult) expect(r.target).toBe(500);
+      if (rv.rule.maxLossLineDelta)
+        expect(r.maxLossLinePct).toBeCloseTo(BALANCE.risk.maxLossLinePct + rv.rule.maxLossLineDelta);
+      if (rv.rule.targetMult) expect(r.target).toBe(computeTarget(1, 2, id, e.state.config));
       if (id === 'the_fed') expect(dealt.some((w) => w.symbol === 'MKTX' || w.symbol === 'INDX')).toBe(true);
     }, 30_000);
 });

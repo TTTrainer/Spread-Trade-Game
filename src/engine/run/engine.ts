@@ -168,6 +168,8 @@ export function emptyStats(): RunStats {
     edgeTop10: 0,
     duoOwned: false,
     parachuteSaves: 0,
+    owned: [],
+    ownedAt: {},
   };
 }
 
@@ -219,6 +221,8 @@ export function initialState(config: RunConfig, startedAt = ''): RunState {
       ...emptyStats(),
       maxCartridges: desk.startingCartridges.length,
       maxAnalysts: desk.startingAnalysts.length,
+      owned: [...desk.startingCartridges],
+      ownedAt: Object.fromEntries(desk.startingCartridges.map((c) => [c, 0])),
     },
   };
 }
@@ -875,7 +879,7 @@ export class RunEngine {
     else this.say(r.status === 'passed' ? 'target_met' : 'target_missed', 5);
     const unused = Math.max(0, r.tickets - r.ticketsUsed);
     if (this.activeCartridges().includes('patience_pays'))
-      st.patienceStacks = Math.min(3, st.patienceStacks + unused);
+      st.patienceStacks = Math.min(2, st.patienceStacks + unused);
     st.phase = 'tally';
     this.finishedSession = s;
     this.session = null;
@@ -1079,6 +1083,7 @@ export class RunEngine {
         creditStopMult: BALANCE.brackets.creditStopMult,
         debitTargetPct: BALANCE.brackets.debitTargetPct,
         debitStopPct: BALANCE.brackets.debitStopPct,
+        ...desk.brackets,
       },
       benchmark: cfg.benchmark,
       callMode: cfg.callMode,
@@ -1133,7 +1138,13 @@ export class RunEngine {
       target,
       startEquityCents: st.equityCents,
       maxLossLinePct: line,
-      tickets: Math.max(1, BALANCE.run.ticketsPerRound + tier.ticketDelta - (burnout ? 1 : 0)),
+      tickets: Math.max(
+        1,
+        BALANCE.run.ticketsPerRound +
+          (DESKS[cfg.deskId].ticketsAdd ?? 0) +
+          tier.ticketDelta -
+          (burnout ? 1 : 0),
+      ),
       rerolls: Math.max(
         0,
         BALANCE.run.rerollsPerRound +
@@ -1161,7 +1172,10 @@ export class RunEngine {
         kind: 'bad',
         text: `Burnout: one fewer ticket this round${silent ? `, and ${ANALYSTS[silent].name} is not answering` : ''}.`,
       });
-    const count = Math.min(BALANCE.run.lineupMax, BALANCE.run.lineupSize + p.lineupAdd);
+    const count = Math.min(
+      BALANCE.run.lineupMax + (DESKS[cfg.deskId].lineupAdd ?? 0),
+      BALANCE.run.lineupSize + p.lineupAdd + (DESKS[cfg.deskId].lineupAdd ?? 0),
+    );
     const { windows, relaxed } = await this.deal(count, []);
     const r = st.round;
     r.filterRelaxed = relaxed;
@@ -1247,7 +1261,7 @@ export class RunEngine {
     this.say('skip', 5);
     st.stats.skips++;
     if (this.activeCartridges().includes('patience_pays'))
-      st.patienceStacks = Math.min(3, st.patienceStacks + 1);
+      st.patienceStacks = Math.min(2, st.patienceStacks + 1);
     r.status = 'skipped';
     st.history.push({
       quarter: st.quarter,
@@ -1501,6 +1515,10 @@ export class RunEngine {
           return this.warn('No free cartridge slot. Sell one first.');
         st.cartridges.push(item.id);
         st.cartState[item.id] = {};
+        if (!st.stats.owned.includes(item.id)) {
+          st.stats.owned.push(item.id);
+          st.stats.ownedAt[item.id] = st.history.length;
+        }
         break;
       case 'analyst': {
         const have = st.analysts.find((a) => a.id === item.id);

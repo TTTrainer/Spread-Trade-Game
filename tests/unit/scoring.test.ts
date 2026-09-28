@@ -1,3 +1,4 @@
+import { BALANCE } from '../../src/content/balance';
 import { describe, expect, it } from 'vitest';
 import {
   brier,
@@ -122,10 +123,11 @@ describe('chips x mult', () => {
       { label: 'refund 30%', kind: 'cartridge', op: 'meter', value: 0.7 },
     ];
     const r = runScore(-10000, 500000, steps);
+    const loss = -200 * BALANCE.scoring.lossChipsScale;
     expect(r.winner).toBe(false);
-    expect(r.chips).toBe(-200);
+    expect(r.chips).toBeCloseTo(loss);
     expect(r.mult).toBe(1);
-    expect(r.points).toBe(-140);
+    expect(r.points).toBe(Math.round(loss * 0.7));
   });
 
   it('builds level and Edge Rank steps', () => {

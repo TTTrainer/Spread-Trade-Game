@@ -381,7 +381,7 @@ export function OrderTicket() {
                 value={builder.stopMult}
                 onChange={(e) => setBuilder({ stopMult: Number(e.target.value) })}
               >
-                {[1.5, 2, 2.5, 3].map((x) => (
+                {[1, 1.5, 2, 3].map((x) => (
                   <option key={x} value={x}>
                     {x}x
                   </option>

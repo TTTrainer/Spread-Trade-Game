@@ -11,21 +11,21 @@ export const BALANCE = {
     quarters: 4,
     roundsPerQuarter: 3,
     ticketsPerRound: 3,
-    rerollsPerRound: 2,
-    lineupSize: 3,
+    rerollsPerRound: 4,
+    lineupSize: 4,
     lineupMax: 5,
     recentShare: 0.75,
   },
 
   targets: {
-    q1: [150, 250, 400] as [number, number, number],
-    quarterGrowth: 1.6,
+    q1: [30, 50, 80] as [number, number, number],
+    quarterGrowth: 1.3,
     endlessGrowth: 1.8,
     annualReviewMult: 1.25,
   },
 
   risk: {
-    maxLossLinePct: 0.1,
+    maxLossLinePct: 0.15,
     riskCapPct: 0.1,
     plannedRiskPct: 0.05, // sizing beyond this is flagged "oversized"
   },
@@ -40,6 +40,8 @@ export const BALANCE = {
 
   scoring: {
     chipsPerUnit: 10_000, // chips = P/L / round-start equity * this (1% = 100 chips)
+    /** A loser's chips on the meter, as a share of its P/L chips (the ledger is never touched). */
+    lossChipsScale: 0.4,
     levelChips: 10,
     levelMult: 0.5,
     rrMult: 1,
@@ -48,7 +50,9 @@ export const BALANCE = {
     callExactOffset: 0.4,
     callExactScale: 0.2,
     callAdjacent: 0.25,
-    disciplineMult: 0.5,
+    disciplineMult: 1,
+    /** A loser with no stop, or whose stop was declined, counts this much on the meter. */
+    undisciplinedLossMult: 1.25,
     verticalsPassiveMult: 1,
   },
 

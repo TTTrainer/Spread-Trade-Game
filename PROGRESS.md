@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 8 (the balance simulator and tuning) is next.
+**Current phase:** Phase 9 (meta-progression and the other modes) is next.
 
 ## How to run (on your PC)
 
@@ -12,6 +12,34 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 8: Balance
+- **`npm run sim`** plays thousands of headless Career runs through the real engine (the same code the game runs, on the SIM market) with four bots, then writes `sim/REPORT.md`. It uses every CPU core and takes about 15 minutes.
+  - *Disciplined Seller:* sells 20–30Δ credit spreads when IV rank is 30+ and leans with the trend. It closes at 50% of max profit or at its stop, holds long premium through earnings, and buys discipline, theta and execution cartridges. On the other desks it plays that desk's playbook the same careful way.
+  - *Hold-to-Expiry:* the same entries, never manages them.
+  - *Greedy:* maximum size, no stops.
+  - *Random:* random structures, strikes and sizes.
+- **Every target in section 17 is met** (see `sim/REPORT.md` for the full tables):
+  - Disciplined Seller wins about 60% of runs, Hold-to-Expiry about 25%, Greedy under 1% and Random 0%.
+  - Every desk is within 10 points of Verticals.
+  - No cartridge lifts the win rate more than 15 points.
+  - A full winning run takes about 37 minutes at an experienced pace. On your first runs, while you learn the builder, expect closer to 50.
+- **What it took (the numbers moved; the rules didn't break):**
+  - Targets now start at 30 / 50 / 80 points and grow ×1.3 a quarter. The plan's 150 / 250 / 400 at ×1.6 made even the careful bot fail by the second quarter. Round scores are large next to these targets. The real difficulty is not having a net-negative round: one bad stop-out or a crossed Max-Loss Line ends the run. That is exactly the "discipline beats luck" feel the plan wanted.
+  - The lineup deals 4 cards (plan: 3) with 4 rerolls (plan: 2), so a patient player can find a setup worth trading. The Max-Loss Line is 15% (plan: 10%).
+  - Losing trades count at 40% of their size on the meter, and more (×1.25) if you had no stop or declined it. The ledger and Stats always show the full real loss.
+  - Closing at plan is worth +1 mult (plan: +0.5).
+  - Stops now mean "exit when the loss reaches 2× the credit". The old "buy back at 2× credit" version kept stopping out on normal day-to-day noise.
+  - The other desks got small built-in boosts so each is as winnable as Verticals:
+    - Condor: +1 ticket, +1 card.
+    - Volatility: +3 tickets, +2 cards, profit taking at +15%.
+    - Calendar: +1 ticket, +1 card, profit taking at +15%.
+    - Income and Calendar are dealt on cheaper-looking share prices.
+  - Two cartridges were toned down: Patience Pays now stores +0.5 mult per unused ticket or skipped round, up to +1 (it was +1 each, up to +3), and Crush It is ×2 (was ×3).
+- **Honest caveats** are written into the report:
+  - These numbers come from the SIM market. Once you build real data, `npm run sim -- --db <path to game.db>` reruns everything on it.
+  - Cartridges picked fewer than 30 times (mostly rares and legendaries the shop rarely shows) are listed but not judged, because with so few runs the uncertainty is bigger than the 15-point limit.
+- Tests: E2E expectations and unit tests now read targets, lineup size and the rest from `balance.ts` instead of hard-coded numbers, so future tuning can't silently break them.
 
 ### Phase 7: Content
 - **Characters:** Director Kessler (Head of Desk), Ines Ortiz (mentor, ex-market-maker), Bradley Stroud IV (rival) and COMPLY-3000 (AI compliance). Each has a 64×64 pixel portrait drawn in code with four expressions (neutral, pleased, angry, worried).
@@ -107,7 +135,8 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 - **Calls on trades closed early.** The plan resolves a call at the trade's expiration. If you close early, the game grades the call on the move so far, with the expected move scaled by the square root of the time that passed. That way closing a winner early never leaves the call hanging, and the same skill is measured either way.
 - **Income trades and the risk cap.** A cash-secured put or covered call can in theory lose nearly all its collateral, which would never fit a 10% risk cap on a small account. For those two, the cap measures a stress loss (a drop of three expected moves, at least 25%) while the full collateral must still fit in your equity.
-- **Stops are "2× the credit" in spread price.** A stop at 2× credit closes when buying the spread back costs twice what you collected (a loss about equal to the credit). A loss of 2× credit would usually equal the whole max loss on a 1/3-width spread, which makes the stop pointless.
+- **Stops mean "the loss reaches 2× the credit".** Phase 2 first read "a stop at 2× credit" as buying the spread back at twice the credit. The balance simulator showed that version stopping out on ordinary daily noise. The stop now fires when the trade has lost twice what it collected, which is the common reading on trading desks. The stop choices in the builder (1×, 1.5×, 2×, 3×) use the same meaning.
+- **Balance numbers differ from the plan** (targets, lineup, rerolls, Max-Loss Line, how losses fill the meter); see Phase 8 above for each change and why.
 
 - **Modeled days use only the chain before them.** The plan says to interpolate between the nearest real chains. Using the chain *after* a missing day would leak the next day's volatility (an earnings crush, say) into the past, so modeled days carry forward the most recent real chain's volatility surface instead.
 - **Compact database.** Option rows are stored as small integers (cents, thousandths, scaled Greeks) to keep `game.db` under the 3 GB target. Greeks are recomputed from each quote's own IV so every row uses the same units.
@@ -130,8 +159,8 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Known issues
 
-- **Balance is untuned.** The simple disciplined bot clears only a few rounds a year right now, so targets, payouts and cartridge strengths will move in Phase 8 (the simulator), not by feel.
-- The other four desks play fully in the engine but stay locked until Phase 9's Bonus unlocks. Early balance numbers vary a lot by desk (condors clear most rounds, income very few), which Phase 8 fixes.
+- **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
+- The other four desks play fully but stay locked until Phase 9's Bonus unlocks.
 - The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
 
 - **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
@@ -140,4 +169,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 8: the balance simulator (`npm run sim`) with the Disciplined Seller, Hold-to-Expiry, Random and Greedy bots, tuned until skill clearly beats luck (section 17 targets), with `sim/REPORT.md`.
+Phase 9: the career ladder (ranks and Bonus), desk unlocks, The Pad, cosmetics, Risk Tiers and Compliance Rules, Endless, Daily with Bradley's ghost, Contracts, Live mode with sync, and the tutorial.
