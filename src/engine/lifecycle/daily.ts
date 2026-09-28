@@ -68,8 +68,8 @@ export interface CloseStepResult {
   autoClosed: boolean;
 }
 
-let dpCounter = 0;
-const dpId = (pos: Position, kind: DecisionKind, date: string) => `${pos.id}:${kind}:${date}:${dpCounter++}`;
+// Deterministic ids (one decision of each kind per position per day) so a replayed action log matches.
+const dpId = (pos: Position, kind: DecisionKind, date: string) => `${pos.id}:${kind}:${date}`;
 
 /** Part 1: the close. */
 export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseStepResult {

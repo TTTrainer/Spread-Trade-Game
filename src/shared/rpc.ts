@@ -37,7 +37,21 @@ export interface DataBuildResult {
   needsDiskConfirm?: boolean;
 }
 
+import type { DrillRow, RunRow, SaveSlot, TradeRow } from './userData';
+
 export interface RpcMap {
+  'user.get': (key: string) => unknown;
+  'user.set': (key: string, value: unknown) => void;
+  'user.save': (slot: SaveSlot) => void;
+  'user.load': (slot: string) => SaveSlot | null;
+  'user.deleteSave': (slot: string) => void;
+  'user.listSaves': () => Omit<SaveSlot, 'data'>[];
+  'user.recordTrade': (t: TradeRow) => void;
+  'user.trades': () => TradeRow[];
+  'user.recordDrill': (d: DrillRow) => void;
+  'user.drills': () => DrillRow[];
+  'user.recordRun': (r: RunRow) => void;
+  'user.runs': () => RunRow[];
   /** Market data: `asOf` is the caller's simulated date; the main process refuses anything later. */
   'market.call': (method: string, args: unknown[], asOf: string | null) => unknown;
   'data.status': () => DataStatus;

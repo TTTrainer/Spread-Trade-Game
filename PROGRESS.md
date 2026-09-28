@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 3 (trading UI and Sandbox) is next.
+**Current phase:** Phase 4 (Drills) is next.
 
 ## How to run (on your PC)
 
@@ -13,6 +13,21 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 3. `npm run dev` opens the game.
 
 ## Done
+
+### Phase 3: Trading screen and Sandbox
+- **The trading screen** (1920×1080 layout, with a compact layout for 1366×768): top bar, lineup cards with sparklines and badges (IV rank, earnings countdown, SIM/MODEL labels), the chart, the bottom tray, and a right panel with payoff and stats.
+- **Chart** (TradingView Lightweight Charts, attribution logo kept on): candles, volume, Bollinger Bands, RSI and MACD panes; daily/weekly; pan and zoom; strike lines, breakevens and the expected-move band; trendline and horizontal-line drawing with undo; a study picker (`Ctrl+E`) with the analyst studies (SMA 20/50/200, EMA 9/21, Keltner, ATR, support/resistance, relative volume) ready to be earned in Career.
+- **Price ladder** on the chart's right edge, lined up with the price axis: click a strike to move the short strike there, Shift+click to set the far strike; `Alt+[` `Alt+]` `Alt+\` zoom it.
+- **Builder:** call cards (`1–5`, `Shift+1–5` confidence, scroll wheel), all 14 structure cards, weekly and monthly expiry chips (plus a back month for calendars), delta, width and contracts with a live risk-vs-cap readout, plain-word errors for illegal builds.
+- **Order ticket:** limit slider from mid to natural with a live fill probability, market orders, brackets (50% target, 2× stop, editable), an "earnings inside: on purpose" checkbox, `Alt+S` sell / `Alt+B` buy with a confirm step, `Alt+A` auto-send.
+- **Payoff diagram** (expiration and today, expected-move shading, hover readout) and **Analyze** (`Ctrl+3`): what-if sliders for price, days and IV, a P/L heat strip, and the full chain table.
+- **Positions dock** (`Ctrl+1`): mark, P/L in $ and % of risk, DTE, Greeks, brackets, distance to the short strike in ATR and expected moves, close and roll (`Alt+F` flattens).
+- **Fast-forward** (`Space`) with decision points that pause the clock (target, stop, short strike touched, 21 DTE, earnings tomorrow, ex-dividend with an ITM short call, pin risk, assigned shares). Declining your own stop is called out.
+- **Debrief:** receipt cards flip in, then expand to show the reveal, P/L attribution bars, the call result, the benchmark and alpha, the process grade checklist, mistake tags and alternates. Every closed trade is saved to your local stats ledger.
+- **Sandbox** (open mode): pick up to 3 tickers and any date, filter for dates with earnings, big gaps or high IV rank ahead, set starting capital, trade with every tool, no score.
+- **Sound:** generated retro sound effects for clicks, fills (stamp), wins, losses, stops, decision points and gaps (with screen shake). Help and glossary on `Ctrl+8`.
+- E2E: open Sandbox, call the shot with hotkeys, sell a bull put, fast-forward through five decision points to expiration, and check the debrief P/L matches the engine. Screenshots reviewed at both resolutions.
+
 
 ### Phase 2: Options engine
 - **Pricing:** Black–Scholes–Merton with dividends, all Greeks, an implied-volatility solver. Checked against textbook values (Hull, Haug), put-call parity, and finite differences.
@@ -63,4 +78,4 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Next
 
-Phase 3: the trading screen (chart, builder, chain ladder, payoff, ticket, positions, fast-forward, decision points, debrief, hotkeys) and Sandbox mode.
+Phase 4: Drills (60-second blind calls, calibration, four mini-games, drill-only adaptation).
