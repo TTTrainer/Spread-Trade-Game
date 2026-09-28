@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+import pkg from './package.json';
 
 export default defineConfig({
   main: {
@@ -36,5 +37,6 @@ export default defineConfig({
       rollupOptions: { input: resolve(__dirname, 'src/index.html') },
     },
     plugins: [react()],
+    define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   },
 });

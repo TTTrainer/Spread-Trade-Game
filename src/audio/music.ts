@@ -36,9 +36,9 @@ function buildRig(style: MusicStyle, out: Tone.ToneAudioNode): Rig {
   const gain = () => keep(new Tone.Gain(0).connect(out));
   const gains = { pad: gain(), bass: gain(), arp: gain(), drums: gain(), hats: gain() };
   const filter = keep(new Tone.Filter({ frequency: 1200, type: 'lowpass', rolloff: -24 }));
-  const reverb = keep(
-    new Tone.Freeverb({ roomSize: style === 'darkwave' ? 0.85 : 0.7, dampening: 2600, wet: 0.35 }),
-  );
+  // A convolution reverb (its impulse is rendered offline): no audio worklet, which the app's
+  // content security policy would block.
+  const reverb = keep(new Tone.Reverb({ decay: style === 'darkwave' ? 5 : 3.2, preDelay: 0.02, wet: 0.35 }));
   filter.connect(reverb);
   reverb.connect(gains.pad);
   const delay = keep(
@@ -139,8 +139,16 @@ class Player {
     return useMusic.getState();
   }
 
-  async start(): Promise<void> {
-    if (this.st.playing || !this.st.available) return;
+  private starting: Promise<void> | null = null;
+
+  /** Start once: a click and a key press can both ask before the first start finishes. */
+  start(): Promise<void> {
+    if (this.st.playing || !this.st.available) return Promise.resolve();
+    if (!this.starting) this.starting = this.boot().finally(() => (this.starting = null));
+    return this.starting;
+  }
+
+  private async boot(): Promise<void> {
     try {
       await Tone.start();
       this.master = new Tone.Volume(this.db()).toDestination();
@@ -159,6 +167,7 @@ class Player {
   }
 
   stop(): void {
+    this.lastTick = -1;
     this.loop?.dispose();
     this.loop = null;
     Tone.getTransport().stop();
@@ -227,10 +236,28 @@ class Player {
     useMusic.setState({ levels: lv });
   }
 
+  private lastTick = -1;
+
   private tick(time: number): void {
     const s = this.section;
     const r = this.rig;
     if (!s || !r) return;
+    // Synths can't start two notes at the same instant. When the page is busy, late ticks get
+    // clamped to "now" and would collide, so a tick that's already late plays nothing.
+    const late = time <= this.lastTick || time < Tone.getContext().currentTime;
+    this.lastTick = Math.max(this.lastTick, time);
+    if (!late)
+      try {
+        this.play(time, s, r);
+      } catch (err) {
+        console.warn('music tick skipped', err);
+      }
+    this.step++;
+    // Eight bars, then something new.
+    if (this.step % (16 * s.bars) === 0) Tone.getDraw().schedule(() => this.nextSection(), time);
+  }
+
+  private play(time: number, s: Section, r: Rig): void {
     const i = this.step % 16;
     const bar = Math.floor(this.step / 16);
     const chord = chordNotes(s, s.progression[bar % s.progression.length]);
@@ -253,9 +280,6 @@ class Player {
       if (s.snare[i]) r.snare.triggerAttackRelease('16n', time, 0.7);
     }
     if (lv.hats > 0.01 && s.hat[i]) r.hat.triggerAttackRelease('32n', time, 0.3);
-    this.step++;
-    // Eight bars, then something new.
-    if (this.step % (16 * s.bars) === 0) Tone.getDraw().schedule(() => this.nextSection(), time);
   }
 }
 

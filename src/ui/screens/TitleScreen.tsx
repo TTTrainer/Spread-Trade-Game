@@ -80,7 +80,7 @@ export function TitleScreen() {
         ))}
       </nav>
       <div className="title-foot num">
-        v0.1 · paper trading only · not financial advice
+        v{__APP_VERSION__} · paper trading only · not financial advice
         {data && (
           <span className="title-data" data-testid="data-status">
             {' '}

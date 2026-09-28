@@ -6,6 +6,8 @@ type Any = any;
 
 test('polish: animated backdrop, adaptive music, particles, reduced motion', async () => {
   const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`${e.name}: ${e.message}`));
   await page.waitForFunction(() => (window as Any).__stg !== undefined);
   // The title's drifting candles render into a canvas.
   await expect(page.getByTestId('backdrop').locator('canvas')).toHaveCount(1, { timeout: 15_000 });
@@ -50,5 +52,7 @@ test('polish: animated backdrop, adaptive music, particles, reduced motion', asy
   await page.waitForTimeout(1500);
   await shot(page, '10-title-1920');
   await shot(page, '10-title-1366', { width: 1366, height: 768 });
+  // Music, particles and the backdrop run without a single page error (e.g. a blocked audio worklet).
+  expect(errors).toEqual([]);
   await app.close();
 });

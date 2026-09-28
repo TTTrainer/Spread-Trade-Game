@@ -253,7 +253,8 @@ export function sfx(name: SfxName, pitch = 1, gain = 1): void {
   if (!enabled) return;
   const ac = audio();
   if (!ac) return;
-  if (ac.state === 'suspended') void ac.resume();
+  // Resuming can fail when there is no audio device; the game just stays quiet.
+  if (ac.state === 'suspended') ac.resume().catch(() => undefined);
   let buf = buffers.get(name);
   if (!buf) {
     const data = render(DEFS[name]);

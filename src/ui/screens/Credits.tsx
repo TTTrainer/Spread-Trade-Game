@@ -34,13 +34,16 @@ export function CreditsScreen() {
         </p>
         <h2>Art, music and sound</h2>
         <p>
-          All pixel art is drawn in code for this game. Music is generated live with Tone.js (MIT). Sound
-          effects are synthesized in code, sfxr-style, with no sample packs.
+          All pixel art (portraits, The Pad, icons, the backdrop) is drawn in code for this game; no art packs
+          are used. Music is composed and played live with <b>Tone.js</b> (MIT). Particles and the backdrop
+          render with <b>PixiJS</b> (MIT). Sound effects are synthesized in code, sfxr-style, with no sample
+          packs.
         </p>
         <h2>Software</h2>
         <p>
-          Electron, React, Vite, TypeScript, Zustand, Motion, PixiJS, pixi-filters, Tone.js, mysql2, Dolt
-          (Apache 2.0) and the Node.js built-in SQLite.
+          Electron (MIT), React (MIT), Vite and electron-vite (MIT), TypeScript (Apache 2.0), Zustand (MIT),
+          Motion (MIT), PixiJS and pixi-filters (MIT), Tone.js (MIT), mysql2 (MIT), Dolt (Apache 2.0) and the
+          Node.js built-in SQLite (public domain). Built with the help of Claude Code.
         </p>
         <h2>Characters</h2>
         <p>

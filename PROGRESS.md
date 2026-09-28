@@ -4,14 +4,25 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** Phase 11 (packaging and hand-off) is next.
+**Current phase:** All phases (0–11) are done. Next is your playtest (`PLAYTEST.md`).
 
 ## How to run (on your PC)
 
-- **Installer:** `npm run build:win` writes `release/SpreadTradingGame-Setup-<version>.exe` (installer) and `release/SpreadTradingGame-Portable-<version>.exe` (runs without installing).
+- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.0.0.exe`, or run `SpreadTradingGame-Portable-1.0.0.exe` directly.
+- **Rebuild the installer:** `npm run build:win` writes both files to `release/`.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Phase 11: Package and hand off
+- **Windows builds, version 1.0.0:** `SpreadTradingGame-Setup-1.0.0.exe` (installer: pick a folder, desktop and Start-menu shortcuts, uninstall from Windows settings) and `SpreadTradingGame-Portable-1.0.0.exe` (no install). Both use the original pixel-art icon and are cross-built from Linux with electron-builder.
+- **Packaged-app check:** the exact same app archive was packaged for Linux and launched headless in a new test. It boots on the SIM market, shows v1.0.0 and deals a Career round, with zero page errors. That test caught two real bugs:
+  - The first reverb I used needs an audio "worklet", which the app's security policy blocks, so it failed silently. I replaced it with a convolution reverb and kept the security policy strict.
+  - When the machine is busy, as right after launch, late music notes could collide and throw an error. Late notes are now skipped instead.
+- **Settings → Data** has OPEN LOG FOLDER and OPEN SAVE FOLDER buttons, so a bug report is one click away.
+- **Credits** list every library with its license: Tone.js, PixiJS and pixi-filters, TradingView Lightweight Charts, the fonts, the DoltHub data (CC BY-SA 4.0) and "not financial advice". There is no third-party art; everything is drawn in code.
+- **`README_PLAY.md`** (plain language): installing, and the "Windows protected your PC" warning; playing the SIM market right away; the optional real-data build (about 16 GB, about 40 GB free, a few hours); syncing and Live; where saves and logs live; and how to report a bug.
+- **`PLAYTEST.md`:** 20 things to try and score from 1 to 5, starting with the three only a Windows PC can prove: the installer, offline play, and smoothness.
 
 ### Phase 10: Juice and polish
 - **Adaptive music** (Tone.js, MIT), composed live in code in three styles:
@@ -260,12 +271,12 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
 - **Frame rate was measured in a cloud box without a graphics card** (about 55 fps, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
 - **Music needs a first click or key press to start.** That's a rule of the browser engine inside the app, not a choice.
-- The v1 Windows installer was built and checked in this cloud session, but only a real Windows PC can prove the installer end to end (see `PLAYTEST.md` at hand-off).
+- **The 1.0.0 Windows installer was built here and the same app package was tested on Linux.** Only a real Windows PC can prove the installer on a fresh profile, so that's item 1 in `PLAYTEST.md`. The exe isn't code-signed (a certificate costs money), so Windows shows a one-time "protected your PC" warning; `README_PLAY.md` explains the click-through.
 
-- **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, run `npm run data:build -- --yes` (or use Settings > Data in the game) to build the real database: roughly 16 GB of downloads and a few hours the first time.
+- **Real market data has not been downloaded yet.** This cloud session's network blocks DoltHub, Cboe and federalreserve.gov, so `data/REPORT.md` currently describes the SIM market. On your PC, open the game's **Settings → Data → BUILD REAL DATA** to build the real database: roughly 16 GB of downloads and a few hours the first time. You can keep playing the SIM market meanwhile. `README_PLAY.md` has the details.
 - **FOMC and CPI dates were compiled offline** (the official sites were unreachable), so they're marked unverified in the database. They match the published schedules to the best of my knowledge.
 - The DoltHub table layouts were written from documentation and checked against a local imitation, not against the live repositories. The pipeline inspects the real column names when it runs and stops with a plain message if something doesn't match.
 
 ## Next
 
-Phase 11: package and hand off. The Windows installer and portable exe, Credits updated (Tone.js, PixiJS), `README_PLAY.md`, `PLAYTEST.md`, and a final plain-language message.
+Your playtest: install from the two exe files, then work through `PLAYTEST.md` and send back the scores and notes. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).

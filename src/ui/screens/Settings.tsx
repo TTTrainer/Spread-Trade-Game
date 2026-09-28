@@ -506,6 +506,33 @@ function DataPanel() {
           VIEW DATA REPORT
         </button>
       </div>
+      <p className="dim">
+        Found a bug? Open the log folder and send <b>game.log</b> to Claude Code with what you were doing.
+        Your saves and stats live in the save folder (<b>user.db</b>).
+      </p>
+      <div className="modal-actions">
+        <button
+          className="pixel-btn"
+          onClick={() =>
+            void bridge()
+              .invoke('system.info')
+              .then((i) => bridge().invoke('system.openPath', i.logDir))
+          }
+          data-testid="open-logs"
+        >
+          OPEN LOG FOLDER
+        </button>
+        <button
+          className="pixel-btn"
+          onClick={() =>
+            void bridge()
+              .invoke('system.info')
+              .then((i) => bridge().invoke('system.openPath', i.userDataDir))
+          }
+        >
+          OPEN SAVE FOLDER
+        </button>
+      </div>
       {busy && (
         <div className="data-progress num">
           <div>
