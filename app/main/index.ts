@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { configurePaths } from './paths';
 import { log } from './log';
 import { registerIpc } from './ipc';
+import { registerDataHandlers } from './dataService';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +54,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   log('info', `app start v${app.getVersion()} electron ${process.versions.electron}`);
   registerIpc(() => mainWindow);
+  registerDataHandlers();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

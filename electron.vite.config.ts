@@ -7,7 +7,12 @@ export default defineConfig({
     build: {
       outDir: 'out/main',
       externalizeDeps: true,
-      rollupOptions: { input: { index: resolve(__dirname, 'app/main/index.ts') } },
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'app/main/index.ts'),
+          dataWorker: resolve(__dirname, 'app/main/dataWorker.ts'),
+        },
+      },
     },
   },
   preload: {

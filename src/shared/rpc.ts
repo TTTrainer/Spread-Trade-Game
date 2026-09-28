@@ -14,9 +14,35 @@ export interface SystemInfo {
   isE2E: boolean;
 }
 
-// Filled out by later phases (market, user and data channels are declared in their own modules
-// and merged here so this file stays the single source of truth for channel names).
+export interface DataStatus {
+  kind: 'real' | 'synthetic' | 'mixed';
+  usingBuiltDb: boolean;
+  gameDbPath: string;
+  gameDbExists: boolean;
+  lastDate: string;
+  symbols: number;
+  notes: string[];
+  busy: boolean;
+}
+
+export interface DataBuildRequest {
+  mode: 'synthetic' | 'real' | 'sync';
+  allowDownload: boolean;
+  confirmLowDisk: boolean;
+}
+
+export interface DataBuildResult {
+  ok: boolean;
+  message: string;
+  needsDiskConfirm?: boolean;
+}
+
 export interface RpcMap {
+  /** Market data: `asOf` is the caller's simulated date; the main process refuses anything later. */
+  'market.call': (method: string, args: unknown[], asOf: string | null) => unknown;
+  'data.status': () => DataStatus;
+  'data.build': (req: DataBuildRequest) => DataBuildResult;
+  'data.report': () => string;
   'system.info': () => SystemInfo;
   'system.quit': () => void;
   'system.toggleFullscreen': () => boolean;

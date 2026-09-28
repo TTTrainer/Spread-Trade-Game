@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { DataStatus } from '../../shared/rpc';
+import { bridge, hasBridge } from '../bridge';
 import './title.css';
 
 const MENU = [
@@ -16,6 +18,15 @@ const MENU = [
 
 export function TitleScreen() {
   const [sel, setSel] = useState(0);
+  const [data, setData] = useState<DataStatus | null>(null);
+
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge()
+      .invoke('data.status')
+      .then(setData)
+      .catch(() => setData(null));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -47,7 +58,16 @@ export function TitleScreen() {
           </button>
         ))}
       </nav>
-      <div className="title-foot num">v0.1 · paper trading only · not financial advice</div>
+      <div className="title-foot num">
+        v0.1 · paper trading only · not financial advice
+        {data && (
+          <span className="title-data" data-testid="data-status">
+            {' '}
+            · MARKET: {data.kind === 'synthetic' ? 'SIM' : 'REAL'} · {data.symbols} tickers · through{' '}
+            {data.lastDate}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
