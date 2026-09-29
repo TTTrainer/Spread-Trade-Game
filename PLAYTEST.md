@@ -32,5 +32,6 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 24 | **New: DESK/OS shop.** Read a few WHEN/GET cards and the BUILD.SYS window. | Do you understand a cartridge in a second? Can you see your combos building? | | |
 | 25 | **New: option chain (Ctrl+5) and the roll dialog.** Click a bid to sell; open ROLL on a position. | Is the chain quick to use? Does the STAY vs ROLL chart make the choice clear? | | |
 | 26 | **New: Developer mode** (Settings → Game). Take a note with a screenshot, then EXPORT .MD. | Is this useful for your notes? What else should the panel do? | | |
+| 27 | **Mac:** install with `join-mac.sh` (see README_PLAY.md), then play a round. | Did it open? Do the keys (⌘ or Control, ⌥ Option) and the menu bar behave? Anything look off compared with Windows? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

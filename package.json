@@ -24,7 +24,8 @@
     "data:report": "tsx data-pipeline/cli.ts report",
     "sim": "tsx tools/sim/cli.ts",
     "build:win": "electron-vite build && electron-builder --win --x64 --publish never",
-    "assets:list": "tsx tools/assets/list.ts"
+    "assets:list": "tsx tools/assets/list.ts",
+    "build:mac": "electron-vite build && node tools/build-mac.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -113,6 +114,22 @@
     },
     "portable": {
       "artifactName": "SpreadTradingGame-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.games",
+      "icon": "build/icon.png",
+      "identity": null,
+      "minimumSystemVersion": "11.0",
+      "darkModeSupport": false,
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
     }
   }
 }

@@ -4,15 +4,26 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1, 2 and 3. Version 1.3.0. Next: the last 27 pictures (achievement badges, `ASSETS_NEEDED.md`) and more playtesting.
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1, 2 and 3, and a Mac version. Version 1.3.0. Next: the last 27 pictures (achievement badges, `ASSETS_NEEDED.md`) and more playtesting.
 
 ## How to run (on your PC)
 
 - **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.3.0.exe`, or run `SpreadTradingGame-Portable-1.3.0.exe` directly.
-- **Rebuild the installer:** `npm run build:win` writes both files to `release/`.
+- **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
+- **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### A Mac version
+You asked to playtest on a Mac as well. The game is the same app on both; the Mac build differs only in packaging:
+
+- **Two builds:** Apple chip (M1 and later) and Intel. Each is a zip holding `Spread Trading Game.app`.
+- **Signed so a Mac will open it.** Macs with Apple chips refuse apps without a code signature, so each build is signed "ad hoc" (a signature without a paid Apple developer certificate). Because the cloud machine here runs Linux, the signing uses rcodesign, an open-source Linux version of Apple's signing tool.
+- **join-mac.sh** glues the downloaded parts back together, checks them, puts the game in Applications and opens it. Files it creates on your Mac carry no "downloaded from the internet" flag, which usually skips the "can't verify this app" warning. If the warning still shows, Privacy & Security → Open Anyway fixes it once.
+- **A Mac menu bar:** hide, quit, copy and paste (for the seed box and dev notes), minimize and full screen. None of it uses a key the game needs.
+- **Keys:** Command works wherever the game says Ctrl, and key hints show ⌥ for Option.
+- **Real data on a Mac:** BUILD REAL DATA downloads the right Dolt tool for Apple chip or Intel Macs, and also finds Dolt if you installed it with Homebrew.
 
 ### Playtest round 3: sliders and drag lines, the day recap, a new shop, trade any day
 From your notes: studies broke the game, too many buttons and number boxes, the call-your-shot step felt useless, sizing was redundant, the brief was hard to read, powerups weren't clear, days went too fast, the shop needed work, the chain needed its own screen, you wanted a developer mode, and more.
@@ -391,6 +402,7 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
 - **Frame rate was measured in a cloud box without a graphics card** (60 fps while candles form at 4×, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
+- **The Mac version was built and checked on Linux, not launched on a real Mac.** The apps are the right type for each chip, are signed, and hold the same game files the Linux and Windows tests run. Opening one on your Mac is the real test (item 27 in `PLAYTEST.md`).
 - **"Make each day's reward meaningful" is read two ways.** I made waiting a day free (Next Day), made a skip cost real time (the sit-out), and gave every day a recap. If you meant something else, for example a small reward every day for good behavior, say so and I'll add it.
 - **Music needs a first click or key press to start.** That's a rule of the browser engine inside the app, not a choice.
 - **The 1.0.0 Windows installer was built here and the same app package was tested on Linux.** Only a real Windows PC can prove the installer on a fresh profile, so that's item 1 in `PLAYTEST.md`. The exe isn't code-signed (a certificate costs money), so Windows shows a one-time "protected your PC" warning; `README_PLAY.md` explains the click-through.

@@ -62,6 +62,7 @@ A single-player Windows desktop roguelite about trading options spreads on real 
 | `npm run data:report` | Write `data/REPORT.md` (tickers, ranges, row counts, gaps) |
 | `npm run sim -- --runs 2000` | Headless balance simulation; writes `sim/REPORT.md` |
 | `npm run build:win` | Build the Windows installer and portable exe into `release/` |
+| `npm run build:mac` | Build, ad-hoc sign and zip the Mac apps (Apple chip and Intel) into `release/`, plus chat-sized parts and `join-mac.sh` in `release/mac-download/` (needs `rcodesign` on Linux) |
 
 ## Repository layout
 

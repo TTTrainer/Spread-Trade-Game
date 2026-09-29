@@ -13,6 +13,20 @@ Then you have two ways to run the game. Use either one.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 
+### On a Mac
+
+There are two Mac builds: **Apple chip** (M1 and later, the `arm64` files) and **Intel** (the `x64` files). If you're not sure, choose Apple menu → About This Mac: "Chip: Apple M…" means Apple chip.
+
+1. Put the parts (`SpreadTradingGame-mac-arm64-1.3.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
+2. Open **Terminal** (press ⌘ Space, type Terminal, press Return).
+3. Type `bash ` (with a space after it), drag `join-mac.sh` from Finder into the Terminal window, and press Return.
+
+The script glues the parts back together, checks it's byte-for-byte the file that was built, moves **Spread Trading Game** into Applications and opens it. After that, open it from Applications or Launchpad like any app.
+
+If macOS still says it "can't verify" the app, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only need to do this once. It happens because the game isn't signed with a paid Apple developer certificate, not because anything is wrong.
+
+**Keys on a Mac:** where the game says **Ctrl**, use **Control** or **Command (⌘)**; both work. **Alt** is the **Option (⌥)** key, and the game shows ⌥ in its key hints. Command-Q quits, Command-H hides.
+
 The game runs offline. It only uses the internet when you ask it to download or update market data (see below).
 
 ## 2. First launch: play right away
@@ -27,7 +41,7 @@ Good first steps:
 2. **Career → START RUN** on the Verticals desk. That's a real run: a fiscal year of 12 rounds, about 30–40 minutes once you know the controls.
 3. **Drills** for quick 60-second chart reads when you only have a few minutes.
 
-Music starts after your first click or key press; Windows' browser engine requires that. Volume, music style, screen shake, CRT scanlines and the colorblind palette are all in **Settings**.
+Music starts after your first click or key press; the browser engine inside the app requires that. Volume, music style, screen shake, CRT scanlines and the colorblind palette are all in **Settings**.
 
 ## 3. Real market data (optional, a few hours once)
 

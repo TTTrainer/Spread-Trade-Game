@@ -11,8 +11,34 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 configurePaths();
 
-// No default menu: Alt-key hotkeys (Alt+S sell, Alt+B buy...) must reach the game.
-Menu.setApplicationMenu(null);
+// No default menu: Alt-key hotkeys (Alt+S sell, Alt+B buy...) must reach the game. A Mac always
+// has a menu bar, so it gets a minimal one: the app menu (hide, quit), an Edit menu so copy and
+// paste work in text fields, and the window menu. None of them uses a key the game needs.
+if (process.platform === 'darwin') {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' },
+        ],
+      },
+      {
+        label: 'Edit',
+        submenu: [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }],
+      },
+      { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'togglefullscreen' }] },
+    ]),
+  );
+} else {
+  Menu.setApplicationMenu(null);
+}
 
 let mainWindow: BrowserWindow | null = null;
 

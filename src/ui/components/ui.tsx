@@ -12,8 +12,15 @@ export function Pnl({ cents, big = false, testId }: { cents: number; big?: boole
   );
 }
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+
+/** On a Mac, Alt is the Option key (⌥); Ctrl works as Control or Command. */
+export function keyLabel(binding: string): string {
+  return IS_MAC ? binding.replace(/\bAlt\+/g, '⌥').replace(/\bAlt\b/g, '⌥') : binding;
+}
+
 export function Kbd({ children }: { children: ReactNode }) {
-  return <span className="kbd">{children}</span>;
+  return <span className="kbd">{typeof children === 'string' ? keyLabel(children) : children}</span>;
 }
 
 export function Meter({
