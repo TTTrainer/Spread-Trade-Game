@@ -115,7 +115,7 @@ Game-only: `1–5` pick a forecast bucket · `Shift+1–5` confidence 50–90% �
 - Look at E2E screenshots of every new screen before calling it done. Fix clipped text, overlaps and unreadable numbers.
 - Build a Windows exe at the v1 milestone (end of Phase 5) and at the end.
 - If a requirement is impossible with the free data, choose the closest honest alternative, note it in `PROGRESS.md`, and keep going.
-- Nothing in the game connects to a broker or places real trades. It is a paper-trading game, not financial advice (say so in Credits).
+- Nothing in the game places real trades or reads account data. It is a paper-trading game, not financial advice (say so in Credits). The one broker connection allowed (Jacob approved it) is **read-only market data** (quotes, option chains, price history) from Jacob's own Schwab developer app, for Live mode. The Schwab App Secret and tokens stay on his computer, never in the repo or chat.
 
 ## Definition of done (any feature)
 

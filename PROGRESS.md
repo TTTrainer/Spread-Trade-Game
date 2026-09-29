@@ -413,4 +413,6 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
+**Schwab market data for Live mode (approved, waiting on your playtest).** You approved using your Schwab developer app for read-only market data, so Live mode can use recent real chains (every weekly expiration, real bid, ask and Greeks). It will never place orders or read your account. You want to test Live mode as it is first, so nothing is built yet. The plan: a Connect Schwab button in Settings → Data where you enter your App Key and Secret (both stay on your computer), log in to Schwab in the browser, and paste back the address it lands on. After that, Live mode reads Schwab. Schwab asks for a fresh login every 7 days.
+
 The last 27 pictures (the achievement badges; see `ASSETS_NEEDED.md`) whenever you like: upload a sheet like the others and I'll cut it in. Keep playtesting with the 1.3.0 exe files. Try the sliders and drag lines, trading on a later day, the new shop and the chain screen (Ctrl+5), and turn on Developer mode to take notes as you play. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
