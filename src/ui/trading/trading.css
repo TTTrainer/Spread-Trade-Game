@@ -2813,7 +2813,11 @@
 }
 .ticket-block {
   position: absolute;
-  inset: 0;
+  /* Anchored at the bottom: a long reason grows upward over the plan line instead of clipping. */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 100%;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -2950,5 +2954,10 @@
   .dp-dock .pixel-btn {
     font-size: 15px;
     padding: 3px 8px;
+  }
+}
+@media (max-width: 1500px) {
+  .ticket-block {
+    font-size: 13px;
   }
 }

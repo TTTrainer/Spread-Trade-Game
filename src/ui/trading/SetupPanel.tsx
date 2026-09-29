@@ -219,7 +219,7 @@ export function SetupSliders() {
               <b className="conv-qty" data-testid="conv-qty">
                 {plan.qty} CONTRACT{plan.qty === 1 ? '' : 'S'}
               </b>{' '}
-              <span className="dim">{convictionStep(confidence).label.toLowerCase()}</span>
+              <span className="dim">· {convictionStep(confidence).label}</span>
             </>
           ) : (
             convictionStep(confidence).label

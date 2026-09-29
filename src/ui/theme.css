@@ -187,19 +187,21 @@ button {
   position: absolute;
   inset: 0;
   background: rgba(120, 90, 255, 0.03);
-  animation: crt-flicker 6s infinite steps(1);
+  opacity: 0;
+}
+/* A short flicker, started every few seconds from App.tsx (see CrtOverlay for why not a loop). */
+.crt-overlay.flick::after {
+  animation: crt-flicker 0.26s steps(1);
 }
 @keyframes crt-flicker {
-  0%,
-  96%,
-  100% {
-    opacity: 0;
-  }
-  97% {
+  0% {
     opacity: 1;
   }
-  98% {
+  40% {
     opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
   }
 }
 :root[data-reduced-motion='true'] .crt-overlay::after {
