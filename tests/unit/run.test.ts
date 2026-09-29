@@ -190,7 +190,8 @@ describe('shop', () => {
     expect(a).toEqual(b);
     expect(a.filter((x) => x.kind === 'cartridge').length).toBe(2);
     expect(a.filter((x) => x.kind === 'analyst').length).toBe(1);
-    expect(a.filter((x) => x.kind === 'memo' || x.kind === 'page').length).toBe(2);
+    expect(a.filter((x) => x.kind === 'memo').length).toBe(1);
+    expect(a.filter((x) => x.kind === 'page').length).toBe(1);
     expect(a.filter((x) => x.kind === 'voucher').length).toBe(1);
     const analyst = a.find((x) => x.kind === 'analyst');
     if (analyst?.kind === 'analyst' && analyst.id === 'quant') expect(analyst.level).toBe(2);

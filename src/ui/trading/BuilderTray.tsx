@@ -1,83 +1,13 @@
 import { useState } from 'react';
-import { diffDays } from '../../engine/calendar';
 import { limitFillProbability } from '../../engine/orders/fill';
-import {
-  BUCKET_GLYPHS,
-  BUCKET_NAMES,
-  CONFIDENCES,
-  cutoffLabels,
-  type Bucket,
-} from '../../engine/scoring/calls';
-import { expirationsOf, STRUCTURES } from '../../engine/strategies/structures';
+import { STRUCTURES } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { useTrading } from '../store/trading';
+import { tradeOpen, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
-
-export function CallCards() {
-  const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
-  useTrading((s) => s.version);
-  const confidence = useTrading((s) => s.confidence);
-  const setCall = useTrading((s) => s.setCall);
-  const setConfidence = useTrading((s) => s.setConfidence);
-  const plan = useTrading((s) => s.plan)();
-  const ff = useTrading((s) => s.ff);
-  const card = session && cardId ? session.card(cardId) : null;
-  const emPct =
-    plan?.entry?.expectedMovePct ??
-    (session && cardId ? (session.context(cardId).iv30 ?? 0.3) * Math.sqrt(30 / 365) * 0.8 : 0.05);
-  const labels = cutoffLabels({ emPct, mode: session?.config.callMode ?? 'em' });
-  const locked = ff !== 'idle' || !!card?.positionIds.length;
-  return (
-    <div className="tray-section calls" data-testid="call-cards">
-      <div className="section-title" data-tip="g:call">
-        Call your shot <Kbd>1-5</Kbd>
-      </div>
-      <div className="call-row">
-        {([0, 1, 2, 3, 4] as Bucket[]).map((b) => (
-          <TiltCard
-            key={b}
-            className={`call-card b${b}`}
-            selected={card?.call?.bucket === b}
-            onClick={() => !locked && void setCall(b)}
-            testId={`call-${b}`}
-            disabled={locked && card?.call?.bucket !== b}
-            title={`${BUCKET_NAMES[b]}: the stock ends ${labels[b]} by expiration. Hotkey ${b + 1}.`}
-          >
-            <div className="call-glyph">{BUCKET_GLYPHS[b]}</div>
-            <div className="call-name">{BUCKET_NAMES[b]}</div>
-            <div className="call-cut num">{labels[b]}</div>
-          </TiltCard>
-        ))}
-      </div>
-      <div
-        className="conf-row"
-        data-tip="g:confidence"
-        onWheel={(e) =>
-          !locked &&
-          void setConfidence(
-            Math.max(0.5, Math.min(0.9, Math.round((confidence + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10)),
-          )
-        }
-      >
-        {CONFIDENCES.map((c) => (
-          <button
-            key={c}
-            className={`conf-btn num ${Math.abs(confidence - c) < 1e-6 ? 'sel' : ''}`}
-            onClick={() => !locked && void setConfidence(c)}
-            data-testid={`conf-${Math.round(c * 100)}`}
-          >
-            {Math.round(c * 100)}%
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function StructureCards({
   allowed,
@@ -116,79 +46,13 @@ export function StructureCards({
   );
 }
 
-export function ExpiryChips() {
-  const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
-  const builder = useTrading((s) => s.builder);
-  const setBuilder = useTrading((s) => s.setBuilder);
-  if (!session || !cardId) return null;
-  const chain = session.chain(cardId);
-  const now = session.view(cardId).now;
-  const exps = chain ? expirationsOf(chain) : [];
-  const shown = exps.filter((e) => {
-    const d = diffDays(now, e);
-    return (d >= 1 && d <= 10) || (d >= 28 && d <= 47) || e === builder.expiration;
-  });
-  const two = STRUCTURES[builder.structureId].twoExpiries;
-  const backs = exps.filter((e) => builder.expiration && diffDays(builder.expiration, e) >= 14);
-  return (
-    <div className="tray-section expiries" data-testid="expiry-chips">
-      <div className="section-title" data-tip="g:expiration">
-        Expiration
-      </div>
-      <div className="chip-row">
-        {shown.map((e) => {
-          const d = diffDays(now, e);
-          return (
-            <button
-              key={e}
-              className={`exp-chip num ${builder.expiration === e ? 'sel' : ''} ${d <= 10 ? 'weekly' : 'monthly'}`}
-              onClick={() => {
-                sfx('click');
-                setBuilder({
-                  expiration: e,
-                  legs: null,
-                  backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
-                });
-              }}
-              data-testid={`exp-${d}`}
-            >
-              {d}d{session.config.blind ? '' : ` ${e.slice(5)}`}
-            </button>
-          );
-        })}
-      </div>
-      {two && (
-        <>
-          <div className="section-title" style={{ marginTop: 4 }}>
-            Back month
-          </div>
-          <div className="chip-row">
-            {backs.map((e) => (
-              <button
-                key={e}
-                className={`exp-chip num ${builder.backExpiration === e ? 'sel' : ''}`}
-                onClick={() => setBuilder({ backExpiration: e, legs: null })}
-              >
-                {diffDays(now, e)}d
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-const DELTAS = [0.1, 0.16, 0.2, 0.25, 0.3, 0.4];
-
 /** One-key setups: a weekly, a 30-45 day swing, and the player's own saved setup. */
 export function SetupPresets() {
   const applyPreset = useTrading((s) => s.applyPreset);
   const saveMySetup = useTrading((s) => s.saveMySetup);
-  const ff = useTrading((s) => s.ff);
+  const open = useTrading(tradeOpen);
   const mine = useApp((s) => s.settings.game.mySetup);
-  const off = ff !== 'idle';
+  const off = !open;
   return (
     <div className="presets num" data-testid="presets">
       <button
@@ -231,121 +95,6 @@ export function SetupPresets() {
   );
 }
 
-export function SizeControls() {
-  const builder = useTrading((s) => s.builder);
-  const setBuilder = useTrading((s) => s.setBuilder);
-  const sizeToRisk = useTrading((s) => s.sizeToRisk);
-  const session = useTrading((s) => s.session);
-  const plan = useTrading((s) => s.plan)();
-  const hasWidth = ![
-    'long_straddle',
-    'long_strangle',
-    'covered_call',
-    'cash_secured_put',
-    'calendar',
-    'double_calendar',
-  ].includes(builder.structureId);
-  const cap = session?.config.riskCapPct ?? 0.1;
-  const risk = plan?.riskPct ?? 0;
-  return (
-    <div className="tray-section size" data-testid="size-controls">
-      <div className="ctl-grid num">
-        <label data-tip="g:delta">Δ short</label>
-        <div className="delta-chips" data-testid="delta-chips">
-          {DELTAS.map((d) => (
-            <button
-              key={d}
-              className={`dchip ${builder.anchor === null && Math.abs(builder.delta - d) < 0.005 ? 'sel' : ''} ${d >= 0.4 ? 'wide-only' : ''}`}
-              onClick={() => {
-                sfx('click', 0.8 + d);
-                setBuilder({ delta: d, anchor: null, legs: null });
-              }}
-              data-testid={`delta-${Math.round(d * 100)}`}
-            >
-              .{Math.round(d * 100)}
-            </button>
-          ))}
-        </div>
-        <span
-          data-tip-title="Short strike"
-          data-tip-body="Pick a delta, press ↑/↓ to move one strike, or drag the S handle on the chart."
-        >
-          {builder.anchor !== null ? `K ${builder.anchor}` : builder.delta.toFixed(2)}{' '}
-          <span className="kbd wide-only">↑↓</span>
-        </span>
-        {hasWidth && (
-          <>
-            <label data-tip="g:width">Width</label>
-            <div
-              className="stepper"
-              onWheel={(e) =>
-                setBuilder({
-                  width: Math.max(1, Math.min(12, builder.width + (e.deltaY < 0 ? 1 : -1))),
-                  legs: null,
-                })
-              }
-            >
-              <button onClick={() => setBuilder({ width: Math.max(1, builder.width - 1), legs: null })}>
-                −
-              </button>
-              <span data-testid="width-value">
-                {plan?.metrics ? `$${price(plan.metrics.width)}` : builder.width}
-              </span>
-              <button
-                onClick={() => setBuilder({ width: Math.min(12, builder.width + 1), legs: null })}
-                data-testid="width-plus"
-              >
-                +
-              </button>
-            </div>
-            <span>{builder.width} str</span>
-          </>
-        )}
-        <label data-tip="g:contracts">Contracts</label>
-        <div className="stepper">
-          <button onClick={() => setBuilder({ qty: Math.max(1, builder.qty - 1) })} data-testid="qty-minus">
-            −
-          </button>
-          <span data-testid="qty-value">{builder.qty}</span>
-          <button onClick={() => setBuilder({ qty: Math.min(50, builder.qty + 1) })} data-testid="qty-plus">
-            +
-          </button>
-        </div>
-        <span
-          className={risk > cap ? 'down' : risk > cap * 0.6 ? 'warn-text' : ''}
-          data-testid="risk-readout"
-          data-tip="g:risk_cap"
-        >
-          {pct(risk)} / {pct(cap, 0)}
-        </span>
-        <label data-tip="g:size_to_risk">Size to</label>
-        <div className="delta-chips">
-          {([0.01, 0.02, 0.03, 'max'] as const).map((r) => (
-            <button
-              key={r}
-              className="dchip"
-              onClick={() => sizeToRisk(r)}
-              disabled={!plan?.ok}
-              data-testid={`risk-${r}`}
-            >
-              {r === 'max' ? 'MAX' : `${r * 100}%`}
-            </button>
-          ))}
-        </div>
-        <span className="dim wide-only">
-          <span className="kbd">-</span>
-          <span className="kbd">=</span>
-        </span>
-      </div>
-      {plan && !plan.ok && plan.reason && (
-        <div className="build-error" data-testid="build-error">
-          {plan.reason}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function OrderTicket() {
   const builder = useTrading((s) => s.builder);
   const setBuilder = useTrading((s) => s.setBuilder);
@@ -353,7 +102,7 @@ export function OrderTicket() {
   const plan = useTrading((s) => s.plan)();
   const session = useTrading((s) => s.session);
   const cardId = useTrading((s) => s.selectedCardId);
-  const ff = useTrading((s) => s.ff);
+  const open = useTrading(tradeOpen);
   const [confirm, setConfirm] = useState<null | 'buy' | 'sell'>(null);
   const card = session && cardId ? session.card(cardId) : null;
   const hasPosition =
@@ -368,7 +117,7 @@ export function OrderTicket() {
         ? 1
         : limitFillProbability({ mid, natural: nat }, limit, session?.config.execution)
       : 0;
-  const disabled = !plan?.ok || ff !== 'idle' || hasPosition;
+  const disabled = !plan?.ok || !open || hasPosition;
   const earnings = plan?.entry?.earningsInside;
 
   const go = (side: 'buy' | 'sell') => {
@@ -447,40 +196,9 @@ export function OrderTicket() {
             <span data-tip="g:natural">NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
           </div>
         </div>
-        <label className="toggle" data-tip="g:brackets">
-          <input
-            type="checkbox"
-            checked={builder.bracketsOn}
-            onChange={(e) => setBuilder({ bracketsOn: e.target.checked })}
-          />{' '}
-          Plan
-          {builder.bracketsOn && credit && (
-            <span className="bracket-edit">
-              <span data-tip="g:bracket_target">target</span>
-              <select
-                value={builder.targetPct}
-                onChange={(e) => setBuilder({ targetPct: Number(e.target.value) })}
-              >
-                {[0.25, 0.4, 0.5, 0.65, 0.75].map((x) => (
-                  <option key={x} value={x}>
-                    {Math.round(x * 100)}%
-                  </option>
-                ))}
-              </select>
-              <span data-tip="g:bracket_stop">stop</span>
-              <select
-                value={builder.stopMult}
-                onChange={(e) => setBuilder({ stopMult: Number(e.target.value) })}
-              >
-                {[1, 1.5, 2, 3].map((x) => (
-                  <option key={x} value={x}>
-                    {x}x
-                  </option>
-                ))}
-              </select>
-            </span>
-          )}
-        </label>
+        <div className="plan-chip" data-tip="g:plan_set">
+          PLAN · take profit at {Math.round(builder.targetPct * 100)}% · stop at {builder.stopMult}× credit
+        </div>
         {earnings && (
           <label className="toggle warn-text" data-testid="earnings-ack" data-tip="g:earnings_ack">
             <input
@@ -529,7 +247,7 @@ export function OrderTicket() {
           <h2>Confirm {confirm === 'sell' ? 'sell' : 'buy'}</h2>
           <div className="num confirm-body">
             <div>
-              {builder.qty} × {STRUCTURES[builder.structureId].name} on {card?.displaySymbol}
+              {plan.qty} × {STRUCTURES[builder.structureId].name} on {card?.displaySymbol}
             </div>
             <div>
               {builder.orderType === 'market'

@@ -3,7 +3,7 @@ import { quotesFor, stepStrike, mid } from '../../engine/strategies/structures';
 import type { Leg, OptionLeg } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { useHotkeys } from '../hotkeys';
-import { useTrading } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { chartBridge } from './chartBridge';
 
 /**
@@ -12,10 +12,10 @@ import { chartBridge } from './chartBridge';
  */
 export function PriceLadder({ expiration, legs }: { expiration: string | null; legs: Leg[] }) {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const builder = useTrading((s) => s.builder);
   const setBuilder = useTrading((s) => s.setBuilder);
-  const ff = useTrading((s) => s.ff);
+  const open = useTrading(tradeOpen);
   const [, setTick] = useState(0);
   const [density, setDensity] = useState(1);
 
@@ -38,7 +38,7 @@ export function PriceLadder({ expiration, legs }: { expiration: string | null; l
     return puts.map((p) => ({ strike: p.strike, put: p, call: calls.get(p.strike) ?? null }));
   }, [chain, expiration]);
 
-  if (!chain || !expiration || ff !== 'idle') return null;
+  if (!chain || !expiration || !open) return null;
   const legAt = (k: number) =>
     legs.filter(
       (l): l is OptionLeg =>
@@ -92,7 +92,15 @@ export function PriceLadder({ expiration, legs }: { expiration: string | null; l
     <div className="ladder" data-testid="price-ladder">
       <div className="ladder-head num">
         <span>PUT</span>
-        <span>STRIKE</span>
+        <button
+          className="ladder-chain"
+          onClick={() => useTrading.getState().setChainOpen(true)}
+          data-testid="ladder-chain"
+          data-tip-title="Open the full chain"
+          data-tip-body="Every strike and expiration with the Greeks (Ctrl+5)."
+        >
+          ⤢ STRIKE
+        </button>
         <span>CALL</span>
       </div>
       {visible.map(({ r, y }) => {

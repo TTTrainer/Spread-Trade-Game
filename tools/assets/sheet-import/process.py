@@ -2,8 +2,16 @@
 import sys
 from collections import deque
 from PIL import Image
-from tiles import SECTIONS
-from mapping import MAP
+import importlib
+
+# Which sheet's layout to use: sheet 1 lives in tiles.py + mapping.py, later sheets in sheetN.py.
+SPEC = sys.argv[3] if len(sys.argv) > 3 else 'sheet1'
+if SPEC == 'sheet1':
+    from tiles import SECTIONS
+    from mapping import MAP
+else:
+    _m = importlib.import_module(SPEC)
+    SECTIONS, MAP = _m.SECTIONS, _m.MAP
 
 OUT = sys.argv[1]
 SIZE = {'cartridge': (64, 64), 'memo': (64, 64), 'voucher': (64, 64), 'analyst': (64, 64), 'tag': (64, 64),

@@ -15,7 +15,7 @@ import { sfx } from '../../audio/sfx';
 import { money, pnlClass, pnlText } from '../format';
 import { Kbd } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { useTrading, type DayAnim } from '../store/trading';
+import { liveCardId, useTrading, type DayAnim } from '../store/trading';
 import { livePl, priceAt } from './dayPath';
 import { RollDialog } from './RollDialog';
 
@@ -129,14 +129,17 @@ function HudRow({
           {STRUCTURES[p.structureId].short} {p.entry.shortStrikes.join('/')}
           {p.qty > 1 ? ` ×${p.qty}` : ''}
         </span>
-        <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:pl_open">
-          {pnlText(cents)}
+        <span className="hud-inhand num dim" data-tip="g:credit_view">
+          {p.openNet < 0 ? 'IN HAND' : 'PAID'} {money(Math.round(Math.abs(p.openNet) * 100 * 100 * p.qty))}
+        </span>
+        <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:credit_view">
+          <span className="hud-pl-k">{p.status === 'open' ? 'IF CLOSED' : 'REALIZED'}</span> {pnlText(cents)}
         </span>
         <AnimatePresence>
           {floats.map((f) => (
             <motion.span
               key={f.id}
-              className={`hud-float num ${f.cents >= 0 ? 'up' : 'down'}`}
+              className={`hud-float unreal num ${f.cents >= 0 ? 'up' : 'down'}`}
               initial={{ y: 6, opacity: 0, scale: 0.8 }}
               animate={{ y: -18, opacity: [0, 1, 1, 0], scale: 1 }}
               transition={{ duration: 1.6, ease: 'easeOut' }}
@@ -177,13 +180,16 @@ export function PositionHud() {
   const session = useTrading((s) => s.session);
   useTrading((s) => s.version);
   const ff = useTrading((s) => s.ff);
-  const selectedCard = useTrading((s) => s.selectedCardId);
+  const selectedCard = useTrading(liveCardId);
   const floats = useTrading((s) => s.floats);
   const note = useTrading((s) => s.testNote);
   const anim = useTrading((s) => s.dayAnim);
   const closePosition = useTrading((s) => s.closePosition);
   const [rolling, setRolling] = useState<Position | null>(null);
-  if (!session || ff === 'idle' || ff === 'done') return null;
+  const recap = useTrading((s) => s.recap);
+  // The day recap covers the same ground (and more) while it is up.
+  if (!session || ff === 'idle' || ff === 'done' || (recap && (ff === 'paused' || ff === 'decision')))
+    return null;
   // Open trades, plus any that closed during the day being played.
   const rows = session.positions.filter((p) => p.status === 'open' || (anim && anim.positions[p.id]));
   if (!rows.length) return null;
@@ -232,7 +238,7 @@ export function PositionHud() {
 
 // ---------------- pace ----------------
 
-const PACE_LABEL: Record<DayPace, string> = { step: 'DAY BY DAY', '1': '1×', '2': '2×', '4': '4×' };
+const PACE_LABEL: Record<DayPace, string> = { step: 'DAY', '1': '1×', '2': '2×', '4': '4×' };
 const PACE_ORDER: DayPace[] = ['step', '1', '2', '4'];
 
 export function PaceControls() {
@@ -260,6 +266,7 @@ export function PaceControls() {
             data-testid={`pace-${p}`}
           >
             {PACE_LABEL[p]}
+            {p === 'step' && <span className="pace-wide"> BY DAY</span>}
           </button>
         ))}
       </span>

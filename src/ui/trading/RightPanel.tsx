@@ -12,7 +12,7 @@ import type { Leg, OptionLeg } from '../../engine/strategies/types';
 import { RR_RULES } from '../../content/structureRules';
 import { money, pct, price } from '../format';
 
-import { useTrading } from '../store/trading';
+import { liveCardId, useTrading } from '../store/trading';
 import { LivePnl } from './DayPlayer';
 
 interface Curve {
@@ -25,9 +25,9 @@ interface Curve {
   breakevens: number[];
 }
 
-function useCurve(): Curve | null {
+export function useCurve(): Curve | null {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   useTrading((s) => s.version);
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
@@ -127,6 +127,25 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
           height={H - pad.b - sy(0)}
           fill="rgba(255,79,109,0.06)"
         />
+        <defs>
+          <clipPath id="pf-above">
+            <rect x={0} y={0} width={W} height={Math.max(0, sy(0))} />
+          </clipPath>
+          <clipPath id="pf-below">
+            <rect x={0} y={sy(0)} width={W} height={Math.max(0, H - sy(0))} />
+          </clipPath>
+        </defs>
+        {/* Profit and loss at expiration, filled so the shape reads at a glance. */}
+        <path
+          d={`${path(data.exp)}L${sx(data.xs[data.xs.length - 1]).toFixed(1)},${sy(0).toFixed(1)}L${sx(data.xs[0]).toFixed(1)},${sy(0).toFixed(1)}Z`}
+          fill="rgba(77,255,154,0.22)"
+          clipPath="url(#pf-above)"
+        />
+        <path
+          d={`${path(data.exp)}L${sx(data.xs[data.xs.length - 1]).toFixed(1)},${sy(0).toFixed(1)}L${sx(data.xs[0]).toFixed(1)},${sy(0).toFixed(1)}Z`}
+          fill="rgba(255,79,109,0.22)"
+          clipPath="url(#pf-below)"
+        />
         <line x1={pad.l} x2={W - pad.r} y1={sy(0)} y2={sy(0)} stroke="#5b4bc4" />
         {curve.em && (
           <rect
@@ -220,9 +239,101 @@ function GreeksLine({ g, units }: { g: Parameters<typeof plainGreeks>[0]; units:
   );
 }
 
+/** Chance of profit as a needle on a red-to-green dial. */
+function PopGauge({ pop }: { pop: number }) {
+  const a = Math.max(0, Math.min(1, pop));
+  const angle = -90 + a * 180;
+  return (
+    <div className="pop-gauge" data-tip="g:pop" data-testid="stat-pop">
+      <svg viewBox="0 0 120 70" width={120} height={70}>
+        <defs>
+          <linearGradient id="popg" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#ff4f6d" />
+            <stop offset="0.5" stopColor="#ffbf3e" />
+            <stop offset="1" stopColor="#4dff9a" />
+          </linearGradient>
+        </defs>
+        <path d="M 10 62 A 50 50 0 0 1 110 62" fill="none" stroke="#221a5c" strokeWidth={12} />
+        <path
+          d="M 10 62 A 50 50 0 0 1 110 62"
+          fill="none"
+          stroke="url(#popg)"
+          strokeWidth={12}
+          strokeDasharray={`${a * 157} 200`}
+          className="pg-arc"
+        />
+        <g className="pg-needle" style={{ transform: `rotate(${angle}deg)` }}>
+          <line x1={60} y1={62} x2={60} y2={20} stroke="#ece9ff" strokeWidth={3} />
+        </g>
+        <circle cx={60} cy={62} r={5} fill="#ece9ff" />
+      </svg>
+      <div className="pg-v num">{Math.round(a * 100)}%</div>
+      <div className="pg-k">CHANCE OF PROFIT</div>
+    </div>
+  );
+}
+
+/** What you can lose against what you can make, drawn to scale. */
+function RiskReward({
+  riskCents,
+  rewardCents,
+  good,
+  rule,
+}: {
+  riskCents: number;
+  rewardCents: number | null;
+  good: boolean;
+  rule: string;
+}) {
+  const reward = rewardCents ?? riskCents * 3;
+  const top = Math.max(1, riskCents, reward);
+  const ratio = reward > 0 ? riskCents / reward : Infinity;
+  return (
+    <div
+      className="rr"
+      data-tip-title="Reward vs risk"
+      data-tip-body={`${rule} ${good ? 'This one passes: +1 mult if it wins.' : 'This one misses the rule, so no reward:risk bonus.'}`}
+    >
+      <div className="rr-row">
+        <span className="rr-k">RISK</span>
+        <span className="rr-bar loss" style={{ width: `${(riskCents / top) * 100}%` }} />
+        <span className="rr-v num down">{money(riskCents)}</span>
+      </div>
+      <div className="rr-row">
+        <span className="rr-k">REWARD</span>
+        <span className="rr-bar gain" style={{ width: `${(reward / top) * 100}%` }} />
+        <span className="rr-v num up">{rewardCents === null ? 'open' : money(reward)}</span>
+      </div>
+      <div className={`rr-ratio num ${good ? 'up' : 'down'}`} data-testid="stat-rr">
+        {good ? '✔' : '✘'} risk {Number.isFinite(ratio) ? ratio.toFixed(1) : '∞'} to make 1
+      </div>
+    </div>
+  );
+}
+
+/** How much of the spread's width you collect: a third or more is the classic target. */
+function PremiumBar({ credit, width }: { credit: number; width: number }) {
+  const f = width > 0 ? Math.min(1, credit / width) : 0;
+  return (
+    <div className="premium-bar" data-tip="g:premium_bar">
+      <div className="pb-head num">
+        <span>PREMIUM</span>
+        <span>
+          {price(credit)} of ${price(width)} wide ·{' '}
+          <b className={f >= 1 / 3 ? 'up' : ''}>{Math.round(f * 100)}%</b>
+        </span>
+      </div>
+      <div className="pb-track">
+        <span className="pb-fill" style={{ width: `${f * 100}%` }} />
+        <span className="pb-mark" style={{ left: '33.3%' }} />
+      </div>
+    </div>
+  );
+}
+
 export function StatsBlock() {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   useTrading((s) => s.version);
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
@@ -239,7 +350,11 @@ export function StatsBlock() {
           <Stat k="OPEN P/L" v={<LivePnl pos={pos} />} tip="g:pl_open" testId="stat-pl" />
           <Stat k="% OF RISK" v={pct(pl / Math.max(1, pos.entry.maxLossCents))} tip="g:pct_risk" />
           <Stat k="MAX LOSS" v={money(pos.entry.maxLossCents)} tip="g:max_loss_trade" tone="down" />
-          <Stat k="DTE" v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)} tip="g:dte" />
+          <Stat
+            k="DAYS LEFT"
+            v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)}
+            tip="g:dte"
+          />
         </div>
         <GreeksLine g={greeks} units={pos.qty} />
       </div>
@@ -256,34 +371,32 @@ export function StatsBlock() {
         ? 'TOP 25% ×1.25'
         : `${Math.round(edge.percentile * 100)}th pct`
     : 'n/a';
+  const credit = m ? m.entryNet < 0 : false;
   return (
     <div className="stats" data-testid="stats-block">
       {m && (
-        <div className="key-stats">
+        <div className="trade-visuals">
+          <PopGauge pop={m.pop} />
+          <RiskReward
+            riskCents={plan.maxLossCents}
+            rewardCents={plan.maxProfitCents}
+            good={plan.goodRR}
+            rule={rule.text}
+          />
+        </div>
+      )}
+      {m && credit && <PremiumBar credit={Math.abs(m.entryNet)} width={m.width} />}
+      {m && (
+        <div className="key-stats small">
           <Stat
-            k={m.entryNet < 0 ? 'CREDIT' : 'DEBIT'}
-            v={`${price(Math.abs(m.entryNet))}${builder.qty > 1 ? ` ×${builder.qty}` : ''}`}
-            tip={m.entryNet < 0 ? 'g:credit' : 'g:debit'}
+            k={credit ? 'CREDIT (EACH)' : 'DEBIT (EACH)'}
+            v={`${price(Math.abs(m.entryNet))}${plan.qty > 1 ? ` ×${plan.qty}` : ''}`}
+            tip={credit ? 'g:credit' : 'g:debit'}
             testId="stat-net"
           />
-          <Stat
-            k="MAX PROFIT"
-            v={plan.maxProfitCents === null ? '∞' : money(plan.maxProfitCents)}
-            tip="g:max_profit"
-            tone="up"
-            testId="stat-maxprofit"
-          />
-          <Stat
-            k="MAX LOSS"
-            v={money(plan.maxLossCents)}
-            tip="g:max_loss_trade"
-            tone="down"
-            testId="stat-maxloss"
-          />
-          <Stat k="POP" v={pct(m.pop, 0)} tip="g:pop" testId="stat-pop" />
           <Stat k="BREAKEVEN" v={m.breakevens.map((b) => price(b)).join(' / ') || '—'} tip="g:breakeven" />
           <Stat
-            k="EXP. MOVE"
+            k="EXPECTED MOVE"
             v={m.expectedMove === null ? '—' : `±${pct(m.expectedMove / ctx.spot)}`}
             tip="g:expected_move"
           />
@@ -291,19 +404,12 @@ export function StatsBlock() {
       )}
       <div className="stat-chips num">
         <span
-          className={`chip ${plan.goodRR ? 'good' : 'bad'}`}
-          data-tip-title="Reward : risk"
-          data-tip-body={`${m?.rewardToRisk ? `This trade: 1 : ${(1 / Math.max(1e-9, m.rewardToRisk)).toFixed(2)}. ` : ''}${rule.text} ${plan.goodRR ? 'It passes: +1 mult if it wins.' : 'It misses the rule, so no R:R bonus.'}`}
-        >
-          R:R {plan.goodRR ? '✔' : '✘'}
-        </span>
-        <span
           className={`chip ${ctx.ivr !== null && ctx.ivr >= 50 ? 'magenta' : ''}`}
           data-testid="stat-ivr"
           data-tip-title="IV rank and IV vs HV"
           data-tip-body={`IV rank ${ctx.ivr === null ? 'n/a' : ctx.ivr.toFixed(0)} (0–100 over the last year). Implied volatility ${pct(ctx.iv30, 0)} against ${pct(ctx.hv20, 0)} realized: options look ${ctx.iv30 !== null && ctx.hv20 !== null && ctx.iv30 > ctx.hv20 ? 'rich (good for selling)' : 'cheap (good for buying)'}.`}
         >
-          IVR {ctx.ivr === null ? '—' : ctx.ivr.toFixed(0)}
+          IV RANK {ctx.ivr === null ? '—' : ctx.ivr.toFixed(0)}
         </span>
         <span
           className={`chip ${edge && edge.tier !== 'none' ? 'warn' : ''}`}
@@ -318,7 +424,7 @@ export function StatsBlock() {
           EDGE {edgeText}
         </span>
       </div>
-      {m && <GreeksLine g={m.greeks} units={builder.qty} />}
+      {m && <GreeksLine g={m.greeks} units={plan.qty} />}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PlanSetup } from '../components/PlanSetup';
 import type { SymbolInfo, WindowDef } from '../../engine/market/types';
 import { defaultSessionConfig, TradingSession } from '../../engine/trading/session';
 import { sfx } from '../../audio/sfx';
@@ -200,6 +201,10 @@ export function SandboxSetup() {
             value={capital}
             onChange={(e) => setCapital(Math.max(1000, Math.min(100000, Number(e.target.value))))}
           />
+          <div className="section-title" data-tip="g:plan_set">
+            Your plan (every trade)
+          </div>
+          <PlanSetup compact />
           <div className="modal-actions">
             <button
               className="pixel-btn primary"

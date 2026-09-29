@@ -18,6 +18,7 @@ import { diffDays } from '../../engine/calendar';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
 import { fitStructure } from '../../engine/strategies/fit';
+import { convictionQty, CONVICTION, impliedBucket } from '../../engine/trading/conviction';
 import { bridge, hasBridge } from '../bridge';
 import { useApp } from './app';
 import { checkAchievements } from '../achievements';
@@ -43,6 +44,8 @@ export interface BuilderState {
   targetPct: number;
   stopMult: number;
   earningsAck: boolean;
+  /** Long straddles and strangles: call the big move down instead of up. */
+  flipVol: boolean;
 }
 
 export type FFState = 'idle' | 'running' | 'paused' | 'decision' | 'done';
@@ -67,6 +70,25 @@ export interface DayAnim {
       prevClose: number;
     }
   >;
+}
+
+/** The end-of-day report: what each trade did, what happened, and the news. */
+export interface DayRecap {
+  /** Cards with no trade yet: how each moved today (they move with the clock in a Career round). */
+  watch: { cardId: string; movePct: number }[];
+  id: number;
+  day: number;
+  spyPct: number | null;
+  trades: {
+    positionId: string;
+    cardId: string;
+    prevCents: number;
+    finalCents: number;
+    closed: boolean;
+    tension: number;
+    movePct: number;
+  }[];
+  news: { text: string; tone: 'good' | 'bad' | 'warn' | 'info'; cardId: string }[];
 }
 
 /** "+$18" rising off a position when its day settles. */
@@ -123,8 +145,12 @@ interface TradingState {
   builder: BuilderState;
   ff: FFState;
   panel: Panel;
-  /** The right panel: the news brief or the trade view (null follows the card: brief until a call). */
+  /** The right panel: the news brief or the trade view (null follows the card: brief until you build). */
   rightTab: 'brief' | 'trade' | null;
+  /** The player has started shaping a trade on this card (the right panel flips to TRADE). */
+  touched: boolean;
+  /** The call this build makes (read from the structure and strikes). */
+  impliedCall: () => { bucket: Bucket; confidence: number } | null;
   feed: FeedItem[];
   whatIf: { pricePct: number; days: number; ivPts: number };
   studies: StudyId[];
@@ -149,6 +175,13 @@ interface TradingState {
   floats: DayFloat[];
   /** Why the clock paused itself (a short strike being tested), shown on the chart. */
   testNote: string | null;
+  recap: DayRecap | null;
+  /** The last day had news worth reading: the clock waits (auto paces only). */
+  recapHold: boolean;
+  dismissRecap: () => void;
+  /** The full-screen option chain is open. */
+  chainOpen: boolean;
+  setChainOpen: (v: boolean) => void;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
   stamp: { id: number; title: string; text: string; credit: boolean } | null;
@@ -220,9 +253,11 @@ const defaultBuilder = (): BuilderState => ({
   limitFrac: 0.5,
   autoSend: !useApp.getState().settings.game.confirmOrders,
   bracketsOn: true,
-  targetPct: 0.5,
-  stopMult: 2,
+  // The plan is set once (Settings, or when starting a run), not per ticket.
+  targetPct: useApp.getState().settings.game.planTargetPct,
+  stopMult: useApp.getState().settings.game.planStopMult,
   earningsAck: false,
+  flipVol: false,
 });
 
 /** One ledger row for a closed trade. Used by every mode that records to Stats. */
@@ -289,6 +324,23 @@ let planCache: { key: string; value: TradePlan | null } = { key: '', value: null
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Whether a trade can be shaped and sent right now: before the clock, or between days while it is
+ * paused (a Career round lets new trades start on a later day). Never while a day is playing.
+ */
+/**
+ * The selected card, but only while it is still on the table. A reroll swaps cards before the
+ * store hears about it, and components that redraw on a timer must not ask for a removed card.
+ */
+export function liveCardId(t: Pick<TradingState, 'session' | 'selectedCardId'>): string | null {
+  const id = t.selectedCardId;
+  return id && t.session?.cards.some((c) => c.id === id) ? id : null;
+}
+
+export function tradeOpen(t: Pick<TradingState, 'ff' | 'dayAnim' | 'session'>): boolean {
+  return (t.ff === 'idle' || t.ff === 'paused') && !t.dayAnim && !t.session?.inDay;
 }
 
 export const useTrading = create<TradingState>((set, get) => {
@@ -380,7 +432,9 @@ export const useTrading = create<TradingState>((set, get) => {
     const pace = get().pace;
     // Near a short strike the day plays in slow motion (except at 4x).
     const slow = tension >= 0.7 && pace !== '4' ? 1.7 : 1;
-    const ms = reduced || get().timeframe === 'W' ? 0 : Math.round(dayMs() * 0.8 * slow);
+    // Day by day plays each candle over a few seconds; the auto paces use most of the day's time.
+    const base = pace === 'step' ? Math.min(3200, dayMs() * 0.8) : dayMs() * 0.8;
+    const ms = reduced || get().timeframe === 'W' ? 0 : Math.round(base * slow);
     return { id: ++feedId, startedAt: performance.now(), ms, tension, cards, positions };
   };
 
@@ -483,6 +537,7 @@ export const useTrading = create<TradingState>((set, get) => {
       return;
     }
     if (!s.inDay) {
+      set({ recap: null, recapHold: false });
       // Remember where every open trade stood, settle the day, then play it back as a candle.
       const before = new Map<string, { cents: number; delta: number; theta: number; cardId: string }>();
       for (const p of s.openPositions()) {
@@ -494,7 +549,7 @@ export const useTrading = create<TradingState>((set, get) => {
           cardId: p.cardId,
         });
       }
-      const prevClose = new Map(s.runningCardIds().map((id) => [id, s.view(id).spot()] as const));
+      const prevClose = new Map(s.advancingCardIds().map((id) => [id, s.view(id).spot()] as const));
       const events = await dispatchHeld({ t: 'begin' });
       const anim = buildDay(s, before, prevClose);
       set({ dayAnim: anim, version: get().version + 1 });
@@ -526,14 +581,71 @@ export const useTrading = create<TradingState>((set, get) => {
             note = `${s.card(x.cardId).displaySymbol} ${c.tension >= 1 ? 'traded through' : 'is testing'} your short strike.`;
           } else if (c.tension < 0.5) tested[id] = false;
         }
+      // The day's report. Days with news (headlines, alerts, gaps, closes) hold the clock so
+      // there is time to read them.
+      const news: DayRecap['news'] = events
+        .filter((e) => ['headline', 'alert', 'gap', 'close', 'expired', 'assigned'].includes(e.kind))
+        .map((e) => ({
+          text: e.text,
+          cardId: e.cardId,
+          tone:
+            e.kind === 'close' || e.kind === 'expired'
+              ? (e.cents ?? 0) >= 0
+                ? 'good'
+                : 'bad'
+              : e.kind === 'headline'
+                ? 'info'
+                : 'warn',
+        }));
+      const firstCard = Object.keys(anim.cards)[0];
+      const bench = firstCard ? s.view(firstCard).benchmarkBars() : [];
+      const watch = Object.entries(anim.cards)
+        .filter(([cardId]) => !Object.values(anim.positions).some((x) => x.cardId === cardId))
+        .map(([cardId, c]) => ({ cardId, movePct: c.bar.close / c.prevClose - 1 }));
+      const recap: DayRecap | null =
+        Object.keys(anim.positions).length || watch.length
+          ? {
+              id: ++feedId,
+              day: s.dayIndex,
+              spyPct:
+                bench.length > 1 ? bench[bench.length - 1].close / bench[bench.length - 2].close - 1 : null,
+              news,
+              watch,
+              trades: Object.entries(anim.positions).map(([positionId, x]) => ({
+                positionId,
+                cardId: x.cardId,
+                prevCents: x.prevCents,
+                finalCents: x.finalCents,
+                closed: s.position(positionId)?.status === 'closed',
+                tension: anim.cards[x.cardId]?.tension ?? 0,
+                movePct: anim.cards[x.cardId]
+                  ? anim.cards[x.cardId].bar.close / anim.cards[x.cardId].prevClose - 1
+                  : 0,
+              })),
+            }
+          : null;
       set({
         dayAnim: null,
         floats: floats.filter((f) => f.cents !== 0),
         testNote: note,
+        recap,
+        recapHold: get().pace !== 'step' && news.length > 0,
         version: get().version + 1,
       });
       handleEvents(events);
-      if (anim.ms > 0 && floats.length) sfx(total >= 0 ? 'coin' : 'tick', total >= 0 ? 1.4 : 0.6, 0.35);
+      // An untraded card moved to a new day: keep the builder on an expiration it still lists.
+      const sel = get().selectedCardId;
+      const exp = get().builder.expiration;
+      if (sel && s.idleCardIds().includes(sel)) {
+        const ch = s.chain(sel);
+        if (ch && (!exp || !expirationsOf(ch).includes(exp) || diffDays(s.view(sel).now, exp) < 1)) {
+          const touched = get().touched;
+          get().select(sel);
+          set({ touched });
+        }
+      }
+      // Money is only won when a trade closes; a day's paper gain or loss gets a quiet tick.
+      if (anim.ms > 0 && floats.length) sfx('tick', total >= 0 ? 1.2 : 0.7, 0.4);
       if (note) sfx('decision', 0.9, 0.6);
     }
     if (s.decisions.length > 0) {
@@ -551,8 +663,8 @@ export const useTrading = create<TradingState>((set, get) => {
       const t0 = performance.now();
       await get().step();
       if (token !== loopToken || get().ff !== 'running') return;
-      // Day by day: wait for the player after each day. A tested strike also waits (once).
-      if (get().pace === 'step' || get().testNote) {
+      // Day by day: wait for the player after each day. A tested strike or a day with news waits too.
+      if (get().pace === 'step' || get().testNote || get().recapHold) {
         loopToken++;
         set({ ff: 'paused' });
         return;
@@ -571,6 +683,7 @@ export const useTrading = create<TradingState>((set, get) => {
     ff: 'idle',
     panel: 'builder',
     rightTab: null,
+    touched: false,
     feed: [],
     whatIf: { pricePct: 0, days: 0, ivPts: 0 },
     // MACD is one click away in Studies; by default the chart keeps to what a spread seller reads.
@@ -595,6 +708,14 @@ export const useTrading = create<TradingState>((set, get) => {
     testNote: null,
     allowed: null,
     stamp: null,
+    recap: null,
+    recapHold: false,
+    dismissRecap: () => set({ recap: null }),
+    chainOpen: false,
+    setChainOpen: (v) => {
+      if (v !== get().chainOpen) sfx(v ? 'select' : 'click');
+      set({ chainOpen: v });
+    },
 
     init: (s, opts = {}) => {
       loopToken++;
@@ -624,6 +745,8 @@ export const useTrading = create<TradingState>((set, get) => {
         dayAnim: null,
         floats: [],
         testNote: null,
+        recap: null,
+        recapHold: false,
       });
       tested = {};
       if (first) get().select(first);
@@ -660,6 +783,7 @@ export const useTrading = create<TradingState>((set, get) => {
       set({
         selectedCardId: cardId,
         rightTab: null,
+        touched: false,
         builder: {
           ...get().builder,
           expiration: pick,
@@ -671,7 +795,7 @@ export const useTrading = create<TradingState>((set, get) => {
       });
     },
     selectPosition: (id) => set({ selectedPositionId: id }),
-    setBuilder: (patch) => set({ builder: { ...get().builder, ...patch } }),
+    setBuilder: (patch) => set({ builder: { ...get().builder, ...patch }, touched: true }),
     setStructure: (id) => {
       const def = STRUCTURES[id];
       sfx('deal');
@@ -698,24 +822,38 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     },
     plan: () => {
-      const { session, selectedCardId, builder, version } = get();
+      const { session, selectedCardId, builder, version, confidence } = get();
       if (!session || !selectedCardId || !builder.expiration) return null;
-      const key = JSON.stringify([session.config.seed, version, selectedCardId, builder]);
+      const key = JSON.stringify([session.config.seed, version, selectedCardId, builder, confidence]);
       if (planCache.key === key) return planCache.value;
       try {
-        const value = session.planFor(
+        const params = {
+          expiration: builder.expiration,
+          backExpiration: builder.backExpiration ?? undefined,
+          delta: builder.delta,
+          width: builder.width,
+          anchor: builder.anchor ?? undefined,
+        };
+        // Size by conviction: price one contract, then fill that share of the risk cap.
+        const one = session.planFor(
           selectedCardId,
           builder.structureId,
-          {
-            expiration: builder.expiration,
-            backExpiration: builder.backExpiration ?? undefined,
-            delta: builder.delta,
-            width: builder.width,
-            anchor: builder.anchor ?? undefined,
-          },
-          builder.qty,
+          params,
+          1,
           builder.legs ?? undefined,
         );
+        const qty = one.ok
+          ? convictionQty(
+              one.maxLossCents,
+              session.markedEquityCents(),
+              session.config.riskCapPct,
+              confidence,
+            )
+          : 1;
+        const value =
+          qty === 1
+            ? one
+            : session.planFor(selectedCardId, builder.structureId, params, qty, builder.legs ?? undefined);
         planCache = { key, value };
         return value;
       } catch {
@@ -723,22 +861,32 @@ export const useTrading = create<TradingState>((set, get) => {
         return null;
       }
     },
+    impliedCall: () => {
+      const { session, selectedCardId, builder, confidence } = get();
+      const plan = get().plan();
+      if (!session || !selectedCardId || !plan?.ok) return null;
+      const spot = session.view(selectedCardId).spot();
+      const em =
+        plan.entry?.expectedMovePct ?? (plan.metrics?.expectedMove ? plan.metrics.expectedMove / spot : 0.05);
+      return { bucket: impliedBucket(builder.structureId, plan.legs, spot, em, builder.flipVol), confidence };
+    },
     setCall: async (bucket) => {
-      const { selectedCardId, confidence } = get();
-      if (!selectedCardId) return;
+      // The number keys pick a structure by view (4 = up: a bull put); the call itself is read
+      // from the trade when it is placed.
+      if (!get().selectedCardId || !tradeOpen(get())) return;
       sfx('select', 0.8 + bucket * 0.1);
-      await dispatch({ t: 'call', cardId: selectedCardId, bucket, confidence });
-      if (useApp.getState().settings.game.callPicksStructure) {
-        const fit = fitStructure(get().builder.structureId, bucket, get().allowed);
-        if (fit !== get().builder.structureId) get().setStructure(fit);
-      }
+      if (get().panel !== 'builder') set({ panel: 'builder' });
+      const fit = fitStructure(get().builder.structureId, bucket, get().allowed);
+      if (fit !== get().builder.structureId) get().setStructure(fit);
+      if (STRUCTURES[fit].bias === 'long_vol') get().setBuilder({ flipVol: bucket < 2 });
+      set({ touched: true });
     },
     setAllowed: (ids) => set({ allowed: ids }),
     nudgeStrike: (dir) => {
       const { session, selectedCardId, builder } = get();
       const plan = get().plan();
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || !builder.expiration || get().ff !== 'idle') return;
+      if (!chain || !builder.expiration || !tradeOpen(get())) return;
       // Condors build both sides from delta; everything else moves its anchor strike.
       if (['iron_condor', 'bwb_condor'].includes(builder.structureId)) {
         get().setBuilder({ delta: Math.max(0.05, Math.min(0.5, builder.delta - dir * 0.02)), legs: null });
@@ -756,7 +904,7 @@ export const useTrading = create<TradingState>((set, get) => {
     nudgeExpiration: (dir) => {
       const { session, selectedCardId, builder } = get();
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || get().ff !== 'idle') return;
+      if (!chain || !tradeOpen(get())) return;
       const now = session!.view(selectedCardId!).now;
       const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
       const i = builder.expiration ? exps.indexOf(builder.expiration) : -1;
@@ -770,20 +918,19 @@ export const useTrading = create<TradingState>((set, get) => {
       });
     },
     sizeToRisk: (target) => {
-      const { session, builder } = get();
-      const plan = get().plan();
-      if (!session || !plan?.ok || plan.maxLossCents <= 0) return;
-      const perContract = plan.maxLossCents / builder.qty;
-      const cap = session.config.riskCapPct;
-      const pct = target === 'max' ? cap : Math.min(cap, target);
-      const qty = Math.max(1, Math.min(50, Math.floor((session.markedEquityCents() * pct) / perContract)));
-      sfx('multPop', 0.9 + Math.min(0.6, qty * 0.05));
-      get().setBuilder({ qty });
+      // Older saved setups stored a risk share; map it onto the nearest conviction step.
+      const session = get().session;
+      if (!session) return;
+      const share = target === 'max' ? 1 : target / session.config.riskCapPct;
+      const step = CONVICTION.reduce((b, c) =>
+        Math.abs(c.capShare - share) < Math.abs(b.capShare - share) ? c : b,
+      );
+      void get().setConfidence(step.confidence);
     },
     applyPreset: (p) => {
       const { session, selectedCardId, builder } = get();
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || !session || get().ff !== 'idle') return;
+      if (!chain || !session || !tradeOpen(get())) return;
       const now = session.view(selectedCardId!).now;
       const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
       const near = (lo: number, hi: number, aim: number) =>
@@ -824,7 +971,12 @@ export const useTrading = create<TradingState>((set, get) => {
           ? { width: mine.width, targetPct: mine.targetPct, stopMult: mine.stopMult }
           : {}),
       });
-      if (p === 'mine' && mine) setTimeout(() => get().sizeToRisk(mine.riskPct), 0);
+      if (p === 'mine' && mine)
+        setTimeout(
+          () =>
+            mine.conviction ? void get().setConfidence(mine.conviction) : get().sizeToRisk(mine.riskPct),
+          0,
+        );
     },
     saveMySetup: () => {
       const { session, selectedCardId, builder } = get();
@@ -836,6 +988,7 @@ export const useTrading = create<TradingState>((set, get) => {
         delta: builder.delta,
         width: builder.width,
         riskPct: plan?.riskPct ?? 0.02,
+        conviction: get().confidence,
         targetPct: builder.targetPct,
         stopMult: builder.stopMult,
       };
@@ -844,16 +997,14 @@ export const useTrading = create<TradingState>((set, get) => {
       useApp
         .getState()
         .toast(
-          `Saved MY SETUP: ${STRUCTURES[builder.structureId].short}, ~${setup.dte} days, ${Math.round(setup.delta * 100)}Δ, risk ${(setup.riskPct * 100).toFixed(1)}%. Press Y to use it.`,
+          `Saved MY SETUP: ${STRUCTURES[builder.structureId].short}, ~${setup.dte} days, ${Math.round(setup.delta * 100)}Δ, conviction ${Math.round(setup.conviction * 100)}%. Press Y to use it.`,
           'good',
         );
     },
     setConfidence: async (c) => {
-      set({ confidence: c });
-      const { selectedCardId, session } = get();
-      const card = selectedCardId && session ? session.card(selectedCardId) : null;
-      sfx('tick', 0.7 + c);
-      if (card?.call) await dispatch({ t: 'call', cardId: card.id, bucket: card.call.bucket, confidence: c });
+      // Conviction: the confidence behind the call and how much of the risk cap the trade uses.
+      set({ confidence: c, touched: true });
+      sfx('multPop', 0.6 + c * 0.6);
     },
     place: async (side) => {
       const { session, selectedCardId, builder } = get();
@@ -883,12 +1034,13 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx('error');
         return false;
       }
-      const card = session.card(selectedCardId);
-      if (!card.call) {
-        useApp.getState().toast('Call your shot first: press 1-5 (and Shift+1-5 for confidence).', 'warn');
-        sfx('error');
-        return false;
-      }
+      // The call is the trade's own view, at the conviction you sized it with.
+      const call = get().impliedCall();
+      if (call)
+        await dispatch(
+          { t: 'call', cardId: selectedCardId, bucket: call.bucket, confidence: call.confidence },
+          true,
+        );
       const limit = plan.mid + (plan.natural - plan.mid) * builder.limitFrac;
       const d = session.config.bracketDefaults;
       const brackets = builder.bracketsOn
@@ -918,7 +1070,7 @@ export const useTrading = create<TradingState>((set, get) => {
           anchor: builder.anchor ?? undefined,
         },
         legs: builder.legs ?? undefined,
-        qty: builder.qty,
+        qty: plan.qty,
         order: { type: builder.orderType, limit: builder.orderType === 'limit' ? limit : undefined },
         brackets,
         earningsAck: builder.earningsAck,
@@ -932,7 +1084,7 @@ export const useTrading = create<TradingState>((set, get) => {
           stamp: {
             id: ++feedId,
             title: isCredit ? 'SOLD' : 'BOUGHT',
-            text: `${builder.qty > 1 ? `${builder.qty}× ` : ''}${st.short} ${isCredit ? '+' : '−'}${net.toFixed(2)}`,
+            text: `${plan.qty > 1 ? `${plan.qty}× ` : ''}${st.short} ${isCredit ? '+' : '−'}${net.toFixed(2)}`,
             credit: isCredit,
           },
         });
@@ -952,7 +1104,7 @@ export const useTrading = create<TradingState>((set, get) => {
     start: () => {
       const s = get().session;
       if (!s) return;
-      if (s.openPositions().length === 0 && s.orders.length === 0) {
+      if (!get().external && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;
@@ -960,7 +1112,8 @@ export const useTrading = create<TradingState>((set, get) => {
       if (get().ff === 'decision' || get().ff === 'done') return;
       if (get().ff === 'running') return;
       sfx('whoosh');
-      set({ ff: 'running', panel: 'positions', testNote: null });
+      // The tray shows your positions while the clock runs (the builder stays up if nothing is open).
+      set({ ff: 'running', panel: s.openPositions().length ? 'positions' : get().panel, testNote: null });
       const token = ++loopToken;
       void loop(token);
     },
@@ -976,12 +1129,13 @@ export const useTrading = create<TradingState>((set, get) => {
       if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;
       if (!s) return;
-      if (!s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
+      if (!get().external && !s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;
       }
-      set({ ff: 'running', panel: 'positions', testNote: null });
+      // The tray shows your positions while the clock runs (the builder stays up if nothing is open).
+      set({ ff: 'running', panel: s.openPositions().length ? 'positions' : get().panel, testNote: null });
       const token = ++loopToken;
       void (async () => {
         await get().step();

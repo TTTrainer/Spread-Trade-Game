@@ -87,6 +87,11 @@ export interface SessionConfig {
    * before". Off for the balance bots, which tick it only to be allowed to trade over a report.
    */
   trustEarningsAck: boolean;
+  /**
+   * Cards nobody has traded yet move with the clock too (with a fresh chain each day), so a trade
+   * can start on a later day. Off in the sandbox and the balance simulator.
+   */
+  advanceIdle?: boolean;
 }
 
 export function defaultSessionConfig(over: Partial<SessionConfig> = {}): SessionConfig {
@@ -214,6 +219,8 @@ export class TradingSession {
   lastEvents: SessionEvent[] = [];
   dayIndex = 0;
   clockStarted = false;
+  /** Set by the run while the round still has days to trade: the session is not done yet. */
+  holdOpen = false;
   inDay = false;
   realizedCents: Cents = 0;
   dayTrades: ISODate[] = [];
@@ -296,9 +303,21 @@ export class TradingSession {
       .map((c) => c.id);
   }
 
+  /** Cards still waiting for their first trade (they only move with the clock when advanceIdle). */
+  idleCardIds(): string[] {
+    if (!this.config.advanceIdle) return [];
+    return this.cards.filter((c) => c.positionIds.length === 0 && c.orderIds.length === 0).map((c) => c.id);
+  }
+
+  /** Every card the next day moves: running trades plus, when enabled, untraded cards. */
+  advancingCardIds(): string[] {
+    return [...this.runningCardIds(), ...this.idleCardIds()];
+  }
+
   isDone(): boolean {
     return (
       this.clockStarted &&
+      !this.holdOpen &&
       this.openPositions().length === 0 &&
       this.orders.length === 0 &&
       this.decisions.length === 0 &&
@@ -811,6 +830,7 @@ export class TradingSession {
     this.clockStarted = true;
     this.dayIndex++;
     this.inDay = true;
+    const idle = this.idleCardIds();
     for (const cardId of this.runningCardIds()) {
       const view = this.view(cardId);
       const moved = await view.advance();
@@ -872,6 +892,16 @@ export class TradingSession {
         const acked = this.config.trustEarningsAck && this.card(cardId).earningsAck;
         this.decisions.push(...r.decisions.filter((d) => !(acked && d.kind === 'earnings_tomorrow')));
       }
+    }
+    // Untraded cards move too: a new day of bars, today's chain (so a trade can start today) and
+    // today's news. Nothing past today is read.
+    for (const cardId of idle) {
+      const view = this.view(cardId);
+      if (!(await view.advance())) continue;
+      this.chains.set(cardId, await view.loadChain());
+      this.contexts.set(cardId, this.buildCtx(view));
+      for (const h of this.headlinesFor(cardId, this.bookFor(cardId)))
+        this.lastEvents.push({ kind: 'headline', cardId, text: h });
     }
   }
 

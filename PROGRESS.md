@@ -4,15 +4,73 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1 and 2. Version 1.2.0. Next: the last 38 pictures (`ASSETS_NEEDED.md`) and more playtesting.
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1, 2 and 3. Version 1.3.0. Next: the last 27 pictures (achievement badges, `ASSETS_NEEDED.md`) and more playtesting.
 
 ## How to run (on your PC)
 
-- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.2.0.exe`, or run `SpreadTradingGame-Portable-1.2.0.exe` directly.
+- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.3.0.exe`, or run `SpreadTradingGame-Portable-1.3.0.exe` directly.
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### Playtest round 3: sliders and drag lines, the day recap, a new shop, trade any day
+From your notes: studies broke the game, too many buttons and number boxes, the call-your-shot step felt useless, sizing was redundant, the brief was hard to read, powerups weren't clear, days went too fast, the shop needed work, the chain needed its own screen, you wanted a developer mode, and more.
+
+- **The studies crash is fixed.** Changing studies rebuilt the chart and left it blank. It now reloads its candles every time, and a test changes four studies and the timeframe to prove it. Escape also closes any dialog now.
+- **Art sheet 2 is in: 166 of 193 pictures.** The 8 cartridges, the Algo Execution voucher and the Diagonal and Double Calendar pages. Only the 27 achievement badges are left.
+- **Shaping a trade with sliders instead of numbers.**
+  - Snap sliders for **Expires** (monthlies marked), **Short Δ**, **Width** and **Conviction**. Drag them, click the track, scroll the wheel or use the arrow keys. They click like a dial as they pass each value.
+  - **Drag the lines on the chart:** the short-strike handle, plus a second handle for the far strike that sets the width.
+  - **Everything updates live as you move:** a chance-of-profit gauge, "risk X to make 1", a bar for the credit against the width, breakeven, expected move, IV rank and Edge. POP and IV explain themselves on hover.
+  - **On the chart:** a soft green band where the trade makes its most at expiration, red where it loses its most, a gold MAX PROFIT line for narrow peaks, and a bracket showing the % cushion from price to your short strike (it turns red under 2%).
+- **Call your shot is now part of the trade.** "YOUR VIEW ▲ UP · profits above 362.90 (−3.0%)" is read from the structure and strikes you pick. Conviction is the confidence: FEELER 50% up to ALL IN 90%, and it also sets the size as a share of your risk cap. The separate sizing buttons are gone.
+- **The plan moved out of the order ticket.** Take-profit and stop sliders are set once: on the Career screen before a run, in the Sandbox setup and in Settings. The ticket shows one small line.
+- **Slower days you can react to.**
+  - **DAY BY DAY is the default.** Each Space or N plays one candle over about 3 seconds, then waits.
+  - 1× is a quarter of its old speed (5.6 seconds a day).
+  - **After each day, a recap:** every trade's last weeks of candles with its strikes, SAFE / GETTING CLOSE / TESTING / THROUGH, the % to the short strike, the day's news, and a CLOSE button.
+  - Any day with news holds the clock until you've read it.
+- **Credit spreads read like credit spreads.** The trade card shows the credit IN HAND and what closing now would leave ("not locked in"). Paper gains float up muted; only closed trades pay.
+- **Trade on any day.**
+  - Cards you haven't traded now move with the clock. You can watch a day or two, then trade on day 3.
+  - New trades may start on any of a round's first 10 trading days while you have tickets.
+  - A **⏱ days-to-open-trades** chip counts down, and **END ROUND** settles early when nothing is open.
+  - The recap lists your untraded cards (a watchlist) with the day's move. Click one to trade it.
+- **Skip is now a sit-out.** Skipping locks trading for 5 trading days while the market moves without you. Then the Tag and −10 stress pay. Waiting a day on your own is free.
+- **The option chain has its own screen (Ctrl+5, or ⤢ on the price ladder).**
+  - Every expiration, with calls and puts side by side: Δ (with a bar), Γ, Θ, Vega, IV, bid and ask.
+  - Your legs are marked, the price-now row and the one-expected-move rows are highlighted, and it opens centred on the price.
+  - Click a bid to sell there (a credit spread with that short strike). Click an ask to buy.
+- **The brief is widgets now.**
+  - A street-read gauge with a needle.
+  - Price (60-day line with the 50-day average) and a 52-week range bar.
+  - An RSI meter with 50- and 200-day trend chips.
+  - The month's expected move, an IV rank bar, and implied against actual volatility.
+  - The market line and VIX on a calm-to-fear meter.
+  - A timeline of what's coming (earnings, ex-dividend, Fed, CPI) with your trade's expiration laid over it. "⚠ EARNINGS INSIDE YOUR TRADE" if it lands before expiry.
+  - **⤢ opens a big version** with a one-year chart, every headline and the notes behind each widget.
+- **Rolling shows charts.** The roll dialog draws the candles with the old strikes (faint) and the new ones, plus the P/L at expiration for STAY against ROLL. A table compares chance of profit, breakeven, best and worst case and days left. It says what closing now locks in and whether the roll pays a credit. Sliders pick the expiration and how far to move the strikes.
+- **A new shop: DESK/OS.**
+  - The shop is an old trading terminal's desktop. Every category has its own window: CARTRIDGES.EXE, ANALYSTS.DIR, VOUCHER.SYS, MEMOS.TXT and PLAYBOOK.PDF. The windows pop open one by one, with the last round's receipt in LAST_ROUND.LOG.
+  - Every shelf is stocked: each shop now always has a memo and a playbook page (it used to be a coin flip).
+  - **Cards are picture-first:** big art, a price tag, family and REAL/ARCADE chips, a **WHEN** line and a colored **GET** badge (◆ chips, ✚ mult, ✖ ×mult, $ cash, ♥ stress…), plus the catch in amber. All 50 cartridges have hand-written one-line summaries.
+  - **BUILD.SYS** shows each family's pips toward its 2/3/4 bonuses and what the next pip unlocks. Offers on the shelf show as pulsing hollow pips, so combos are visible before you buy.
+  - The reroll button is a spinning ⟳ with its price. Selling a cartridge is a ↩$ chip.
+  - Your loadout (analysts, memos, playbook levels, vouchers) shows as icon slots, with empty slots as dashed boxes.
+- **Clearer powerups before a run.** The Career screen shows your desk's **starting kit** as cards (the same WHEN/GET look) and **"How runs are won"** in three lines: winners score chips × mult, stack a family, close at your plan. During a run, the family counters in the rail are bigger and have pips.
+- **The combo panel.** "IF IT WINS" counts up, a bar shows how much of the round target the trade would fill ("✔ CLEARS THE ROUND"), and each bonus that would fire is a chip with its cartridge picture.
+- **Coworker tips.** Ines (and occasionally Kessler or Bradley) speaks up the first time you meet something: earnings inside a trade, a stop hit, a roll, your first win, watching before trading, or the trading window closing with tickets left. She also speaks when you're struggling (two losses in a row, or a negative meter), once per round.
+- **Developer mode (Settings → Game → Developer mode).**
+  - A DEV button, and Ctrl+Shift+D, opens a panel.
+  - **Playtest notes** are stamped with where you are (screen, run, round, day, card with its real name and date). **SCREENSHOT + NOTE** saves a picture in the game's data folder under `playtest`. Export the notes as a .md file or copy them.
+  - **UNLOCK EVERYTHING:** every desk, pack, tier, Pad upgrade and cosmetic, plus 5000 Bonus.
+  - **Run levers:** cash, stress, tickets, rerolls, meter, and any cartridge, analyst, memo or voucher. They go through the run's action log, so a saved run replays them exactly, and they never touch market data.
+- **Bugs found on the way:**
+  - The put side of the chain showed ask under the "Bid" header.
+  - Rerolling the lineup could crash the round screen.
+  - Two style names collided with older ones (a meter and a sparkline).
+  - The CRT overlay halved the frame rate while candles moved. It now keeps 60 fps and looks the same.
 
 ### Playtest round 2: your art, candles you can watch, faster trade entry
 From your notes: the loop after placing a trade felt like a simulation; you wanted candle animations, anticipation, time and control day to day, easier or more fun trade input, and your asset sheet in the game.
@@ -315,7 +373,10 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 - **SQLite without a native module.** The plan named better-sqlite3. Electron 44 ships SQLite built in (`node:sqlite`), which needs no compiling for Windows and behaves the same in the game, the tests and the data scripts. Same database files, fewer ways for the install to break.
 - **Practice runs.** A run can be flagged "practice" (a missed round doesn't end it). The tutorial will use it; the end-to-end test uses it so a whole year always plays out regardless of balance.
 - **Rerolls redraw every card you haven't traded** (traded cards stay), rather than the whole lineup, so a reroll never throws away an open position.
-- **Skipping goes straight to the next round with no shop**, like skipping a blind in Balatro.
+- **Skipping is a sit-out, then the next round with no shop.** Round 3 turned the instant skip into 5 trading days with trading locked (the Tag pays at the end). There is still no shop after a sit-out, like skipping a blind in Balatro.
+- **Rounds hold open for later trades.** A Career round now ends when nothing is open and either your tickets are used, no untraded card is left, the 10-day trading window has closed, or you press END ROUND. Before, it ended the moment nothing was open. The balance simulator's bots still place their trades up front and skip instantly, so their reports compare with earlier ones.
+- **Conviction replaced separate sizing.** Your confidence (50–90%) picks the size: 20% of the risk cap at FEELER up to all of it at ALL IN, never less than one contract. The "call" is read from the trade itself (the structure and where the strikes sit against the price and the expected move).
+- **Untraded cards load a fresh chain each day.** That's what lets a trade start on a later day. It only ever reads the current day, the same time gate as everything else.
 - **Assignments add +5 stress** (not in the plan's table). The Assignment Artist cartridge says assignments give chips "instead of stress", so they needed a stress cost to replace; the Income desk and that cartridge remove it.
 - **The Chop's rule** ("debit and directional wins score ×0.5") is read as *debit trades with a bull or bear lean*, so a bull put credit spread in a range isn't punished for being the right trade there.
 - **Algo Execution** makes brackets execute on their own (no confirm step), since brackets already default on.
@@ -329,7 +390,8 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 ## Known issues
 
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
-- **Frame rate was measured in a cloud box without a graphics card** (about 55 fps, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
+- **Frame rate was measured in a cloud box without a graphics card** (60 fps while candles form at 4×, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
+- **"Make each day's reward meaningful" is read two ways.** I made waiting a day free (Next Day), made a skip cost real time (the sit-out), and gave every day a recap. If you meant something else, for example a small reward every day for good behavior, say so and I'll add it.
 - **Music needs a first click or key press to start.** That's a rule of the browser engine inside the app, not a choice.
 - **The 1.0.0 Windows installer was built here and the same app package was tested on Linux.** Only a real Windows PC can prove the installer on a fresh profile, so that's item 1 in `PLAYTEST.md`. The exe isn't code-signed (a certificate costs money), so Windows shows a one-time "protected your PC" warning; `README_PLAY.md` explains the click-through.
 
@@ -339,4 +401,4 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-The last 38 pictures (8 cartridges, 1 voucher, 2 playbook pages, 27 achievement badges; see `ASSETS_NEEDED.md`) whenever you like: upload a sheet like the first one and I'll cut it in. Keep playtesting with the 1.2.0 exe files, and try DAY BY DAY and the strike handle. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
+The last 27 pictures (the achievement badges; see `ASSETS_NEEDED.md`) whenever you like: upload a sheet like the others and I'll cut it in. Keep playtesting with the 1.3.0 exe files. Try the sliders and drag lines, trading on a later day, the new shop and the chain screen (Ctrl+5), and turn on Developer mode to take notes as you play. Anything that scores 1–2 gets fixed first. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).

@@ -10,6 +10,7 @@ import { useLive } from './ui/store/live';
 import { playRun, type BotKind } from './engine/sim/bot';
 import { useMusic } from './audio/music';
 import { fx } from './fx/overlay';
+import { chartBridge } from './ui/trading/chartBridge';
 
 // Stores are reachable from the console and from end-to-end tests.
 (window as unknown as { __stg: unknown }).__stg = {
@@ -20,6 +21,7 @@ import { fx } from './fx/overlay';
   live: useLive,
   music: useMusic,
   fx,
+  chart: chartBridge,
   /** Let a bot finish the current Career run through the same store actions the UI uses. */
   botPlay: async (kind: BotKind = 'disciplined', maxSteps = 400) => {
     const e = useRun.getState().engine;

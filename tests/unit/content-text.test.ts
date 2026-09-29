@@ -210,3 +210,17 @@ describe('achievements', () => {
     expect(done.has('fifty_club')).toBe(false);
   });
 });
+
+describe('one-glance summaries', () => {
+  it('every cartridge has a short WHEN / GET summary', async () => {
+    const { CARTRIDGES } = await import('../../src/content/cartridges');
+    const { CARTRIDGE_SUMMARY } = await import('../../src/content/summaries');
+    for (const c of CARTRIDGES) {
+      const s = CARTRIDGE_SUMMARY[c.id];
+      expect(s, c.id).toBeDefined();
+      expect(s.when.length, c.id).toBeLessThanOrEqual(64);
+      expect(s.get.length, c.id).toBeLessThanOrEqual(40);
+    }
+    expect(Object.keys(CARTRIDGE_SUMMARY).sort()).toEqual(CARTRIDGES.map((c) => c.id).sort());
+  });
+});

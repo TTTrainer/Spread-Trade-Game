@@ -62,6 +62,7 @@ import {
   sellPrice,
 } from './shop';
 import type {
+  DevOp,
   RoundState,
   RunAction,
   RunConfig,
@@ -442,10 +443,34 @@ export class RunEngine {
       !complianceMods(this.state.config.compliance).noSkips &&
       r.index < 2 &&
       !r.clockStarted &&
+      !r.sitOut &&
       !!this.session &&
       this.session.positions.length === 0 &&
       this.session.orders.length === 0
     );
+  }
+
+  /**
+   * Whether the round still has days to trade: tickets left, an untraded card on the table and the
+   * trading window open. While it does, a day with nothing open doesn't end the round. A sit-out
+   * holds until its days run out. The balance simulator keeps the old rule (trades up front only).
+   */
+  holdOpen(): boolean {
+    const s = this.session;
+    const r = this.state.round;
+    if (!s || this.state.config.mode === 'sim') return false;
+    if (r.sitOut) return s.dayIndex < r.sitOut.days;
+    if (r.ticketsUsed >= r.tickets) return false;
+    if (s.clockStarted && s.dayIndex >= BALANCE.run.tradeWindowDays) return false;
+    return s.cards.some((c) => c.positionIds.length === 0 && c.orderIds.length === 0);
+  }
+
+  /** Trading days left in the window for new trades (null when the round takes none). */
+  tradeDaysLeft(): number | null {
+    const s = this.session;
+    const r = this.state.round;
+    if (!s || r.sitOut || this.state.config.mode === 'sim') return null;
+    return Math.max(0, BALANCE.run.tradeWindowDays - s.dayIndex);
   }
 
   // ---------- actions ----------
@@ -502,6 +527,9 @@ export class RunEngine {
         case 'forfeit':
           this.finishRun('forfeit', 'You walked away from the desk.');
           break;
+        case 'dev':
+          this.devOp(a.op);
+          break;
       }
     this.flushSpeech(String(this.log.length));
     if (!this.session || !this.sessionDirty) this.checkpoint();
@@ -516,6 +544,16 @@ export class RunEngine {
     who?: CharacterId,
   ): void {
     if (!this.speech || pri > this.speech.pri) this.speech = { trigger, pri, vars, who };
+  }
+
+  /** A coworker tip, spoken once per key (a first-time tip once a run, a nudge once a round). */
+  private tip(trigger: Trigger, pri: number, key: string = trigger): void {
+    const st = this.state;
+    if (st.config.mode === 'sim') return;
+    const seen = (st.stats.tipsSeen ??= []);
+    if (seen.includes(key)) return;
+    seen.push(key);
+    this.say(trigger, pri);
   }
 
   private flushSpeech(label: string): void {
@@ -551,7 +589,12 @@ export class RunEngine {
     const s = this.session as TradingSession;
     const r = this.state.round;
     const desk = DESKS[this.state.config.deskId];
-    if (r.clockStarted || s.clockStarted) return 'The clock is running: new trades wait for the next round.';
+    if (r.sitOut) return 'You are sitting this round out: no new trades until it ends.';
+    if (s.inDay) return 'Wait for the close.';
+    if (this.state.config.mode === 'sim' && (r.clockStarted || s.clockStarted))
+      return 'The clock is running: new trades wait for the next round.';
+    if (s.clockStarted && s.dayIndex >= BALANCE.run.tradeWindowDays)
+      return `The trading window closed after day ${BALANCE.run.tradeWindowDays}: new trades wait for the next round.`;
     if (r.ticketsUsed >= r.tickets) return 'No tickets left this round. Press Space to start the clock.';
     if (!desk.structures.includes(a.structureId))
       return `${STRUCTURES[a.structureId].name} is not in the ${desk.name} desk's playbook.`;
@@ -652,10 +695,30 @@ export class RunEngine {
     const res = await this.sdispatch(action);
     for (const p of s.positions) if (!before.has(p.id)) this.onOpened(p);
     if (sa.t === 'place' && res?.ok) r.ticketsUsed++;
+    if (sa.t === 'begin') {
+      for (const d of s.decisions) {
+        if (d.kind === 'stop_hit') this.tip('tip_stop', 5);
+        if (d.kind === 'earnings_tomorrow') this.tip('tip_earnings', 5);
+      }
+      if (s.dayIndex === 1 && s.positions.length === 0 && !r.sitOut) this.tip('tip_wait', 2);
+    }
+    if (sa.t === 'roll' || (sa.t === 'decide' && action.t === 'decide' && action.action === 'roll'))
+      this.tip('tip_roll', 3);
+    if (sa.t === 'end' && !r.sitOut) {
+      const left = this.tradeDaysLeft();
+      if (left === 2 && r.ticketsUsed < r.tickets && this.holdOpen())
+        this.tip('tip_window', 3, `tip_window:${st.quarter}:${r.index}`);
+    }
     if (hadOrder) r.ticketsUsed = Math.max(0, r.ticketsUsed - 1);
     if (sa.t === 'end') this.afterDayClose();
     this.scoreClosed();
     if (sa.t === 'end' || sa.t === 'close' || sa.t === 'decide') await this.checkLine();
+    if (this.session !== s) return res;
+    if (r.sitOut && r.clockStarted && !s.inDay && s.dayIndex >= r.sitOut.days) {
+      await this.finishSitOut();
+      return res;
+    }
+    s.holdOpen = this.holdOpen();
     if (r.clockStarted && s.isDone()) await this.settleRound();
     return res;
   }
@@ -823,6 +886,10 @@ export class RunEngine {
     if (facts.closedAtPlan)
       this.addStress(BALANCE.stress.closeAtPlan, `Closed ${sym} at plan (${facts.closedAtPlan})`);
     if (facts.closedAtPlan && this.rng(`plan:${p.id}`).chance(0.5)) this.say('closed_at_plan', 3);
+    st.stats.lossRun = facts.win ? 0 : (st.stats.lossRun ?? 0) + 1;
+    if (facts.win) this.tip('tip_first_win', 4);
+    else if ((st.stats.lossRun ?? 0) >= 2 || r.meter < 0)
+      this.tip('tip_struggling', 5, `tip_struggling:${st.quarter}:${r.index}`);
     if (facts.assigned && st.config.deskId !== 'income' && !carts.includes('assignment_artist'))
       this.addStress(BALANCE.stress.assignment, `Assigned on ${sym}`);
     const call = card.call;
@@ -918,9 +985,11 @@ export class RunEngine {
     const s = this.session;
     const r = this.state.round;
     if (!s || this.state.phase !== 'round') return this.warn('No round is in progress.');
+    if (r.sitOut) return this.warn('You are sitting this round out: let the days run.');
     if (s.openPositions().length || s.orders.length || s.inDay)
       return this.warn('Close or wait out your positions first.');
     r.clockStarted = true;
+    s.holdOpen = false;
     await this.settleRound();
   }
 
@@ -1146,6 +1215,7 @@ export class RunEngine {
       blind: true,
       rescale: cfg.rescale,
       priceRange: desk.priceRange ?? [20, 150],
+      advanceIdle: cfg.mode !== 'sim',
     });
   }
 
@@ -1161,6 +1231,7 @@ export class RunEngine {
       });
     this.session = s;
     this.sessionDirty = false;
+    s.holdOpen = this.holdOpen();
   }
 
   private async enterRound(reviewId: ReviewId | null): Promise<void> {
@@ -1311,6 +1382,10 @@ export class RunEngine {
     return true;
   }
 
+  /**
+   * A skip sits the round out: no trades for a set number of trading days while the market moves
+   * on without you, then the Tag and the stress relief pay. The simulator skips instantly.
+   */
   private async skipRound(): Promise<void> {
     const st = this.state;
     const r = st.round;
@@ -1318,8 +1393,20 @@ export class RunEngine {
       return this.warn(
         r.index === 2 ? 'Reviews cannot be skipped.' : 'You can only skip before placing any trade.',
       );
-    this.addStress(BALANCE.stress.skipRound, 'Skipped a round');
+    if (st.config.mode === 'sim' || !this.session) return this.finishSitOut();
+    r.sitOut = { days: BALANCE.run.sitOutDays };
+    this.session.holdOpen = true;
     this.say('skip', 5);
+    this.events.push({
+      kind: 'info',
+      text: `Sitting out: ${BALANCE.run.sitOutDays} trading days with no new trades. Press Space to let them pass; the Tag pays at the end.`,
+    });
+  }
+
+  private async finishSitOut(): Promise<void> {
+    const st = this.state;
+    const r = st.round;
+    this.addStress(BALANCE.stress.skipRound, 'Sat a round out');
     st.stats.skips++;
     if (this.activeCartridges().includes('patience_pays'))
       st.patienceStacks = Math.min(3, st.patienceStacks + 1);
@@ -1336,6 +1423,7 @@ export class RunEngine {
       trades: 0,
     });
     if (r.skipTag) this.awardTag(r.skipTag);
+    this.events.push({ kind: 'good', text: 'Sit-out over: rested, and the Tag is yours.' });
     this.session = null;
     this.sessionDirty = false;
     await this.advanceRound();
@@ -1613,6 +1701,60 @@ export class RunEngine {
     st.stats.maxAnalysts = Math.max(st.stats.maxAnalysts, st.analysts.length);
     if (st.cartridges.some((c) => CARTRIDGE_BY_ID[c]?.duoOf)) st.stats.duoOwned = true;
     this.events.push({ kind: 'good', text: 'Bought.' });
+  }
+
+  /** Developer mode's levers: game-layer only, logged like any action. */
+  private devOp(op: DevOp): void {
+    const st = this.state;
+    const r = st.round;
+    st.dev = true;
+    const note = (text: string): void => {
+      this.events.push({ kind: 'info', text: `DEV: ${text}` });
+    };
+    switch (op.k) {
+      case 'cash':
+        st.cash = Math.max(0, st.cash + op.delta);
+        return note(`cash ${op.delta >= 0 ? '+' : '−'}$${Math.abs(op.delta)}`);
+      case 'stress':
+        this.addStress(op.delta, 'Developer mode');
+        return note(`stress ${op.delta >= 0 ? '+' : ''}${op.delta}`);
+      case 'tickets':
+        r.tickets = Math.max(0, r.tickets + op.delta);
+        return note(`tickets now ${r.tickets}`);
+      case 'rerolls':
+        r.rerolls = Math.max(0, r.rerolls + op.delta);
+        return note(`rerolls now ${r.rerolls - r.rerollsUsed}`);
+      case 'meter':
+        r.meter += op.delta;
+        return note(`meter ${op.delta >= 0 ? '+' : ''}${op.delta}`);
+      case 'cartridge': {
+        const c = CARTRIDGE_BY_ID[op.id];
+        if (!c || st.cartridges.includes(op.id)) return this.warn('Already owned (or unknown).');
+        if (st.cartridges.length >= this.cartridgeSlots())
+          return this.warn('No free cartridge slot. Sell one first.');
+        st.cartridges.push(op.id);
+        st.cartState[op.id] = {};
+        return note(`added ${c.name}`);
+      }
+      case 'analyst': {
+        const have = st.analysts.find((a) => a.id === op.id);
+        if (have) have.level = 2;
+        else {
+          if (st.analysts.length >= this.analystSeats()) return this.warn('No free analyst seat.');
+          st.analysts.push({ id: op.id, level: 1 });
+        }
+        return note(`hired ${ANALYSTS[op.id].name}`);
+      }
+      case 'memo':
+        if (st.memos.length >= BALANCE.shop.memoSlots) return this.warn('Memo slots are full.');
+        st.memos.push(op.id);
+        return note(`memo ${MEMOS[op.id].name}`);
+      case 'voucher':
+        if (st.vouchers.includes(op.id)) return this.warn('Already owned.');
+        st.vouchers.push(op.id);
+        st.cash += VOUCHERS[op.id].cashNow ?? 0;
+        return note(`voucher ${VOUCHERS[op.id].name}`);
+    }
   }
 
   private sell(id: string): void {

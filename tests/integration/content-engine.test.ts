@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { skip } from './sitout';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
 import { computeTarget, RunEngine } from '../../src/engine/run/engine';
 import { BALANCE } from '../../src/content/balance';
@@ -163,7 +164,7 @@ describe('vouchers', () => {
 
   it('Seed Capital pays $10 when bought; Second Monitor deals a fourth card next round', async () => {
     const e = await RunEngine.create(src, config('voucher-buy'));
-    await e.dispatch({ t: 'skip' });
+    await skip(e);
     // Set up a shop by finishing a (skipped) round the normal way: skip Month 2, then fake a shop.
     e.state.phase = 'shop';
     e.state.cash = 30;
@@ -203,16 +204,16 @@ describe('tags', () => {
       const e = await RunEngine.create(src, config(`tag-${tag}`));
       e.state.round.skipTag = tag;
       const before = { stress: e.state.stress, cash: e.state.cash };
-      await e.dispatch({ t: 'skip' });
+      await skip(e);
       effects[tag](e, before);
     }, 30_000);
 
   it('Double copies the next tag', async () => {
     const e = await RunEngine.create(src, config('tag-double-2'));
     e.state.round.skipTag = 'double';
-    await e.dispatch({ t: 'skip' });
+    await skip(e);
     e.state.round.skipTag = 'reroll';
-    await e.dispatch({ t: 'skip' });
+    await skip(e);
     expect(e.state.tagEffects.freeRerolls).toBe(4);
   }, 30_000);
 });
@@ -225,8 +226,8 @@ describe('reviews', () => {
         src,
         config(`review-${id}`, id === 'annual_review' ? { quarters: 1 } : {}),
       );
-      await e.dispatch({ t: 'skip' });
-      await e.dispatch({ t: 'skip' });
+      await skip(e);
+      await skip(e);
       expect(e.state.phase).toBe('review_intro');
       e.state.nextReview = id;
       e.state.round.reviewId = id;

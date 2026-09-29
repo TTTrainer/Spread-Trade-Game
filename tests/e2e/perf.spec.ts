@@ -59,6 +59,8 @@ async function measure(page: Page, ms: number): Promise<FrameStats> {
 test('fast-forward stays smooth: frame times and main-thread stalls', async () => {
   const { app, page } = await launchGame();
   await page.waitForFunction(() => (window as Any).__stg !== undefined);
+  // Settings load on boot: change them after that, or the load overwrites the change.
+  await expect(page.getByTestId('title-screen')).toBeVisible();
   // Don't stop for decisions while measuring.
   await page.evaluate(() =>
     (window as Any).__stg.app.getState().updateSettings((s: Any) => ({

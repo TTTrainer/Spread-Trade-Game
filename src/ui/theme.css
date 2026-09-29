@@ -177,7 +177,10 @@ button {
       transparent 3px
     ),
     radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
-  mix-blend-mode: multiply;
+  /* Black over the picture looks the same blended normally as multiplied, and normal blending
+     keeps the overlay on its own layer instead of re-blending the whole screen every frame. */
+  will-change: opacity;
+  transform: translateZ(0);
 }
 .crt-overlay::after {
   content: '';
@@ -228,6 +231,7 @@ button {
       transparent 3px
     ),
     radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.75) 100%);
+  mix-blend-mode: multiply;
 }
 :root[data-crt='rolling'] .crt-overlay::after {
   background: linear-gradient(

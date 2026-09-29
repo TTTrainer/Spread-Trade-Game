@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PlanSetup } from '../components/PlanSetup';
 import { DESKS, DESK_ORDER } from '../../content/desks';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
@@ -27,6 +28,9 @@ import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { TradingLayout } from '../trading/TradingScreen';
 import { RunEnd, ReviewIntro, ShopView, TallyView } from '../run/RunPhases';
+import { CartridgeMini } from '../run/Shop';
+import { Primer } from '../run/Primer';
+import { ANALYST_SHORT } from '../../content/summaries';
 import { careerBadges, careerBriefAccess, RunLeftExtra, RunRightExtra, RunTopBar } from '../run/RunParts';
 import './screens.css';
 import '../run/run.css';
@@ -203,7 +207,14 @@ export function CareerScreen() {
           );
         })}
       </div>
+      <StartingKit deskId={desk} />
       <div className="career-options">
+        <div className="panel career-opt">
+          <div className="section-title" data-tip="g:plan_set">
+            Your plan (every trade)
+          </div>
+          <PlanSetup compact />
+        </div>
         <div className="panel career-opt">
           <div className="section-title" data-tip="g:risk_tier">
             Risk Tier
@@ -424,5 +435,54 @@ export function RunScreen() {
       {body}
       {coach}
     </>
+  );
+}
+
+/** What the chosen desk hands you on day one, as cards, beside the three rules that win runs. */
+function StartingKit({ deskId }: { deskId: DeskId }) {
+  const d = DESKS[deskId];
+  return (
+    <div className="kit-row" data-testid="starting-kit">
+      <div className="panel kit-panel">
+        <div className="section-title">
+          Your starting kit · <span className="amber-text">{d.name}</span>
+        </div>
+        <div className="kit-cards">
+          {d.startingCartridges.map((c) => (
+            <CartridgeMini key={c} id={c} />
+          ))}
+          {d.startingAnalysts.map((a) => (
+            <div key={a} className="cart-mini analyst" data-tip={`analyst:${a}`}>
+              <ArtIcon category="analyst" id={a} name={ANALYSTS[a].name} />
+              <div className="cm-body">
+                <div className="cm-name">{ANALYSTS[a].name}</div>
+                <div className="cm-get fx-info">
+                  <span className="sc-glyph">◉</span> {ANALYST_SHORT[a]}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="cart-mini passive" data-tip={`desk:${deskId}`}>
+            <span className="kit-passive-ico">★</span>
+            <div className="cm-body">
+              <div className="cm-name">Desk passive</div>
+              <div className="cm-text">{d.passiveText}</div>
+            </div>
+          </div>
+        </div>
+        <div className="kit-plays">
+          {d.structures.map((st) => (
+            <span key={st} className="kit-play num" data-tip={`struct:${st}`}>
+              <ArtIcon category="page" id={st} name={STRUCTURES[st].name} scale={0.5} />
+              {STRUCTURES[st].short}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="panel kit-panel primer-panel">
+        <div className="section-title">How runs are won</div>
+        <Primer />
+      </div>
+    </div>
   );
 }

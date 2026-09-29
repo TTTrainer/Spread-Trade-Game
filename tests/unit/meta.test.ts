@@ -312,3 +312,20 @@ describe('Daily and Contracts bookkeeping', () => {
     expect(mergeProfile(null)).toEqual(defaultProfile());
   });
 });
+
+describe('developer mode', () => {
+  it('unlocks every desk, pack, tier and cosmetic without losing progress', async () => {
+    const { unlockEverything, defaultProfile, cartridgePoolFor, cosmeticUnlocked, packUnlocked } =
+      await import('../../src/engine/meta/profile');
+    const { CARTRIDGE_PACKS, COSMETICS } = await import('../../src/content/meta');
+    const { DESK_ORDER } = await import('../../src/content/desks');
+    const p = { ...defaultProfile(), bonus: 12 };
+    const q = unlockEverything(p);
+    expect(q.desks).toEqual(DESK_ORDER);
+    for (const pk of CARTRIDGE_PACKS) expect(packUnlocked(q, pk.id)).toBe(true);
+    expect(cartridgePoolFor(q).length).toBe(CARTRIDGES.length);
+    expect(COSMETICS.every((c) => cosmeticUnlocked(q, c))).toBe(true);
+    expect(q.bonus).toBe(5012);
+    expect(p.desks.length).toBeLessThan(q.desks.length);
+  });
+});

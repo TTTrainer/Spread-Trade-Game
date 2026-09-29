@@ -11,7 +11,7 @@ async function fastClock(page: Page): Promise<void> {
   await page.evaluate(() => {
     (window as Any).__stg.app.getState().updateSettings((x: Any) => ({
       ...x,
-      game: { ...x.game, ffSecondsPerDay: 0.06, pauseOnTest: false },
+      game: { ...x.game, ffSecondsPerDay: 0.06, pauseOnTest: false, dayPace: '4' },
     }));
   });
 }
@@ -42,6 +42,9 @@ async function runClock(page: Page, done: () => Promise<boolean>, maxLoops = 600
   await page.keyboard.press('Space');
   for (let i = 0; i < maxLoops; i++) {
     if (await done()) return;
+    // Days with news (and recaps) hold the clock; keep it going.
+    const ff = await page.evaluate(() => (window as Any).__stg.trading.getState().ff as string);
+    if (ff === 'paused') await page.keyboard.press('Space');
     const modal = page.getByTestId('decision-modal');
     if (await modal.isVisible()) {
       const hold = page.getByTestId('dp-hold');
@@ -173,7 +176,7 @@ test('tutorial: Ines coaches the first round', async () => {
   await expect(page.getByTestId('tutorial-banner')).toBeVisible();
   await page.getByTestId('start-tutorial').click();
   await expect(page.getByTestId('tutorial-coach')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'call');
+  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'read');
   await page.keyboard.press('4');
   await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'build');
   await shot(page, '09-tutorial-1920');

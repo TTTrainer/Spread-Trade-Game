@@ -117,6 +117,8 @@ export interface RoundState {
   filterRelaxed: boolean;
   scored: string[]; // position ids already tallied
   client: { id: string; status: 'open' | 'filled' | 'missed' } | null;
+  /** Sitting the round out (a skip): no trades until the days run out, then the Tag pays. */
+  sitOut?: { days: number } | null;
 }
 
 export type ShopItem =
@@ -160,6 +162,8 @@ export interface RunResult {
 export interface RunState {
   version: 1;
   id: string;
+  /** Developer mode touched this run (its levers were used). */
+  dev?: boolean;
   config: RunConfig;
   phase: RunPhase;
   quarter: number;
@@ -237,6 +241,10 @@ export interface RunStats {
   ownedAt: Record<string, number>;
   /** The year reached (2+ only in Endless). */
   year?: number;
+  /** Coworker tips already given (first-time tips speak once a run; struggling once a round). */
+  tipsSeen?: string[];
+  /** Losing trades in a row. */
+  lossRun?: number;
 }
 
 export type RunAction =
@@ -254,7 +262,24 @@ export type RunAction =
   | { t: 'leaveShop' }
   | { t: 'startReview' }
   | { t: 'endless' }
-  | { t: 'forfeit' };
+  | { t: 'forfeit' }
+  | { t: 'dev'; op: DevOp };
+
+/**
+ * Developer mode's test levers. They go through the action log like every other action, so a
+ * resumed run replays them exactly. They touch the game layer only (cash, stress, meter, items),
+ * never the market.
+ */
+export type DevOp =
+  | { k: 'cash'; delta: number }
+  | { k: 'stress'; delta: number }
+  | { k: 'tickets'; delta: number }
+  | { k: 'rerolls'; delta: number }
+  | { k: 'meter'; delta: number }
+  | { k: 'cartridge'; id: string }
+  | { k: 'analyst'; id: AnalystId }
+  | { k: 'memo'; id: MemoId }
+  | { k: 'voucher'; id: VoucherId };
 
 export interface RunEvent {
   kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say';

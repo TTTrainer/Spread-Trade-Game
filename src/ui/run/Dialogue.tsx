@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { CHARACTERS } from '../../content/characters';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
+import { useTrading } from '../store/trading';
 import { Portrait } from '../components/Portrait';
 
 /** The speech box: a portrait, a name and a typed line. Clicks pass through it; it fades on its own. */
@@ -14,7 +15,16 @@ export function DialogueBox() {
   // NEXT button); at the bottom elsewhere, clear of stamps.
   const phase = useRun((s) => s.engine?.state.phase);
   const inRun = useApp((s) => s.screen === 'run');
-  const place = inRun && phase === 'round' ? '' : inRun && phase === 'shop' ? 'at-corner' : 'at-bottom';
+  // The day's recap owns the middle of the chart: step aside to the corner while it's up.
+  const recapUp = useTrading((s) => !!s.recap && (s.ff === 'paused' || s.ff === 'decision'));
+  const place =
+    inRun && phase === 'round'
+      ? recapUp
+        ? 'at-corner'
+        : ''
+      : inRun && phase === 'shop'
+        ? 'at-corner'
+        : 'at-bottom';
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {

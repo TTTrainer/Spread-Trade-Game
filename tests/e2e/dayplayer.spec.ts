@@ -61,7 +61,12 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
   await expect.poll(async () => (await state(page)).day, { timeout: 10_000 }).toBe(2);
   await expect.poll(async () => (await state(page)).ff, { timeout: 10_000 }).toBe('paused');
 
-  // The trade card shows the stop-vs-target meter and a close button while waiting.
+  // Each day ends with a recap: the trade's candles, its status and a way to close it.
+  await expect(page.getByTestId('day-recap')).toBeVisible();
+  await expect(page.locator('.recap-trade .mini-candles')).toBeVisible();
+  await shot(page, '14-day-recap-1920');
+  // Hiding the recap shows the trade card with its stop-vs-target meter and a close button.
+  await page.locator('.dr-x').click();
   await expect(page.locator('.tug')).toBeVisible();
   await expect(page.getByTestId('hud-close')).toBeVisible();
   await page.setViewportSize({ width: 1366, height: 768 });

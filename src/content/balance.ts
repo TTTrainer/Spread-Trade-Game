@@ -15,6 +15,10 @@ export const BALANCE = {
     lineupSize: 4,
     lineupMax: 5,
     recentShare: 0.75,
+    /** New trades may start on any of a round's first N trading days. */
+    tradeWindowDays: 10,
+    /** A skip sits the round out for this many trading days before its Tag pays. */
+    sitOutDays: 5,
   },
 
   targets: {

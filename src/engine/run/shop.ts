@@ -1,7 +1,8 @@
 /**
  * The shop between rounds: cartridge offers weighted by rarity (60/28/10/2) and 60/40 toward the
  * desk's own cartridges, duo Legendaries only once both parents are owned, analysts, boosters
- * (memos and Playbook Pages) and one voucher. Rerolls get pricier each time within a shop.
+ * (a memo and a Playbook Page, so every shelf is stocked) and one voucher. Rerolls get pricier
+ * each time within a shop.
  */
 
 import { ANALYSTS, ANALYST_IDS } from '../../content/analysts';
@@ -98,9 +99,10 @@ export function generateShop(state: RunState, rng: Rng, mods: ShopMods): ShopIte
       sold: false,
     });
   }
+  // Boosters alternate memo, page, memo...: every shop has at least one of each on the shelf.
   const deskStructures = DESKS[state.config.deskId].structures;
   for (let i = 0; i < BALANCE.shop.boosterOffers; i++) {
-    if (rng.chance(0.5))
+    if (i % 2 === 0)
       items.push({
         kind: 'memo',
         id: rng.pick(MEMO_IDS),

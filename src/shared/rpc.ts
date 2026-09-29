@@ -62,6 +62,8 @@ export interface RpcMap {
   'system.toggleFullscreen': () => boolean;
   'system.openPath': (path: string) => void;
   'system.saveTextFile': (suggestedName: string, content: string) => string | null;
+  /** Save a PNG of the window into the playtest folder; returns its path. */
+  'system.screenshot': (name: string) => string | null;
 }
 
 export type RpcChannel = keyof RpcMap;

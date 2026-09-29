@@ -58,7 +58,9 @@ export type HotkeyAction =
   | 'qtyDown'
   | 'presetWeekly'
   | 'presetSwing'
-  | 'presetMine';
+  | 'presetMine'
+  | 'chain'
+  | 'devPanel';
 
 /** thinkorswim defaults (plus game-only keys). Remappable in Settings. */
 export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
@@ -120,6 +122,8 @@ export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
   presetWeekly: 'W',
   presetSwing: 'M',
   presetMine: 'Y',
+  chain: 'Ctrl+5',
+  devPanel: 'Ctrl+Shift+D',
 };
 
 export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
@@ -176,11 +180,13 @@ export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
   strikeDown: 'Short strike down one',
   expNext: 'Later expiration',
   expPrev: 'Earlier expiration',
-  qtyUp: 'One more contract',
-  qtyDown: 'One fewer contract',
+  qtyUp: 'More conviction (size)',
+  qtyDown: 'Less conviction (size)',
   presetWeekly: 'Setup: weekly',
   presetSwing: 'Setup: 30-45 day swing',
   presetMine: 'Setup: my saved setup',
+  chain: 'Option chain (full screen)',
+  devPanel: 'Developer panel (developer mode)',
 };
 
 export type DayPace = 'step' | '1' | '2' | '4';
@@ -192,8 +198,10 @@ export interface SavedSetup {
   delta: number;
   /** Width in strike steps. */
   width: number;
-  /** Risk per trade as a share of equity (sizes the contracts). */
+  /** Risk per trade as a share of equity (older saves). */
   riskPct: number;
+  /** Conviction (0.5-0.9): the confidence behind the call and the share of the risk cap used. */
+  conviction?: number;
   targetPct: number;
   stopMult: number;
 }
@@ -215,11 +223,17 @@ export interface Settings {
     mySetup: SavedSetup | null;
     /** Calling a direction switches to a structure that fits it (up: bull put, down: bear call). */
     callPicksStructure: boolean;
+    /** Your trading plan, set once: take profit at this share of max profit... */
+    planTargetPct: number;
+    /** ...and stop a credit spread when the loss reaches this many times the credit. */
+    planStopMult: number;
     pause: Record<DecisionKind, boolean>;
     pureMarket: boolean;
     tutorialDone: boolean;
     /** Show a confirm box before each order (off: orders go out on Sell/Buy). */
     confirmOrders: boolean;
+    /** Developer mode: the DEV panel (unlocks, cash and stress levers, playtest notes). */
+    devMode: boolean;
   };
   realism: {
     bidAsk: boolean;
@@ -248,7 +262,7 @@ export interface Settings {
   data: { gameDbPath: string | null };
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
@@ -256,11 +270,13 @@ export const DEFAULT_SETTINGS: Settings = {
     startingCapitalCents: 500_000,
     shortDelta: 0.3,
     bucketMode: 'em',
-    ffSecondsPerDay: 1.4,
-    dayPace: '1',
+    ffSecondsPerDay: 5.6,
+    dayPace: 'step',
     pauseOnTest: true,
     mySetup: null,
     callPicksStructure: true,
+    planTargetPct: 0.5,
+    planStopMult: 2,
     // Only the moments that need a real decision stop the clock. Targets close at plan by
     // themselves; a touched short strike and 21 DTE show up as notices.
     pause: {
@@ -276,6 +292,7 @@ export const DEFAULT_SETTINGS: Settings = {
     pureMarket: false,
     tutorialDone: false,
     confirmOrders: false,
+    devMode: false,
   },
   realism: {
     bidAsk: true,
@@ -309,8 +326,19 @@ export function mergeSettings(saved: unknown): Settings {
   const s = (saved ?? {}) as Partial<Settings>;
   // Version 2 (playtest feedback): fewer clock stops. Older saves take the new pause defaults.
   const old = (s.version ?? 1) < 2;
-  // Version 3: days play out as forming candles, so the old fast default (0.35 s) becomes 1.4 s.
-  const v3 = (s.version ?? 1) < 3 && s.game?.ffSecondsPerDay === 0.35 ? { ffSecondsPerDay: 1.4 } : {};
+  // Version 3: days play out as forming candles, so the old fast default (0.35 s) became 1.4 s.
+  // Version 4 (playtest 3): day by day is the default, and 1x runs at a quarter of the v3 speed.
+  const ver = s.version ?? 1;
+  const oldSpeed = s.game?.ffSecondsPerDay;
+  const v3 =
+    ver < 4
+      ? {
+          dayPace: 'step' as const,
+          ...(oldSpeed === undefined || oldSpeed === 0.35 || oldSpeed === 1.4
+            ? { ffSecondsPerDay: 5.6 }
+            : {}),
+        }
+      : {};
   return {
     version: SETTINGS_VERSION,
     game: {

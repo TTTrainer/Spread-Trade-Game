@@ -40,13 +40,12 @@ function tipFor(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tip {
       return {
         key: 'end',
         title: 'That is the loop',
-        text: "Lineup, call, build, clock, tally, shop, Review. Practice never counts against you. The mug is yours. Career is where it's real: every trade lands in your Stats.",
+        text: "Lineup, brief, build, days, tally, shop, Review. Practice never counts against you. The mug is yours. Career is where it's real: every trade lands in your Stats.",
       };
     default:
       break;
   }
   if (!s) return { key: 'wait', title: 'One second', text: 'Dealing the lineup…' };
-  const card = t.selectedCardId ? s.cards.find((c) => c.id === t.selectedCardId) : null;
   const anyPosition = s.positions.length > 0;
   if (r.index === 1 && !anyPosition && !r.clockStarted)
     return {
@@ -54,23 +53,23 @@ function tipFor(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tip {
       title: 'Month 2',
       text: 'You have more than one ticket: try two trades on different cards. If nothing looks right, reroll (R), or skip the round (K) before trading for −10 stress and a Tag.',
     };
-  if (!card?.call && !anyPosition)
+  if (!t.touched && !anyPosition)
     return {
-      key: 'call',
-      title: 'Call your shot',
-      text: 'Each card is one real stock at one real moment, disguised. Read the chart, then press 1–5 (down big … up big). Shift+1–5 sets how sure you are. Calls are graded on calibration, not bravado.',
+      key: 'read',
+      title: 'Read the card',
+      text: 'Each card is one real stock at one real moment, disguised. Read the chart and the BRIEF on the right. Think it goes up? Press 4 for a bull put. Down? Press 2 for a bear call.',
     };
   if (!anyPosition)
     return {
       key: 'build',
-      title: 'Build a bull put',
-      text: 'A bull put collects a credit and wins if the stock stays above the short strike. Pick an expiration near 30 days, check POP and max loss on the right, then SELL (Alt+S). Brackets (take profit at 50%, stop at 2× credit) come on by default.',
+      title: 'Shape a bull put',
+      text: 'It collects a credit and wins while the stock stays above your short strike. Drag the S handle on the chart or use the sliders, and watch POP and max loss change. Conviction is how sure you are and how much you risk. Then SELL (Alt+S).',
     };
   if (!r.clockStarted)
     return {
       key: 'clock',
       title: 'Start the clock',
-      text: 'Placed. Add another trade on a different card if you like, then press Space (START CLOCK). Once the clock runs, no new trades this round.',
+      text: 'Placed. Add another trade on a different card if you like, then press Space. Each press plays one day; the day ends with a recap of every trade.',
     };
   if (t.ff === 'decision')
     return {
@@ -80,8 +79,8 @@ function tipFor(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tip {
     };
   return {
     key: 'ff',
-    title: 'Fast-forward',
-    text: 'Days fly by, one candle at a time. Headlines slide in on event days. Positions close at your brackets, at a decision, or at expiration.',
+    title: 'Day by day',
+    text: 'Each day plays as a forming candle, then a recap shows how every trade stands. Positions close at your plan, at a decision, or at expiration. Space plays the next day.',
   };
 }
 

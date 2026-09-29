@@ -2,10 +2,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { BriefAccess } from '../../engine/news/brief';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { burstAt } from '../../fx/overlay';
-import { ArtIcon } from '../art';
+import { ArtIcon, artUrl } from '../art';
+import { BALANCE } from '../../content/balance';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { ALL_FAMILIES, FAMILY_NAMES } from '../../content/families';
+import { FAMILY_GLYPH } from '../../content/summaries';
 import { MEMOS, TAGS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
 import type { AnalystId, CartridgeDef, Family } from '../../content/types';
@@ -28,7 +30,7 @@ import { Kbd, Meter, Modal, CountUp } from '../components/ui';
 import { money, pct, signed } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useRun } from '../store/run';
-import { useTrading } from '../store/trading';
+import { tradeOpen, useTrading } from '../store/trading';
 import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
 import './run.css';
@@ -105,7 +107,11 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
       </div>
       <div className="fam-counters num">
         {ALL_FAMILIES.filter((f) => fam[f] > 0).map((f) => (
-          <span key={f} className={`fam ${fam[f] >= 2 ? 'on' : ''}`} data-tip={`family:${f}`}>
+          <span
+            key={f}
+            className={`fam ${fam[f] >= (f === 'CHAOS' ? 1 : 2) ? 'on' : ''}`}
+            data-tip={`family:${f}`}
+          >
             <ArtIcon
               category="family"
               id={f}
@@ -114,7 +120,13 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
               className="fam-art"
               style={{ width: 16, height: 16 }}
             />
-            {FAMILY_NAMES[f].toUpperCase()} {fam[f]}
+            {!artUrl('family', f) && <span className="fam-glyph">{FAMILY_GLYPH[f]}</span>}
+            {FAMILY_NAMES[f].toUpperCase()}
+            <span className="fam-pips" aria-label={`${fam[f]} of 4`}>
+              {[1, 2, 3, 4].map((i) => (
+                <i key={i} className={i <= fam[f] ? 'full' : ''} />
+              ))}
+            </span>
           </span>
         ))}
       </div>
@@ -426,6 +438,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
   const st = e.state;
   const r = st.round;
   const canSkip = e.canSkip();
+  const daysLeft = e.tradeDaysLeft();
   const session = e.session;
   const noPositions =
     !!session && session.openPositions().length === 0 && session.orders.length === 0 && !session.inDay;
@@ -457,16 +470,16 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
         >
           REROLL {r.rerolls - r.rerollsUsed} <Kbd>R</Kbd>
         </button>
-        {r.index < 2 && (
+        {r.index < 2 && !r.sitOut && (
           <button
             className="pixel-btn"
             disabled={!canSkip}
             onClick={() => void act({ t: 'skip' })}
             data-testid="skip"
-            data-tip-title="Skip the round (K)"
-            data-tip-body={`Skip before trading: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a skip; Reviews can't be skipped.`}
+            data-tip-title="Sit this round out (K)"
+            data-tip-body={`No trades for ${BALANCE.run.sitOutDays} trading days while the market moves without you. At the end: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a sit-out; Reviews can't be skipped.`}
           >
-            SKIP →{' '}
+            ☕ SIT OUT →{' '}
             {r.skipTag && (
               <ArtIcon
                 category="tag"
@@ -480,9 +493,40 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
             {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
           </button>
         )}
-        {noPositions && (session?.positions.length ?? 0) > 0 && (
-          <button className="pixel-btn" onClick={() => void act({ t: 'endRound' })} data-testid="end-round">
-            END ROUND
+        {r.sitOut && session && (
+          <div className="sitout-banner num" data-testid="sitout">
+            <div>
+              ☕ SITTING OUT · day {Math.min(session.dayIndex, r.sitOut.days)}/{r.sitOut.days}
+            </div>
+            <div className="sitout-bar">
+              <i style={{ width: `${(Math.min(session.dayIndex, r.sitOut.days) / r.sitOut.days) * 100}%` }} />
+            </div>
+            <div className="dim small">
+              {r.skipTag ? `${TAGS[r.skipTag].name} and −10 stress at the end.` : '−10 stress at the end.'}{' '}
+              Space lets a day pass.
+            </div>
+          </div>
+        )}
+        {!r.sitOut && daysLeft !== null && r.index >= 0 && (
+          <div
+            className={`window-chip num ${daysLeft <= 2 ? 'low' : ''}`}
+            data-testid="trade-window"
+            data-tip-title="Trading window"
+            data-tip-body={`New trades can start on any of the round's first ${BALANCE.run.tradeWindowDays} trading days, while you have tickets. Waiting a day to see more bars is allowed: press Space (or N) without trading.`}
+          >
+            ⏱ {daysLeft > 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} to open trades` : 'window closed'}{' '}
+            · 🎫 {Math.max(0, r.tickets - r.ticketsUsed)}
+          </div>
+        )}
+        {noPositions && r.clockStarted && !r.sitOut && (
+          <button
+            className="pixel-btn"
+            onClick={() => void act({ t: 'endRound' })}
+            data-testid="end-round"
+            data-tip-title="End the round now"
+            data-tip-body="Nothing is open. Settle the round with what you have instead of waiting out the trading window."
+          >
+            END ROUND ■
           </button>
         )}
         {r.filterRelaxed && (
@@ -567,35 +611,116 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
   );
 }
 
+/**
+ * What this trade is worth if it wins, and which of your cartridges power it: each bonus is a
+ * chip that pops in (with the cartridge's picture), and the ones this trade doesn't trigger sit
+ * greyed out, so it's clear what you're building toward.
+ */
 export function ScorePreviewBox({ e }: { e: RunEngine }) {
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
   const cardId = useTrading((s) => s.selectedCardId);
   const session = useTrading((s) => s.session);
+  const open = useTrading(tradeOpen);
+  const implied = useTrading((s) => s.impliedCall)();
   useTrading((s) => s.version);
-  if (!plan || !cardId || !session || session.clockStarted) return null;
-  const card = session.cards.find((c) => c.id === cardId);
-  const p = previewScore(e, plan, builder.structureId, cardId, card?.call ?? null);
+  if (!plan || !cardId || !session || !open) return null;
+  const call = implied
+    ? {
+        ...implied,
+        emPct: plan.entry?.expectedMovePct ?? 0.05,
+        horizonDays: plan.dte ?? 30,
+        mode: session.config.callMode,
+      }
+    : null;
+  const p = previewScore(e, plan, builder.structureId, cardId, call);
   if (!p) return null;
-  const steps = p.steps
-    .filter((st) => st.op !== 'meter')
-    .map(
-      (st) =>
-        `${st.op === 'chips' ? `+${Math.round(st.value)} chips` : st.op === 'add' ? `+${st.value} mult` : `×${st.value}`} ${st.label}`,
-    )
-    .join(' · ');
+  const steps = p.steps.filter((st) => st.op !== 'meter');
+  const firing = new Set(steps.map((st) => st.source).filter((x): x is string => !!x));
+  const idle = e.activeCartridges().filter((id) => !firing.has(id) && CARTRIDGE_BY_ID[id]);
+  const share = p.targetLeft > 0 ? p.points / p.targetLeft : 1;
   return (
     <div
-      className="score-preview"
+      className="combo"
       data-testid="score-preview"
-      data-tip-title="Score preview (at max profit)"
-      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round needs ${p.targetLeft.toLocaleString()} more. ${steps}`}
+      data-tip-title="If it wins (at max profit)"
+      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round still needs ${p.targetLeft.toLocaleString()}.`}
     >
-      <span className="dim">SCORE IF IT WINS</span>{' '}
-      <b className="num sp-points">{p.points.toLocaleString()}</b>{' '}
-      <span className="dim num">
-        ({p.chips}c × {p.mult.toFixed(1)}) · needs {p.targetLeft.toLocaleString()}
-      </span>
+      <div className="combo-head">
+        <span className="dim">IF IT WINS</span>
+        <b className="num combo-pts">
+          <CountUp value={p.points} />
+        </b>
+        <span className="num dim">
+          {p.chips} chips × {p.mult.toFixed(1)}
+        </span>
+      </div>
+      <div
+        className="combo-fill"
+        data-tip-title="Round target"
+        data-tip-body={`This trade alone would fill ${Math.round(share * 100)}% of what the round still needs (${p.targetLeft.toLocaleString()}).`}
+      >
+        <span
+          className={`cf-bar ${share >= 1 ? 'full' : ''}`}
+          style={{ width: `${Math.min(1, share) * 100}%` }}
+        />
+        <span className="cf-label num">
+          {share >= 1 ? '✔ CLEARS THE ROUND' : `${Math.round(share * 100)}% OF THE ROUND`}
+        </span>
+      </div>
+      <div className="combo-steps">
+        <AnimatePresence initial={false}>
+          {steps.map((st, i) => {
+            const cart = st.source ? CARTRIDGE_BY_ID[st.source] : undefined;
+            return (
+              <motion.span
+                key={`${st.label}-${st.op}-${st.value}-${i}`}
+                className={`cstep ${st.op}`}
+                data-tip={cart ? `cart:${cart.id}` : undefined}
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 20, delay: i * 0.03 }}
+              >
+                {cart && (
+                  <ArtIcon
+                    category="cartridge"
+                    id={cart.id}
+                    name={cart.name}
+                    tone={cart.rarity}
+                    style={{ width: 16, height: 16, fontSize: 8 }}
+                  />
+                )}
+                <b className="num">
+                  {st.op === 'chips'
+                    ? `+${Math.round(st.value)}`
+                    : st.op === 'add'
+                      ? `+${st.value}×`
+                      : st.op === 'chipsMul'
+                        ? `×${st.value}c`
+                        : `×${st.value}`}
+                </b>{' '}
+                {st.label}
+              </motion.span>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+      {idle.length > 0 && (
+        <div className="combo-idle">
+          <span className="dim">NOT TRIGGERED:</span>
+          {idle.map((id) => (
+            <span key={id} className="ci" data-tip={`cart:${id}`}>
+              <ArtIcon
+                category="cartridge"
+                id={id}
+                name={CARTRIDGE_BY_ID[id].name}
+                tone={CARTRIDGE_BY_ID[id].rarity}
+                style={{ width: 20, height: 20, fontSize: 9 }}
+              />
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   COLLECTIONS,
   COSMETIC_BY_ID,
   COSMETICS,
+  HEAT_MILESTONES,
   PACKED_CARTRIDGES,
   PAD_TIERS,
   RANKS,
@@ -24,6 +25,7 @@ import {
   type PadPerk,
   type SetupTrack,
 } from '../../content/meta';
+import { RISK_TIERS } from '../../content/tiers';
 import type { DeskId } from '../../content/types';
 
 export interface DailyResult {
@@ -373,4 +375,34 @@ export function contractsDone(p: Profile, week: string): Record<string, Contract
 /** Flags the achievements read (kept in the same store as other counters). */
 export function profileFlags(p: Profile): Record<string, number> {
   return { padTier: p.pad.tier, tutorialDone: p.tutorialDone ? 1 : 0 };
+}
+
+// ---------------- developer mode ----------------
+
+/**
+ * Developer mode: every desk, pack, tier, Pad upgrade and cosmetic, top rank and a pile of Bonus.
+ * For playtesting only; it is a one-way switch on the profile like any other purchase.
+ */
+export function unlockEverything(p: Profile): Profile {
+  const q = structuredClone(p);
+  const top = RANKS[RANKS.length - 1];
+  const maxTier = RISK_TIERS[RISK_TIERS.length - 1].tier;
+  q.xp = Math.max(q.xp, top.xp);
+  q.bonus += 5000;
+  q.desks = [...DESK_ORDER];
+  q.packs = CARTRIDGE_PACKS.map((x) => x.id);
+  q.maxTier = maxTier;
+  q.tierCleared = Object.fromEntries(DESK_ORDER.map((d) => [d, maxTier]));
+  q.heatBest = Math.max(q.heatBest, ...HEAT_MILESTONES.map((m) => m.heat));
+  q.pad.tier = PAD_TIERS[PAD_TIERS.length - 1].tier;
+  q.pad.items = [
+    ...new Set([...q.pad.items, ...Object.values(COLLECTIONS).flatMap((c) => c.items.map((i) => i.id))]),
+  ];
+  for (const t of Object.keys(SETUP_TRACKS) as SetupTrack[])
+    q.pad.setup[t] = SETUP_TRACKS[t].levels.length - 1;
+  q.cosmetics = [
+    ...new Set([...q.cosmetics, ...COSMETICS.filter((c) => c.unlock.kind === 'bonus').map((c) => c.id)]),
+  ];
+  q.tutorialDone = true;
+  return q;
 }

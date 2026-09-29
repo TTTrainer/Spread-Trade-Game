@@ -6,7 +6,7 @@ The first three items can only be checked on your Windows PC. They matter most, 
 
 | # | Try this | What to look for | Score (1–5) | Notes |
 |---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.2.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
+| 1 | **Install** with `SpreadTradingGame-Setup-1.3.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
 | 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
 | 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
 | 4 | **Tutorial** (Career → TUTORIAL). | Are Ines's tips clear? Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
@@ -26,5 +26,11 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 18 | **Live:** trade a ticker at the latest close. On real data, Sync the next day; on SIM, Sync to move a week. | Do your positions carry over and update after a sync? | | |
 | 19 | **Real data:** Settings → Data → BUILD REAL DATA (a few hours, about 16 GB; see README_PLAY.md). | Did it finish? Does VIEW DATA REPORT look sensible? Does Career now deal real tickers (blind)? | | |
 | 20 | **Look and sound:** music style and CRT style in Settings, The Pad, the title screen, reduced motion. | Does it feel like a retro-future desk? Any screen hard to read? | | |
+| 21 | **New in 1.3.0: shaping a trade.** Use the sliders (Expires, Short Δ, Width, Conviction) and drag both strike handles on the chart. | Do the gauges, the green/red zones and the cushion bracket tell you enough while you move things? | | |
+| 22 | **New: trade on a later day.** Press Space with no trade, read the recap's watchlist, then trade on day 2 or 3. | Does waiting feel like a real choice? Is the 10-day window about right? | | |
+| 23 | **New: the sit-out skip** (K). Let the 5 days pass. | Worth it for the Tag and −10 stress? | | |
+| 24 | **New: DESK/OS shop.** Read a few WHEN/GET cards and the BUILD.SYS window. | Do you understand a cartridge in a second? Can you see your combos building? | | |
+| 25 | **New: option chain (Ctrl+5) and the roll dialog.** Click a bid to sell; open ROLL on a position. | Is the chain quick to use? Does the STAY vs ROLL chart make the choice clear? | | |
+| 26 | **New: Developer mode** (Settings → Game). Take a note with a screenshot, then EXPORT .MD. | Is this useful for your notes? What else should the panel do? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

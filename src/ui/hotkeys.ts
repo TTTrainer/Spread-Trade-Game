@@ -43,6 +43,7 @@ function isTyping(e: KeyboardEvent): boolean {
       (((t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox') || arrow)) ||
     tag === 'TEXTAREA' ||
     (tag === 'SELECT' && arrow) ||
+    (t.getAttribute('role') === 'slider' && arrow) ||
     t.isContentEditable
   );
 }

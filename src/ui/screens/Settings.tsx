@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PlanSetup } from '../components/PlanSetup';
 import { DEFAULT_HOTKEYS, HOTKEY_LABELS, type HotkeyAction, type Settings } from '../../shared/settings';
 import type { DecisionKind } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
@@ -145,9 +146,9 @@ export function SettingsScreen() {
               <Slider
                 label="Seconds per day at 1× (the candle plays for most of it)"
                 value={settings.game.ffSecondsPerDay}
-                min={0.4}
-                max={3}
-                step={0.1}
+                min={1}
+                max={10}
+                step={0.2}
                 onChange={(v) => set((s) => ({ ...s, game: { ...s.game, ffSecondsPerDay: v } }))}
                 fmt={(v) => v.toFixed(1)}
               />
@@ -216,12 +217,21 @@ export function SettingsScreen() {
                 testId="set-confirm"
               />
               <Toggle
+                label="Developer mode"
+                value={settings.game.devMode}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, devMode: v } }))}
+                hint="A DEV button (Ctrl+Shift+D): playtest notes with screenshots, unlock everything, cash/stress/ticket levers"
+                testId="set-dev"
+              />
+              <Toggle
                 label="Calling a direction picks a matching structure"
                 value={settings.game.callPicksStructure}
                 onChange={(v) => set((s) => ({ ...s, game: { ...s.game, callPicksStructure: v } }))}
                 hint="Up: bull put. Down: bear call. Flat: iron condor (when your playbook has one)."
                 testId="set-call-picks"
               />
+              <div className="section-title">Your plan (applies to every trade)</div>
+              <PlanSetup />
               <div className="section-title">Decision points that pause the fast-forward</div>
               <p className="dim small">
                 Off: targets close at your plan by themselves, and the rest show up as short notices.

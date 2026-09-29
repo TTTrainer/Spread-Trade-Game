@@ -15,12 +15,12 @@ const builder = (page: Page) =>
       structure: t.builder.structureId as string,
       anchor: t.builder.anchor as number | null,
       delta: t.builder.delta as number,
-      qty: t.builder.qty as number,
+      conviction: t.confidence as number,
       dte,
     };
   });
 
-test('fast trade entry: call picks the structure, presets, nudges, risk sizing, drag and stamp', async () => {
+test('fast trade entry: view picks the structure, presets, sliders, conviction, drag and stamp', async () => {
   const { app, page } = await launchGame();
   await page.waitForFunction(() => (window as Any).__stg !== undefined);
   await page.getByTestId('menu-sandboxSetup').click();
@@ -43,9 +43,13 @@ test('fast trade entry: call picks the structure, presets, nudges, risk sizing, 
   await expect.poll(async () => (await builder(page)).dte ?? 0).toBeGreaterThanOrEqual(25);
   expect((await builder(page)).delta).toBeCloseTo(0.3, 5);
 
-  // Delta chip, then one strike up with the arrow key.
-  await page.getByTestId('delta-20').click();
+  // The delta slider snaps: two steps left from .30 is .20 (arrow keys belong to a focused slider).
+  await page.getByTestId('slider-delta').locator('[role=slider]').focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
   expect((await builder(page)).delta).toBeCloseTo(0.2, 5);
+  // Off the slider, ↑ moves the short strike one listed strike.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('ArrowUp');
   await expect.poll(async () => (await builder(page)).anchor).not.toBeNull();
   const k1 = (await builder(page)).anchor as number;
@@ -59,16 +63,30 @@ test('fast trade entry: call picks the structure, presets, nudges, risk sizing, 
   await page.mouse.move(box.x + 20, box.y + box.height / 2 + 60, { steps: 8 });
   await page.mouse.up();
   await expect.poll(async () => (await builder(page)).anchor as number).toBeLessThan(k1);
+  // Drag the far strike further away: the spread gets wider.
+  const w0 = await page.evaluate(() => (window as Any).__stg.trading.getState().builder.width as number);
+  const far = page.getByTestId('far-handle');
+  await expect(far).toBeVisible();
+  const fb = (await far.boundingBox())!;
+  await page.mouse.move(fb.x + 20, fb.y + fb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(fb.x + 20, fb.y + fb.height / 2 + 50, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(() => page.evaluate(() => (window as Any).__stg.trading.getState().builder.width as number))
+    .toBeGreaterThan(w0);
+  await expect(page.getByTestId('chart-zones')).toBeVisible();
   await shot(page, '13-fast-entry-1920');
   await page.setViewportSize({ width: 1366, height: 768 });
   await shot(page, '13-fast-entry-1366');
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  // Size to 2% of equity.
-  await page.getByTestId('risk-0.02').click();
+  // Conviction sizes the trade: 60% uses up to 40% of the 10% risk cap.
+  await page.keyboard.press('Shift+2');
   const risk = await page.evaluate(() => (window as Any).__stg.trading.getState().plan()?.riskPct as number);
-  expect(risk).toBeGreaterThan(0.005);
-  expect(risk).toBeLessThanOrEqual(0.021);
+  expect(risk).toBeGreaterThan(0.001);
+  expect(risk).toBeLessThanOrEqual(0.1);
+  await expect(page.getByTestId('slider-conviction')).toContainText('LEAN');
 
   // Save it as MY SETUP, change things, and bring it back with one key.
   await page.getByTestId('preset-save').click();
@@ -77,7 +95,7 @@ test('fast trade entry: call picks the structure, presets, nudges, risk sizing, 
   await page.keyboard.press('w');
   await page.keyboard.press('y');
   await expect.poll(async () => (await builder(page)).delta).toBeCloseTo(saved.delta, 5);
-  await expect.poll(async () => (await builder(page)).qty).toBe(saved.qty);
+  await expect.poll(async () => (await builder(page)).conviction).toBe(saved.conviction);
 
   // Selling slams the ticket onto the chart.
   await page.getByTestId('order-market').click();

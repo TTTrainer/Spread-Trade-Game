@@ -28,11 +28,13 @@ import {
 import type { Bar } from '../../engine/market/types';
 import { optionLegsOf } from '../../engine/lifecycle/position';
 import type { Leg } from '../../engine/strategies/types';
-import { useTrading, type StudyId } from '../store/trading';
+import { tradeOpen, useTrading, type StudyId } from '../store/trading';
 import { chartBridge } from './chartBridge';
 import { PriceLadder } from './PriceLadder';
 import { PositionHud } from './DayPlayer';
 import { StrikeHandle } from './StrikeHandle';
+import { DayRecapPanel } from './DayRecap';
+import { ChartZones } from './ChartZones';
 import { formingBar } from './dayPath';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -94,6 +96,7 @@ export function ChartPanel() {
   const drawings = useTrading((s) => (cardId ? s.drawings[cardId] : undefined));
   const drawTool = useTrading((s) => s.drawTool);
   const ff = useTrading((s) => s.ff);
+  const open = useTrading(tradeOpen);
   const addDrawing = useTrading((s) => s.addDrawing);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -104,6 +107,8 @@ export function ChartPanel() {
   const drawRef = useRef<ISeriesApi<'Line'>[]>([]);
   const pendingRef = useRef<{ time: number; price: number } | null>(null);
   const [legend, setLegend] = useState<string>('');
+  // Bumped whenever the chart is rebuilt (new card, studies or timeframe) so data and overlays reload.
+  const [chartGen, setChartGen] = useState(0);
   const blind = session?.config.blind ?? false;
   const studiesKey = studies.slice().sort().join(',');
 
@@ -230,6 +235,9 @@ export function ChartPanel() {
     chartBridge.priceToY = (p) => candles.priceToCoordinate(p);
     chartBridge.yToPrice = (y) => candles.coordinateToPrice(y);
     chartBridge.paneHeight = () => panes[0]?.getHeight() ?? host.clientHeight;
+    chartBridge.barCount = () => candles.data().length;
+    chartBridge.plotWidth = () => chart.timeScale().width();
+    setChartGen((g) => g + 1);
     chart.subscribeCrosshairMove((param) => {
       const d = param.seriesData.get(candles) as
         { open: number; high: number; low: number; close: number } | undefined;
@@ -387,7 +395,7 @@ export function ChartPanel() {
       cancelAnimationFrame(raf);
       for (const l of shortLinesRef.current) l.applyOptions({ color: COLORS.magenta, lineWidth: 2 });
     };
-  }, [bars, animKey]);
+  }, [bars, animKey, chartGen]);
 
   // Zoom in on the recent candles while the clock runs; zoom back out to build the next trade.
   const clockOn = ff !== 'idle';
@@ -453,7 +461,7 @@ export function ChartPanel() {
           lvl.kind === 'support' ? 'SUP' : 'RES',
           LineStyle.SparseDotted,
         );
-  }, [legKey]);
+  }, [legKey, chartGen]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -486,7 +494,7 @@ export function ChartPanel() {
         drawRef.current.push(s);
       }
     }
-  }, [drawings, legKey]);
+  }, [drawings, legKey, chartGen]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -510,7 +518,7 @@ export function ChartPanel() {
 
   return (
     <div className="chart-panel panel" data-testid="chart-panel">
-      <div className="chart-host" ref={hostRef} style={ff === 'idle' ? undefined : { right: 0 }} />
+      <div className="chart-host" ref={hostRef} style={open ? undefined : { right: 0 }} />
       <div className="chart-legend num">{legend}</div>
       {drawTool !== 'none' && (
         <div className="chart-drawhint num">
@@ -518,8 +526,10 @@ export function ChartPanel() {
         </div>
       )}
       <PriceLadder expiration={builder.expiration} legs={legs} />
+      <ChartZones />
       <StrikeHandle />
       <PositionHud />
+      <DayRecapPanel />
       <AnimatePresence>
         {stamp && (
           <motion.div

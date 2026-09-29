@@ -1,5 +1,6 @@
 import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { EventChannel, EventMap, RpcChannel, RpcMap } from '../../src/shared/rpc';
 import { defaultGameDbPath, logDir, userDataDir } from './paths';
 import { log } from './log';
@@ -43,6 +44,16 @@ function systemHandlers(): Pick<Handlers, `system.${string}` & RpcChannel> {
     },
     'system.openPath': (path: string) => {
       void shell.openPath(path);
+    },
+    'system.screenshot': async (name: string) => {
+      const w = getWindow();
+      if (!w) return null;
+      const dir = join(userDataDir(), 'playtest');
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, `${name.replace(/[^\w.-]+/g, '_')}.png`);
+      const img = await w.webContents.capturePage();
+      writeFileSync(file, img.toPNG());
+      return file;
     },
     'system.saveTextFile': (suggestedName: string, content: string) => {
       const w = getWindow();

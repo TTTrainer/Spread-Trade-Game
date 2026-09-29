@@ -46,7 +46,7 @@ async function fastClock(page: Page): Promise<void> {
     const s = (window as unknown as { __stg: Stg }).__stg;
     s.app.getState().updateSettings((x) => ({
       ...(x as object),
-      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06, pauseOnTest: false },
+      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06, pauseOnTest: false, dayPace: '4' },
     }));
   });
 }
@@ -62,7 +62,7 @@ async function runState(page: Page): Promise<RunState | null> {
 async function sellBullPut(page: Page): Promise<void> {
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+2');
-  await expect(page.getByTestId('call-3')).toHaveClass(/selected/);
+  await expect(page.getByTestId('view-chip')).toContainText('UP');
   await page.getByTestId('structure-bull_put').click();
   await page.getByTestId('order-market').click();
   await expect(page.getByTestId('score-preview')).toBeVisible();
@@ -77,6 +77,9 @@ async function playToTally(page: Page, shotDecision?: string): Promise<void> {
   let shotTaken = false;
   for (let i = 0; i < 600; i++) {
     if (await page.getByTestId('tally-screen').isVisible()) return;
+    // Days with news (and recaps) hold the clock; keep it going.
+    const ff = await page.evaluate(() => (window as unknown as { __stg: Stg }).__stg.trading.getState().ff);
+    if (ff === 'paused') await page.keyboard.press('Space');
     const modal = page.getByTestId('decision-modal');
     if (await modal.isVisible()) {
       if (shotDecision && !shotTaken) {
