@@ -31,7 +31,14 @@ import { RunEnd, ReviewIntro, ShopView, TallyView } from '../run/RunPhases';
 import { CartridgeMini } from '../run/Shop';
 import { Primer } from '../run/Primer';
 import { ANALYST_SHORT } from '../../content/summaries';
-import { careerBadges, careerBriefAccess, RunLeftExtra, RunRightExtra, RunTopBar } from '../run/RunParts';
+import {
+  careerBadges,
+  careerBriefAccess,
+  GoalCard,
+  RunLeftExtra,
+  RunRightExtra,
+  RunTopBar,
+} from '../run/RunParts';
 import './screens.css';
 import '../run/run.css';
 
@@ -46,6 +53,7 @@ export function CareerScreen() {
   const [tier, setTier] = useState(0);
   const [rules, setRules] = useState<string[]>([]);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const [tab, setTab] = useState<'start' | 'options'>('start');
 
   useEffect(() => {
     void checkSave('career');
@@ -108,211 +116,243 @@ export function CareerScreen() {
           </div>
         </div>
       </div>
-      {!profile.tutorialDone && !saveSummary && (
-        <div className="panel tutorial-banner" data-testid="tutorial-banner">
-          <Portrait id="ines" mood="happy" scale={1} />
-          <div>
-            <b>New here?</b> Ines walks you through three practice rounds: the lineup, calling your shot,
-            building a bull put, the clock, the tally and the shop. Nothing counts, and you keep her mug.
-          </div>
-          <button
-            className="pixel-btn primary"
-            onClick={() => void tutorial()}
-            disabled={busy}
-            data-testid="start-tutorial"
-          >
-            TUTORIAL ▶
-          </button>
-        </div>
-      )}
-      {saveSummary && (
-        <div className="panel save-panel" data-testid="save-panel">
-          <div className="section-title">Run in progress</div>
-          <div className="num save-line">
-            {DESKS[saveSummary.desk].name} desk · {yearLabel(saveSummary.quarter, saveSummary.roundIndex)} ·
-            cash ${saveSummary.cash} · equity {money(saveSummary.equityCents)} · seed {saveSummary.seed}
-          </div>
-          <div className="modal-actions">
-            <button
-              className="pixel-btn primary"
-              onClick={() => void cont()}
-              disabled={busy}
-              data-testid="continue-run"
-            >
-              {busy ? 'LOADING…' : 'CONTINUE ▶'}
-            </button>
-            <button className="pixel-btn" onClick={() => setConfirmAbandon(true)} disabled={busy}>
-              ABANDON RUN
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="section-title">Pick a desk</div>
-      <div className="desk-row">
-        {DESK_ORDER.map((id) => {
-          const d = DESKS[id];
-          const locked = !profile.desks.includes(id);
-          const price = deskPrice(profile, id);
-          const best = profile.tierCleared[id];
-          return (
-            <div key={id} className="desk-slot">
-              <TiltCard
-                className="desk-card"
-                selected={desk === id}
-                disabled={locked}
-                onClick={() => !locked && setDesk(id)}
-                testId={`desk-${id}`}
-                tip={`desk:${id}`}
-                rarity={id === 'verticals' ? 'U' : undefined}
-              >
-                <ArtIcon
-                  category="desk"
-                  id={id}
-                  name={d.name}
-                  onlyIfUploaded
-                  style={{ width: '100%', height: 'auto' }}
-                />
-                <div className="desk-name">{d.name.toUpperCase()}</div>
-                <div className="desk-blurb">{d.blurb}</div>
-                <div className="desk-plays num">
-                  {d.structures.map((s) => STRUCTURES[s].short).join(' · ')}
-                </div>
-                <div className="desk-passive">
-                  <span className="dim">Passive:</span> {d.passiveText}
-                </div>
-                <div className="desk-kit dim">
-                  Starts with:{' '}
-                  {[
-                    ...d.startingAnalysts.map((a) => ANALYSTS[a].name),
-                    ...d.startingCartridges.map((c) => CARTRIDGE_BY_ID[c].name),
-                  ].join(', ') || 'nothing'}
-                </div>
-                {!locked && best !== undefined && (
-                  <div className="desk-best num amber-text">Cleared up to Tier {best}</div>
-                )}
-                {locked && <div className="desk-lock num">LOCKED</div>}
-              </TiltCard>
-              {locked && (
-                <button
-                  className="pixel-btn desk-unlock"
-                  disabled={profile.bonus < price}
-                  onClick={() => void apply((p) => unlockDesk(p, id)).then((ok) => ok && setDesk(id))}
-                  data-testid={`unlock-${id}`}
-                  title={price < d.unlockCost ? `Rank discount: was ${d.unlockCost}` : undefined}
-                >
-                  UNLOCK · {price} BONUS
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <StartingKit deskId={desk} />
-      <div className="career-options">
-        <div className="panel career-opt">
-          <div className="section-title" data-tip="g:plan_set">
-            Your plan (every trade)
-          </div>
-          <PlanSetup compact />
-        </div>
-        <div className="panel career-opt">
-          <div className="section-title" data-tip="g:risk_tier">
-            Risk Tier
-          </div>
-          <div className="seg num" data-testid="tier-picker">
-            {RISK_TIERS.map((t) => (
-              <button
-                key={t.tier}
-                className={tier === t.tier ? 'sel' : ''}
-                disabled={t.tier > profile.maxTier}
-                title={t.tier > profile.maxTier ? `Clear a year at Tier ${t.tier - 1} to unlock` : t.text}
-                onClick={() => setTier(t.tier)}
-                data-testid={`tier-${t.tier}`}
-              >
-                {t.tier > profile.maxTier ? '🔒' : ''}
-                {t.tier}
-              </button>
-            ))}
-          </div>
-          <div className="dim small">
-            {tier === 0
-              ? 'Base rules. Clear a year to unlock Tier 1.'
-              : `Cumulative: ${RISK_TIERS.slice(1, tier + 1)
-                  .map((t) => t.text)
-                  .join(' ')}`}
-          </div>
-        </div>
-        <div className="panel career-opt">
-          <div className="section-title">
-            Compliance Rules{' '}
-            <span className="chip warn" data-testid="heat-total" data-tip="g:heat">
-              HEAT {heat}
+      <div className="career-tabs num" role="tablist">
+        <button
+          className={tab === 'start' ? 'sel' : ''}
+          onClick={() => (sfx('click'), setTab('start'))}
+          role="tab"
+          aria-selected={tab === 'start'}
+          data-testid="ctab-start"
+        >
+          ▶ QUICK START
+        </button>
+        <button
+          className={tab === 'options' ? 'sel' : ''}
+          onClick={() => (sfx('click'), setTab('options'))}
+          role="tab"
+          aria-selected={tab === 'options'}
+          data-testid="ctab-options"
+        >
+          ⚙ CHALLENGE &amp; OPTIONS
+          {(tier > 0 || rules.length > 0 || seed) && (
+            <span className="ct-badge">
+              {tier > 0 ? `T${tier}` : ''}
+              {rules.length ? ` HEAT ${heat}` : ''}
+              {seed ? ' SEED' : ''}
             </span>
-          </div>
-          <div className="compliance-list">
-            {COMPLIANCE_RULES.map((r) => {
-              const on = rules.includes(r.id);
-              return (
-                <label key={r.id} className={`comp-rule ${on ? 'on' : ''}`} title={r.text}>
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => setRules(on ? rules.filter((x) => x !== r.id) : [...rules, r.id])}
-                    data-testid={`rule-${r.id}`}
-                  />
-                  <span>
-                    {r.name} <span className="dim">+{r.heat}</span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-          <div className="dim small">
-            Optional and harsher. Clear a year with Heat to unlock cosmetics (best so far: {profile.heatBest};
-            next at {HEAT_MILESTONES.find((m) => m.heat > profile.heatBest)?.heat ?? '—'}).
-          </div>
-        </div>
-        <div className="panel career-opt">
-          <div className="section-title">Cartridge packs</div>
-          {CARTRIDGE_PACKS.map((pk) => {
-            const open = packUnlocked(profile, pk.id);
-            return (
-              <div key={pk.id} className="pack-row">
+          )}
+        </button>
+      </div>
+      <div className="career-body">
+        {tab === 'start' && (
+          <>
+            {!profile.tutorialDone && !saveSummary && (
+              <div className="panel tutorial-banner" data-testid="tutorial-banner">
+                <Portrait id="ines" mood="happy" scale={1} />
                 <div>
-                  <b>{pk.name}</b>{' '}
-                  <span className="dim small">
-                    {pk.cartridges.map((c) => CARTRIDGE_BY_ID[c].name).join(', ')}
-                  </span>
+                  <b>New here?</b> Ines walks you through three practice rounds: the lineup, calling your
+                  shot, building a bull put, the clock, the tally and the shop. Nothing counts, and you keep
+                  her mug.
                 </div>
-                {open ? (
-                  <span className="chip good">IN THE POOL</span>
-                ) : (
-                  <button
-                    className="pixel-btn"
-                    disabled={profile.bonus < pk.bonus}
-                    onClick={() => void apply((p) => buyPack(p, pk.id))}
-                    title={`Free at ${RANKS[pk.rank].name}`}
-                    data-testid={`pack-${pk.id}`}
-                  >
-                    {pk.bonus} BONUS
-                  </button>
-                )}
+                <button
+                  className="pixel-btn primary"
+                  onClick={() => void tutorial()}
+                  disabled={busy}
+                  data-testid="start-tutorial"
+                >
+                  TUTORIAL ▶
+                </button>
               </div>
-            );
-          })}
-        </div>
+            )}
+            {saveSummary && (
+              <div className="panel save-panel" data-testid="save-panel">
+                <div className="section-title">Run in progress</div>
+                <div className="num save-line">
+                  {DESKS[saveSummary.desk].name} desk ·{' '}
+                  {yearLabel(saveSummary.quarter, saveSummary.roundIndex)} · cash ${saveSummary.cash} · equity{' '}
+                  {money(saveSummary.equityCents)} · seed {saveSummary.seed}
+                </div>
+                <div className="modal-actions">
+                  <button
+                    className="pixel-btn primary"
+                    onClick={() => void cont()}
+                    disabled={busy}
+                    data-testid="continue-run"
+                  >
+                    {busy ? 'LOADING…' : 'CONTINUE ▶'}
+                  </button>
+                  <button className="pixel-btn" onClick={() => setConfirmAbandon(true)} disabled={busy}>
+                    ABANDON RUN
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="section-title">Pick a desk</div>
+            <div className="desk-row">
+              {DESK_ORDER.map((id) => {
+                const d = DESKS[id];
+                const locked = !profile.desks.includes(id);
+                const price = deskPrice(profile, id);
+                const best = profile.tierCleared[id];
+                return (
+                  <div key={id} className="desk-slot">
+                    <TiltCard
+                      className="desk-card"
+                      selected={desk === id}
+                      disabled={locked}
+                      onClick={() => !locked && setDesk(id)}
+                      testId={`desk-${id}`}
+                      tip={`desk:${id}`}
+                      rarity={id === 'verticals' ? 'U' : undefined}
+                    >
+                      <ArtIcon
+                        category="desk"
+                        id={id}
+                        name={d.name}
+                        onlyIfUploaded
+                        style={{ width: '100%', height: 'auto' }}
+                      />
+                      <div className="desk-name">{d.name.toUpperCase()}</div>
+                      <div className="desk-blurb">{d.blurb}</div>
+                      <div className="desk-plays num">
+                        {d.structures.map((s) => STRUCTURES[s].short).join(' · ')}
+                      </div>
+                      {!locked && best !== undefined && (
+                        <div className="desk-best num amber-text">Cleared up to Tier {best}</div>
+                      )}
+                      {locked && <div className="desk-lock num">LOCKED</div>}
+                    </TiltCard>
+                    {locked && (
+                      <button
+                        className="pixel-btn desk-unlock"
+                        disabled={profile.bonus < price}
+                        onClick={() => void apply((p) => unlockDesk(p, id)).then((ok) => ok && setDesk(id))}
+                        data-testid={`unlock-${id}`}
+                        title={price < d.unlockCost ? `Rank discount: was ${d.unlockCost}` : undefined}
+                      >
+                        UNLOCK · {price} BONUS
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <StartingKit deskId={desk} />
+          </>
+        )}
+        {tab === 'options' && (
+          <div className="career-options">
+            <div className="panel career-opt">
+              <div className="section-title">Seed</div>
+              <label className="num">
+                Seed (optional){' '}
+                <input
+                  className="seed-input num"
+                  value={seed}
+                  onChange={(e) => setSeed(e.target.value)}
+                  placeholder="random"
+                  data-testid="seed-input"
+                />
+              </label>
+              <div className="dim small">Same seed, same deal: replay a run or race a friend on it.</div>
+            </div>
+            <div className="panel career-opt">
+              <div className="section-title" data-tip="g:plan_set">
+                Your plan (every trade)
+              </div>
+              <PlanSetup compact />
+            </div>
+            <div className="panel career-opt">
+              <div className="section-title" data-tip="g:risk_tier">
+                Risk Tier
+              </div>
+              <div className="seg num" data-testid="tier-picker">
+                {RISK_TIERS.map((t) => (
+                  <button
+                    key={t.tier}
+                    className={tier === t.tier ? 'sel' : ''}
+                    disabled={t.tier > profile.maxTier}
+                    title={t.tier > profile.maxTier ? `Clear a year at Tier ${t.tier - 1} to unlock` : t.text}
+                    onClick={() => setTier(t.tier)}
+                    data-testid={`tier-${t.tier}`}
+                  >
+                    {t.tier > profile.maxTier ? '🔒' : ''}
+                    {t.tier}
+                  </button>
+                ))}
+              </div>
+              <div className="dim small">
+                {tier === 0
+                  ? 'Base rules. Clear a year to unlock Tier 1.'
+                  : `Cumulative: ${RISK_TIERS.slice(1, tier + 1)
+                      .map((t) => t.text)
+                      .join(' ')}`}
+              </div>
+            </div>
+            <div className="panel career-opt">
+              <div className="section-title">
+                Compliance Rules{' '}
+                <span className="chip warn" data-testid="heat-total" data-tip="g:heat">
+                  HEAT {heat}
+                </span>
+              </div>
+              <div className="compliance-list">
+                {COMPLIANCE_RULES.map((r) => {
+                  const on = rules.includes(r.id);
+                  return (
+                    <label key={r.id} className={`comp-rule ${on ? 'on' : ''}`} title={r.text}>
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => setRules(on ? rules.filter((x) => x !== r.id) : [...rules, r.id])}
+                        data-testid={`rule-${r.id}`}
+                      />
+                      <span>
+                        {r.name} <span className="dim">+{r.heat}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="dim small">
+                Optional and harsher. Clear a year with Heat to unlock cosmetics (best so far:{' '}
+                {profile.heatBest}; next at{' '}
+                {HEAT_MILESTONES.find((m) => m.heat > profile.heatBest)?.heat ?? '—'}).
+              </div>
+            </div>
+            <div className="panel career-opt">
+              <div className="section-title">Cartridge packs</div>
+              {CARTRIDGE_PACKS.map((pk) => {
+                const open = packUnlocked(profile, pk.id);
+                return (
+                  <div key={pk.id} className="pack-row">
+                    <div>
+                      <b>{pk.name}</b>{' '}
+                      <span className="dim small">
+                        {pk.cartridges.map((c) => CARTRIDGE_BY_ID[c].name).join(', ')}
+                      </span>
+                    </div>
+                    {open ? (
+                      <span className="chip good">IN THE POOL</span>
+                    ) : (
+                      <button
+                        className="pixel-btn"
+                        disabled={profile.bonus < pk.bonus}
+                        onClick={() => void apply((p) => buyPack(p, pk.id))}
+                        title={`Free at ${RANKS[pk.rank].name}`}
+                        data-testid={`pack-${pk.id}`}
+                      >
+                        {pk.bonus} BONUS
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
       <div className="career-start">
-        <label className="num">
-          Seed (optional){' '}
-          <input
-            className="seed-input num"
-            value={seed}
-            onChange={(e) => setSeed(e.target.value)}
-            placeholder="random"
-            data-testid="seed-input"
-          />
-        </label>
         <button
           className="pixel-btn primary"
           onClick={() => (saveSummary ? setConfirmAbandon(true) : void start())}
@@ -426,6 +466,7 @@ export function RunScreen() {
         badges={careerBadges(engine, (sym) => sectors[sym] ?? null)}
         briefAccess={careerBriefAccess(engine)}
         leftExtra={<RunLeftExtra e={engine} />}
+        leftPinned={<GoalCard e={engine} />}
         rightExtra={<RunRightExtra e={engine} />}
       />
     );

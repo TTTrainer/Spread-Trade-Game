@@ -1,7 +1,7 @@
 {
   "name": "spread-trading-game",
   "productName": "Spread Trading Game",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A roguelite about trading options spreads on real historical market data.",
   "author": "Spread Trading Game",
   "license": "UNLICENSED",

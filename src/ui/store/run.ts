@@ -244,6 +244,7 @@ export const useRun = create<RunStore>((set, get) => {
       deskId: e.state.config.deskId,
       lockedStudies: chartist ? [] : CHARTIST_STUDIES,
       external: (a: SessionAction) => sessionAct(a),
+      blockReason: (cardId, structureId) => get().engine?.tradeBlock(cardId, structureId) ?? null,
     });
     useTrading.getState().setStructure(DESKS[e.state.config.deskId].structures[0]);
   };

@@ -8,8 +8,8 @@ If you received the game in pieces (`...exe.part1` to `part4` plus a `Join-Porta
 
 Then you have two ways to run the game. Use either one.
 
-- **`SpreadTradingGame-Setup-1.3.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
-- **`SpreadTradingGame-Portable-1.3.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
+- **`SpreadTradingGame-Setup-1.4.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
+- **`SpreadTradingGame-Portable-1.4.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 
@@ -17,7 +17,7 @@ Then you have two ways to run the game. Use either one.
 
 There are two Mac builds: **Apple chip** (M1 and later, the `arm64` files) and **Intel** (the `x64` files). If you're not sure, choose Apple menu → About This Mac: "Chip: Apple M…" means Apple chip.
 
-1. Put the parts (`SpreadTradingGame-mac-arm64-1.3.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
+1. Put the parts (`SpreadTradingGame-mac-arm64-1.4.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
 2. Open **Terminal** (press ⌘ Space, type Terminal, press Return).
 3. Type `bash ` (with a space after it), drag `join-mac.sh` from Finder into the Terminal window, and press Return.
 
@@ -62,9 +62,21 @@ When it finishes, **VIEW DATA REPORT** lists the tickers, the dates covered and 
 ## 4. Keeping data current and playing Live
 
 - **Settings → Data → SYNC LATEST DAYS** pulls the newest trading days, usually a few minutes.
-- The **Live** mode has its own **⟳ SYNC DATA** button that does the same thing and then catches your open paper trades up to the newest close.
+- **Live** plays the most recent month: you start 20 trading days back with a dealt lineup (the market plus a few stocks), trade like any desk, and press Space to play each day. At the latest close the clock waits. **⟳ CHECK FOR NEW DAYS** fetches newer days and the month plays on from there, so it never runs out. The aim: finish ahead of simply holding the market. **NEW MONTH** starts over (closed trades stay in Stats).
+- On the SIM market there's nothing new to download, so CHECK FOR NEW DAYS moves a simulated calendar forward one week instead, and the screen says so.
 
-Live uses this week's real market with real names. Your positions carry over between sessions and score when they expire. On the SIM market there's nothing new to download, so Live's Sync moves a simulated calendar forward one week instead, and the screen says so.
+### Optional: Schwab, so Live reaches today
+
+The free DoltHub data runs a few days behind. Your own Schwab developer app can fill in the newest days (daily prices and option chains). The game only asks Schwab for **market data**: it never reads your account and never places a trade. Your App Secret and login stay on your computer, encrypted by Windows or macOS; they are never sent anywhere else or put in the game's files.
+
+1. On **developer.schwab.com**, open your app and note its **App Key**, **Secret** and **Callback URL** (for example `https://127.0.0.1`). The app needs the **Market Data** product.
+2. In the game: **Settings → Data → Schwab**. Type the App Key, the Secret and the same Callback URL, then **SAVE KEYS**.
+3. Click **LOG IN AT SCHWAB ↗**. Your browser opens Schwab's login. Log in and approve.
+4. Your browser then lands on your callback address, which usually shows "can't reach this page". That's expected: copy the **whole address** from the address bar (it contains `?code=`).
+5. Paste it into the box in step 3 of the panel and click **CONNECT** within about 30 seconds (the code expires quickly; if it fails, just log in again).
+6. After 4 pm Eastern, click **GET THE NEWEST DAYS** (or Live's CHECK FOR NEW DAYS). While the market is open only finished days are added; the latest option chain is taken after the close. Days between DoltHub's last day and today get modeled chains, labeled MODEL.
+
+Schwab asks you to log in again every 7 days (repeat steps 3 to 5). **LOG OUT** forgets the login; **REMOVE KEYS** deletes everything Schwab-related from this computer.
 
 ## 5. Where your saves live
 

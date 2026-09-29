@@ -289,6 +289,14 @@ export class TradingSession {
     return this.config.startEquityCents + this.realizedCents;
   }
 
+  /**
+   * Cash in the account: closed P/L plus the premium every open trade collected (or paid). A
+   * credit spread puts cash in right away; equity only moves as the spread's value changes.
+   */
+  cashCents(): Cents {
+    return this.equityCents() + this.openPositions().reduce((a, p) => a + p.cashCents - p.feesCents, 0);
+  }
+
   /** Mark-to-market equity at the last close (for the Max-Loss Line). */
   markedEquityCents(): Cents {
     const open = this.openPositions().reduce((a, p) => a + (lastMark(p)?.plCents ?? 0), 0);
@@ -309,9 +317,25 @@ export class TradingSession {
     return this.cards.filter((c) => c.positionIds.length === 0 && c.orderIds.length === 0).map((c) => c.id);
   }
 
-  /** Every card the next day moves: running trades plus, when enabled, untraded cards. */
+  /**
+   * Cards whose trade has already closed. They keep moving with the clock (when advanceIdle) so
+   * their charts stay current while the round runs on; before, they froze on the closing day.
+   */
+  settledCardIds(): string[] {
+    if (!this.config.advanceIdle) return [];
+    return this.cards
+      .filter(
+        (c) =>
+          c.positionIds.length > 0 &&
+          c.orderIds.length === 0 &&
+          c.positionIds.every((id) => this.position(id)?.status !== 'open'),
+      )
+      .map((c) => c.id);
+  }
+
+  /** Every card the next day moves: running trades plus, when enabled, untraded and settled cards. */
   advancingCardIds(): string[] {
-    return [...this.runningCardIds(), ...this.idleCardIds()];
+    return [...this.runningCardIds(), ...this.idleCardIds(), ...this.settledCardIds()];
   }
 
   isDone(): boolean {
@@ -448,12 +472,12 @@ export class TradingSession {
     return iv * Math.sqrt(30 / 365) * 0.8;
   }
 
-  /** Live mode: is every running card at the latest day with data? */
+  /** Live mode: is every card the clock moves at the latest day with data? */
   atLiveEdge(): boolean {
     const edge = this.config.liveEdge;
     if (!edge) return false;
-    const running = this.runningCardIds();
-    return running.length > 0 && running.every((id) => this.view(id).now >= edge);
+    const moving = this.advancingCardIds();
+    return moving.length > 0 && moving.every((id) => this.view(id).now >= edge);
   }
 
   private async addLiveCard(cardId: string, symbol: string, entryDate: ISODate): Promise<void> {
@@ -830,7 +854,8 @@ export class TradingSession {
     this.clockStarted = true;
     this.dayIndex++;
     this.inDay = true;
-    const idle = this.idleCardIds();
+    // Cards that aren't trading today; read before the running cards, whose trades may close today.
+    const idle = [...this.idleCardIds(), ...this.settledCardIds()];
     for (const cardId of this.runningCardIds()) {
       const view = this.view(cardId);
       const moved = await view.advance();
@@ -893,8 +918,8 @@ export class TradingSession {
         this.decisions.push(...r.decisions.filter((d) => !(acked && d.kind === 'earnings_tomorrow')));
       }
     }
-    // Untraded cards move too: a new day of bars, today's chain (so a trade can start today) and
-    // today's news. Nothing past today is read.
+    // Untraded and settled cards move too: a new day of bars, today's chain (so a trade can start
+    // today) and today's news. Nothing past today is read.
     for (const cardId of idle) {
       const view = this.view(cardId);
       if (!(await view.advance())) continue;

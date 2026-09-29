@@ -10,6 +10,7 @@ import type { DataBuildRequest, DataBuildResult, DataStatus } from '../../src/sh
 import { addHandlers, emit } from './ipc';
 import { log } from './log';
 import { defaultGameDbPath, doltRootDir, userDataDir } from './paths';
+import { schwabAccessToken } from './schwab';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -69,7 +70,7 @@ async function status(): Promise<DataStatus> {
 }
 
 /** Builds run in a separate utility process so the game window never freezes. */
-function runWorker(req: DataBuildRequest): Promise<DataBuildResult> {
+function runWorker(req: DataBuildRequest, schwabToken: string | null): Promise<DataBuildResult> {
   return new Promise((resolve) => {
     const child = utilityProcess.fork(join(here, 'dataWorker.js'), [], {
       serviceName: 'stg-data-build',
@@ -107,6 +108,8 @@ function runWorker(req: DataBuildRequest): Promise<DataBuildResult> {
       gameDbPath: gameDbPath(),
       doltRoot: doltRootDir(),
       reportPath: join(userDataDir(), 'data', 'REPORT.md'),
+      // Only a short-lived access token crosses over; the worker never saves it.
+      schwabToken,
     });
   });
 }
@@ -130,8 +133,17 @@ export function registerDataHandlers(): void {
       busy = true;
       try {
         resetSource();
-        const result = await runWorker(req);
-        return result;
+        // A sync also tops up the newest days from Schwab when the player connected it.
+        let token: string | null = null;
+        let tokenNote = '';
+        if (req.mode === 'sync')
+          try {
+            token = await schwabAccessToken();
+          } catch (e) {
+            tokenNote = ` Schwab: ${(e as Error).message}`;
+          }
+        const result = await runWorker(req, token);
+        return tokenNote ? { ...result, message: result.message + tokenNote } : result;
       } finally {
         busy = false;
         resetSource();

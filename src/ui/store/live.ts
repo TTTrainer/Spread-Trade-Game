@@ -1,8 +1,9 @@
 /**
- * Live mode: paper spreads on the latest end-of-day chain, with real names. Positions carry over
- * between sessions: the session's action log is saved, and on load it is replayed against a
- * longer calendar (the live edge moves forward after each data sync). Nothing is sent anywhere;
- * there is no broker connection.
+ * Live mode: the most recent month of the market, real names and real dates. A month starts
+ * LIVE_MONTH_DAYS trading days before the latest close with a dealt lineup, and plays forward day by
+ * day like any other desk. At the latest close the clock waits; each new day of data (a sync) plays
+ * on from there, so the month never runs out. The session's action log is saved and replayed
+ * against the newer data on load. Nothing is sent anywhere; nothing places real trades.
  *
  * On the SIM market there is no new data to download, so Sync moves a simulated "today" forward
  * one week (five trading days) through the SIM history instead, and the screen says so.
@@ -11,6 +12,7 @@
 import { create } from 'zustand';
 import { addDays, type ISODate } from '../../engine/calendar';
 import { buildDebrief } from '../../engine/trading/debrief';
+import { liveMonthStart, pickLiveLineup } from '../../engine/trading/liveMonth';
 import { defaultSessionConfig, TradingSession, type SessionAction } from '../../engine/trading/session';
 import { bridge, hasBridge } from '../bridge';
 import { ipcSource } from '../data/ipcSource';
@@ -27,11 +29,17 @@ interface LiveSave {
   log: SessionAction[];
   simToday: ISODate | null;
   startedAt: string;
+  /** First day of this Live month. Saves from before months have none and keep the old rules. */
+  start?: ISODate | null;
 }
 
 interface LiveStore {
   session: TradingSession | null;
   edge: ISODate | null;
+  /** First day of the month being played (null for an old, month-less save). */
+  start: ISODate | null;
+  /** Trading days from the month's start through the latest close. */
+  days: ISODate[];
   synthetic: boolean;
   /** Last day of data in the SIM market (the simulated today can't pass it). */
   simEnd: ISODate | null;
@@ -54,35 +62,48 @@ async function loadSave(): Promise<LiveSave | null> {
   return (slot?.data as LiveSave | undefined) ?? null;
 }
 
+/** The day the desk's clock is on: every card moves together, so any card's date will do. */
+export function liveClock(s: TradingSession, start: ISODate | null): ISODate | null {
+  const dates = s.cards.map((c) => s.view(c.id).now);
+  return dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : start;
+}
+
 export const useLive = create<LiveStore>((set, get) => ({
   session: null,
   edge: null,
+  start: null,
+  days: [],
   synthetic: true,
   simEnd: null,
   busy: false,
   recorded: new Set(),
 
-  /** Build the session at the current edge and replay every saved action. */
+  /** Build the session at the current edge and replay every saved action (or deal a new month). */
   open: async () => {
     set({ busy: true });
     try {
       const meta = await src.meta();
       const synthetic = meta.kind === 'synthetic';
       save = (await loadSave()) ?? null;
+      const fresh = !save;
       if (!save) {
         let simToday: ISODate | null = null;
         if (synthetic) {
           const days = await src.tradingDays(addDays(meta.lastDate, -140), meta.lastDate);
           simToday = days[Math.max(0, days.length - 1 - SIM_RUNWAY_DAYS)];
         }
+        const edge0 = simToday ?? meta.lastDate;
+        const recent = await src.tradingDays(addDays(edge0, -60), edge0);
         save = {
           seed: `live-${Date.now().toString(36)}`,
           log: [],
           simToday,
           startedAt: new Date().toISOString(),
+          start: liveMonthStart(recent, edge0),
         };
       }
       const edge = synthetic ? (save.simToday ?? meta.lastDate) : meta.lastDate;
+      const month = !!save.start;
       const settings = useApp.getState().settings;
       const s = new TradingSession(
         src,
@@ -97,15 +118,35 @@ export const useLive = create<LiveStore>((set, get) => ({
           callMode: settings.game.bucketMode,
           blind: false,
           liveEdge: edge,
+          // The whole desk moves with the clock, traded or not, so any day can start a trade.
+          advanceIdle: month,
         }),
       );
+      // A month never "ends" early: it runs to the latest close and waits there for new days.
+      s.holdOpen = month;
       for (const a of save.log) await s.dispatch(a);
-      // A ticker you looked at but never traded stays on the day you opened it; drop it so every
-      // card on the desk is at today's close.
-      for (const c of s.cards.slice())
-        if (!c.positionIds.length && !c.orderIds.length && s.view(c.id).now < edge)
-          await s.dispatch({ t: 'removeCard', cardId: c.id });
-      set({ session: s, edge, synthetic, simEnd: synthetic ? meta.lastDate : null });
+      if (month && fresh) {
+        const lineup = pickLiveLineup(await src.symbols(), meta.benchmark, save.seed, save.start as ISODate);
+        let n = 0;
+        for (const symbol of lineup) {
+          try {
+            await s.dispatch({ t: 'addLive', cardId: `L${++n}`, symbol, entryDate: save.start as ISODate });
+          } catch (err) {
+            s.log.pop();
+            n--;
+            console.error(`live lineup: no chain for ${symbol}`, err);
+          }
+        }
+      }
+      if (!month)
+        // An old save: a ticker you looked at but never traded stays on the day you opened it; drop
+        // it so every card on the desk is at today's close.
+        for (const c of s.cards.slice())
+          if (!c.positionIds.length && !c.orderIds.length && s.view(c.id).now < edge)
+            await s.dispatch({ t: 'removeCard', cardId: c.id });
+      const start = save.start ?? null;
+      const days = start ? await src.tradingDays(start, edge) : [];
+      set({ session: s, edge, start, days, synthetic, simEnd: synthetic ? meta.lastDate : null });
       useTrading.getState().init(s, { recordMode: 'live', onChange: () => void get().persist() });
       await get().persist();
       await get().recordClosed();
@@ -122,17 +163,23 @@ export const useLive = create<LiveStore>((set, get) => ({
     const s = get().session;
     const edge = get().edge;
     if (!s || !edge) return null;
-    const existing = s.cards.find((c) => c.realSymbol === symbol && s.view(c.id).now >= edge);
+    if (s.inDay) {
+      useApp.getState().toast('Finish the day first.', 'warn');
+      return null;
+    }
+    // New tickers join on the day the desk is on (the latest close for an old save).
+    const day = get().start ? (liveClock(s, get().start) ?? edge) : edge;
+    const existing = s.cards.find((c) => c.realSymbol === symbol && s.view(c.id).now >= day);
     if (existing) {
       useTrading.getState().select(existing.id);
       return existing.id;
     }
     const cardId = `L${s.log.filter((a) => a.t === 'addLive').length + 1}`;
     try {
-      await s.dispatch({ t: 'addLive', cardId, symbol, entryDate: edge });
+      await s.dispatch({ t: 'addLive', cardId, symbol, entryDate: day });
     } catch (err) {
       s.log.pop();
-      useApp.getState().toast(`No chain for ${symbol} on ${edge}.`, 'warn');
+      useApp.getState().toast(`No chain for ${symbol} on ${day}.`, 'warn');
       console.error(err);
       return null;
     }
@@ -180,7 +227,7 @@ export const useLive = create<LiveStore>((set, get) => ({
     if (hasBridge()) await bridge().invoke('user.deleteSave', LIVE_SLOT);
     save = null;
     useTrading.getState().reset();
-    set({ session: null, recorded: new Set() });
+    set({ session: null, start: null, days: [], recorded: new Set() });
     await get().open();
   },
 

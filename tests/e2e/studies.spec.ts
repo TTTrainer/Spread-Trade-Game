@@ -31,7 +31,7 @@ test('changing studies rebuilds the chart with its candles (playtest bug)', asyn
   await app.close();
 });
 
-test('the full option chain opens on Ctrl+5 and a bid click sets up a credit spread', async () => {
+test('the option chain tab opens on Ctrl+5 and a bid click sets up a credit spread', async () => {
   const { app, page } = await launchGame();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -55,8 +55,8 @@ test('the full option chain opens on Ctrl+5 and a bid click sets up a credit spr
   await expect(row.locator('td.strike i.leg-s')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(chain).toBeHidden();
-  // The ladder header opens it too.
-  await page.getByTestId('ladder-chain').click();
+  // It's a tab over the chart: the CHAIN tab opens it too.
+  await page.getByTestId('ctab-chain').click();
   await expect(chain).toBeVisible();
   await page.keyboard.press('Control+5');
   await expect(chain).toBeHidden();

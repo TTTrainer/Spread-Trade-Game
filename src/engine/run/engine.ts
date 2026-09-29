@@ -40,6 +40,7 @@ import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
 import { runScore } from '../scoring/mult';
 import { STRUCTURES } from '../strategies/structures';
+import type { StructureId } from '../strategies/types';
 import { buildDebrief } from '../trading/debrief';
 import {
   defaultSessionConfig,
@@ -248,6 +249,16 @@ export function initialState(config: RunConfig, startedAt = ''): RunState {
     },
     endless: false,
   };
+}
+
+export interface GoalOutlook {
+  meter: number;
+  target: number;
+  toGo: number;
+  openCount: number;
+  openPlCents: number;
+  /** P/L chips of the open trades if closed now (a floor for winners). */
+  openPoints: number;
 }
 
 export interface Passives {
@@ -473,6 +484,31 @@ export class RunEngine {
     return Math.max(0, BALANCE.run.tradeWindowDays - s.dayIndex);
   }
 
+  /**
+   * Distance to the round's target, plus what the open trades would score if closed now. Only the
+   * P/L chips are counted for them: multipliers can only raise a winner, so for winners this is a
+   * floor, and for losers it is the scaled-down penalty they would take.
+   */
+  goalOutlook(): GoalOutlook {
+    const r = this.state.round;
+    const open = this.session?.openPositions() ?? [];
+    let openPlCents = 0;
+    let openPoints = 0;
+    for (const p of open) {
+      const pl = lastMark(p)?.plCents ?? 0;
+      openPlCents += pl;
+      openPoints += runScore(pl, r.startEquityCents, []).points;
+    }
+    return {
+      meter: r.meter,
+      target: r.target,
+      toGo: Math.max(0, r.target - r.meter),
+      openCount: open.length,
+      openPlCents,
+      openPoints,
+    };
+  }
+
   // ---------- actions ----------
 
   async dispatch(a: RunAction): Promise<PlaceResult | null> {
@@ -585,9 +621,14 @@ export class RunEngine {
     return r;
   }
 
-  private placeBlock(a: Extract<SessionAction, { t: 'place' }>): string | null {
-    const s = this.session as TradingSession;
+  /**
+   * Why a new trade can't go on this card right now, in words the order ticket can show (null
+   * when it can). The call itself is read from the trade when it's placed, so it isn't checked.
+   */
+  tradeBlock(cardId: string, structureId: StructureId): string | null {
+    const s = this.session;
     const r = this.state.round;
+    if (!s || this.state.phase !== 'round') return 'No round is in progress.';
     const desk = DESKS[this.state.config.deskId];
     if (r.sitOut) return 'You are sitting this round out: no new trades until it ends.';
     if (s.inDay) return 'Wait for the close.';
@@ -595,15 +636,23 @@ export class RunEngine {
       return 'The clock is running: new trades wait for the next round.';
     if (s.clockStarted && s.dayIndex >= BALANCE.run.tradeWindowDays)
       return `The trading window closed after day ${BALANCE.run.tradeWindowDays}: new trades wait for the next round.`;
-    if (r.ticketsUsed >= r.tickets) return 'No tickets left this round. Press Space to start the clock.';
-    if (!desk.structures.includes(a.structureId))
-      return `${STRUCTURES[a.structureId].name} is not in the ${desk.name} desk's playbook.`;
-    const card = s.cards.find((c) => c.id === a.cardId);
+    if (r.ticketsUsed >= r.tickets)
+      return 'No tickets left this round: manage your open trades or end the round.';
+    if (!desk.structures.includes(structureId))
+      return `${STRUCTURES[structureId].name} is not in the ${desk.name} desk's playbook.`;
+    const card = s.cards.find((c) => c.id === cardId);
     if (!card) return 'That card is not on the table.';
     if (card.orderIds.length || card.positionIds.some((id) => s.position(id)?.status === 'open'))
-      return 'One position per card.';
-    if (card.positionIds.length) return 'This card already had its trade this round.';
-    if (!card.call) return 'Call your shot first: press 1-5 (and Shift+1-5 for confidence).';
+      return 'One trade per card: manage this one in Positions (Ctrl+1).';
+    if (card.positionIds.length) return 'This card already had its trade this round: pick another card.';
+    return null;
+  }
+
+  private placeBlock(a: Extract<SessionAction, { t: 'place' }>): string | null {
+    const why = this.tradeBlock(a.cardId, a.structureId);
+    if (why) return why;
+    const card = this.session?.cards.find((c) => c.id === a.cardId);
+    if (!card?.call) return 'Call your shot first: press 1-5 (and Shift+1-5 for confidence).';
     return null;
   }
 

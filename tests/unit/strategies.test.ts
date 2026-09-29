@@ -230,7 +230,8 @@ describe('pricing spreads from legs', () => {
   it('writes Greeks in plain English', () => {
     const m = computeMetrics(legsOf('bull_put'), chain, STRUCTURES.bull_put, 0.03);
     const lines = plainGreeks(m?.greeks ?? { delta: 0, gamma: 0, theta: 0, vega: 0 }, 2);
-    expect(lines[0]).toMatch(/You make about \$\d+ a day from time decay/);
+    expect(lines[0]).toMatch(/You make about \$[\d.]+ a day from time decay/);
+    expect(plainGreeks({ delta: 0, gamma: 0, theta: 0.45, vega: 0 }, 1)[0]).toContain('$0.45 a day');
     expect(lines[1]).toMatch(/If the stock rises \$1, you make about/);
     expect(lines[2]).toMatch(/drops 1 point, you make/);
     expect(plainGreeks({ delta: 0, gamma: 0, theta: 0, vega: 0 }, 1)[0]).toMatch(/barely/);

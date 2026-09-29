@@ -13,6 +13,7 @@ import { NewsTicker } from './NewsTicker';
 import { OrderTicket, StructureCards } from './BuilderTray';
 import { SetupSliders } from './SetupPanel';
 import { ChainScreen } from './ChainScreen';
+import { CashDeposit, CashReadout } from './CashDeposit';
 import {
   AnalyzePanel,
   DecisionModal,
@@ -172,17 +173,7 @@ export function HelpModal() {
                 'help',
                 'settings',
               ],
-              [
-                'sell',
-                'buy',
-                'flatten',
-                'reverse',
-                'autoSend',
-                'playPause',
-                'confirm',
-                'ladderIn',
-                'ladderOut',
-              ],
+              ['sell', 'buy', 'flatten', 'reverse', 'autoSend', 'playPause', 'confirm'],
             ] as const
           ).map((group, gi) => (
             <div key={gi} className="hotkey-list">
@@ -214,6 +205,7 @@ export function TradingTopBar({ left, right }: { left?: ReactNode; right?: React
       <div className="tb-item num">
         <span className="dim">EQUITY</span> <span data-testid="equity">{money(marked)}</span>
       </div>
+      <CashReadout />
       <div className="tb-item num">
         <span className="dim">REALIZED</span> <Pnl cents={session.realizedCents} testId="realized" />
       </div>
@@ -232,6 +224,7 @@ export function TradingLayout({
   allowedStructures,
   onDone,
   leftExtra,
+  leftPinned,
   rightExtra,
   badges,
   levels,
@@ -244,6 +237,8 @@ export function TradingLayout({
   allowedStructures?: StructureId[];
   onDone?: ReactNode;
   leftExtra?: ReactNode;
+  /** Stays in view at the bottom of the lineup column however far it scrolls. */
+  leftPinned?: ReactNode;
   rightExtra?: ReactNode;
   badges?: (cardId: string) => CardBadges;
 }) {
@@ -341,9 +336,33 @@ export function TradingLayout({
       <div className="t-top">{top}</div>
       <div className="t-left">
         <LineupColumn extra={leftExtra} badges={badges} briefAccess={briefAccess} />
+        {leftPinned && <div className="t-left-pin">{leftPinned}</div>}
       </div>
       <div className="t-center">
         <ChartPanel />
+        <div className="center-tabs num" role="tablist">
+          <button
+            className={chainOpen ? '' : 'sel'}
+            onClick={() => setChainOpen(false)}
+            role="tab"
+            aria-selected={!chainOpen}
+            data-testid="ctab-chart"
+          >
+            ◲ CHART
+          </button>
+          <button
+            className={chainOpen ? 'sel' : ''}
+            onClick={() => setChainOpen(true)}
+            role="tab"
+            aria-selected={chainOpen}
+            data-testid="ctab-chain"
+            data-tip-title="Option chain"
+            data-tip-body="Every strike and expiration with bid, ask, IV and the Greeks. Click a bid to sell there."
+          >
+            ⊞ CHAIN <span className="kbd">{chainKey}</span>
+          </button>
+        </div>
+        {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
         <NewsTicker />
       </div>
       <div className="t-right panel">
@@ -392,14 +411,6 @@ export function TradingLayout({
               <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
             </button>
           ))}
-          <button
-            onClick={() => setChainOpen(true)}
-            data-testid="open-chain"
-            data-tip-title="Option chain"
-            data-tip-body="Every strike and expiration with bid, ask, IV and the Greeks. Click a bid to sell there."
-          >
-            ⊞ CHAIN <span className="kbd">{chainKey}</span>
-          </button>
           <button onClick={() => setStudiesOpen(true)}>
             STUDIES <span className="kbd">Ctrl+E</span>
           </button>
@@ -420,8 +431,8 @@ export function TradingLayout({
         </div>
       </div>
       <DecisionModal />
+      <CashDeposit />
       {studiesOpen && <StudyPicker onClose={() => setStudiesOpen(false)} />}
-      {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
     </motion.div>
   );
 }

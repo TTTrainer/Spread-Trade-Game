@@ -37,6 +37,26 @@ export interface DataBuildResult {
   needsDiskConfirm?: boolean;
 }
 
+/** Settings for the read-only Schwab market-data connection (an empty secret keeps the saved one). */
+export interface SchwabSettings {
+  appKey: string;
+  appSecret: string;
+  callbackUrl: string;
+}
+
+export interface SchwabStatus {
+  /** App Key and App Secret saved. */
+  configured: boolean;
+  /** Logged in, with a login that hasn't expired. */
+  connected: boolean;
+  appKeyHint: string | null;
+  callbackUrl: string;
+  /** When Schwab asks for the login again (every 7 days). */
+  loginExpiresAt: number | null;
+  /** Keys and tokens are encrypted by the operating system's key store. */
+  encrypted: boolean;
+}
+
 import type { DrillRow, RunRow, SaveSlot, TradeRow } from './userData';
 
 export interface RpcMap {
@@ -57,6 +77,15 @@ export interface RpcMap {
   'data.status': () => DataStatus;
   'data.build': (req: DataBuildRequest) => DataBuildResult;
   'data.report': () => string;
+  /** Read-only Schwab market data. Keys and tokens stay in the user-data folder, encrypted. */
+  'schwab.status': () => SchwabStatus;
+  'schwab.save': (s: SchwabSettings) => SchwabStatus;
+  /** Opens Schwab's login page in the browser; returns its address. */
+  'schwab.login': () => string;
+  /** The address the browser landed on after the login (it carries the one-time code). */
+  'schwab.finish': (pastedUrl: string) => SchwabStatus;
+  /** Log out (forget = also remove the saved App Key and Secret). */
+  'schwab.disconnect': (forget: boolean) => SchwabStatus;
   'system.info': () => SystemInfo;
   'system.quit': () => void;
   'system.toggleFullscreen': () => boolean;

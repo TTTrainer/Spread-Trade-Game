@@ -27,12 +27,13 @@ import { previewScore } from '../../engine/run/preview';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { Kbd, Meter, Modal, CountUp } from '../components/ui';
-import { money, pct, signed } from '../format';
+import { money, pct, pnlText, signed } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useRun } from '../store/run';
 import { tradeOpen, useTrading } from '../store/trading';
 import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
+import { CashReadout } from '../trading/CashDeposit';
 import './run.css';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
@@ -264,6 +265,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         <div className="tb-item num" data-tip="g:equity">
           <span className="dim">EQUITY</span> {money(eq)}
         </div>
+        <CashReadout />
         <div className="tb-spacer" />
         <FastForwardBar />
       </div>
@@ -425,6 +427,83 @@ function ClientCard({ e }: { e: RunEngine }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * The round goal in one glance: points still needed, a bar that shows where the meter is and where
+ * it would be if the open trades closed now, and a plain line on what that means.
+ */
+export function GoalCard({ e }: { e: RunEngine }) {
+  useTrading((s) => s.version);
+  useRun((s) => s.version);
+  if (e.state.round.sitOut) return null;
+  const g = e.goalOutlook();
+  const met = g.meter >= g.target;
+  const hole = g.meter < 0;
+  const frac = (v: number) => Math.max(0, Math.min(1, v / Math.max(1, g.target)));
+  const now = frac(g.meter);
+  const withOpen = frac(g.meter + g.openPoints);
+  const ifClosedToGo = g.target - (g.meter + g.openPoints);
+  const note = met
+    ? 'Target met. Anything more is bonus; protect it.'
+    : hole
+      ? 'Losses score against you. Small, planned exits climb back out.'
+      : g.openCount > 0 && ifClosedToGo <= 0
+        ? 'Closing your open trades now would clear the target.'
+        : g.openCount > 0
+          ? `If your open trades closed now: ${Math.max(0, ifClosedToGo).toLocaleString()} still to go.`
+          : 'Winning trades fill the bar; confident, exact calls multiply it.';
+  return (
+    <div
+      className={`goal-card ${met ? 'met' : hole ? 'hole' : ''}`}
+      data-testid="goal-card"
+      data-tip="g:meter"
+    >
+      <div className="goal-head">
+        <span className="section-title">Round goal</span>
+        <span className="num dim">
+          {g.meter.toLocaleString()} / {g.target.toLocaleString()}
+        </span>
+      </div>
+      <motion.div
+        key={g.meter}
+        className="goal-big num"
+        data-testid="goal-to-go"
+        initial={{ scale: 1.25 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 14 }}
+      >
+        {met
+          ? '✔ TARGET MET'
+          : hole
+            ? `▼ ${Math.abs(g.meter).toLocaleString()} IN THE HOLE`
+            : `${g.toGo.toLocaleString()} TO GO`}
+      </motion.div>
+      <div className="goal-bar" aria-label={`${Math.round(now * 100)}% of the target`}>
+        <i className="gb-now" style={{ width: `${now * 100}%` }} />
+        {g.openCount > 0 && withOpen !== now && (
+          <i
+            className={`gb-open ${withOpen > now ? 'up' : 'down'}`}
+            style={{ left: `${Math.min(now, withOpen) * 100}%`, width: `${Math.abs(withOpen - now) * 100}%` }}
+          />
+        )}
+        <b className="gb-pct num">{Math.round(now * 100)}%</b>
+      </div>
+      {g.openCount > 0 && (
+        <div className="goal-open num" data-testid="goal-open">
+          <span className="dim">OPEN ×{g.openCount}</span>{' '}
+          <span className={g.openPlCents >= 0 ? 'up-text' : 'down-text'}>{pnlText(g.openPlCents)}</span>{' '}
+          <span className="dim">≈</span>{' '}
+          <span className={g.openPoints >= 0 ? 'up-text' : 'down-text'}>
+            {g.openPoints >= 0 ? '+' : ''}
+            {g.openPoints.toLocaleString()}
+            {g.openPoints > 0 ? '+' : ''} pts
+          </span>
+        </div>
+      )}
+      <div className="goal-note">{note}</div>
     </div>
   );
 }

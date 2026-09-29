@@ -9,12 +9,16 @@ import { buildRealDb, LowDiskError } from '../../data-pipeline/dolt/extract';
 import { get, openDb } from '../../data-pipeline/lib/sqlite';
 import { writeReport } from '../../data-pipeline/report';
 import { buildSyntheticDb } from '../../data-pipeline/synthetic';
+import { schwabFetchApi } from '../../data-pipeline/schwab/client';
+import { keepLaterDays, schwabTopUp } from '../../data-pipeline/schwab/topup';
 
 interface Job {
   req: DataBuildRequest;
   gameDbPath: string;
   doltRoot: string;
   reportPath: string;
+  /** A short-lived Schwab access token when the player connected Schwab (never saved here). */
+  schwabToken?: string | null;
 }
 
 interface ParentPort {
@@ -79,18 +83,43 @@ async function run(job: Job): Promise<DataBuildResult> {
     db.close();
     if (meta.kind !== 'real')
       return { ok: false, message: 'Sync needs the real market data. Build it first.' };
-    const r = await buildRealDb({
-      gameDbPath,
-      doltRoot: job.doltRoot,
-      allowDownload: req.allowDownload,
-      confirmLowDisk: true,
-      tickers,
-      incrementalFrom: addDays(meta.lastDate, -10),
-      log,
-      progress: (s, f) => progress(s, f),
-    });
+    // DoltHub first (it is the reference data), then the newest days from Schwab when connected.
+    const notes: string[] = [];
+    let ok = false;
+    try {
+      const r = await buildRealDb({
+        gameDbPath,
+        doltRoot: job.doltRoot,
+        allowDownload: req.allowDownload,
+        confirmLowDisk: true,
+        tickers,
+        incrementalFrom: addDays(meta.lastDate, -10),
+        log,
+        progress: (s, f) => progress(s, f),
+      });
+      keepLaterDays(gameDbPath, meta.lastDate);
+      notes.push(`DoltHub: synced through ${r.lastDate}.`);
+      ok = true;
+    } catch (e) {
+      if (e instanceof LowDiskError || !job.schwabToken) throw e;
+      notes.push(`DoltHub sync failed (${e instanceof Error ? e.message : String(e)}).`);
+    }
+    if (job.schwabToken) {
+      try {
+        const t = await schwabTopUp({
+          gameDbPath,
+          api: schwabFetchApi(job.schwabToken),
+          log,
+          progress: (s, f) => progress(s, f),
+        });
+        notes.push(t.message);
+        ok = ok || t.ok;
+      } catch (e) {
+        notes.push(`Schwab top-up failed (${e instanceof Error ? e.message : String(e)}).`);
+      }
+    }
     writeReport(gameDbPath, job.reportPath);
-    return { ok: true, message: `Synced through ${r.lastDate}.` };
+    return { ok, message: notes.join(' ') };
   } catch (e) {
     if (e instanceof LowDiskError) return { ok: false, message: e.message, needsDiskConfirm: true };
     return { ok: false, message: e instanceof Error ? e.message : String(e) };

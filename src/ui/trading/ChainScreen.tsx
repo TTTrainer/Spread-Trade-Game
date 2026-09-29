@@ -12,7 +12,7 @@ import { expirationsOf, mid, quotesFor } from '../../engine/strategies/structure
 import type { OptionLeg, StructureId } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { price } from '../format';
-import { Kbd, Modal } from '../components/ui';
+import { Kbd } from '../components/ui';
 import { useApp } from '../store/app';
 import { tradeOpen, useTrading } from '../store/trading';
 
@@ -25,6 +25,11 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
   const allowed = useTrading((s) => s.allowed);
   const plan = useTrading((s) => s.plan)();
   const [exp, setExp] = useState<string | null>(builder.expiration);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const wrap = useRef<HTMLDivElement>(null);
   // Open centred on the price, where the tradable strikes are.
   useEffect(() => {
@@ -126,7 +131,7 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal onClose={onClose} wide testId="chain-screen">
+    <div className="chain-embed" data-testid="chain-screen">
       <div className="chain-head">
         <h2>
           Option chain · {session.card(cardId).displaySymbol}{' '}
@@ -136,7 +141,7 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
           {em !== null && `Expected move to this date ±${price(em)} (${((em / spot) * 100).toFixed(1)}%)`}
         </span>
         <button className="pixel-btn" onClick={onClose}>
-          BACK TO CHART <Kbd>Esc</Kbd>
+          ◂ CHART <Kbd>Esc</Kbd>
         </button>
       </div>
       <div className="chain-exps num">
@@ -222,6 +227,6 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
         Click a bid to sell there (the short strike of a credit spread), an ask to buy. Shaded: in the money.
         Gold rows: about one expected move away.
       </p>
-    </Modal>
+    </div>
   );
 }

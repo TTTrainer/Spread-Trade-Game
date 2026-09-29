@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { diffDays } from '../../engine/calendar';
 import {
   envFromChain,
   payoffAtExpiry,
   payoffNow,
   plainGreeks,
+  type ExpectedOutcome,
   type PricingEnv,
 } from '../../engine/strategies/metrics';
 import { optionLegsOf } from '../../engine/lifecycle/position';
@@ -67,11 +68,24 @@ export function useCurve(): Curve | null {
   };
 }
 
+/** A box's width, kept current as the column resizes. */
+function useWidth(fallback: number): [(el: HTMLDivElement | null) => void, number] {
+  const [w, setW] = useState(fallback);
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(200, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, w];
+}
+
 export function PayoffChart({ height = 190 }: { height?: number }) {
   const curve = useCurve();
   const whatIf = useTrading((s) => s.whatIf);
   const [hover, setHover] = useState<number | null>(null);
-  const W = 310;
+  const [boxRef, W] = useWidth(310);
   const H = height;
   const pad = { l: 44, r: 8, t: 10, b: 20 };
   const data = useMemo(() => {
@@ -91,7 +105,12 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
     const ymax = Math.max(0, ...all);
     return { xs, exp, now, lo, hi, ymin, ymax: ymax === ymin ? ymin + 1 : ymax };
   }, [curve, whatIf.days, whatIf.ivPts]);
-  if (!curve || !data) return <div className="payoff empty num">Build a trade to see its payoff.</div>;
+  if (!curve || !data)
+    return (
+      <div className="payoff empty num" ref={boxRef}>
+        Build a trade to see its payoff.
+      </div>
+    );
   const sx = (x: number) => pad.l + ((x - data.lo) / (data.hi - data.lo)) * (W - pad.l - pad.r);
   const sy = (y: number) => pad.t + ((data.ymax - y) / (data.ymax - data.ymin)) * (H - pad.t - pad.b);
   const path = (ys: number[]) =>
@@ -100,7 +119,7 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
   const hoverIdx =
     hover === null ? null : Math.round(((hover - data.lo) / (data.hi - data.lo)) * (data.xs.length - 1));
   return (
-    <div className="payoff" data-testid="payoff-chart">
+    <div className="payoff" data-testid="payoff-chart" ref={boxRef}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
@@ -229,12 +248,21 @@ function Stat({
   );
 }
 
-/** The Greeks in plain words, tucked into one hover line so the panel stays clean. */
+const MOVE_GLYPHS = ['Θ', 'Δ', 'ν', 'Γ'];
+const MOVE_TIPS = ['g:pos_theta', 'g:pos_delta', 'g:pos_vega', 'g:gamma'];
+
+/** The Greeks in plain words, one line each: what time, price and volatility do to the trade. */
 function GreeksLine({ g, units }: { g: Parameters<typeof plainGreeks>[0]; units: number }) {
   const lines = plainGreeks(g, units);
   return (
-    <div className="greeks-line num" data-tip-title="What moves this trade" data-tip-body={lines.join(' ')}>
-      <span className="ginfo">ⓘ</span> {lines[0]}
+    <div className="moves num" data-testid="moves-block">
+      <div className="moves-k">WHAT MOVES THIS TRADE</div>
+      {lines.map((l, i) => (
+        <div key={i} className="moves-row" data-tip={MOVE_TIPS[i]}>
+          <span className="moves-g">{MOVE_GLYPHS[i]}</span>
+          <span>{l}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -273,39 +301,72 @@ function PopGauge({ pop }: { pop: number }) {
   );
 }
 
-/** What you can lose against what you can make, drawn to scale. */
+/**
+ * Risk against reward, weighted by the odds: every price at expiration counts by how likely it
+ * is, so a short strike near the price shows its higher chance of loss instead of looking like
+ * a bargain because it collects more credit per dollar of width.
+ */
 function RiskReward({
-  riskCents,
-  rewardCents,
+  outcome,
+  units,
+  maxLossCents,
+  maxProfitCents,
   good,
   rule,
 }: {
-  riskCents: number;
-  rewardCents: number | null;
+  outcome: ExpectedOutcome;
+  units: number;
+  maxLossCents: number;
+  maxProfitCents: number | null;
   good: boolean;
   rule: string;
 }) {
-  const reward = rewardCents ?? riskCents * 3;
-  const top = Math.max(1, riskCents, reward);
-  const ratio = reward > 0 ? riskCents / reward : Infinity;
+  // Per-share dollars × shares, in cents.
+  const loss = Math.round(outcome.expLoss * units * 100);
+  const gain = Math.round(outcome.expGain * units * 100);
+  const ev = gain - loss;
+  const top = Math.max(1, loss, gain);
+  const ratio = gain > 0 ? loss / gain : Infinity;
+  const basis =
+    outcome.basis === 'realized'
+      ? 'how much the stock has actually moved (20 days)'
+      : "the options' own volatility";
   return (
     <div
       className="rr"
-      data-tip-title="Reward vs risk"
-      data-tip-body={`${rule} ${good ? 'This one passes: +1 mult if it wins.' : 'This one misses the rule, so no reward:risk bonus.'}`}
+      data-tip-title="Risk to reward, weighted by the odds"
+      data-tip-body={`Every price the stock could finish at counts by how likely it is, using ${basis}. Max loss over max profit ignores the odds, so a short strike close to the price looks better than it is. Max: lose ${money(maxLossCents)}, make ${maxProfitCents === null ? 'open-ended' : money(maxProfitCents)}.`}
+      data-testid="stat-rr"
     >
       <div className="rr-row">
-        <span className="rr-k">RISK</span>
-        <span className="rr-bar loss" style={{ width: `${(riskCents / top) * 100}%` }} />
-        <span className="rr-v num down">{money(riskCents)}</span>
+        <span className="rr-k">LIKELY LOSS</span>
+        <span className="rr-bar loss" style={{ width: `${(loss / top) * 100}%` }} />
+        <span className="rr-v num down">{money(loss)}</span>
       </div>
       <div className="rr-row">
-        <span className="rr-k">REWARD</span>
-        <span className="rr-bar gain" style={{ width: `${(reward / top) * 100}%` }} />
-        <span className="rr-v num up">{rewardCents === null ? 'open' : money(reward)}</span>
+        <span className="rr-k">LIKELY GAIN</span>
+        <span className="rr-bar gain" style={{ width: `${(gain / top) * 100}%` }} />
+        <span className="rr-v num up">{money(gain)}</span>
       </div>
-      <div className={`rr-ratio num ${good ? 'up' : 'down'}`} data-testid="stat-rr">
-        {good ? '✔' : '✘'} risk {Number.isFinite(ratio) ? ratio.toFixed(1) : '∞'} to make 1
+      <div className={`rr-ratio num ${ratio <= 1 ? 'up' : 'down'}`}>
+        risk {Number.isFinite(ratio) ? ratio.toFixed(2) : '∞'} to make 1 ·{' '}
+        <b className={ev >= 0 ? 'up' : 'down'} data-testid="stat-ev">
+          EDGE {ev >= 0 ? '▲ +' : '▼ −'}
+          {money(Math.abs(ev))}
+        </b>
+      </div>
+      <div className="rr-foot num">
+        {outcome.pTouch !== null && (
+          <span className={outcome.pTouch >= 0.5 ? 'down' : ''}>touches short {pct(outcome.pTouch, 0)}</span>
+        )}
+        <span className={outcome.pMaxLoss >= 0.2 ? 'down' : ''}>max loss {pct(outcome.pMaxLoss, 0)}</span>
+        <span
+          className={`rr-rule ${good ? 'up' : 'dim'}`}
+          data-tip-title="Score rule"
+          data-tip-body={`${rule}. ${good ? 'This one passes: +1 mult if it wins.' : 'This one misses it: no bonus.'}`}
+        >
+          {good ? '✔' : '✘'} +1 mult rule
+        </span>
       </div>
     </div>
   );
@@ -377,12 +438,16 @@ export function StatsBlock() {
       {m && (
         <div className="trade-visuals">
           <PopGauge pop={m.pop} />
-          <RiskReward
-            riskCents={plan.maxLossCents}
-            rewardCents={plan.maxProfitCents}
-            good={plan.goodRR}
-            rule={rule.text}
-          />
+          {plan.outcome && (
+            <RiskReward
+              outcome={plan.outcome}
+              units={100 * plan.qty}
+              maxLossCents={plan.maxLossCents}
+              maxProfitCents={plan.maxProfitCents}
+              good={plan.goodRR}
+              rule={rule.text}
+            />
+          )}
         </div>
       )}
       {m && credit && <PremiumBar credit={Math.abs(m.entryNet)} width={m.width} />}

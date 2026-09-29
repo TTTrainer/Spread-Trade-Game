@@ -8,7 +8,7 @@ import { diffDays } from '../../engine/calendar';
 import { BUCKET_GLYPHS, BUCKET_NAMES } from '../../engine/scoring/calls';
 import { expirationsOf, quotesFor, STRUCTURES } from '../../engine/strategies/structures';
 import type { OptionLeg } from '../../engine/strategies/types';
-import { CONVICTION, convictionStep } from '../../engine/trading/conviction';
+import { CONVICTION, convictionQty, convictionStep } from '../../engine/trading/conviction';
 import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { SnapSlider } from '../components/SnapSlider';
@@ -115,6 +115,9 @@ export function SetupSliders() {
   const backs = exps.filter((e) => builder.expiration && diffDays(builder.expiration, e) >= 14);
   const shorts =
     plan?.legs.filter((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0).map((l) => l.strike) ?? [];
+  const equity = session.markedEquityCents();
+  const cap = session.config.riskCapPct;
+  const perContract = plan?.ok && plan.qty > 0 ? plan.maxLossCents / plan.qty : null;
   return (
     <div className="tray-section setup" data-testid="setup-sliders">
       <ViewChip />
@@ -197,7 +200,7 @@ export function SetupSliders() {
         />
       )}
       <SnapSlider
-        label="Conviction"
+        label="Size"
         tip="g:conviction"
         testId="slider-conviction"
         accent="up"
@@ -205,23 +208,43 @@ export function SetupSliders() {
         options={CONVICTION.map((c) => ({
           value: c.confidence,
           major: c.confidence === 0.7,
-          mark: `${Math.round(c.confidence * 100)}%`,
+          // Each step shows the contracts it buys, so conviction reads as size (and risk).
+          mark: perContract ? `${convictionQty(perContract, equity, cap, c.confidence)}×` : c.label,
         }))}
         index={Math.max(0, convIdx)}
         onIndex={(i) => void setConfidence(CONVICTION[i].confidence)}
         readout={
           plan?.ok ? (
             <>
-              {convictionStep(confidence).label} · {plan.qty}×{' '}
-              <span className="dim">
-                risk {money(plan.maxLossCents)} ({pct(plan.riskPct)})
-              </span>
+              <b className="conv-qty" data-testid="conv-qty">
+                {plan.qty} CONTRACT{plan.qty === 1 ? '' : 'S'}
+              </b>{' '}
+              <span className="dim">{convictionStep(confidence).label.toLowerCase()}</span>
             </>
           ) : (
             convictionStep(confidence).label
           )
         }
       />
+      {plan?.ok && (
+        <div
+          className="conv-cap num"
+          data-testid="conv-cap"
+          data-tip-title="Conviction is size"
+          data-tip-body={`More conviction buys more contracts, and every contract adds risk. This trade risks ${money(plan.maxLossCents)}: ${pct(plan.riskPct)} of your account, out of the ${pct(cap, 0)} one trade may risk.`}
+        >
+          <span className="cc-k">RISKING</span>
+          <span className="cc-track">
+            <i
+              style={{ width: `${Math.min(1, plan.riskPct / cap) * 100}%` }}
+              className={plan.riskPct / cap > 0.8 ? 'hot' : ''}
+            />
+          </span>
+          <span className="cc-v">
+            <b>{money(plan.maxLossCents)}</b> · {pct(plan.riskPct)} of account
+          </span>
+        </div>
+      )}
     </div>
   );
 }

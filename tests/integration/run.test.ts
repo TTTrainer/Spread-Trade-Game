@@ -146,7 +146,7 @@ describe('career run loop', () => {
     expect(r?.ok).toBe(true);
     expect(e.state.round.ticketsUsed).toBe(1);
     r = await place('bull_put');
-    expect(r?.reason).toMatch(/One position per card/);
+    expect(r?.reason).toMatch(/One trade per card/);
     // Once the clock runs: no skipping, and a new trade waits for the close, then may start on a
     // later day (the untraded card moved with the clock and has today's chain).
     await e.dispatch({ t: 's', a: { t: 'begin' } });
@@ -189,6 +189,77 @@ describe('career run loop', () => {
       r = await placeOn(c3.id);
       expect(r?.reason).toMatch(/trading window closed/);
     }
+  }, 60_000);
+
+  it('names why a trade is blocked and tracks the goal with open trades', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'goal-1' }));
+    const s = e.session!;
+    const c = s.cards[0];
+    expect(e.tradeBlock(c.id, 'bull_put')).toBeNull();
+    expect(e.tradeBlock(c.id, 'iron_condor')).toMatch(/playbook/);
+    const g0 = e.goalOutlook();
+    expect(g0).toMatchObject({ meter: 0, toGo: e.state.round.target, openCount: 0, openPoints: 0 });
+    const chain = s.chain(c.id)!;
+    const exp = [...new Set(chain.quotes.map((q) => q.expiration))]
+      .sort()
+      .find((x) => Date.parse(x) - Date.parse(chain.date) > 25 * 86400000)!;
+    await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+    const r = await e.dispatch({
+      t: 's',
+      a: {
+        t: 'place',
+        cardId: c.id,
+        structureId: 'bull_put',
+        params: { expiration: exp, delta: 0.3, width: 1 },
+        qty: 1,
+        order: { type: 'market' },
+        earningsAck: true,
+      },
+    });
+    expect(r?.ok).toBe(true);
+    expect(e.tradeBlock(c.id, 'bull_put')).toMatch(/One trade per card/);
+    await day(e);
+    const g = e.goalOutlook();
+    expect(g.openCount).toBe(1);
+    // Open trades count their P/L chips only: 1% of round-start equity is 100 points before mults.
+    const expected = (g.openPlCents / e.state.round.startEquityCents) * BALANCE.scoring.chipsPerUnit;
+    const scaled = g.openPlCents > 0 ? expected : expected * BALANCE.scoring.lossChipsScale;
+    expect(g.openPoints).toBe(Math.round(scaled));
+  }, 60_000);
+
+  it('a card whose trade closed keeps moving with the clock (its chart never freezes)', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'settled-1' }));
+    const s = e.session!;
+    const c = s.cards[0];
+    const chain = s.chain(c.id)!;
+    const exp = [...new Set(chain.quotes.map((q) => q.expiration))]
+      .sort()
+      .find((x) => Date.parse(x) - Date.parse(chain.date) > 25 * 86400000)!;
+    await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+    const r = await e.dispatch({
+      t: 's',
+      a: {
+        t: 'place',
+        cardId: c.id,
+        structureId: 'bull_put',
+        params: { expiration: exp, delta: 0.3, width: 1 },
+        qty: 1,
+        order: { type: 'market' },
+        earningsAck: true,
+      },
+    });
+    expect(r?.ok).toBe(true);
+    await day(e);
+    const pos = s.openPositions()[0];
+    await e.dispatch({ t: 's', a: { t: 'close', positionId: pos.id, order: { type: 'market' } } });
+    expect(s.settledCardIds()).toContain(c.id);
+    const closedOn = s.view(c.id).now;
+    const bars = s.view(c.id).bars().length;
+    await day(e);
+    expect(e.session).toBe(s); // the trading window keeps the round open
+    expect(s.view(c.id).now > closedOn).toBe(true);
+    expect(s.view(c.id).bars().length).toBe(bars + 1);
+    expect(s.chain(c.id)?.date).toBe(s.view(c.id).now);
   }, 60_000);
 
   it('skips Month 1 for a tag, then deals Month 2 with no shop', async () => {

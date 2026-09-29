@@ -687,6 +687,16 @@
   .rtb-meter,
   .rtb-line {
     width: 170px;
+    flex-shrink: 0;
+  }
+  /* Labels stack over their numbers so the gauges keep their width on a laptop screen. */
+  .rtb-row > .tb-item.num {
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .rtb-row > .tb-item.num > .dim:first-child {
+    display: block;
+    font-size: 12px;
   }
   .rtb-stress {
     width: 110px;
@@ -1813,4 +1823,243 @@
 .window-chip.low {
   border-color: var(--amber);
   color: var(--amber);
+}
+
+/* Career setup: two tabs, no page scroll (lists may scroll inside) */
+.screen.career {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 18px;
+  padding-bottom: 14px;
+}
+.career-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0 10px;
+  border-bottom: 2px solid var(--line-bright);
+}
+.career-tabs button {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  padding: 4px 18px;
+  background: var(--bg-2);
+  color: var(--text-dim);
+  border: 2px solid var(--line-bright);
+  border-bottom: none;
+  cursor: pointer;
+  margin-bottom: -2px;
+}
+.career-tabs button.sel {
+  background: var(--bg-3);
+  color: var(--amber);
+  border-color: var(--amber);
+  text-shadow: var(--glow-amber);
+}
+.ct-badge {
+  margin-left: 8px;
+  font-size: 15px;
+  padding: 0 5px;
+  background: var(--magenta);
+  color: #000;
+}
+.career-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.career .career-start {
+  flex: none;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.career .desk-card {
+  min-height: 0;
+}
+.career .career-options {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+}
+@media (max-width: 1500px), (max-height: 820px) {
+  .screen.career {
+    padding: 10px 24px;
+  }
+  .career .screen-title {
+    font-size: 32px;
+  }
+  .career .screen-sub {
+    font-size: 15px;
+    margin: 2px 0 0;
+  }
+  .career .desk-card {
+    width: 216px;
+    padding: 6px 8px;
+    gap: 3px;
+  }
+  .career .desk-card .art-icon {
+    max-height: 64px;
+    object-fit: cover;
+  }
+  .career .desk-blurb {
+    font-size: 13px;
+  }
+  .career .desk-row {
+    margin-bottom: 8px;
+  }
+  .career .kit-row {
+    margin: 6px 0;
+  }
+  .career .cart-mini {
+    width: 270px;
+    padding: 6px;
+  }
+  .career .tutorial-banner {
+    margin-bottom: 8px;
+    padding: 4px 10px;
+  }
+}
+@media (max-width: 1500px), (max-height: 820px) {
+  .career .tutorial-banner {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+  .career .tutorial-banner canvas {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .career .desk-blurb {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .career .desk-name {
+    font-size: 17px;
+  }
+  .career .desk-card .art-icon {
+    max-height: 48px;
+  }
+  .career .desk-unlock {
+    font-size: 13px;
+    padding: 2px 6px;
+  }
+  .career .kit-panel {
+    padding: 4px 10px 6px;
+  }
+  .career .cm-name {
+    font-size: 15px;
+  }
+  .career .cart-mini .sc-when,
+  .career .cart-mini .cm-get,
+  .career .cart-mini .cm-text {
+    font-size: 13px;
+  }
+  .career .cart-mini .art-icon {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  .career .kit-plays {
+    margin-top: 4px;
+  }
+  .career .primer {
+    font-size: 13px;
+  }
+}
+
+/* ---------- round goal card ---------- */
+.goal-card {
+  border: 2px solid var(--magenta);
+  background: linear-gradient(180deg, rgba(255, 62, 165, 0.12), rgba(255, 62, 165, 0.03));
+  padding: 6px 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.goal-card.met {
+  border-color: var(--cyan);
+  background: linear-gradient(180deg, rgba(62, 242, 255, 0.14), rgba(62, 242, 255, 0.03));
+}
+.goal-card.hole {
+  border-color: var(--down);
+  background: linear-gradient(180deg, rgba(255, 79, 109, 0.14), rgba(255, 79, 109, 0.03));
+}
+.goal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.goal-head .section-title {
+  margin: 0;
+}
+.goal-head .num {
+  font-size: 16px;
+}
+.goal-big {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--magenta);
+  text-shadow: var(--glow-magenta);
+  transform-origin: left center;
+  white-space: nowrap;
+}
+.goal-card.met .goal-big {
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+}
+.goal-card.hole .goal-big {
+  color: var(--down);
+  text-shadow: none;
+}
+.goal-bar {
+  position: relative;
+  height: 14px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-bright);
+  overflow: hidden;
+}
+.goal-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.gb-now {
+  background: var(--magenta);
+}
+.goal-card.met .gb-now {
+  background: var(--cyan);
+}
+/* What the open trades would add or take away if closed now: striped so it reads as "not yet banked". */
+.gb-open.up {
+  background: repeating-linear-gradient(135deg, var(--up) 0 4px, transparent 4px 7px);
+  opacity: 0.8;
+}
+.gb-open.down {
+  background: repeating-linear-gradient(45deg, var(--down) 0 4px, transparent 4px 7px);
+  opacity: 0.85;
+}
+.gb-pct {
+  position: absolute;
+  right: 4px;
+  top: -2px;
+  font-size: 15px;
+  font-weight: normal;
+  color: var(--text);
+  text-shadow:
+    0 0 3px var(--bg-0),
+    0 0 3px var(--bg-0);
+}
+.goal-open {
+  font-size: 16px;
+}
+.goal-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.25;
+}
+@media (max-width: 1500px) {
+  .goal-big {
+    font-size: 24px;
+  }
 }

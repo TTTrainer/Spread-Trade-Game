@@ -37,6 +37,13 @@ test('watch a day before trading, then trade on day 1; a sit-out locks trading a
   await expect.poll(() => day(page)).toBe(1);
   await expect(page.getByTestId('day-recap')).toBeVisible();
   await expect(page.getByTestId('recap-watch')).toBeVisible();
+  // The new day's candle is on the chart and in view.
+  const bar = await page.evaluate(() => {
+    const w = window as Any;
+    const t = w.__stg.trading.getState();
+    return { last: w.__stg.chart.lastBar(), now: t.session.view(t.selectedCardId).now };
+  });
+  expect(bar.last).toEqual({ date: bar.now, inView: true });
   await shot(page, '12-watch-day-1920');
   await page.locator('.dr-x').click();
   await expect(page.getByTestId('trade-window')).toContainText('9 days');

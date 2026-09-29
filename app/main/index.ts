@@ -5,6 +5,7 @@ import { configurePaths } from './paths';
 import { log } from './log';
 import { registerIpc } from './ipc';
 import { registerDataHandlers } from './dataService';
+import { registerSchwabHandlers } from './schwab';
 import { registerUserHandlers } from './userDb';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -82,6 +83,7 @@ app.whenReady().then(() => {
   log('info', `app start v${app.getVersion()} electron ${process.versions.electron}`);
   registerIpc(() => mainWindow);
   registerDataHandlers();
+  registerSchwabHandlers();
   registerUserHandlers();
   createWindow();
   app.on('activate', () => {

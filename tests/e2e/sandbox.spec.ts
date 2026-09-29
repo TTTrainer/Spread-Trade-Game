@@ -26,7 +26,21 @@ async function ffUntilDone(page: Page, maxDecisions = 40): Promise<string[]> {
     if (state === 'decision') {
       const title = (await page.getByTestId('decision-modal').locator('h2').textContent()) ?? '';
       seen.push(title);
-      if (seen.length === 1) await shot(page, '03-decision-1920');
+      if (seen.length === 1) {
+        // The decision shows the last weeks of candles, and can step aside to review the full
+        // chart (with the solid expiration line) without losing the choice.
+        await expect(page.getByTestId('dp-mini-chart')).toBeVisible();
+        await shot(page, '03-decision-1920');
+        await page.keyboard.press('v');
+        await expect(page.getByTestId('decision-dock')).toBeVisible();
+        await expect(page.getByTestId('decision-modal')).toBeHidden();
+        await expect(page.getByTestId('exp-line')).toHaveCount(1);
+        await shot(page, '03-decision-review-1920');
+        await shot(page, '03-decision-review-1366', { width: 1366, height: 768 });
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.getByTestId('dp-back').click();
+        await expect(page.getByTestId('decision-modal')).toBeVisible();
+      }
       // Hold through everything so the trade reaches expiration.
       const hold = page.getByTestId('dp-hold');
       if (await hold.count()) await hold.click();
@@ -86,6 +100,8 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   await expect(page.getByTestId('payoff-chart')).toBeVisible();
   await expect(page.getByTestId('stat-pop')).toBeVisible();
   await page.getByTestId('order-market').click();
+  // The planned trade's expiration is a dotted line on the chart (or an arrow at its edge).
+  await expect(page.getByTestId('exp-line')).toHaveCount(1);
   await shot(page, '03-builder-1920');
   await shot(page, '03-builder-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });

@@ -102,6 +102,8 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await expect(page.getByTestId('desk-verticals')).toBeVisible();
   await expect(page.getByTestId('desk-income')).toBeDisabled();
   await shot(page, '06-career-1920');
+  // Seed, tier and Compliance live on the CHALLENGE & OPTIONS tab.
+  await page.getByTestId('ctab-options').click();
   await page.getByTestId('seed-input').fill('menu-seed');
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });

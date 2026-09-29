@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { diffDays } from '../../engine/calendar';
 import { lastMark, optionLegsOf, stockRatio } from '../../engine/lifecycle/position';
 import { BUCKET_GLYPHS } from '../../engine/scoring/calls';
@@ -18,6 +18,7 @@ import { LivePnl, PaceControls, useDayProgress } from './DayPlayer';
 import { priceAt } from './dayPath';
 import type { BriefAccess } from '../../engine/news/brief';
 import { RollDialog } from './RollDialog';
+import { MiniCandles } from './DayRecap';
 
 export { RollDialog };
 
@@ -327,18 +328,43 @@ export function DecisionModal() {
   useTrading((s) => s.version);
   const ff = useTrading((s) => s.ff);
   const decide = useTrading((s) => s.decide);
+  const selected = useTrading((s) => s.selectedCardId);
+  const select = useTrading((s) => s.select);
   const [rolling, setRolling] = useState<DecisionPoint | null>(null);
+  // Reviewing the chart: the dialog tucks into a bar so the full chart can be scrolled and zoomed.
+  const peek = useTrading((s) => s.reviewChart);
+  const setPeek = useTrading((s) => s.setReviewChart);
   const dp = ff === 'decision' ? session?.decisions[0] : undefined;
   const pos = dp ? session?.position(dp.positionId) : undefined;
   const act = (a: DecisionAction) => {
     if (!dp) return;
     if (a === 'roll') {
+      setPeek(false);
       setRolling(dp);
       return;
     }
     sfx(a === 'close' ? 'stamp' : 'click');
+    setPeek(false);
     void decide(dp.id, a);
   };
+  // The chart behind the dialog shows the stock the decision is about.
+  const cardId = pos?.cardId;
+  useEffect(() => {
+    if (cardId && selected !== cardId) select(cardId);
+  }, [dp?.id, cardId]);
+  useEffect(() => {
+    if (!dp) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.code === 'KeyV' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        setPeek(!peek);
+      } else if (e.key === 'Escape' && peek) setPeek(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dp, peek]);
   useHotkeys(
     dp
       ? {
@@ -346,9 +372,50 @@ export function DecisionModal() {
         }
       : {},
   );
+  useEffect(() => {
+    // A new decision (or none) always starts as the full dialog.
+    if (!dp && peek) setPeek(false);
+  }, [dp?.id]);
   if (!dp || !pos || !session) return null;
   const m = lastMark(pos);
   const view = session.view(pos.cardId);
+  const buttons = dp.options.map((o) => (
+    <button
+      key={o}
+      className={`pixel-btn ${dp.planned === o ? 'primary' : ''}`}
+      onClick={() => act(o)}
+      data-testid={`dp-${o}`}
+      title={ACTION_KEY[o] ? `Hotkey ${ACTION_KEY[o]}` : undefined}
+    >
+      {ACTION_LABEL[o]} {dp.planned === o && <span className="chip good">PLAN</span>}
+    </button>
+  ));
+  const roll = rolling && (
+    <RollDialog
+      pos={pos}
+      onClose={() => setRolling(null)}
+      onRoll={(legs) => {
+        void decide(rolling.id, 'roll', legs);
+      }}
+    />
+  );
+  if (peek)
+    return (
+      <div className="dp-dock panel" data-testid="decision-dock" role="region" aria-label="Decision">
+        <div className={`dp-kind kind-${dp.kind}`}>
+          {dp.title}: {pos.symbol}
+        </div>
+        <span className="num">
+          P/L <Pnl cents={m?.plCents ?? 0} />
+        </span>
+        <div className="dp-actions">{buttons}</div>
+        <button className="pixel-btn" onClick={() => setPeek(false)} data-testid="dp-back">
+          ▣ BACK <Kbd>V</Kbd>
+        </button>
+        {roll}
+      </div>
+    );
+  const legs = optionLegsOf(pos.legs);
   return (
     <Modal testId="decision-modal">
       <div className={`dp-kind kind-${dp.kind}`}>DECISION POINT · {view.dayLabel()}</div>
@@ -356,6 +423,16 @@ export function DecisionModal() {
         {dp.title}: {pos.symbol}
       </h2>
       <p className="dp-msg">{dp.message}</p>
+      <div className="dp-chart" data-testid="dp-mini-chart">
+        <MiniCandles
+          bars={view.bars().slice(-30)}
+          shorts={legs.filter((l) => l.ratio < 0).map((l) => l.strike)}
+          longs={legs.filter((l) => l.ratio > 0).map((l) => l.strike)}
+          width={440}
+          height={150}
+          tags
+        />
+      </div>
       <div className="num dp-facts">
         <span>
           P/L <Pnl cents={m?.plCents ?? 0} />
@@ -364,17 +441,15 @@ export function DecisionModal() {
         <span>short {pos.entry.shortStrikes.join('/') || '—'}</span>
       </div>
       <div className="modal-actions dp-actions">
-        {dp.options.map((o) => (
-          <button
-            key={o}
-            className={`pixel-btn ${dp.planned === o ? 'primary' : ''}`}
-            onClick={() => act(o)}
-            data-testid={`dp-${o}`}
-            title={ACTION_KEY[o] ? `Hotkey ${ACTION_KEY[o]}` : undefined}
-          >
-            {ACTION_LABEL[o]} {dp.planned === o && <span className="chip good">PLAN</span>}
-          </button>
-        ))}
+        {buttons}
+        <button
+          className="pixel-btn"
+          onClick={() => setPeek(true)}
+          data-testid="dp-peek"
+          title="Hide this dialog to scroll and zoom the full chart; your choices stay in a bar"
+        >
+          ◐ REVIEW CHART <Kbd>V</Kbd>
+        </button>
       </div>
       {dp.kind === 'stop_hit' && (
         <p className="dp-warn">
@@ -384,15 +459,7 @@ export function DecisionModal() {
       <p className="dim num">
         <Kbd>Enter</Kbd> follows the plan
       </p>
-      {rolling && (
-        <RollDialog
-          pos={pos}
-          onClose={() => setRolling(null)}
-          onRoll={(legs) => {
-            void decide(rolling.id, 'roll', legs);
-          }}
-        />
-      )}
+      {roll}
     </Modal>
   );
 }

@@ -179,12 +179,17 @@ interface TradingState {
   /** The last day had news worth reading: the clock waits (auto paces only). */
   recapHold: boolean;
   dismissRecap: () => void;
-  /** The full-screen option chain is open. */
+  /** A decision is tucked into a bar so the full chart can be reviewed. */
+  reviewChart: boolean;
+  setReviewChart: (v: boolean) => void;
+  /** The option chain tab replaces the chart. */
   chainOpen: boolean;
   setChainOpen: (v: boolean) => void;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
   stamp: { id: number; title: string; text: string; credit: boolean } | null;
+  /** A credit landing in the account: the big number that flies into the BALANCE readout. */
+  deposit: { id: number; cents: number } | null;
   /** The structures this screen allows (a desk's playbook); null = all. */
   allowed: StructureId[] | null;
   setAllowed: (ids: StructureId[] | null) => void;
@@ -209,8 +214,11 @@ interface TradingState {
       external?: ExternalDispatch | null;
       maxPositions?: number | null;
       onChange?: (() => void) | null;
+      blockReason?: ((cardId: string, structureId: StructureId) => string | null) | null;
     },
   ) => void;
+  /** Rules outside the market that stop a trade (a Career round's tickets, window, sit-out). */
+  blockReason: ((cardId: string, structureId: StructureId) => string | null) | null;
   reset: () => void;
   bump: () => void;
   select: (cardId: string) => void;
@@ -403,7 +411,7 @@ export const useTrading = create<TradingState>((set, get) => {
         .flatMap((p) =>
           optionLegsOf(p.legs)
             .filter((l) => l.ratio < 0)
-            .map((l) => l.strike),
+            .map((l) => ({ strike: l.strike, right: l.right })),
         );
       const t = strikeTension(shorts, bar);
       tension = Math.max(tension, t);
@@ -533,7 +541,12 @@ export const useTrading = create<TradingState>((set, get) => {
       // Live mode: nothing after the latest close until the next sync.
       loopToken++;
       set({ ff: 'idle' });
-      useApp.getState().toast('Caught up to the latest close. Sync data for new days.', 'info');
+      useApp
+        .getState()
+        .toast(
+          'Caught up to the latest close. Open trades wait here for the next day of data (◀ LIVE › CHECK FOR NEW DAYS).',
+          'info',
+        );
       return;
     }
     if (!s.inDay) {
@@ -708,9 +721,13 @@ export const useTrading = create<TradingState>((set, get) => {
     testNote: null,
     allowed: null,
     stamp: null,
+    deposit: null,
+    blockReason: null,
     recap: null,
     recapHold: false,
     dismissRecap: () => set({ recap: null }),
+    reviewChart: false,
+    setReviewChart: (v) => set({ reviewChart: v }),
     chainOpen: false,
     setChainOpen: (v) => {
       if (v !== get().chainOpen) sfx(v ? 'select' : 'click');
@@ -741,6 +758,7 @@ export const useTrading = create<TradingState>((set, get) => {
         external: opts.external ?? null,
         maxPositions: opts.maxPositions ?? null,
         onChange: opts.onChange ?? null,
+        blockReason: opts.blockReason ?? null,
         pace: useApp.getState().settings.game.dayPace,
         dayAnim: null,
         floats: [],
@@ -1094,6 +1112,12 @@ export const useTrading = create<TradingState>((set, get) => {
           isCredit ? 26 : 14,
         );
         setTimeout(() => set({ stamp: null }), 1300);
+        if (isCredit) {
+          const cents = Math.round(net * 100 * 100 * plan.qty);
+          const id = ++feedId;
+          set({ deposit: { id, cents } });
+          setTimeout(() => get().deposit?.id === id && set({ deposit: null }), 1900);
+        }
       }
       return !!r?.ok;
     },
@@ -1104,7 +1128,9 @@ export const useTrading = create<TradingState>((set, get) => {
     start: () => {
       const s = get().session;
       if (!s) return;
-      if (!get().external && s.openPositions().length === 0 && s.orders.length === 0) {
+      // A desk whose cards all move with the clock (Career, a Live month) may watch days pass untraded.
+      const watchable = get().external || s.config.advanceIdle;
+      if (!watchable && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;
@@ -1129,7 +1155,8 @@ export const useTrading = create<TradingState>((set, get) => {
       if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;
       if (!s) return;
-      if (!get().external && !s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
+      const watchable = get().external || s.config.advanceIdle;
+      if (!watchable && !s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;

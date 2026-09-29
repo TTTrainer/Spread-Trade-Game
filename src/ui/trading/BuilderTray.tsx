@@ -117,7 +117,29 @@ export function OrderTicket() {
         ? 1
         : limitFillProbability({ mid, natural: nat }, limit, session?.config.execution)
       : 0;
-  const disabled = !plan?.ok || !open || hasPosition;
+  const blockReason = useTrading((s) => s.blockReason);
+  const maxPositions = useTrading((s) => s.maxPositions);
+  const runBlock = cardId ? (blockReason?.(cardId, builder.structureId) ?? null) : null;
+  // What to fix, in one line, when the buttons are greyed out.
+  const reason: string | null =
+    !session || !cardId
+      ? null
+      : hasPosition
+        ? 'One trade per card: manage this one in Positions (Ctrl+1).'
+        : !open
+          ? 'Wait for the day to finish playing.'
+          : runBlock
+            ? runBlock
+            : maxPositions !== null && session.positions.length + session.orders.length >= maxPositions
+              ? `This one allows ${maxPositions} trade${maxPositions > 1 ? 's' : ''}. Manage the one you have.`
+              : !builder.expiration
+                ? 'Pick an expiration with the Expires slider.'
+                : !plan
+                  ? 'This build has no price today: try another expiration or strike.'
+                  : !plan.ok
+                    ? plan.reason
+                    : null;
+  const disabled = !plan?.ok || !open || hasPosition || !!runBlock;
   const earnings = plan?.entry?.earningsInside;
 
   const go = (side: 'buy' | 'sell') => {
@@ -210,6 +232,11 @@ export function OrderTicket() {
           </label>
         )}
         <div className="ticket-buttons">
+          {reason && (
+            <div className="ticket-block" data-testid="order-block" role="status">
+              ⚠ {reason}
+            </div>
+          )}
           <button
             className="pixel-btn sell"
             disabled={disabled || !credit}

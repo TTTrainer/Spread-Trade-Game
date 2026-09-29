@@ -10,6 +10,7 @@ import {
   type IPriceLine,
   type ISeriesApi,
   type LineData,
+  type Logical,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -27,10 +28,10 @@ import {
 } from '../../engine/market/indicators';
 import type { Bar } from '../../engine/market/types';
 import { optionLegsOf } from '../../engine/lifecycle/position';
+import { addDays, diffDays, tradingDaysBetween } from '../../engine/calendar';
 import type { Leg } from '../../engine/strategies/types';
-import { tradeOpen, useTrading, type StudyId } from '../store/trading';
+import { useTrading, type StudyId } from '../store/trading';
 import { chartBridge } from './chartBridge';
-import { PriceLadder } from './PriceLadder';
 import { PositionHud } from './DayPlayer';
 import { StrikeHandle } from './StrikeHandle';
 import { DayRecapPanel } from './DayRecap';
@@ -92,11 +93,9 @@ export function ChartPanel() {
   const version = useTrading((s) => s.version);
   const studies = useTrading((s) => s.studies);
   const timeframe = useTrading((s) => s.timeframe);
-  const builder = useTrading((s) => s.builder);
   const drawings = useTrading((s) => (cardId ? s.drawings[cardId] : undefined));
   const drawTool = useTrading((s) => s.drawTool);
   const ff = useTrading((s) => s.ff);
-  const open = useTrading(tradeOpen);
   const addDrawing = useTrading((s) => s.addDrawing);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -237,6 +236,17 @@ export function ChartPanel() {
     chartBridge.paneHeight = () => panes[0]?.getHeight() ?? host.clientHeight;
     chartBridge.barCount = () => candles.data().length;
     chartBridge.plotWidth = () => chart.timeScale().width();
+    chartBridge.lastBar = () => {
+      const d = candles.data();
+      if (!d.length) return { date: null, inView: false };
+      const i = d.length - 1;
+      const r = chart.timeScale().getVisibleLogicalRange();
+      return { date: toDate(d[i].time), inView: !!r && i >= r.from - 0.5 && i <= r.to + 0.5 };
+    };
+    chartBridge.xAhead = (n) => {
+      const len = candles.data().length;
+      return len ? chart.timeScale().logicalToCoordinate((len - 1 + n) as Logical) : null;
+    };
     setChartGen((g) => g + 1);
     chart.subscribeCrosshairMove((param) => {
       const d = param.seriesData.get(candles) as
@@ -254,6 +264,7 @@ export function ChartPanel() {
       linesRef.current = [];
       drawRef.current = [];
       chartBridge.priceToY = () => null;
+      chartBridge.xAhead = () => null;
     };
   }, [session, cardId, studiesKey, timeframe]);
 
@@ -414,6 +425,28 @@ export function ChartPanel() {
   const em = plan?.metrics?.expectedMove ?? null;
   const legKey = JSON.stringify([legs, breakevens, em, studiesKey, version]);
 
+  // Expiration: solid for the open trade, dotted for the one being planned. Future days have no
+  // bars, so it sits that many trading days (or weeks) past the newest candle.
+  const exps = optionLegsOf(legs).map((l) => l.expiration);
+  const exp = exps.length ? exps.reduce((a, b) => (a < b ? a : b)) : null;
+  const expAhead =
+    exp && now && exp > now
+      ? timeframe === 'W'
+        ? Math.max(1, Math.round(diffDays(now, exp) / 7))
+        : tradingDaysBetween(addDays(now, 1), exp).length
+      : null;
+  const expDte = exp && now ? diffDays(now, exp) : null;
+  // Leave room on the right to see the expiration, up to 40% of the chart; beyond that an arrow
+  // at the edge points to it.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const ts = chart.timeScale();
+    const visible = ts.width() / ts.options().barSpacing;
+    const room = visible > 20 ? Math.floor(visible * 0.4) : 30;
+    ts.applyOptions({ rightOffset: expAhead === null ? 6 : Math.min(Math.max(6, expAhead + 3), room) });
+  }, [expAhead, clockOn, chartGen]);
+
   useEffect(() => {
     const candles = candleRef.current;
     if (!candles || !session || !cardId) return;
@@ -518,15 +551,15 @@ export function ChartPanel() {
 
   return (
     <div className="chart-panel panel" data-testid="chart-panel">
-      <div className="chart-host" ref={hostRef} style={open ? undefined : { right: 0 }} />
+      <div className="chart-host" ref={hostRef} />
       <div className="chart-legend num">{legend}</div>
       {drawTool !== 'none' && (
         <div className="chart-drawhint num">
           {drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}
         </div>
       )}
-      <PriceLadder expiration={builder.expiration} legs={legs} />
       <ChartZones />
+      {expAhead !== null && expDte !== null && <ExpiryLine ahead={expAhead} dte={expDte} open={!!position} />}
       <StrikeHandle />
       <PositionHud />
       <DayRecapPanel />
@@ -560,6 +593,50 @@ export function ChartPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** The expiration as a vertical line: solid once the trade is on, dotted while it's a plan. */
+function ExpiryLine({ ahead, dte, open }: { ahead: number; dte: number; open: boolean }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    // Follow scrolling and zooming, like the payoff zones do.
+    const id = setInterval(() => setTick((t) => t + 1), 150);
+    return () => clearInterval(id);
+  }, []);
+  const w = chartBridge.plotWidth();
+  const h = chartBridge.paneHeight();
+  const x = chartBridge.xAhead(ahead);
+  if (w <= 0 || h <= 0) return null;
+  const label = `${open ? 'EXPIRES' : 'EXP'} ${dte}d`;
+  const tip = open
+    ? `Your trade expires in ${dte} calendar days (${ahead} trading days). Past this line it settles at intrinsic value.`
+    : `The planned trade would expire in ${dte} calendar days (${ahead} trading days).`;
+  if (x === null || x > w - 2)
+    return (
+      <div
+        className={`exp-edge num ${open ? 'open' : 'plan'}`}
+        style={{ left: w - 2 }}
+        data-testid="exp-line"
+        data-exp-offscreen="1"
+        data-tip-title="Expiration"
+        data-tip-body={`${tip} It's off the right edge of the chart.`}
+      >
+        {label} ▶
+      </div>
+    );
+  if (x < 0) return null;
+  return (
+    <div
+      className={`exp-line ${open ? 'open' : 'plan'}`}
+      style={{ left: x, height: h }}
+      data-testid="exp-line"
+      data-exp-style={open ? 'solid' : 'dotted'}
+    >
+      <span className="exp-tag num" data-tip-title="Expiration" data-tip-body={tip}>
+        {label}
+      </span>
     </div>
   );
 }

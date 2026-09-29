@@ -118,10 +118,13 @@ function RecapTrade({ t }: { t: Recap['trades'][number] }) {
   const shorts = legs.filter((l) => l.ratio < 0).map((l) => l.strike);
   const longs = legs.filter((l) => l.ratio > 0).map((l) => l.strike);
   const spot = view.spot();
-  const nearest = shorts.length
-    ? shorts.reduce((a, k) => (Math.abs(k - spot) < Math.abs(a - spot) ? k : a))
+  const shortLegs = legs.filter((l) => l.ratio < 0);
+  const nearest = shortLegs.length
+    ? shortLegs.reduce((a, l) => (Math.abs(l.strike - spot) < Math.abs(a.strike - spot) ? l : a))
     : null;
-  const room = nearest !== null ? Math.abs(spot - nearest) / spot : null;
+  const room = nearest ? Math.abs(spot - nearest.strike) / spot : null;
+  // Below a short put or above a short call is past it, not a cushion.
+  const past = nearest ? (nearest.right === 'P' ? spot < nearest.strike : spot > nearest.strike) : false;
   const st = STATUS(t.tension, t.closed);
   const today = t.finalCents - t.prevCents;
   const cv = creditView(p, t.finalCents);
@@ -141,7 +144,10 @@ function RecapTrade({ t }: { t: Recap['trades'][number] }) {
         <div className={`rt-status ${st.cls}`}>
           ● {st.text}
           {room !== null && !t.closed && (
-            <span className="num"> · {(room * 100).toFixed(1)}% from the short strike</span>
+            <span className="num">
+              {' '}
+              · {(room * 100).toFixed(1)}% {past ? 'past' : 'from'} the short strike
+            </span>
           )}
         </div>
         {t.closed ? (
@@ -182,7 +188,8 @@ export function DayRecapPanel() {
   const toggle = useTrading((s) => s.toggle);
   const dismiss = useTrading((s) => s.dismissRecap);
   const pace = useTrading((s) => s.pace);
-  const show = recap && (ff === 'paused' || ff === 'decision');
+  const reviewing = useTrading((s) => s.reviewChart);
+  const show = recap && !reviewing && (ff === 'paused' || ff === 'decision');
   return (
     <AnimatePresence>
       {show && recap && (

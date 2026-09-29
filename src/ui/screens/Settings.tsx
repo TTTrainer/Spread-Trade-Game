@@ -4,6 +4,7 @@ import { DEFAULT_HOTKEYS, HOTKEY_LABELS, type HotkeyAction, type Settings } from
 import type { DecisionKind } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
+import type { SchwabStatus } from '../../shared/rpc';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
@@ -568,6 +569,7 @@ function DataPanel() {
           VIEW DATA REPORT
         </button>
       </div>
+      <SchwabPanel busy={busy} onSync={() => void run('sync')} />
       <p className="dim">
         Found a bug? Open the log folder and send <b>game.log</b> to Claude Code with what you were doing.
         Your saves and stats live in the save folder (<b>user.db</b>).
@@ -634,6 +636,196 @@ function DataPanel() {
         </Modal>
       )}
     </>
+  );
+}
+
+/**
+ * The read-only Schwab connection: the player's own developer app fills in the newest days
+ * (prices and option chains) that DoltHub hasn't published yet. Keys stay on this computer.
+ */
+function SchwabPanel({ busy, onSync }: { busy: boolean; onSync: () => void }) {
+  const toast = useApp((s) => s.toast);
+  const [st, setSt] = useState<SchwabStatus | null>(null);
+  const [appKey, setAppKey] = useState('');
+  const [secret, setSecret] = useState('');
+  const [callback, setCallback] = useState('');
+  const [pasted, setPasted] = useState('');
+  const [working, setWorking] = useState(false);
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge()
+      .invoke('schwab.status')
+      .then((x) => {
+        setSt(x);
+        setCallback(x.callbackUrl);
+      });
+  }, []);
+  const act = async (f: () => Promise<SchwabStatus | string>, ok?: string) => {
+    setWorking(true);
+    try {
+      const r = await f();
+      if (typeof r !== 'string') setSt(r);
+      if (ok) toast(ok, 'good');
+    } catch (e) {
+      toast(
+        e instanceof Error
+          ? e.message.replace(/^Error invoking remote method 'rpc': (Error: )?/, '')
+          : String(e),
+        'warn',
+      );
+    } finally {
+      setWorking(false);
+    }
+  };
+  const until = st?.loginExpiresAt ? new Date(st.loginExpiresAt).toLocaleDateString() : null;
+  return (
+    <div className="schwab-panel panel" data-testid="schwab-panel">
+      <div className="schwab-head">
+        <h3>Schwab · read-only market data</h3>
+        <span
+          className={`chip ${st?.connected ? 'good' : st?.configured ? 'warn' : ''}`}
+          data-testid="schwab-status"
+        >
+          {st?.connected
+            ? `CONNECTED · login good until ${until}`
+            : st?.configured
+              ? 'KEYS SAVED · NOT LOGGED IN'
+              : 'NOT SET UP'}
+        </span>
+      </div>
+      <p className="dim small">
+        Your own Schwab developer app fills in the newest days (daily prices and option chains) that the free
+        DoltHub data hasn't published yet, so Live's month reaches today. The game only asks for market data:
+        it never reads your account and never places a trade. Your keys and login stay on this computer
+        {st && !st.encrypted
+          ? ' (this system has no key store, so they are saved unencrypted)'
+          : ', encrypted'}
+        .
+      </p>
+      <div className="schwab-step">
+        <b className="num">1</b>
+        <label>
+          App Key
+          <input
+            value={appKey}
+            onChange={(e) => setAppKey(e.target.value)}
+            placeholder={st?.appKeyHint ? `saved ${st.appKeyHint}` : 'from developer.schwab.com › Apps'}
+            data-testid="schwab-key"
+          />
+        </label>
+        <label>
+          App Secret
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            placeholder={st?.configured ? 'saved (leave empty to keep)' : 'Secret'}
+            data-testid="schwab-secret"
+          />
+        </label>
+        <label>
+          Callback URL
+          <input
+            value={callback}
+            onChange={(e) => setCallback(e.target.value)}
+            data-testid="schwab-callback"
+          />
+        </label>
+        <button
+          className="pixel-btn"
+          disabled={working}
+          onClick={() =>
+            void act(async () => {
+              const r = await bridge().invoke('schwab.save', {
+                appKey,
+                appSecret: secret,
+                callbackUrl: callback,
+              });
+              setSecret('');
+              return r;
+            }, 'Schwab keys saved on this computer.')
+          }
+          data-testid="schwab-save"
+        >
+          SAVE KEYS
+        </button>
+      </div>
+      <p className="dim small schwab-note">
+        The Callback URL must match your app on developer.schwab.com exactly (for example https://127.0.0.1).
+      </p>
+      <div className="schwab-step">
+        <b className="num">2</b>
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.configured}
+          onClick={() => void act(() => bridge().invoke('schwab.login'))}
+          data-testid="schwab-login"
+        >
+          LOG IN AT SCHWAB ↗
+        </button>
+        <span className="dim small">
+          Approve in your browser. It then lands on a page that may not load: copy that page's whole address.
+        </span>
+      </div>
+      <div className="schwab-step">
+        <b className="num">3</b>
+        <input
+          className="schwab-paste"
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder="Paste the address here (it contains ?code=…)"
+          data-testid="schwab-paste"
+        />
+        <button
+          className="pixel-btn primary"
+          disabled={working || !pasted.trim()}
+          onClick={() =>
+            void act(async () => {
+              const r = await bridge().invoke('schwab.finish', pasted);
+              setPasted('');
+              return r;
+            }, 'Connected to Schwab (read-only market data).')
+          }
+          data-testid="schwab-finish"
+        >
+          CONNECT
+        </button>
+      </div>
+      <div className="modal-actions">
+        <button
+          className="pixel-btn"
+          disabled={busy || !st?.connected}
+          onClick={onSync}
+          data-testid="schwab-sync"
+        >
+          ⟳ GET THE NEWEST DAYS
+        </button>
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.connected}
+          onClick={() => void act(() => bridge().invoke('schwab.disconnect', false), 'Logged out of Schwab.')}
+        >
+          LOG OUT
+        </button>
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.configured}
+          onClick={() =>
+            void act(
+              () => bridge().invoke('schwab.disconnect', true),
+              'Schwab keys removed from this computer.',
+            )
+          }
+          data-testid="schwab-forget"
+        >
+          REMOVE KEYS
+        </button>
+      </div>
+      <p className="dim small">
+        Schwab asks you to log in again every 7 days. Syncs made while the market is open add only finished
+        days; the latest option chain is taken after the 4 pm close.
+      </p>
+    </div>
   );
 }
 

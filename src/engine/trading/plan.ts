@@ -10,7 +10,16 @@ import type { Chain } from '../market/types';
 import { contractCents, type Cents } from '../money';
 import { checkRisk, type RiskCheck } from '../orders/rules';
 import { computeEdgeRank, type EdgeRank } from '../strategies/edgeRank';
-import { computeMetrics, frontExpiration, netOpenPrice, type TradeMetrics } from '../strategies/metrics';
+import {
+  atmIv,
+  computeMetrics,
+  envFromChain,
+  expectedOutcome,
+  frontExpiration,
+  netOpenPrice,
+  type ExpectedOutcome,
+  type TradeMetrics,
+} from '../strategies/metrics';
 import { buildStructure, optionLegs, STRUCTURES } from '../strategies/structures';
 import type { BuildParams, Leg, StructureId } from '../strategies/types';
 import { RR_RULES } from '../../content/structureRules';
@@ -47,6 +56,8 @@ export interface TradePlan {
   riskPct: number;
   risk: RiskCheck | null;
   goodRR: boolean;
+  /** Probability-weighted gain, loss and expected value (the honest risk:reward). */
+  outcome: ExpectedOutcome | null;
   expiration: ISODate | null;
   dte: number | null;
   entry: EntrySnapshot | null;
@@ -69,6 +80,7 @@ const empty = (i: PlanInput, reason: string): TradePlan => ({
   riskPct: 0,
   risk: null,
   goodRR: false,
+  outcome: null,
   expiration: null,
   dte: null,
   entry: null,
@@ -163,6 +175,25 @@ export function planTrade(i: PlanInput): TradePlan {
   });
   const edge = computeEdgeRank(i.structureId, legs, i.chain);
   const goodRR = dte !== null && meetsRR(i.structureId, metrics, i.ctx, dte);
+  // Weigh outcomes by how much the stock has actually been moving (20-day realized volatility).
+  // With the options' own IV every fairly priced trade would come out about even, which hides
+  // exactly what a premium seller needs to see: whether the premium beats the real movement.
+  const realized = i.ctx.hv20 !== null && i.ctx.hv20 > 0.02;
+  const sigma = realized
+    ? (i.ctx.hv20 as number)
+    : (atmIv(i.chain, exp ?? i.chain.date) ?? i.ctx.iv30 ?? 0.3);
+  const outcome =
+    mid !== null
+      ? expectedOutcome(
+          legs,
+          mid,
+          envFromChain(i.chain, i.rate, i.ctx.divYield),
+          i.chain.spot,
+          sigma,
+          realized ? 'realized' : 'implied',
+          metrics.maxLoss,
+        )
+      : null;
   const shortStrikes = optionLegs(legs)
     .filter((l) => l.ratio < 0)
     .map((l) => l.strike);
@@ -216,6 +247,7 @@ export function planTrade(i: PlanInput): TradePlan {
     riskPct: riskCheck.riskPct,
     risk: riskCheck,
     goodRR,
+    outcome,
     expiration: exp,
     dte,
     entry,
