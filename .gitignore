@@ -19,7 +19,9 @@ data/cache/
 *.db-journal
 *.db-wal
 *.db-shm
+# Dolt clones (big downloads), but not the pipeline's own dolt/ source folder.
 dolt/
+!data-pipeline/dolt/
 SpreadTradingGameData/
 
 # logs and OS cruft
