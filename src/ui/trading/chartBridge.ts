@@ -11,6 +11,8 @@ export const chartBridge: {
   lastBar: () => { date: string | null; inView: boolean };
   /** Screen x of the bar `n` bars past the newest one (future days have no bars yet). */
   xAhead: (n: number) => number | null;
+  /** Screen x of a day's candle (null when it isn't on the chart). */
+  xForDate: (date: string) => number | null;
 } = {
   priceToY: () => null,
   yToPrice: () => null,
@@ -19,4 +21,5 @@ export const chartBridge: {
   plotWidth: () => 0,
   lastBar: () => ({ date: null, inView: false }),
   xAhead: () => null,
+  xForDate: () => null,
 };

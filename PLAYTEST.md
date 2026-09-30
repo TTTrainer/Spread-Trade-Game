@@ -6,7 +6,7 @@ The first three items can only be checked on your Windows PC. They matter most, 
 
 | # | Try this | What to look for | Score (1–5) | Notes |
 |---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.4.1.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
+| 1 | **Install** with `SpreadTradingGame-Setup-1.4.2.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
 | 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
 | 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
 | 4 | **Tutorial** (Career → TUTORIAL). | Are Ines's tips clear? Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
@@ -38,6 +38,12 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 30 | **New: round goal card** (bottom of the lineup). Play a round. | Can you tell at a glance how far you are from winning, and what closing your open trades would do? | | |
 | 31 | **New: expiration line and decisions.** Watch the dotted EXP line become solid after you trade. When a strike gets hit, press V (REVIEW CHART). | Can you judge the chart before choosing Close / Hold / Roll? Did candles ever go missing? | | |
 | 32 | **New: greyed-out SELL.** Try to trade when you can't (no tickets, one trade per card). | Does the ⚠ message tell you what to fix? | | |
-| 33 | **New: Schwab (read-only).** Settings → Data → Schwab: save keys, log in, CONNECT, then GET THE NEWEST DAYS after 4 pm. | Did it connect? Does Live's month now reach today? Any error text you didn't understand? | | |
+| 33 | **New: Schwab (read-only).** Settings → Data → Schwab: save keys, log in, CONNECT. | Did it connect? Any error text you didn't understand? | | |
+| 34 | **New in 1.4.2: build from Schwab.** After connecting: step 4 **PULL FROM SCHWAB**, then step 5 **BUILD GAME DATA FROM SCHWAB** (after 4:15 pm New York time, to also get real option chains). Then play Live or a Career run. | Did the pull and build finish, and in how long? Does the line under step 4 show what `schwab.db` holds? Do the MODEL labels make sense? | | |
+| 35 | **New: tougher round targets.** Play a Career run on Verticals. | Does round 1 now usually take two or more good trades? Is a missed Month (a write-up) a fair warning rather than the end? Too hard, too easy? | | |
+| 36 | **New: covered calls and cash-secured puts.** Start an Income run (it asks for starting capital; try $50,000). Sell a covered call and let it expire below the strike; sell a put that expires above its strike. | Does SELL show the premium you collect? Does an out-of-the-money option expire worthless with the premium kept (no shares assigned)? | | |
+| 37 | **New: strike lines.** Drag a strike line far past the chart's edge; try an iron condor. | Does the line stay pinned at the edge instead of vanishing? Can you drag both the put side and the call side of a condor? While dragging, are the labels on the right out of the way? | | |
+| 38 | **New: your trades on the chart.** Open a trade and play a few days. | Can you see where the trade sits (the shaded box from entry to expiry, the SOLD tag) without it getting in the way? Does the expiration line keep up with the DTE slider? | | |
+| 39 | **New: small fixes.** Career → CHALLENGE & OPTIONS (risk tiers); the shop with Ines talking. | Does the tier list read cleanly? Is Ines's box out of the way of the shop? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

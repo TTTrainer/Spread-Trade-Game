@@ -37,7 +37,8 @@ export function schwabFetchApi(accessToken: string, fetchImpl: typeof fetch = fe
     priceHistory: (symbol: string, fromDate: ISODate) =>
       get('pricehistory', {
         symbol,
-        periodType: 'month',
+        // Daily candles come by the month or the year; a first pull reaches back years.
+        periodType: Date.now() - Date.parse(`${fromDate}T00:00:00Z`) > 300 * 86_400_000 ? 'year' : 'month',
         frequencyType: 'daily',
         frequency: '1',
         startDate: String(Date.parse(`${fromDate}T00:00:00Z`)),

@@ -9,7 +9,7 @@ import { SqliteSource } from '../../data-pipeline/lib/sqliteSource';
 import type { DataBuildRequest, DataBuildResult, DataStatus } from '../../src/shared/rpc';
 import { addHandlers, emit } from './ipc';
 import { log } from './log';
-import { defaultGameDbPath, doltRootDir, userDataDir } from './paths';
+import { defaultGameDbPath, doltRootDir, schwabStorePath, userDataDir } from './paths';
 import { schwabAccessToken } from './schwab';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -66,6 +66,7 @@ async function status(): Promise<DataStatus> {
     symbols: syms.length,
     notes: meta.notes,
     busy,
+    fromSchwab: meta.chainModel === 'history',
   };
 }
 
@@ -108,6 +109,7 @@ function runWorker(req: DataBuildRequest, schwabToken: string | null): Promise<D
       gameDbPath: gameDbPath(),
       doltRoot: doltRootDir(),
       reportPath: join(userDataDir(), 'data', 'REPORT.md'),
+      schwabStorePath: schwabStorePath(),
       // Only a short-lived access token crosses over; the worker never saves it.
       schwabToken,
     });
@@ -133,10 +135,10 @@ export function registerDataHandlers(): void {
       busy = true;
       try {
         resetSource();
-        // A sync also tops up the newest days from Schwab when the player connected it.
+        // A sync also pulls the newest days from Schwab when the player connected it.
         let token: string | null = null;
         let tokenNote = '';
-        if (req.mode === 'sync')
+        if (req.mode === 'sync' || req.mode === 'schwabPull')
           try {
             token = await schwabAccessToken();
           } catch (e) {

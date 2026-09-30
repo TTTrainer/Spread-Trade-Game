@@ -196,11 +196,16 @@ export function SandboxSetup() {
             className="num capital"
             type="number"
             min={1000}
-            max={100000}
+            max={1000000}
             step={500}
             value={capital}
-            onChange={(e) => setCapital(Math.max(1000, Math.min(100000, Number(e.target.value))))}
+            onChange={(e) => setCapital(Math.max(1000, Math.min(1000000, Number(e.target.value))))}
           />
+          {capital < 50000 && (
+            <div className="dim small" data-testid="capital-hint">
+              Cash-secured puts and covered calls tie up the whole share price: $50,000 or more recommended.
+            </div>
+          )}
           <div className="section-title" data-tip="g:plan_set">
             Your plan (every trade)
           </div>

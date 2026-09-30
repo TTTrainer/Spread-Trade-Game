@@ -34,6 +34,18 @@ describe('round targets', () => {
     expect(computeTarget(4, 2, 'annual_review', cfg)).toBe(r10(t.q1[2] * t.quarterGrowth ** 3 * 1.25));
     expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25));
   });
+
+  it('scale by desk, so a desk that scores more per trade asks for more', () => {
+    const t = BALANCE.targets;
+    const r10 = (x: number) => Math.round(x / 10) * 10;
+    expect(computeTarget(1, 0, null, { tier: 0, deskId: 'verticals' })).toBe(r10(t.q1[0]));
+    for (const id of ['income', 'condor', 'volatility', 'calendar'] as const) {
+      const m = DESKS[id].targetMult ?? 1;
+      expect(computeTarget(1, 0, null, { tier: 0, deskId: id })).toBe(r10(t.q1[0] * m));
+    }
+    // Round 1 takes more than one typical winner on every desk (a median Verticals win is ~220).
+    expect(computeTarget(1, 0, null, { tier: 0, deskId: 'verticals' })).toBeGreaterThanOrEqual(200);
+  });
 });
 
 describe('scoring pipeline', () => {

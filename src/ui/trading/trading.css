@@ -2961,3 +2961,40 @@
     font-size: 13px;
   }
 }
+
+/* The trade's box on the chart: from the day it opened (or today, for a plan) to expiration. */
+.chart-zones.boxed {
+  border-left: 1px dashed rgba(164, 157, 224, 0.4);
+}
+.chart-zones.boxed.open {
+  border-left: 1px solid rgba(164, 157, 224, 0.55);
+}
+.zone-entry {
+  position: absolute;
+  top: 26px;
+  left: 4px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-dim);
+  background: rgba(7, 5, 26, 0.8);
+  padding: 2px 4px;
+  pointer-events: none !important;
+  white-space: nowrap;
+}
+/* At today's candle the cushion bracket opens to the right, its label beside it. */
+.chart-zones.boxed .cushion {
+  border-left: 2px solid var(--up);
+  border-right: none;
+}
+.chart-zones.boxed .cushion.thin {
+  border-left-color: var(--down);
+}
+.chart-zones.boxed .cushion span {
+  right: auto;
+  left: 14px;
+}
+/* Mid-drag the edge-pinned handle shows an arrow toward its strike. */
+.strike-handle.edge {
+  opacity: 0.9;
+  border-style: dashed;
+}

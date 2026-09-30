@@ -28,7 +28,8 @@ import {
 } from '../../engine/market/indicators';
 import type { Bar } from '../../engine/market/types';
 import { optionLegsOf } from '../../engine/lifecycle/position';
-import { addDays, diffDays, tradingDaysBetween } from '../../engine/calendar';
+import { diffDays } from '../../engine/calendar';
+import { barsAhead } from './expiry';
 import type { Leg } from '../../engine/strategies/types';
 import { useTrading, type StudyId } from '../store/trading';
 import { chartBridge } from './chartBridge';
@@ -97,6 +98,9 @@ export function ChartPanel() {
   const drawTool = useTrading((s) => s.drawTool);
   const ff = useTrading((s) => s.ff);
   const addDrawing = useTrading((s) => s.addDrawing);
+  // The builder's sliders move the strike and expiration lines: redraw on every change.
+  useTrading((s) => s.builder);
+  const dragging = useTrading((s) => s.dragging);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -243,6 +247,7 @@ export function ChartPanel() {
       const r = chart.timeScale().getVisibleLogicalRange();
       return { date: toDate(d[i].time), inView: !!r && i >= r.from - 0.5 && i <= r.to + 0.5 };
     };
+    chartBridge.xForDate = (d) => chart.timeScale().timeToCoordinate(toTs(d));
     chartBridge.xAhead = (n) => {
       const len = candles.data().length;
       return len ? chart.timeScale().logicalToCoordinate((len - 1 + n) as Logical) : null;
@@ -265,6 +270,7 @@ export function ChartPanel() {
       drawRef.current = [];
       chartBridge.priceToY = () => null;
       chartBridge.xAhead = () => null;
+      chartBridge.xForDate = () => null;
     };
   }, [session, cardId, studiesKey, timeframe]);
 
@@ -423,18 +429,13 @@ export function ChartPanel() {
   const legs: Leg[] = position ? position.legs : (plan?.legs ?? []);
   const breakevens = position ? [] : (plan?.metrics?.breakevens ?? []);
   const em = plan?.metrics?.expectedMove ?? null;
-  const legKey = JSON.stringify([legs, breakevens, em, studiesKey, version]);
+  const legKey = JSON.stringify([legs, breakevens, em, studiesKey, version, dragging]);
 
   // Expiration: solid for the open trade, dotted for the one being planned. Future days have no
   // bars, so it sits that many trading days (or weeks) past the newest candle.
   const exps = optionLegsOf(legs).map((l) => l.expiration);
   const exp = exps.length ? exps.reduce((a, b) => (a < b ? a : b)) : null;
-  const expAhead =
-    exp && now && exp > now
-      ? timeframe === 'W'
-        ? Math.max(1, Math.round(diffDays(now, exp) / 7))
-        : tradingDaysBetween(addDays(now, 1), exp).length
-      : null;
+  const expAhead = exp && now && exp > now ? barsAhead(now, exp, timeframe) : null;
   const expDte = exp && now ? diffDays(now, exp) : null;
   // Leave room on the right to see the expiration, up to 40% of the chart; beyond that an arrow
   // at the edge points to it.
@@ -453,6 +454,7 @@ export function ChartPanel() {
     for (const l of linesRef.current) candles.removePriceLine(l);
     linesRef.current = [];
     shortLinesRef.current = [];
+    // While a strike is dragged, the axis labels step aside: the handle is the one to watch.
     const add = (
       price: number,
       color: string,
@@ -466,10 +468,21 @@ export function ChartPanel() {
           color,
           lineWidth: width,
           lineStyle: style,
-          axisLabelVisible: true,
-          title,
+          axisLabelVisible: !dragging,
+          title: dragging ? '' : title,
         }),
       );
+    // Keep the trade's strikes in view (but not mid-drag, or the scale would chase the cursor).
+    const strikes = optionLegsOf(legs).map((l) => l.strike);
+    candles.applyOptions({
+      autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
+        const r = base();
+        if (!r || dragging || !strikes.length) return r;
+        const lo = Math.min(r.priceRange.minValue, ...strikes);
+        const hi = Math.max(r.priceRange.maxValue, ...strikes);
+        return { ...r, priceRange: { minValue: lo - (hi - lo) * 0.03, maxValue: hi + (hi - lo) * 0.03 } };
+      },
+    });
     for (const l of optionLegsOf(legs)) {
       add(
         l.strike,
@@ -482,11 +495,11 @@ export function ChartPanel() {
     }
     for (const b of breakevens) add(b, COLORS.amber, 'BE', LineStyle.Dotted);
     const spot = session.view(cardId).spot();
-    if (studies.includes('em') && em) {
+    if (studies.includes('em') && em && !dragging) {
       add(spot + em, COLORS.violet, '+EM', LineStyle.LargeDashed);
       add(spot - em, COLORS.violet, '-EM', LineStyle.LargeDashed);
     }
-    if (studies.includes('sr'))
+    if (studies.includes('sr') && !dragging)
       for (const lvl of supportResistance(session.view(cardId).bars()))
         add(
           lvl.price,

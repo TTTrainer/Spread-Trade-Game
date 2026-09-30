@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { nearestStrike, quotesFor } from '../../engine/strategies/structures';
+import { nearestStrike, quotesFor, stepStrike } from '../../engine/strategies/structures';
 import type { OptionLeg } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { pct, price } from '../format';
@@ -15,6 +15,21 @@ function useChartTick(ms = 150): void {
   }, [ms]);
 }
 
+/**
+ * The strike nearest `target` that still leaves room for the spread's far strike `steps` listed
+ * strikes away in direction `dir`. Dragging past the listed strikes stops at the last buildable
+ * one instead of breaking the trade (which made every line vanish).
+ */
+function buildable(strikes: number[], target: number, dir: number, steps: number): number | null {
+  if (!strikes.length) return null;
+  let i = 0;
+  for (let k = 1; k < strikes.length; k++)
+    if (Math.abs(strikes[k] - target) < Math.abs(strikes[i] - target)) i = k;
+  if (dir > 0) i = Math.min(i, strikes.length - 1 - steps);
+  if (dir < 0) i = Math.max(i, steps);
+  return i >= 0 && i < strikes.length ? strikes[i] : null;
+}
+
 function Handle({
   leg,
   kind,
@@ -22,6 +37,7 @@ function Handle({
   onWheel,
   readout,
   testId,
+  room,
 }: {
   leg: OptionLeg;
   kind: 'anchor' | 'far';
@@ -29,29 +45,41 @@ function Handle({
   onWheel: (dir: 1 | -1) => void;
   readout: string | null;
   testId: string;
+  /** Where the spread's far strike sits from this one: direction and listed steps. */
+  room?: { dir: number; steps: number };
 }) {
   const session = useTrading((s) => s.session);
   const cardId = useTrading(liveCardId);
+  const setDragging = useTrading((s) => s.setDragging);
   const [drag, setDrag] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const chain = session && cardId ? session.chain(cardId) : null;
-  const y = chartBridge.priceToY(leg.strike);
+  const raw = chartBridge.priceToY(leg.strike);
   const h = chartBridge.paneHeight();
-  if (!chain || y === null || y < 6 || y > h - 6) return null;
+  if (!chain || raw === null || h <= 0) return null;
+  // A strike past the top or bottom of the chart stays grabbable at the edge (with an arrow),
+  // so a drag never loses its line; the chart rescales to show it once the drag ends.
+  const y = Math.max(12, Math.min(h - 12, raw));
+  const edge = raw < 12 ? 'up' : raw > h - 12 ? 'down' : null;
   const pick = (clientY: number) => {
     const top = host.current?.parentElement?.getBoundingClientRect().top ?? 0;
     const p = chartBridge.yToPrice(clientY - top);
     if (p === null) return;
-    const q = nearestStrike(chain, leg.expiration, leg.right, p);
-    if (q && Math.abs(q.strike - leg.strike) > 1e-6) {
-      sfx('tick', 0.9 + Math.min(0.6, Math.abs(q.strike - chain.spot) / chain.spot / 0.2));
-      onPick(q.strike);
+    const strikes = quotesFor(chain, leg.expiration, leg.right)
+      .map((q) => q.strike)
+      .sort((a, b) => a - b);
+    const k = room
+      ? buildable(strikes, p, room.dir, room.steps)
+      : (nearestStrike(chain, leg.expiration, leg.right, p)?.strike ?? null);
+    if (k !== null && Math.abs(k - leg.strike) > 1e-6) {
+      sfx('tick', 0.9 + Math.min(0.6, Math.abs(k - chain.spot) / chain.spot / 0.2));
+      onPick(k);
     }
   };
   return (
     <div
       ref={host}
-      className={`strike-handle num ${drag ? 'drag' : ''} ${leg.ratio < 0 ? 'short' : 'long'} ${kind}`}
+      className={`strike-handle num ${drag ? 'drag' : ''} ${leg.ratio < 0 ? 'short' : 'long'} ${kind} ${edge ? 'edge' : ''}`}
       style={{ top: y - 11 }}
       data-testid={testId}
       data-tip-title={kind === 'anchor' ? 'Drag your strike' : 'Drag the far strike'}
@@ -63,16 +91,22 @@ function Handle({
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         setDrag(true);
+        setDragging(true);
         sfx('select');
       }}
       onPointerMove={(e) => drag && pick(e.clientY)}
       onPointerUp={() => {
         setDrag(false);
+        setDragging(false);
         sfx('click');
+      }}
+      onPointerCancel={() => {
+        setDrag(false);
+        setDragging(false);
       }}
       onWheel={(e) => onWheel(e.deltaY < 0 ? 1 : -1)}
     >
-      <span className="sh-grip">⇕</span>
+      <span className="sh-grip">{edge === 'up' ? '▲' : edge === 'down' ? '▼' : '⇕'}</span>
       <span className="sh-k">
         {leg.ratio < 0 ? 'S' : 'L'} {leg.strike}
         {leg.right}
@@ -99,7 +133,47 @@ export function StrikeHandle() {
   const opts = plan?.legs.filter((l): l is OptionLeg => l.kind === 'option') ?? [];
   const lead = opts[0];
   const chain = session && cardId ? session.chain(cardId) : null;
-  if (!open || !lead || !chain || ['iron_condor', 'bwb_condor'].includes(builder.structureId)) return null;
+  if (!open || !lead || !chain) return null;
+  if (['iron_condor', 'bwb_condor'].includes(builder.structureId)) {
+    // A condor has two short strikes to move: the put side and the call side.
+    const sp = opts.find((l) => l.ratio < 0 && l.right === 'P');
+    const sc = opts.find((l) => l.ratio < 0 && l.right === 'C');
+    const pop = plan?.metrics ? `POP ${pct(plan.metrics.pop, 0)}` : null;
+    return (
+      <>
+        {sp && (
+          <Handle
+            leg={sp}
+            kind="anchor"
+            testId="strike-handle"
+            readout={pop}
+            room={{ dir: -1, steps: builder.width }}
+            onPick={(k) => (sc && k >= sc.strike ? undefined : setBuilder({ anchor: k, legs: null }))}
+            onWheel={(d) => {
+              const next = stepStrike(chain, sp.expiration, 'P', sp.strike, d);
+              if (next !== null && (!sc || next < sc.strike)) setBuilder({ anchor: next, legs: null });
+            }}
+          />
+        )}
+        {sc && (
+          <Handle
+            leg={sc}
+            kind="anchor"
+            testId="call-handle"
+            room={{ dir: 1, steps: builder.width + (builder.structureId === 'bwb_condor' ? 1 : 0) }}
+            readout={
+              plan?.mid !== null && plan?.mid !== undefined && plan.mid < 0 ? `+${price(-plan.mid)}` : null
+            }
+            onPick={(k) => (sp && k <= sp.strike ? undefined : setBuilder({ callAnchor: k, legs: null }))}
+            onWheel={(d) => {
+              const next = stepStrike(chain, sc.expiration, 'C', sc.strike, d);
+              if (next !== null && (!sp || next > sp.strike)) setBuilder({ callAnchor: next, legs: null });
+            }}
+          />
+        )}
+      </>
+    );
+  }
   // A two-leg spread on one expiration and one side has a far strike that sets the width.
   const far =
     opts.length === 2 && opts[1].right === lead.right && opts[1].expiration === lead.expiration
@@ -127,6 +201,7 @@ export function StrikeHandle() {
         kind="anchor"
         testId="strike-handle"
         readout={readout}
+        room={far ? { dir: Math.sign(far.strike - lead.strike), steps: builder.width } : undefined}
         onPick={(k) => setBuilder({ anchor: k, legs: null })}
         onWheel={(d) => nudgeStrike(d)}
       />

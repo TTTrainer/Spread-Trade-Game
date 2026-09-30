@@ -7,7 +7,9 @@ import type { Chain } from '../../src/engine/market/types';
 import { buildSyntheticDb } from '../../data-pipeline/synthetic';
 import { openDb } from '../../data-pipeline/lib/sqlite';
 import { SqliteSource } from '../../data-pipeline/lib/sqliteSource';
-import { keepLaterDays, schwabTopUp, type SchwabMarketApi } from '../../data-pipeline/schwab/topup';
+import { schwabPull, type SchwabMarketApi } from '../../data-pipeline/schwab/pull';
+import { SchwabStore } from '../../data-pipeline/schwab/store';
+import { keepLaterDays, schwabTopUp } from '../../data-pipeline/schwab/topup';
 
 const SYMBOLS = ['MKTX', 'HLXR'];
 
@@ -38,9 +40,12 @@ function schwabChainJson(c: Chain) {
   return maps;
 }
 
-describe('Schwab top-up of game.db (read-only market data, faked)', () => {
+describe('Schwab pull into schwab.db, then the newest days added to game.db (faked)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'stg-schwab-'));
   const dbPath = join(dir, 'game.db');
+  const storePath = join(dir, 'schwab.db');
+  const pull = (now: Date) => schwabPull({ storePath, api, symbols: SYMBOLS, now });
+  const topUp = () => schwabTopUp({ gameDbPath: dbPath, storePath });
   let last: ISODate;
   let days: ISODate[];
   const calls: string[] = [];
@@ -70,6 +75,7 @@ describe('Schwab top-up of game.db (read-only market data, faked)', () => {
     api = {
       priceHistory: async (symbol) => {
         calls.push(`history:${symbol}`);
+        if (symbol.startsWith('$')) return { candles: [] };
         const c0 = lastClose.get(symbol) as number;
         return {
           candles: days.map((d, i) => ({
@@ -92,7 +98,10 @@ describe('Schwab top-up of game.db (read-only market data, faked)', () => {
   it('during market hours: only finished days, and no chain taken (it would be intraday)', async () => {
     // 11:00 in New York on the third new day.
     const now = new Date(`${days[2]}T15:00:00Z`);
-    const r = await schwabTopUp({ gameDbPath: dbPath, api, now });
+    const p = await pull(now);
+    expect(p.ok).toBe(true);
+    expect(p.chains).toBe(0);
+    const r = await topUp();
     expect(r.ok).toBe(true);
     expect(r.newDays).toEqual(days.slice(0, 2));
     expect(r.realChains).toBe(0);
@@ -105,7 +114,15 @@ describe('Schwab top-up of game.db (read-only market data, faked)', () => {
 
   it("after the close: the day's candles and a real chain; the game reads them like any day", async () => {
     const now = new Date(`${days[2]}T21:30:00Z`); // 5:30 pm in New York
-    const r = await schwabTopUp({ gameDbPath: dbPath, api, now });
+    const p = await pull(now);
+    expect(p.chains).toBe(SYMBOLS.length);
+    // Everything Schwab sent is in its own file.
+    const store = new SchwabStore(storePath, { readOnly: true });
+    expect(store.symbols()).toEqual([...SYMBOLS].sort());
+    expect(store.chains('HLXR').map((c) => c.date)).toEqual([days[2]]);
+    expect(store.summary().lastPullAt).toBe(now.toISOString());
+    store.close();
+    const r = await topUp();
     expect(r.newDays).toEqual([days[2]]);
     expect(r.realChains).toBe(SYMBOLS.length);
     const src = new SqliteSource(dbPath);
@@ -122,10 +139,13 @@ describe('Schwab top-up of game.db (read-only market data, faked)', () => {
     expect(vol[0]?.iv30).toBeGreaterThan(0);
     expect((await src.symbols()).find((s) => s.symbol === 'HLXR')?.lastDate).toBe(days[2]);
     src.close();
-    // Nothing new: nothing written.
-    const again = await schwabTopUp({ gameDbPath: dbPath, api, now });
+    // Nothing new: nothing asked of Schwab, nothing written.
+    const before = calls.length;
+    await pull(now);
+    expect(calls.slice(before).filter((c) => c.startsWith('chain:'))).toEqual([]);
+    const again = await topUp();
     expect(again.newDays).toEqual([]);
-    expect(again.message).toContain('up to date');
+    expect(again.message).toContain('no days after');
   });
 
   it('a later DoltHub sync never moves the calendar back behind the Schwab days', async () => {

@@ -48,10 +48,11 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['verticals', 'condor', 'income'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: '+8 chips for every trading day a short-premium position is open and in profit.',
+    // +3 a day: at +8 the balance simulator found it doubled the win rate once targets rose in 1.4.2.
+    text: '+3 chips for every trading day a short-premium position is open and in profit.',
     synergies: ['fifty_percent_club', 'premium_printer', 'weekend_warrior'],
     onDayClose: ({ positions, addChips }) => {
-      for (const p of positions) if (p.shortPremium && p.inProfit) addChips(p.id, 8);
+      for (const p of positions) if (p.shortPremium && p.inProfit) addChips(p.id, 3);
     },
     score: ({ facts }) => when(facts.win && facts.thetaChips > 0, chips('Theta Engine', facts.thetaChips)),
   },

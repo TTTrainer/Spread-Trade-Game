@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { premiumOf } from '../../engine/trading/plan';
 import { limitFillProbability } from '../../engine/orders/fill';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
@@ -109,7 +110,11 @@ export function OrderTicket() {
     !!card?.positionIds.some((id) => session?.position(id)?.status === 'open') || !!card?.orderIds.length;
   const mid = plan?.mid ?? null;
   const nat = plan?.natural ?? null;
-  const credit = mid !== null && mid < 0;
+  const spot = plan?.entry?.spot ?? null;
+  // Premium collected per share (a covered call counts only its call, not the shares it buys).
+  const premium = premiumOf(mid, plan?.legs ?? [], spot);
+  const credit = premium !== null;
+  const shares = (plan?.legs ?? []).reduce((a, l) => a + (l.kind === 'stock' ? l.ratio : 0), 0);
   const limit = mid !== null && nat !== null ? mid + (nat - mid) * builder.limitFrac : null;
   const prob =
     mid !== null && nat !== null && limit !== null
@@ -244,9 +249,10 @@ export function OrderTicket() {
             data-testid="sell-button"
             data-tip="g:sell"
           >
-            SELL {credit && mid !== null ? `+${price(-mid)}` : ''}
+            SELL {credit && premium !== null ? `+${price(premium)}` : ''}
             {credit && plan?.ok && (
               <span className="btn-sub num">
+                {shares > 0 && spot !== null ? `buys ${shares * 100 * plan.qty} sh @ ${price(spot)} · ` : ''}
                 risk ${Math.round(plan.maxLossCents / 100).toLocaleString()} · POP{' '}
                 {pct(plan.metrics?.pop ?? 0, 0)}
               </span>

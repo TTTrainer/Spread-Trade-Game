@@ -91,7 +91,9 @@ export function computeTarget(
   quarter: number,
   index: number,
   reviewId: ReviewId | null,
-  cfg: Pick<RunConfig, 'tier'> & Partial<Pick<RunConfig, 'compliance' | 'quarters'>>,
+  cfg: Pick<RunConfig, 'tier'> & Partial<Pick<RunConfig, 'compliance' | 'quarters' | 'deskId'>>,
+  /** The quarter already has a written-up Month: its Review asks for more. */
+  writtenUp = false,
 ): number {
   const t = BALANCE.targets;
   const rule = reviewId ? REVIEWS[reviewId].rule : {};
@@ -104,7 +106,9 @@ export function computeTarget(
     growth *
     (rule.targetMult ?? 1) *
     tierMods(cfg.tier).targetMult *
-    complianceMods(cfg.compliance).targetMult;
+    complianceMods(cfg.compliance).targetMult *
+    ((cfg.deskId && DESKS[cfg.deskId].targetMult) || 1) *
+    (writtenUp && index === 2 ? t.writeUpReviewMult : 1);
   return Math.round(raw / 10) * 10;
 }
 
@@ -445,6 +449,11 @@ export class RunEngine {
   isLastRound(): boolean {
     if (this.state.endless) return false;
     return this.state.quarter >= this.state.config.quarters && this.state.roundIndex === 2;
+  }
+
+  /** This quarter already used its one missed Month target. */
+  writtenUp(quarter = this.state.quarter): boolean {
+    return (this.state.writeUps ?? []).includes(quarter);
   }
 
   canSkip(): boolean {
@@ -1104,7 +1113,18 @@ export class RunEngine {
       alphaCents: r.debriefs.reduce((a, d) => a + d.alphaCents, 0),
       trades: r.tallies.length,
     });
-    if (!passed) {
+    // One missed Month target per quarter is a write-up, not the end: more stress, no round-win
+    // cash, and a bigger Review. A breach, a missed Review or a second miss still ends the run.
+    const writeUp = !passed && !r.breached && r.index < 2 && !this.writtenUp(st.quarter) && !st.endless;
+    if (writeUp) {
+      st.writeUps = [...(st.writeUps ?? []), st.quarter];
+      this.addStress(BALANCE.stress.writeUp, `Written up: missed the ${ROUND_NAMES[r.index]} target`);
+      this.events.push({
+        kind: 'warn',
+        text: `WRITTEN UP: ${r.meter} of ${r.target} points. One miss a quarter is allowed; this quarter's Review target is ${Math.round((BALANCE.targets.writeUpReviewMult - 1) * 100)}% higher, and another miss ends the run.`,
+      });
+      this.say('target_missed', 9);
+    } else if (!passed) {
       if (this.activeCartridges().includes('golden_parachute')) {
         st.cartridges = st.cartridges.filter((c) => c !== 'golden_parachute');
         st.parachuteUsed = true;
@@ -1292,7 +1312,7 @@ export class RunEngine {
     const rng = this.rng(`round:q${q}r${idx}`);
     const rule = reviewId ? REVIEWS[reviewId].rule : {};
     const p = this.passives();
-    const target = computeTarget(q, idx, reviewId, cfg);
+    const target = computeTarget(q, idx, reviewId, cfg, this.writtenUp(q));
     const comp = complianceMods(cfg.compliance);
     const line = Math.max(
       0.02,
@@ -1552,7 +1572,7 @@ export class RunEngine {
       this.say(
         'review_intro',
         4,
-        { target: st.round.target || computeTarget(q, 2, review, st.config) },
+        { target: st.round.target || computeTarget(q, 2, review, st.config, this.writtenUp(q)) },
         'kessler',
       );
       st.round = {
@@ -1560,7 +1580,7 @@ export class RunEngine {
         quarter: q,
         index: 2,
         reviewId: review,
-        target: computeTarget(q, 2, review, st.config),
+        target: computeTarget(q, 2, review, st.config, this.writtenUp(q)),
       };
       this.addStress(BALANCE.stress.enterReview, `Entering a Review: ${REVIEWS[review].name}`);
       return;

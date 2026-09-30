@@ -267,3 +267,17 @@ export function maxContracts(
     plan1.collateralCents > 0 ? Math.floor((equityCents - reservedCents) / plan1.collateralCents) : 0;
   return Math.max(0, Math.min(byRisk, byBp));
 }
+
+/**
+ * The premium a build collects per share at a given net price, or null when it pays a debit. A
+ * covered call's net is a debit because it buys the shares, yet it is a premium sale: only its
+ * option legs count, so the ticket says SELL and the take-profit and stop are sized on the premium.
+ */
+export function premiumOf(net: number | null, legs: Leg[], spot: number | null | undefined): number | null {
+  if (net === null) return null;
+  if (net < 0) return -net;
+  const shares = legs.reduce((a, l) => a + (l.kind === 'stock' ? l.ratio : 0), 0);
+  if (!shares || spot === null || spot === undefined) return null;
+  const optionNet = net - shares * spot;
+  return optionNet < 0 ? -optionNet : null;
+}

@@ -9,10 +9,11 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exchangeCode, refreshTokens, tokenState, type SchwabTokens } from '../../data-pipeline/schwab/auth';
 import { codeFromRedirect, DEFAULT_CALLBACK, schwabAuthUrl } from '../../data-pipeline/schwab/map';
-import type { SchwabSettings, SchwabStatus } from '../../src/shared/rpc';
+import { SchwabStore } from '../../data-pipeline/schwab/store';
+import type { SchwabSettings, SchwabStatus, SchwabStoreStatus } from '../../src/shared/rpc';
 import { addHandlers } from './ipc';
 import { log } from './log';
-import { userDataDir } from './paths';
+import { schwabStorePath, userDataDir } from './paths';
 
 interface Stored {
   appKey: string;
@@ -98,8 +99,35 @@ export async function schwabAccessToken(): Promise<string | null> {
   return next.accessToken;
 }
 
+function storeStatus(): SchwabStoreStatus {
+  const path = schwabStorePath();
+  const empty: SchwabStoreStatus = {
+    path,
+    exists: false,
+    symbols: 0,
+    firstDate: null,
+    lastDate: null,
+    chainDays: 0,
+    chains: 0,
+    lastPullAt: null,
+  };
+  if (!existsSync(path)) return empty;
+  try {
+    const store = new SchwabStore(path, { readOnly: true });
+    try {
+      return { ...store.summary(), exists: true };
+    } finally {
+      store.close();
+    }
+  } catch (e) {
+    log('warn', 'schwab: could not read schwab.db', e);
+    return empty;
+  }
+}
+
 export function registerSchwabHandlers(): void {
   addHandlers({
+    'schwab.store': () => storeStatus(),
     'schwab.status': () => schwabStatus(),
     'schwab.save': (x: SchwabSettings) => {
       const prev = load();

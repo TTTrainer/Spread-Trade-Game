@@ -3,11 +3,51 @@
  * Everything is original: rectangles and a few hand-placed pixels, no image files.
  */
 
-import { COLLECTIONS, type CollectionId } from '../../content/meta';
+import { COLLECTIONS, PAD_TIERS, type CollectionId } from '../../content/meta';
+import { PAD_ART_BY_ID } from '../../content/padArt';
 import type { Profile } from '../../engine/meta/profile';
+import { artUrl } from '../art';
 
+/** The scene's grid. The canvas is twice this, so uploaded art gets half-step detail. */
 export const PAD_W = 320;
 export const PAD_H = 180;
+export const PAD_SCALE = 2;
+
+const images = new Map<string, HTMLImageElement>();
+let onArtLoaded: (() => void) | null = null;
+/** Redraw once uploaded Pad art finishes loading. */
+export function whenPadArtLoads(cb: (() => void) | null): void {
+  onArtLoaded = cb;
+}
+
+function padImage(id: string): HTMLImageElement | null {
+  const url = artUrl('pad', id);
+  if (!url) return null;
+  let im = images.get(id);
+  if (!im) {
+    im = new Image();
+    im.onload = () => onArtLoaded?.();
+    im.src = url;
+    images.set(id, im);
+  }
+  return im.complete && im.naturalWidth > 0 ? im : null;
+}
+
+/**
+ * Draw an uploaded Pad picture at its anchor (or at `at`, for pieces placed by the scene), at its
+ * native pixels. Returns false when none is uploaded, so the code drawing runs instead.
+ */
+function sprite(g: Ctx, id: string, at?: { x: number; y: number }): boolean {
+  const im = padImage(id);
+  const a = PAD_ART_BY_ID[id];
+  if (!im || !a) return false;
+  const w = im.naturalWidth / PAD_SCALE;
+  const h = im.naturalHeight / PAD_SCALE;
+  const x = at?.x ?? a.x;
+  const y = at?.y ?? a.y;
+  g.drawImage(im, a.anchor === 'bottom' ? x - w / 2 : x, a.anchor === 'bottom' ? y - h : y, w, h);
+  return true;
+}
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -169,15 +209,18 @@ function lighting(g: Ctx, level: number): void {
 
 // ---------------- desk ----------------
 
-function desk(g: Ctx, monitors: number): void {
+function deskBase(g: Ctx): void {
   const x0 = 150;
   const top = 110;
-  // Desk.
   rect(g, x0 - 20, top, 140, 5, '#3a3448');
   rect(g, x0 - 20, top + 5, 140, 2, '#241f30');
   rect(g, x0 - 16, top + 7, 4, 28, '#241f30');
   rect(g, x0 + 112, top + 7, 4, 28, '#241f30');
-  // Screens.
+}
+
+function screens(g: Ctx, monitors: number): void {
+  const x0 = 150;
+  const top = 110;
   const screens = monitors === 0 ? 0 : [0, 2, 3, 4, 6][monitors];
   const chart = (sx: number, sy: number, w: number, h: number, seed: number) => {
     rect(g, sx, sy, w, h, '#05081a');
@@ -312,16 +355,17 @@ function watchCase(g: Ctx, owned: string[]): void {
   const items = COLLECTIONS.watches.items.filter((w) => owned.includes(w.id));
   if (!items.length) return;
   const x = 18;
-  const y = 112;
-  rect(g, x - 2, y - 2, 58, 22, '#8890b0');
-  rect(g, x, y, 54, 18, '#101424');
+  const y = 102;
+  rect(g, x - 2, y - 2, 58, 32, '#8890b0');
+  rect(g, x, y, 54, 28, '#101424');
   items.forEach((w, i) => {
-    const cx = x + 4 + (i % 4) * 13;
-    const cy = y + 2 + Math.floor(i / 4) * 8;
-    rect(g, cx + 1, cy, 4, 7, w.colors[1]);
-    rect(g, cx, cy + 2, 6, 3, w.colors[0]);
+    const cx = x + 1 + (i % 4) * 13;
+    const cy = y + 1 + Math.floor(i / 4) * 13;
+    if (sprite(g, w.id, { x: cx, y: cy })) return;
+    rect(g, cx + 4, cy + 2, 4, 7, w.colors[1]);
+    rect(g, cx + 3, cy + 4, 6, 3, w.colors[0]);
   });
-  rect(g, x - 2, y + 20, 58, 12, '#3a3448');
+  rect(g, x - 2, y + 30, 58, 12, '#3a3448');
 }
 
 function vehicle(g: Ctx, owned: string[]): void {
@@ -339,12 +383,7 @@ function vehicle(g: Ctx, owned: string[]): void {
   rect(g, x - 8, y + 15, 74, 1, '#00e5ff');
   rect(g, x - 8, y + 21, 74, 1, '#ff2fd0');
   const [a, b] = top.colors;
-  rect(g, x, y + 4, 58, 8, a);
-  rect(g, x + 12, y - 2, 30, 7, b);
-  rect(g, x + 16, y - 1, 10, 4, '#9fd8ff');
-  rect(g, x + 28, y - 1, 10, 4, '#9fd8ff');
-  rect(g, x + 4, y + 11, 8, 4, '#101018');
-  rect(g, x + 44, y + 11, 8, 4, '#101018');
+  if (!sprite(g, top.id)) drawCar(g, x, y, a, b);
   // The rest of the fleet as badges.
   items.slice(0, -1).forEach((v, i) => {
     rect(g, 118 + i * 12, 170, 10, 5, v.colors[0]);
@@ -352,11 +391,24 @@ function vehicle(g: Ctx, owned: string[]): void {
   });
 }
 
+function drawCar(g: Ctx, x: number, y: number, a: string, b: string): void {
+  rect(g, x, y + 4, 58, 8, a);
+  rect(g, x + 12, y - 2, 30, 7, b);
+  rect(g, x + 16, y - 1, 10, 4, '#9fd8ff');
+  rect(g, x + 28, y - 1, 10, 4, '#9fd8ff');
+  rect(g, x + 4, y + 11, 8, 4, '#101018');
+  rect(g, x + 44, y + 11, 8, 4, '#101018');
+}
+
 function deskItems(g: Ctx, items: string[]): void {
   const x0 = 136;
   const y = 110;
   let x = x0;
   for (const it of items) {
+    if (sprite(g, `item_${it}`, { x: x + 4, y })) {
+      x -= 13;
+      continue;
+    }
     if (it === 'mug') {
       rect(g, x, y - 7, 6, 7, '#f0e8d8');
       rect(g, x + 6, y - 5, 2, 3, '#f0e8d8');
@@ -394,22 +446,27 @@ export interface PadView {
 }
 
 export function drawPad(g: Ctx, v: PadView): void {
+  // Draw on the 320x180 grid; the canvas is twice that, so uploaded art keeps its full detail.
+  g.setTransform(PAD_SCALE, 0, 0, PAD_SCALE, 0, 0);
   g.imageSmoothingEnabled = false;
   g.clearRect(0, 0, PAD_W, PAD_H);
-  [studio, loft, penthouse, orbital][Math.max(0, Math.min(3, v.tier))](g);
+  const tier = Math.max(0, Math.min(3, v.tier));
+  if (!sprite(g, `room_${PAD_TIERS[tier].id}`)) [studio, loft, penthouse, orbital][tier](g);
   const cols: CollectionId[] = ['art'];
   let spot = 0;
   for (const col of cols)
     for (const item of COLLECTIONS[col].items)
       if (v.items.includes(item.id) && spot < ART_SPOTS.length) {
         const [x, y] = ART_SPOTS[spot++];
-        artPiece(g, item.id, x, y, item.colors);
+        if (!sprite(g, item.id, { x: x - 1, y: y - 1 })) artPiece(g, item.id, x, y, item.colors);
       }
-  lighting(g, v.setup.lighting);
-  plant(g, v.setup.plants);
-  desk(g, v.setup.monitors);
+  if (!sprite(g, `light_${v.setup.lighting}`)) lighting(g, v.setup.lighting);
+  if (v.setup.plants > 0 && !sprite(g, `plant_${v.setup.plants}`)) plant(g, v.setup.plants);
+  if (!sprite(g, 'desk')) deskBase(g);
+  if (!sprite(g, `monitors_${v.setup.monitors}`)) screens(g, v.setup.monitors);
   deskItems(g, v.deskItems);
-  chair(g, v.setup.chair);
+  if (!sprite(g, `chair_${v.setup.chair}`)) chair(g, v.setup.chair);
   watchCase(g, v.items);
   vehicle(g, v.items);
+  g.setTransform(1, 0, 0, 1, 0, 0);
 }

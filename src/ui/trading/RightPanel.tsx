@@ -24,6 +24,8 @@ interface Curve {
   spot: number;
   em: number | null;
   breakevens: number[];
+  /** The open trade's first day (null while it's still a plan). */
+  openedOn: string | null;
 }
 
 export function useCurve(): Curve | null {
@@ -53,6 +55,7 @@ export function useCurve(): Curve | null {
       spot: view.spot(),
       em: pos.entry.expectedMove,
       breakevens: [],
+      openedOn: pos.openedOn,
     };
   }
   const chain = session.chain(cardId);
@@ -65,6 +68,7 @@ export function useCurve(): Curve | null {
     spot: chain.spot,
     em: plan.metrics.expectedMove,
     breakevens: plan.metrics.breakevens,
+    openedOn: null,
   };
 }
 

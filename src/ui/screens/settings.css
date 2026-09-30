@@ -164,3 +164,15 @@
 .schwab-note {
   margin: 0 0 4px 28px;
 }
+.schwab-step > span.small {
+  flex: 1;
+  min-width: 280px;
+  align-self: center;
+}
+.schwab-store {
+  margin: 0 0 4px 28px;
+  padding: 4px 8px;
+  font-size: 15px;
+  color: var(--cyan);
+  border-left: 2px solid var(--cyan);
+}

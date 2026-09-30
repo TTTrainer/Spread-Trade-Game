@@ -262,6 +262,32 @@ describe('career run loop', () => {
     expect(s.chain(c.id)?.date).toBe(s.view(c.id).now);
   }, 60_000);
 
+  it('a missed Month target is a write-up; a second miss in the quarter ends the run', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'writeup-1' }));
+    const t1 = e.state.round.target;
+    expect(t1).toBe(computeTarget(1, 0, null, e.state.config));
+    // Month 1: no trades, end the round: missed, but the run goes on to the shop.
+    await e.dispatch({ t: 'endRound' });
+    expect(e.state.phase).toBe('tally');
+    const stress0 = e.state.stress;
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('shop');
+    expect(e.state.writeUps).toEqual([1]);
+    expect(e.state.stress).toBe(stress0 + BALANCE.stress.writeUp);
+    expect(e.state.round.payouts.some((p) => /Round win/.test(p.label))).toBe(false);
+    // The quarter's Review now asks for more.
+    const review = computeTarget(1, 2, null, e.state.config, true);
+    expect(review).toBe(
+      Math.round((computeTarget(1, 2, null, e.state.config) * BALANCE.targets.writeUpReviewMult) / 10) * 10,
+    );
+    // Month 2 missed too: the run ends.
+    await e.dispatch({ t: 'leaveShop' });
+    expect(e.state.round.index).toBe(1);
+    await e.dispatch({ t: 'endRound' });
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('defeat');
+  }, 60_000);
+
   it('skips Month 1 for a tag, then deals Month 2 with no shop', async () => {
     const e = await RunEngine.create(src, config({ seed: 'skip-1' }));
     const tag = e.state.round.skipTag;

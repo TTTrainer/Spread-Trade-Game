@@ -45,7 +45,7 @@ export const EFFECT_LABEL: Record<EffectKind, string> = {
 };
 
 export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
-  theta_engine: { when: 'Short premium open and in profit', get: '+8 chips a day', kind: 'chips' },
+  theta_engine: { when: 'Short premium open and in profit', get: '+3 chips a day', kind: 'chips' },
   fifty_percent_club: { when: 'Close a credit trade at 50%+ profit, early', get: '+3 mult', kind: 'mult' },
   weekend_warrior: { when: 'Short premium held over a weekend', get: '+15 chips', kind: 'chips' },
   twenty_one_day_rule: {

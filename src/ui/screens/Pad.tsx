@@ -24,7 +24,7 @@ import {
 } from '../../engine/meta/profile';
 import { useApp } from '../store/app';
 import { useProfile } from '../store/profile';
-import { drawPad, PAD_H, PAD_W } from '../pad/scene';
+import { drawPad, PAD_H, PAD_SCALE, PAD_W, whenPadArtLoads } from '../pad/scene';
 import './screens.css';
 import './pad.css';
 
@@ -40,8 +40,14 @@ export function PadScreen() {
     void load();
   }, []);
   useEffect(() => {
-    const g = canvas.current?.getContext('2d');
-    if (g) drawPad(g, { ...profile.pad, deskItems: profile.pad.deskItems });
+    const draw = () => {
+      const g = canvas.current?.getContext('2d');
+      if (g) drawPad(g, { ...profile.pad, deskItems: profile.pad.deskItems });
+    };
+    draw();
+    // Uploaded Pad pictures load a moment later: draw again as each one arrives.
+    whenPadArtLoads(draw);
+    return () => whenPadArtLoads(null);
   }, [profile]);
 
   const rank = rankFor(profile.xp);
@@ -74,7 +80,13 @@ export function PadScreen() {
       </div>
       <div className="pad-grid">
         <div className="pad-stage panel">
-          <canvas ref={canvas} width={PAD_W} height={PAD_H} className="pad-canvas" data-testid="pad-canvas" />
+          <canvas
+            ref={canvas}
+            width={PAD_W * PAD_SCALE}
+            height={PAD_H * PAD_SCALE}
+            className="pad-canvas"
+            data-testid="pad-canvas"
+          />
           <div className="pad-perks num">
             <b>Comfort perks:</b>{' '}
             {perkLines.length ? perkLines.join(' · ') : 'none yet (move up from the Studio)'}

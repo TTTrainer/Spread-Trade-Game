@@ -54,6 +54,8 @@ async function ffUntilDone(page: Page, maxDecisions = 40): Promise<string[]> {
 
 test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine', async () => {
   const { app, page } = await launchGame();
+  // Saved settings load just after launch; changing one before that would be overwritten.
+  await expect(page.getByTestId('title-screen')).toBeVisible();
   await page.evaluate(() => {
     const stg = (window as unknown as { __stg: Stg }).__stg;
     stg.app.getState().updateSettings((s) => ({

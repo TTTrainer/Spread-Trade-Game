@@ -4,7 +4,7 @@ import { DEFAULT_HOTKEYS, HOTKEY_LABELS, type HotkeyAction, type Settings } from
 import type { DecisionKind } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
-import type { SchwabStatus } from '../../shared/rpc';
+import type { DataBuildRequest, SchwabStatus, SchwabStoreStatus } from '../../shared/rpc';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
@@ -504,6 +504,7 @@ function DataPanel() {
   });
   const [report, setReport] = useState<string | null>(null);
   const [diskAsk, setDiskAsk] = useState<string | null>(null);
+  const [runs, setRuns] = useState(0);
   useEffect(() => {
     if (!hasBridge()) return;
     return bridge().on('data.progress', (p) =>
@@ -514,10 +515,11 @@ function DataPanel() {
       ),
     );
   }, []);
-  const run = async (mode: 'synthetic' | 'real' | 'sync', confirmLowDisk = false) => {
+  const run = async (mode: DataBuildRequest['mode'], confirmLowDisk = false) => {
     setBusy(true);
     const r = await bridge().invoke('data.build', { mode, allowDownload: true, confirmLowDisk });
     setBusy(false);
+    setRuns((n) => n + 1);
     if (r.needsDiskConfirm) setDiskAsk(r.message);
     else toast(r.message, r.ok ? 'good' : 'warn');
     await refresh();
@@ -544,7 +546,8 @@ function DataPanel() {
       <p>
         <b>Build real market data</b> downloads about 16 GB from DoltHub (free, public options data) the first
         time, takes a few hours, and needs about 40 GB free. The game can fetch the Dolt tool by itself. You
-        can keep playing the SIM market meanwhile.
+        can keep playing the SIM market meanwhile. <b>Or build it from Schwab</b> in a few minutes (steps 4
+        and 5 below).
       </p>
       <div className="modal-actions">
         <button
@@ -569,7 +572,12 @@ function DataPanel() {
           VIEW DATA REPORT
         </button>
       </div>
-      <SchwabPanel busy={busy} onSync={() => void run('sync')} />
+      <SchwabPanel
+        busy={busy}
+        runs={runs}
+        onRun={(m) => void run(m)}
+        dolthub={!!data && data.kind === 'real' && !data.fromSchwab}
+      />
       <p className="dim">
         Found a bug? Open the log folder and send <b>game.log</b> to Claude Code with what you were doing.
         Your saves and stats live in the save folder (<b>user.db</b>).
@@ -640,12 +648,29 @@ function DataPanel() {
 }
 
 /**
- * The read-only Schwab connection: the player's own developer app fills in the newest days
- * (prices and option chains) that DoltHub hasn't published yet. Keys stay on this computer.
+ * The read-only Schwab connection: the player's own developer app pulls prices and closing
+ * option chains into schwab.db (a separate file), and the game data is built from it: the whole
+ * market, or just the days DoltHub hasn't published yet. Keys stay on this computer.
  */
-function SchwabPanel({ busy, onSync }: { busy: boolean; onSync: () => void }) {
+function SchwabPanel({
+  busy,
+  runs,
+  onRun,
+  dolthub,
+}: {
+  busy: boolean;
+  runs: number;
+  onRun: (mode: 'schwabPull' | 'schwabBuild') => void;
+  /** The game data is DoltHub's: a build from schwab.db adds the newest days instead of replacing it. */
+  dolthub: boolean;
+}) {
   const toast = useApp((s) => s.toast);
   const [st, setSt] = useState<SchwabStatus | null>(null);
+  const [store, setStore] = useState<SchwabStoreStatus | null>(null);
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge().invoke('schwab.store').then(setStore);
+  }, [runs]);
   const [appKey, setAppKey] = useState('');
   const [secret, setSecret] = useState('');
   const [callback, setCallback] = useState('');
@@ -694,9 +719,11 @@ function SchwabPanel({ busy, onSync }: { busy: boolean; onSync: () => void }) {
         </span>
       </div>
       <p className="dim small">
-        Your own Schwab developer app fills in the newest days (daily prices and option chains) that the free
-        DoltHub data hasn't published yet, so Live's month reaches today. The game only asks for market data:
-        it never reads your account and never places a trade. Your keys and login stay on this computer
+        Your own Schwab developer app pulls daily prices and option chains into a separate file (schwab.db),
+        and the game builds its market from it: the whole market with no big download, or just the newest days
+        the free DoltHub data hasn't published yet, so Live's month reaches today. The game only asks for
+        market data: it never reads your account and never places a trade. Your keys and login stay on this
+        computer
         {st && !st.encrypted
           ? ' (this system has no key store, so they are saved unencrypted)'
           : ', encrypted'}
@@ -791,15 +818,53 @@ function SchwabPanel({ busy, onSync }: { busy: boolean; onSync: () => void }) {
           CONNECT
         </button>
       </div>
-      <div className="modal-actions">
+      <div className="schwab-step">
+        <b className="num">4</b>
         <button
-          className="pixel-btn"
-          disabled={busy || !st?.connected}
-          onClick={onSync}
-          data-testid="schwab-sync"
+          className="pixel-btn primary"
+          disabled={busy || working || !st?.connected}
+          onClick={() => onRun('schwabPull')}
+          data-testid="schwab-pull"
         >
-          ⟳ GET THE NEWEST DAYS
+          ⤓ PULL FROM SCHWAB
         </button>
+        <span className="dim small">
+          Saves daily prices (since 2018 the first time, then just the new days) and, after the 4 pm close,
+          that day's option chains into <b>schwab.db</b>, a separate file on this computer. Pull once a day
+          after the close to collect real chains. The first pull takes a few minutes.
+        </span>
+      </div>
+      <div className="schwab-store num" data-testid="schwab-store">
+        {store?.exists && store.symbols > 0 ? (
+          <>
+            schwab.db · {store.symbols} tickers · prices {store.firstDate} → {store.lastDate} · real option
+            chains on {store.chainDays} close{store.chainDays === 1 ? '' : 's'}
+            {store.lastPullAt ? ` · last pull ${new Date(store.lastPullAt).toLocaleString()}` : ''}
+          </>
+        ) : (
+          <>schwab.db · nothing pulled yet</>
+        )}
+      </div>
+      <div className="schwab-step">
+        <b className="num">5</b>
+        <button
+          className="pixel-btn primary"
+          disabled={busy || working || !store?.exists || !store.symbols}
+          onClick={() => onRun('schwabBuild')}
+          data-testid="schwab-build"
+        >
+          ▶ BUILD GAME DATA FROM SCHWAB
+        </button>
+        <span className="dim small">
+          {dolthub
+            ? "Adds the days after DoltHub's last day to your game data, with the real chains you pulled."
+            : "Makes the game's market from schwab.db: real prices, real chains on the closes you pulled, other days' chains modeled (labeled MODEL). Schwab has no earnings history, so no earnings events."}
+        </span>
+      </div>
+      <p className="dim small">
+        After that, <b>SYNC LATEST DAYS</b> (or Live's <b>CHECK FOR NEW DAYS</b>) does steps 4 and 5 for you.
+      </p>
+      <div className="modal-actions">
         <button
           className="pixel-btn"
           disabled={working || !st?.connected}
@@ -822,8 +887,9 @@ function SchwabPanel({ busy, onSync }: { busy: boolean; onSync: () => void }) {
         </button>
       </div>
       <p className="dim small">
-        Schwab asks you to log in again every 7 days. Syncs made while the market is open add only finished
-        days; the latest option chain is taken after the 4 pm close.
+        Schwab asks you to log in again every 7 days. Pulls made while the market is open add only finished
+        days; the latest option chain is taken after the 4 pm close. <b>REMOVE KEYS</b> leaves schwab.db;
+        delete that file from the save folder's data folder to remove the pulled prices too.
       </p>
     </div>
   );

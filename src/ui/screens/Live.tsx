@@ -198,7 +198,7 @@ export function LiveScreen() {
               data-tip-body={
                 synthetic
                   ? `The SIM market has no new data to download, so this moves its calendar forward one week (through ${simEnd}).`
-                  : 'Pulls the newest trading days from DoltHub (and from Schwab, when connected in Settings › Data), then plays on from where the month stopped.'
+                  : 'Pulls the newest trading days (from Schwab into schwab.db when connected in Settings › Data, and from DoltHub when your data came from there), then plays on from where the month stopped.'
               }
             >
               {busy ? 'CHECKING…' : '⟳ CHECK FOR NEW DAYS'}
@@ -209,7 +209,7 @@ export function LiveScreen() {
           </div>
           <p className="dim small">
             {synthetic
-              ? 'SIM market (practice data). Build real data in Settings › Data to play the real last month.'
+              ? 'SIM market (practice data). Build real data in Settings › Data (from DoltHub, or from Schwab in a few minutes) to play the real last month.'
               : `Real data through ${edge ?? '…'}.${schwab ? ' Schwab fills in the newest days.' : ' Connect Schwab in Settings › Data to reach today.'}`}
           </p>
           <div className="section-title">Open trades ({openPos.length})</div>

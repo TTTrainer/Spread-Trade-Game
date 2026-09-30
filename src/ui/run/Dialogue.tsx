@@ -11,8 +11,8 @@ export function DialogueBox() {
   const speech = useRun((s) => s.speech);
   const clear = useRun((s) => s.clearSpeech);
   const reduced = useApp((s) => s.settings.display.reducedMotion);
-  // Over the chart during a round; a small corner box in the shop (clear of the offers and the
-  // NEXT button); at the bottom elsewhere, clear of stamps.
+  // Over the chart during a round; in the shop, inside BUILD.SYS's empty middle (clear of the
+  // offers, the payouts at the top right and the NEXT button); at the bottom elsewhere.
   const phase = useRun((s) => s.engine?.state.phase);
   const inRun = useApp((s) => s.screen === 'run');
   // The day's recap owns the middle of the chart: step aside to the corner while it's up.
@@ -23,7 +23,7 @@ export function DialogueBox() {
         ? 'at-corner'
         : ''
       : inRun && phase === 'shop'
-        ? 'at-corner'
+        ? 'at-corner at-shop'
         : 'at-bottom';
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
@@ -49,7 +49,11 @@ export function DialogueBox() {
           exit={{ y: -10, opacity: 0 }}
           data-testid="dialogue"
         >
-          <Portrait id={speech.line.who} mood={speech.line.mood} scale={place === 'at-corner' ? 1 : 1.5} />
+          <Portrait
+            id={speech.line.who}
+            mood={speech.line.mood}
+            scale={place.includes('at-corner') ? 1 : 1.5}
+          />
           <span className="dlg-body">
             <span className="dlg-name">
               {CHARACTERS[speech.line.who].name}{' '}

@@ -9,7 +9,8 @@ import { payoffAtExpiry } from '../../engine/strategies/metrics';
 import type { OptionLeg } from '../../engine/strategies/types';
 import { chartBridge } from './chartBridge';
 import { useCurve } from './RightPanel';
-import { useTrading } from '../store/trading';
+import { liveCardId, useTrading } from '../store/trading';
+import { barsAhead } from './expiry';
 
 interface Band {
   top: number;
@@ -20,6 +21,9 @@ export function ChartZones() {
   const curve = useCurve();
   const [, setTick] = useState(0);
   useTrading((s) => s.version);
+  const session = useTrading((s) => s.session);
+  const cardId = useTrading(liveCardId);
+  const timeframe = useTrading((s) => s.timeframe);
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 150);
     return () => clearInterval(id);
@@ -63,11 +67,34 @@ export function ChartZones() {
   const nearest = shorts.length
     ? shorts.reduce((a, k) => (Math.abs(k - curve.spot) < Math.abs(a - curve.spot) ? k : a))
     : null;
+  // The zones cover the trade's own life, from the day it opens (today, for a plan) to
+  // expiration, like a position box: where the trade is, without painting over the history.
+  const now = session && cardId ? session.view(cardId).now : null;
+  const exps = curve.legs.filter((l): l is OptionLeg => l.kind === 'option').map((l) => l.expiration);
+  const exp = exps.length ? exps.reduce((a, b) => (a < b ? a : b)) : null;
+  const todayX = chartBridge.xAhead(0);
+  const expX = now && exp ? chartBridge.xAhead(barsAhead(now, exp, timeframe)) : null;
+  const openX = curve.openedOn ? chartBridge.xForDate(curve.openedOn) : todayX;
+  const left = Math.max(0, Math.min(w, openX ?? 0));
+  const right = Math.max(0, Math.min(w, expX ?? w));
+  const boxed = right - left >= 8;
+  const box = boxed ? { left, width: right - left } : { left: 0, width: w };
   const ySpot = chartBridge.priceToY(curve.spot);
   const yK = nearest !== null ? chartBridge.priceToY(nearest) : null;
   const cushion = nearest !== null ? (curve.spot - nearest) / curve.spot : null;
   return (
-    <div className="chart-zones" style={{ width: w, height: h }} data-testid="chart-zones">
+    <div
+      className={`chart-zones ${boxed ? 'boxed' : ''} ${curve.openedOn ? 'open' : 'plan'}`}
+      style={{ left: box.left, width: box.width, height: h }}
+      data-testid="chart-zones"
+    >
+      {curve.openedOn && boxed && (
+        <div className="zone-entry num" data-testid="zone-entry">
+          {curve.entryNet < 0
+            ? `SOLD +${Math.abs(curve.entryNet).toFixed(2)}`
+            : `BOUGHT −${curve.entryNet.toFixed(2)}`}
+        </div>
+      )}
       {wide.map((b, i) => (
         <div key={`g${i}`} className="zone win" style={{ top: b.top, height: b.bottom - b.top }} />
       ))}
@@ -83,7 +110,12 @@ export function ChartZones() {
         <div
           className={`cushion num ${Math.abs(cushion) < 0.02 ? 'thin' : ''}`}
           data-tip="g:cushion"
-          style={{ top: Math.min(ySpot, yK), height: Math.abs(yK - ySpot) }}
+          style={{
+            top: Math.min(ySpot, yK),
+            height: Math.abs(yK - ySpot),
+            // At today's candle, whatever the box's width.
+            ...(todayX !== null ? { left: Math.max(0, todayX - box.left + 10), right: 'auto' } : {}),
+          }}
         >
           <span>
             {cushion >= 0 ? '▼' : '▲'} {(Math.abs(cushion) * 100).toFixed(1)}%

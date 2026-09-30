@@ -314,8 +314,8 @@ export function buildStructure(id: StructureId, chain: Chain, p: BuildParams): B
     case 'iron_condor':
     case 'bwb_condor': {
       const skip = id === 'bwb_condor' ? (p.skip ?? 1) : 0;
-      const put = vertical(chain, { ...p, anchor: undefined, width: p.width }, 'P', true, false);
-      const call = vertical(chain, { ...p, anchor: undefined, width: p.width + skip }, 'C', true, true);
+      const put = vertical(chain, { ...p, anchor: p.anchor, width: p.width }, 'P', true, false);
+      const call = vertical(chain, { ...p, anchor: p.callAnchor, width: p.width + skip }, 'C', true, true);
       if (!put.ok) return put;
       if (!call.ok) return call;
       const sp = put.legs[0] as OptionLeg;

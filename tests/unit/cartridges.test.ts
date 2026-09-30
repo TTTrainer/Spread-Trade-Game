@@ -37,7 +37,7 @@ const CASES: Record<string, () => void> = {
       ],
       addChips: (id, c) => (added[id] = (added[id] ?? 0) + c),
     });
-    expect(added).toEqual({ a: 8 });
+    expect(added).toEqual({ a: 3 });
     expect(one('theta_engine', { thetaChips: 40 })).toEqual({ op: 'chips', value: 40 });
     expect(one('theta_engine', { thetaChips: 40, ...lose })).toBeNull();
   },

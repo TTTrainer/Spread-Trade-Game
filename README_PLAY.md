@@ -8,8 +8,8 @@ If you received the game in pieces (`...exe.part1` to `part4` plus a `Join-Porta
 
 Then you have two ways to run the game. Use either one.
 
-- **`SpreadTradingGame-Setup-1.4.1.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
-- **`SpreadTradingGame-Portable-1.4.1.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
+- **`SpreadTradingGame-Setup-1.4.2.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
+- **`SpreadTradingGame-Portable-1.4.2.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 
@@ -17,7 +17,7 @@ Then you have two ways to run the game. Use either one.
 
 There are two Mac builds: **Apple chip** (M1 and later, the `arm64` files) and **Intel** (the `x64` files). If you're not sure, choose Apple menu → About This Mac: "Chip: Apple M…" means Apple chip.
 
-1. Put the parts (`SpreadTradingGame-mac-arm64-1.4.1.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
+1. Put the parts (`SpreadTradingGame-mac-arm64-1.4.2.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
 2. Open **Terminal** (press ⌘ Space, type Terminal, press Return).
 3. Type `bash ` (with a space after it), drag `join-mac.sh` from Finder into the Terminal window, and press Return.
 
@@ -45,6 +45,8 @@ Music starts after your first click or key press; the browser engine inside the 
 
 ## 3. Real market data (optional, a few hours once)
 
+**Quicker alternative:** with a Schwab developer app you can build a real market in minutes instead (see *Schwab* in section 4). It has real prices, but mostly modeled option chains and no earnings events; DoltHub has real option chains every day back to 2019 and the earnings history.
+
 The real options history comes free from DoltHub (public data, CC BY-SA 4.0). To use it:
 
 1. Open **Settings → Data**.
@@ -65,18 +67,26 @@ When it finishes, **VIEW DATA REPORT** lists the tickers, the dates covered and 
 - **Live** plays the most recent month: you start 20 trading days back with a dealt lineup (the market plus a few stocks), trade like any desk, and press Space to play each day. At the latest close the clock waits. **⟳ CHECK FOR NEW DAYS** fetches newer days and the month plays on from there, so it never runs out. The aim: finish ahead of simply holding the market. **NEW MONTH** starts over (closed trades stay in Stats).
 - On the SIM market there's nothing new to download, so CHECK FOR NEW DAYS moves a simulated calendar forward one week instead, and the screen says so.
 
-### Optional: Schwab, so Live reaches today
+### Schwab: real data in minutes, and Live up to today
 
-The free DoltHub data runs a few days behind. Your own Schwab developer app can fill in the newest days (daily prices and option chains). The game only asks Schwab for **market data**: it never reads your account and never places a trade. Your App Secret and login stay on your computer, encrypted by Windows or macOS; they are never sent anywhere else or put in the game's files.
+Your own Schwab developer app can supply the game's market data instead of (or on top of) the big DoltHub download. The game only asks Schwab for **market data**: it never reads your account and never places a trade. Your App Secret and login stay on your computer, encrypted by Windows or macOS; they are never sent anywhere else or put in the game's files.
+
+**Connect (once):**
 
 1. On **developer.schwab.com**, open your app and note its **App Key**, **Secret** and **Callback URL** (for example `https://127.0.0.1`). The app needs the **Market Data** product.
 2. In the game: **Settings → Data → Schwab**. Type the App Key, the Secret and the same Callback URL, then **SAVE KEYS**.
-3. Click **LOG IN AT SCHWAB ↗**. Your browser opens Schwab's login. Log in and approve.
-4. Your browser then lands on your callback address, which usually shows "can't reach this page". That's expected: copy the **whole address** from the address bar (it contains `?code=`).
-5. Paste it into the box in step 3 of the panel and click **CONNECT** within about 30 seconds (the code expires quickly; if it fails, just log in again).
-6. After 4 pm Eastern, click **GET THE NEWEST DAYS** (or Live's CHECK FOR NEW DAYS). While the market is open only finished days are added; the latest option chain is taken after the close. Days between DoltHub's last day and today get modeled chains, labeled MODEL.
+3. Click **LOG IN AT SCHWAB ↗**. Your browser opens Schwab's login. Log in and approve. Your browser then lands on your callback address, which usually shows "can't reach this page". That's expected: copy the **whole address** from the address bar (it contains `?code=`), paste it into the box and click **CONNECT** within about 30 seconds (the code expires quickly; if it fails, just log in again).
 
-Schwab asks you to log in again every 7 days (repeat steps 3 to 5). **LOG OUT** forgets the login; **REMOVE KEYS** deletes everything Schwab-related from this computer.
+**Get the data:**
+
+4. Click **⤓ PULL FROM SCHWAB**. The game saves daily prices for every ticker (since 2018 the first time, a few minutes; after that just the new days) into its own file, **`schwab.db`**. After the 4 pm close it also saves that day's **real option chains**. The line under the button shows what the file holds.
+5. Click **▶ BUILD GAME DATA FROM SCHWAB**.
+   - If you haven't built the DoltHub data, this makes the whole game market from `schwab.db` in a minute or two: real prices, real option chains on each close you pulled after, and **modeled chains** (labeled **MODEL**) on every other day, worked out from each stock's own recent movement. Schwab's market data has no earnings history, so this market has **no earnings events**; the DoltHub build has them.
+   - If you already built the DoltHub data, this adds the days DoltHub hasn't published yet, so Live's month reaches today. DoltHub stays the reference: when it publishes those days, a sync replaces the Schwab rows.
+
+After that, **SYNC LATEST DAYS** (or Live's **⟳ CHECK FOR NEW DAYS**) does steps 4 and 5 for you. Pull once a day after the close and the store collects a real option chain for every day, so more and more of your market is real rather than modeled.
+
+Schwab asks you to log in again every 7 days (repeat step 3). **LOG OUT** forgets the login; **REMOVE KEYS** deletes the keys and login. `schwab.db` stays (it's only market data); delete it from the save folder's `data` folder if you want it gone too.
 
 ## 5. Where your saves live
 
@@ -85,6 +95,7 @@ Everything is saved automatically after every action. There is no undo, by desig
 - **Save folder:** `C:\Users\<you>\AppData\Roaming\SpreadTradingGame\`
   - `user.db` holds your runs, trades, stats, achievements, profile, Bonus and The Pad.
   - `data\game.db` is the market database (once you've built real data).
+  - `data\schwab.db` holds everything pulled from Schwab (once you've pulled).
   - `logs\game.log` is the log file for bug reports.
 - **Settings → Data** has **OPEN SAVE FOLDER** and **OPEN LOG FOLDER** buttons, so you never have to hunt for them.
 - Uninstalling the game does **not** delete your saves or the downloaded data. To start completely fresh, delete the save folder.

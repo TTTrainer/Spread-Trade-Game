@@ -211,19 +211,41 @@ describe('expiration', () => {
     expect(sold.pos.realizedCents).toBe(30000 - 60000);
   });
 
-  it('flips a seeded coin for pin risk within 0.5% of a short strike', () => {
+  it('expires out-of-the-money shorts worthless and assigns in-the-money ones, even by a cent', () => {
     const csp: Leg[] = [{ kind: 'option', right: 'P', strike: 95, expiration: EXP, ratio: -1 }];
-    let assigned = 0;
-    for (let i = 0; i < 400; i++) {
-      const r = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng(`pin${i}`) }));
-      if (r.assignedToday) assigned++;
-    }
-    expect(assigned).toBeGreaterThan(150);
-    expect(assigned).toBeLessThan(250);
-    const again = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday;
-    expect(endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday).toBe(
-      again,
-    );
+    // Just above a short put's strike: worthless, the credit is kept, no shares.
+    const otm = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin') }));
+    expect(otm.assignedToday).toBe(false);
+    expect(otm.pos.status).toBe('closed');
+    expect(otm.pos.exitReason).toBe('expired');
+    expect(otm.pos.realizedCents).toBe(10000);
+    // A cent in the money: assigned 100 shares at the strike.
+    const itm = endOfDay(open(csp, 1, -1), day(EXP, 94.99), ctx({ rng: new Rng('pin') }));
+    expect(itm.assignedToday).toBe(true);
+    expect(stockRatio(itm.pos.legs)).toBe(1);
+  });
+
+  it('a covered call whose call expires worthless keeps the premium and sells the shares at that close', () => {
+    const cc: Leg[] = [
+      { kind: 'stock', ratio: 1 },
+      { kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: -1 },
+    ];
+    // Bought the shares at 100 and sold the call for 1.50: a 98.50 net debit per share.
+    const p = { ...open(cc, 1, 98.5), structureId: 'covered_call' as const };
+    const flat = endOfDay(p, day(EXP, 100), ctx());
+    expect(flat.pos.status).toBe('closed');
+    expect(flat.pos.legs).toEqual([]);
+    // Shares unchanged at 100: the result is exactly the premium.
+    expect(flat.pos.realizedCents).toBe(15000);
+    expect(flat.pos.events.at(-1)?.detail).toMatch(/premium kept/);
+    // Below the strike but the stock fell: premium kept, the share loss is part of the trade.
+    const down = endOfDay(p, day(EXP, 97), ctx());
+    expect(down.pos.realizedCents).toBe(15000 - 30000);
+    // Above the strike: the call is assigned and the shares go at 105.
+    const up = endOfDay(p, day(EXP, 108), ctx());
+    expect(up.assignedToday).toBe(true);
+    expect(up.pos.status).toBe('closed');
+    expect(up.pos.realizedCents).toBe(15000 + 50000);
   });
 
   it('cash-settles at intrinsic when expiration mechanics are off', () => {

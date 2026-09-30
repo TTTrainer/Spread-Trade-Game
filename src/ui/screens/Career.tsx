@@ -54,6 +54,8 @@ export function CareerScreen() {
   const [rules, setRules] = useState<string[]>([]);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [tab, setTab] = useState<'start' | 'options'>('start');
+  const [capAsk, setCapAsk] = useState(false);
+  const updateSettings = useApp((s) => s.updateSettings);
 
   useEffect(() => {
     void checkSave('career');
@@ -64,9 +66,15 @@ export function CareerScreen() {
   const next = RANKS[rank.rank + 1];
   const heat = heatOf(rules);
 
-  const start = async () => {
+  const start = async (startEquityCents?: number) => {
+    // Income trades tie up the whole share price: ask what to start with first.
+    if (desk === 'income' && startEquityCents === undefined) {
+      sfx('select');
+      setCapAsk(true);
+      return;
+    }
     sfx('whoosh');
-    if (await newRun({ deskId: desk, seed, tier, compliance: rules })) go('run');
+    if (await newRun({ deskId: desk, seed, tier, compliance: rules, startEquityCents })) go('run');
   };
   const cont = async () => {
     sfx('whoosh');
@@ -266,27 +274,30 @@ export function CareerScreen() {
               <div className="section-title" data-tip="g:risk_tier">
                 Risk Tier
               </div>
-              <div className="seg num" data-testid="tier-picker">
-                {RISK_TIERS.map((t) => (
-                  <button
-                    key={t.tier}
-                    className={tier === t.tier ? 'sel' : ''}
-                    disabled={t.tier > profile.maxTier}
-                    title={t.tier > profile.maxTier ? `Clear a year at Tier ${t.tier - 1} to unlock` : t.text}
-                    onClick={() => setTier(t.tier)}
-                    data-testid={`tier-${t.tier}`}
-                  >
-                    {t.tier > profile.maxTier ? '🔒' : ''}
-                    {t.tier}
-                  </button>
-                ))}
-              </div>
-              <div className="dim small">
-                {tier === 0
-                  ? 'Base rules. Clear a year to unlock Tier 1.'
-                  : `Cumulative: ${RISK_TIERS.slice(1, tier + 1)
-                      .map((t) => t.text)
-                      .join(' ')}`}
+              {/* A ladder, like stakes: each tier adds its rule on top of the ones below it. */}
+              <div className="tier-ladder num" data-testid="tier-picker" role="radiogroup">
+                {RISK_TIERS.map((t) => {
+                  const locked = t.tier > profile.maxTier;
+                  const on = t.tier <= tier;
+                  return (
+                    <button
+                      key={t.tier}
+                      role="radio"
+                      aria-checked={tier === t.tier}
+                      className={`tier-row ${tier === t.tier ? 'sel' : ''} ${on ? 'on' : ''} ${locked ? 'locked' : ''}`}
+                      disabled={locked}
+                      onClick={() => (sfx('select'), setTier(t.tier))}
+                      data-testid={`tier-${t.tier}`}
+                    >
+                      <b className="tier-n">{locked ? '🔒' : t.tier}</b>
+                      <span className="tier-text">
+                        {t.tier === 0 ? 'Base rules' : t.text}
+                        {locked && <span className="dim"> · clear a year at Tier {t.tier - 1}</span>}
+                      </span>
+                      {on && t.tier > 0 && <span className="tier-on">✔</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="panel career-opt">
@@ -382,6 +393,17 @@ export function CareerScreen() {
       {settings.game.pureMarket && (
         <p className="dim small">Pure Market is on (Settings): ARCADE cartridges are out of the shop.</p>
       )}
+      {capAsk && (
+        <IncomeCapital
+          initial={settings.game.incomeCapitalCents}
+          onClose={() => setCapAsk(false)}
+          onPick={(cents) => {
+            setCapAsk(false);
+            updateSettings((x) => ({ ...x, game: { ...x.game, incomeCapitalCents: cents } }));
+            void start(cents);
+          }}
+        />
+      )}
       {confirmAbandon && (
         <Modal onClose={() => setConfirmAbandon(false)} testId="abandon-confirm">
           <h2>Abandon the run in progress?</h2>
@@ -406,6 +428,72 @@ export function CareerScreen() {
         </Modal>
       )}
     </div>
+  );
+}
+
+const INCOME_PRESETS = [2_500_000, 5_000_000, 10_000_000, 25_000_000];
+
+/**
+ * Starting capital for an Income run. A cash-secured put sets aside the whole strike (a $60 stock
+ * is $6,000 a contract) and a covered call buys 100 shares, so $5,000 barely opens one trade.
+ */
+function IncomeCapital({
+  initial,
+  onClose,
+  onPick,
+}: {
+  initial: number;
+  onClose: () => void;
+  onPick: (cents: number) => void;
+}) {
+  const [dollars, setDollars] = useState(Math.round(initial / 100));
+  const cents = Math.max(100_000, Math.round(dollars) * 100);
+  return (
+    <Modal onClose={onClose} testId="income-capital">
+      <h2>Starting capital for this Income run</h2>
+      <p>
+        Cash-secured puts set aside the whole strike (a $60 stock ties up $6,000 per contract) and covered
+        calls buy 100 shares, so a small account can barely open one. <b>At least $50,000 is recommended.</b>{' '}
+        Targets, risk caps and the Max-Loss Line are all percentages, so a bigger account doesn't make the run
+        easier.
+      </p>
+      <div className="modal-actions income-presets">
+        {INCOME_PRESETS.map((c) => (
+          <button
+            key={c}
+            className={`pixel-btn ${c === cents ? 'primary' : ''}`}
+            onClick={() => setDollars(c / 100)}
+            data-testid={`income-cap-${c / 100}`}
+          >
+            {money(c).replace('.00', '')}
+            {c === DESKS.income.recommendedCapitalCents ? ' ★' : ''}
+          </button>
+        ))}
+        <label className="num">
+          $
+          <input
+            className="capital"
+            type="number"
+            min={1000}
+            step={1000}
+            value={dollars}
+            onChange={(e) => setDollars(Number(e.target.value) || 0)}
+            data-testid="income-cap-input"
+          />
+        </label>
+      </div>
+      {cents < (DESKS.income.recommendedCapitalCents ?? 0) && (
+        <p className="warn-text small">Under $50,000 most cash-secured puts won't fit the risk cap.</p>
+      )}
+      <div className="modal-actions">
+        <button className="pixel-btn primary" onClick={() => onPick(cents)} data-testid="income-cap-go">
+          START WITH {money(cents).replace('.00', '')} ▶
+        </button>
+        <button className="pixel-btn" onClick={onClose}>
+          CANCEL
+        </button>
+      </div>
+    </Modal>
   );
 }
 

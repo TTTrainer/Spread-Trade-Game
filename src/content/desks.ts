@@ -28,6 +28,8 @@ export const DESKS: Record<DeskId, DeskDef> = {
     startingCartridges: ['dividend_radar'],
     unlockCost: 100,
     priceRange: [6, 18],
+    recommendedCapitalCents: 5_000_000,
+    targetMult: 1.1,
     passive: (f) =>
       f.win && f.dividendsCollected > 0
         ? [
@@ -51,6 +53,8 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 150,
     ticketsAdd: 1,
     lineupAdd: 1,
+    // Two credits a trade score about 2.5x a vertical's: targets scale to match.
+    targetMult: 2.2,
     passive: (f) =>
       f.win && f.callFlat && f.callExact && f.callBonus > 0
         ? [{ label: 'Condor desk (flat call x2)', kind: 'desk', op: 'add', value: f.callBonus }]
@@ -68,6 +72,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 200,
     ticketsAdd: 3,
     lineupAdd: 2,
+    targetMult: 1.7,
     priceRange: [10, 50],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
     passive: (f) =>
@@ -86,6 +91,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 250,
     ticketsAdd: 1,
     lineupAdd: 1,
+    targetMult: 1.2,
     priceRange: [10, 60],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },

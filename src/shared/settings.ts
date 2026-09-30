@@ -211,6 +211,11 @@ export interface Settings {
   version: number;
   game: {
     startingCapitalCents: number;
+    /**
+     * Starting capital for Income desk runs. Cash-secured puts and covered calls tie up the whole
+     * share price, so a small account can barely open one; the game asks before each Income run.
+     */
+    incomeCapitalCents: number;
     shortDelta: number;
     bucketMode: 'em' | 'fixed';
     /** Seconds per trading day at 1x (the candle plays for most of it). */
@@ -268,6 +273,7 @@ export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
   game: {
     startingCapitalCents: 500_000,
+    incomeCapitalCents: 5_000_000,
     shortDelta: 0.3,
     bucketMode: 'em',
     ffSecondsPerDay: 5.6,

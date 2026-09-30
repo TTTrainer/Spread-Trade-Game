@@ -203,6 +203,8 @@ export interface RunState {
   };
   patienceStacks: number;
   parachuteUsed: boolean;
+  /** Quarters with a written-up (missed) Month target; a second miss in one ends the run. */
+  writeUps?: number[];
   burnoutNext: boolean;
   usedWindows: number[];
   result: RunResult | null;

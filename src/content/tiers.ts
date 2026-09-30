@@ -7,7 +7,7 @@ export const RISK_TIERS: { tier: number; name: string; text: string }[] = [
   { tier: 1, name: 'Tier 1', text: 'Fees on ($0.65 per contract per leg).' },
   { tier: 2, name: 'Tier 2', text: 'Max-Loss Line 2% tighter.' },
   { tier: 3, name: 'Tier 3', text: 'Risk cap 7.5% of equity.' },
-  { tier: 4, name: 'Tier 4', text: 'Early assignment and pin risk always on.' },
+  { tier: 4, name: 'Tier 4', text: 'Early assignment always on.' },
   { tier: 5, name: 'Tier 5', text: 'Targets +25%.' },
   { tier: 6, name: 'Tier 6', text: '-1 reroll per round.' },
   { tier: 7, name: 'Tier 7', text: 'Fills one step worse.' },

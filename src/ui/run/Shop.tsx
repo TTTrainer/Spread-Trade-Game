@@ -345,6 +345,7 @@ export function ShopView({ e }: { e: RunEngine }) {
     nextIndex,
     nextIndex === 2 && annual ? 'annual_review' : null,
     st.config,
+    e.writtenUp(nextQ),
   );
   const payout = r.payouts.reduce((a, p) => a + p.cash, 0);
   const cost = e.shopRerollCost();

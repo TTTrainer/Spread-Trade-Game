@@ -6,7 +6,7 @@ import type {
   OrderSpec,
   PlaceResult,
 } from '../../engine/trading/session';
-import type { TradePlan } from '../../engine/trading/plan';
+import { premiumOf, type TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
 import { computeFacts } from '../../engine/run/facts';
 import { STRUCTURES, expirationsOf, reverseOf, stepStrike } from '../../engine/strategies/structures';
@@ -34,6 +34,8 @@ export interface BuilderState {
   delta: number;
   width: number;
   anchor: number | null;
+  /** A condor's short call strike (dragged on the chart). */
+  callAnchor: number | null;
   qty: number;
   legs: Leg[] | null;
   orderType: 'limit' | 'market';
@@ -179,6 +181,9 @@ interface TradingState {
   /** The last day had news worth reading: the clock waits (auto paces only). */
   recapHold: boolean;
   dismissRecap: () => void;
+  /** A strike handle is being dragged: the chart hides everything but the trade being shaped. */
+  dragging: boolean;
+  setDragging: (v: boolean) => void;
   /** A decision is tucked into a bar so the full chart can be reviewed. */
   reviewChart: boolean;
   setReviewChart: (v: boolean) => void;
@@ -255,6 +260,7 @@ const defaultBuilder = (): BuilderState => ({
   delta: useApp.getState().settings.game.shortDelta,
   width: 2,
   anchor: null,
+  callAnchor: null,
   qty: 1,
   legs: null,
   orderType: 'limit',
@@ -726,6 +732,8 @@ export const useTrading = create<TradingState>((set, get) => {
     recap: null,
     recapHold: false,
     dismissRecap: () => set({ recap: null }),
+    dragging: false,
+    setDragging: (v) => set({ dragging: v }),
     reviewChart: false,
     setReviewChart: (v) => set({ reviewChart: v }),
     chainOpen: false,
@@ -808,6 +816,7 @@ export const useTrading = create<TradingState>((set, get) => {
           backExpiration: back,
           legs: null,
           anchor: null,
+          callAnchor: null,
           earningsAck: false,
         },
       });
@@ -828,6 +837,7 @@ export const useTrading = create<TradingState>((set, get) => {
           width: def.defaults.width || get().builder.width,
           legs: null,
           anchor: null,
+          callAnchor: null,
         },
       });
     },
@@ -836,7 +846,7 @@ export const useTrading = create<TradingState>((set, get) => {
       const next = reverseOf(b.structureId);
       if (next !== b.structureId) {
         sfx('whoosh');
-        set({ builder: { ...b, structureId: next, legs: null, anchor: null } });
+        set({ builder: { ...b, structureId: next, legs: null, anchor: null, callAnchor: null } });
       }
     },
     plan: () => {
@@ -851,6 +861,7 @@ export const useTrading = create<TradingState>((set, get) => {
           delta: builder.delta,
           width: builder.width,
           anchor: builder.anchor ?? undefined,
+          callAnchor: builder.callAnchor ?? undefined,
         };
         // Size by conviction: price one contract, then fill that share of the risk cap.
         const one = session.planFor(
@@ -984,6 +995,7 @@ export const useTrading = create<TradingState>((set, get) => {
         backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
         delta: setup.delta,
         anchor: null,
+        callAnchor: null,
         legs: null,
         ...(p === 'mine' && mine
           ? { width: mine.width, targetPct: mine.targetPct, stopMult: mine.stopMult }
@@ -1033,7 +1045,10 @@ export const useTrading = create<TradingState>((set, get) => {
         useApp.getState().toast(plan?.reason ?? 'Pick an expiration first.', 'warn');
         return false;
       }
-      const isCredit = plan.mid < 0;
+      // A covered call is a premium sale even though buying the shares makes its net a debit.
+      const spot = plan.entry?.spot ?? null;
+      const premium = premiumOf(plan.mid, plan.legs, spot);
+      const isCredit = premium !== null;
       if (side === 'sell' && !isCredit) {
         useApp.getState().toast('This build is a debit: use Buy (Alt+B).', 'warn');
         sfx('error');
@@ -1062,10 +1077,10 @@ export const useTrading = create<TradingState>((set, get) => {
       const limit = plan.mid + (plan.natural - plan.mid) * builder.limitFrac;
       const d = session.config.bracketDefaults;
       const brackets = builder.bracketsOn
-        ? isCredit
+        ? premium !== null
           ? {
-              targetPl: -plan.mid * builder.targetPct,
-              stopPl: -plan.mid * builder.stopMult,
+              targetPl: premium * builder.targetPct,
+              stopPl: premium * builder.stopMult,
               targetPct: builder.targetPct,
               stopMult: builder.stopMult,
             }
@@ -1086,6 +1101,7 @@ export const useTrading = create<TradingState>((set, get) => {
           delta: builder.delta,
           width: builder.width,
           anchor: builder.anchor ?? undefined,
+          callAnchor: builder.callAnchor ?? undefined,
         },
         legs: builder.legs ?? undefined,
         qty: plan.qty,
@@ -1097,7 +1113,8 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx(isCredit ? 'fill' : 'buy');
         // The ticket slams onto the chart and coins fly off the button.
         const st = STRUCTURES[builder.structureId];
-        const net = Math.abs(plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit);
+        const fillNet = plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit;
+        const net = isCredit ? (premiumOf(fillNet, plan.legs, spot) ?? premium ?? 0) : Math.abs(fillNet);
         set({
           stamp: {
             id: ++feedId,

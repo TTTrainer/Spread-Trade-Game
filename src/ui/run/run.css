@@ -2063,3 +2063,65 @@
     font-size: 24px;
   }
 }
+
+/* Risk Tier ladder */
+.tier-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tier-row {
+  display: grid;
+  grid-template-columns: 26px 1fr 16px;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.15;
+  padding: 3px 8px;
+  background: var(--bg-1);
+  color: var(--text);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.tier-row:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+.tier-row .tier-n {
+  font-size: 17px;
+  color: var(--amber);
+  text-align: center;
+}
+.tier-row.on {
+  background: rgba(255, 191, 62, 0.07);
+}
+.tier-row.sel {
+  border-color: var(--amber);
+  box-shadow: var(--glow-amber);
+}
+.tier-row .tier-on {
+  color: var(--amber);
+}
+.tier-row.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tier-row.locked .tier-n {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+@media (max-height: 820px) {
+  .tier-row {
+    padding: 1px 8px;
+    font-size: 13px;
+  }
+}
+/* In the shop: the middle of the BUILD.SYS column, where nothing needs reading. */
+/* BUILD.SYS's empty middle: under the family rows, above the tips at its foot, at any height. */
+.dialogue.at-corner.at-shop {
+  top: 52%;
+  bottom: auto;
+  right: 24px;
+  width: min(420px, 29vw);
+}

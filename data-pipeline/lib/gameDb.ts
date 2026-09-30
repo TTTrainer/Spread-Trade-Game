@@ -121,6 +121,16 @@ export class GameDbWriter {
     });
   }
 
+  /** Chain days whose quotes aren't stored (modeled when read; see DatasetMeta.chainModel). */
+  putChainDays(list: { symbol: string; date: ISODate; spot: number; spread: number | null }[]): void {
+    const st = this.db.prepare(
+      'INSERT OR REPLACE INTO chain_days(symbol,date,spot,src,spread) VALUES (?,?,?,?,?)',
+    );
+    tx(this.db, () => {
+      for (const d of list) st.run(d.symbol, encDate(d.date), d.spot, srcCode('modeled'), d.spread);
+    });
+  }
+
   putVol(symbol: string, pts: VolPoint[]): void {
     const st = this.db.prepare(
       'INSERT OR REPLACE INTO vol(symbol,date,iv30,hv20,ivr,ivp) VALUES (?,?,?,?,?,?)',

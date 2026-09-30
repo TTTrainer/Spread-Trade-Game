@@ -22,8 +22,12 @@ export const BALANCE = {
   },
 
   targets: {
-    q1: [30, 50, 80] as [number, number, number],
-    quarterGrowth: 1.3,
+    // Round 1 needs more than one typical trade (a median Verticals win scores about 220 on the
+    // SIM market). Reviews ask a little less: their rules (beat SPY, stay calm) are the hard part.
+    q1: [200, 220, 180] as [number, number, number],
+    quarterGrowth: 1.12,
+    /** A missed Month target is a write-up, not the end: that quarter's Review target grows this much. */
+    writeUpReviewMult: 1.1,
     endlessGrowth: 1.8,
     annualReviewMult: 1.25,
   },
@@ -92,6 +96,7 @@ export const BALANCE = {
     skipRound: -10,
     closeAtPlan: -5,
     assignment: 5, // not in the plan's table; the Assignment Artist cartridge implies assignments cost stress
+    writeUp: 15,
     vacationDay: -30,
     burnoutAt: 100,
     burnoutResetTo: 50,

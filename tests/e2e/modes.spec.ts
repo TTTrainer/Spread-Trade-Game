@@ -191,8 +191,19 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await page.getByTestId('ctab-start').click();
   await page.getByTestId('desk-income').click();
   await page.getByTestId('start-run').click();
+  // Income asks for the starting capital first ($50,000 recommended).
+  await expect(page.getByTestId('income-capital')).toBeVisible();
+  await expect(page.getByTestId('income-cap-go')).toContainText('$50,000');
+  await shot(page, '09-income-capital-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.getByTestId('income-cap-100000').click();
+  await page.getByTestId('income-cap-go').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('topbar').or(page.locator('.rtb-round'))).toContainText('HEAT 3');
+  const equity = await page.evaluate(
+    () => (window as Any).__stg.run.getState().engine.state.config.startEquityCents,
+  );
+  expect(equity).toBe(10_000_000);
   await app.close();
 });
 

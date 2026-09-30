@@ -23,10 +23,16 @@ export interface DataStatus {
   symbols: number;
   notes: string[];
   busy: boolean;
+  /** Built from schwab.db alone (option chains modeled except the closes Schwab was pulled after). */
+  fromSchwab?: boolean;
 }
 
 export interface DataBuildRequest {
-  mode: 'synthetic' | 'real' | 'sync';
+  /**
+   * schwabPull saves Schwab's newest prices and closing chains into schwab.db; schwabBuild makes
+   * game.db from schwab.db (adding the newest days to DoltHub data, or building from it alone).
+   */
+  mode: 'synthetic' | 'real' | 'sync' | 'schwabPull' | 'schwabBuild';
   allowDownload: boolean;
   confirmLowDisk: boolean;
 }
@@ -55,6 +61,18 @@ export interface SchwabStatus {
   loginExpiresAt: number | null;
   /** Keys and tokens are encrypted by the operating system's key store. */
   encrypted: boolean;
+}
+
+/** What schwab.db holds (null fields before the first pull). */
+export interface SchwabStoreStatus {
+  path: string;
+  exists: boolean;
+  symbols: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  chainDays: number;
+  chains: number;
+  lastPullAt: string | null;
 }
 
 import type { DrillRow, RunRow, SaveSlot, TradeRow } from './userData';
@@ -86,6 +104,8 @@ export interface RpcMap {
   'schwab.finish': (pastedUrl: string) => SchwabStatus;
   /** Log out (forget = also remove the saved App Key and Secret). */
   'schwab.disconnect': (forget: boolean) => SchwabStatus;
+  /** What PULL FROM SCHWAB has saved in schwab.db. */
+  'schwab.store': () => SchwabStoreStatus;
   'system.info': () => SystemInfo;
   'system.quit': () => void;
   'system.toggleFullscreen': () => boolean;

@@ -202,6 +202,13 @@ export interface DeskDef {
   ticketsAdd?: number;
   /** Extra lineup cards every round. */
   lineupAdd?: number;
+  /**
+   * Every target on this desk is scaled by this. Desks whose structures score more per round ask
+   * for more, so every desk is about as hard as Verticals (set by the balance simulator).
+   */
+  targetMult?: number;
+  /** Starting capital the Career screen recommends (and the simulator plays) for this desk. */
+  recommendedCapitalCents?: number;
   /** Desk default brackets (long-premium desks take profits sooner). */
   brackets?: Partial<{
     creditTargetPct: number;

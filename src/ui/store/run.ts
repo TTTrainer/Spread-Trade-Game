@@ -57,6 +57,8 @@ export interface NewRunOpts {
   quarters?: number;
   compliance?: string[];
   slot?: RunSlot;
+  /** Starting capital for this run (defaults to the setting). */
+  startEquityCents?: number;
 }
 
 interface RunStore {
@@ -336,6 +338,7 @@ export const useRun = create<RunStore>((set, get) => {
       quarters = 4,
       compliance = [],
       slot = 'career',
+      startEquityCents,
     }) => {
       set({ busy: true, error: null, slot });
       try {
@@ -352,7 +355,7 @@ export const useRun = create<RunStore>((set, get) => {
               deskId,
               mode,
               tier,
-              startEquityCents: settings.game.startingCapitalCents,
+              startEquityCents: startEquityCents ?? settings.game.startingCapitalCents,
               pureMarket: settings.game.pureMarket,
               realism: { ...settings.realism },
               pause: { ...settings.game.pause },

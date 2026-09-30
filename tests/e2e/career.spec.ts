@@ -3,6 +3,8 @@ import { launchGame, shot } from './helpers';
 import { BALANCE } from '../../src/content/balance';
 
 const Q1 = BALANCE.targets.q1;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any;
 
 type RunState = {
   phase: string;
@@ -175,7 +177,25 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   await expect(page.getByTestId('shop-screen')).toBeVisible();
   await shot(page, '06-shop-1920');
   await shot(page, '06-shop-1366', { width: 1366, height: 768 });
-  await page.setViewportSize({ width: 1920, height: 1080 });
+  // A colleague's line in the shop sits in the lower right, clear of the offers and NEXT.
+  await page.evaluate(() =>
+    (window as Any).__stg.run.setState({
+      speech: {
+        line: {
+          who: 'ines',
+          mood: 'happy',
+          text: 'Nice round. Spend on what your build actually uses, not on shiny things.',
+        },
+        n: 99,
+      },
+    }),
+  );
+  await expect(page.locator('.dialogue.who-ines')).toBeVisible();
+  await expect(page.getByTestId('dialogue')).toHaveCount(1);
+  await page.waitForTimeout(1200);
+  await shot(page, '06-shop-dialogue-1366');
+  await shot(page, '06-shop-dialogue-1920', { width: 1920, height: 1080 });
+  await page.evaluate(() => (window as Any).__stg.run.getState().clearSpeech());
   const cashBefore = (await runState(page))?.cash ?? 0;
   await page.getByTestId('leave-shop').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible();
