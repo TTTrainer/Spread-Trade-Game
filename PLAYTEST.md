@@ -6,7 +6,7 @@ The first three items can only be checked on your Windows PC. They matter most, 
 
 | # | Try this | What to look for | Score (1–5) | Notes |
 |---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.4.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
+| 1 | **Install** with `SpreadTradingGame-Setup-1.4.1.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
 | 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
 | 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
 | 4 | **Tutorial** (Career → TUTORIAL). | Are Ines's tips clear? Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |

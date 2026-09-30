@@ -4,7 +4,7 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version and the read-only Schwab connection. Version 1.4.0. Next: your playtest of round 4 (Live's month, Schwab on your PC) and the last 27 pictures (achievement badges, `ASSETS_NEEDED.md`).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version and the read-only Schwab connection. Version 1.4.1. All 193 pictures are in. Next: your playtest of round 4 (Live's month, Schwab on your PC).
 
 ## How to run (on your PC)
 
@@ -14,6 +14,9 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.4.1: the achievement badges
+Art sheet 3 is in: all 47 achievement badges, cut from your sheet with their backgrounds removed. The 20 badges that already had pictures now use the new sheet too, so the whole set matches. That completes the art checklist: 193 of 193.
 
 ### Playtest round 4: honest risk, bigger payoffs, a clear goal, Live as "the last month", Schwab
 From your notes: make it obvious that confidence means contracts and risk, a truthful risk-to-reward, too much on screen, a scrolling career setup, trades that didn't feel rewarding, missing candles, no sense of how close you were to winning, needing the chart at decisions, an expiration line, greyed-out buttons with no reason, and Live mode being unclear and running out of data.
@@ -435,8 +438,8 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-**Your round 4 playtest** with the 1.4.0 exe (items 28–33 in `PLAYTEST.md`): the Size slider and RISKING bar, the credit payout, the round goal card, the expiration line, REVIEW CHART at a decision, the greyed-out SELL messages, and Live's month.
+**Your round 4 playtest** with the 1.4.1 exe (items 28–33 in `PLAYTEST.md`): the Size slider and RISKING bar, the credit payout, the round goal card, the expiration line, REVIEW CHART at a decision, the greyed-out SELL messages, and Live's month.
 
 **Schwab on your PC.** This cloud session can't reach Schwab, so the connection was tested against a stand-in that answers the way Schwab's documentation describes (login, token refresh, candles and chains). The first real test is yours: Settings → Data → Schwab (steps in `README_PLAY.md`). If anything fails, the message on screen plus `game.log` (OPEN LOG FOLDER) is all I need; the log never contains your keys.
 
-The last 27 pictures (the achievement badges; see `ASSETS_NEEDED.md`) whenever you like. After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
+After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
