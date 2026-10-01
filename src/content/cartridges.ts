@@ -627,13 +627,15 @@ export const CARTRIDGES: CartridgeDef[] = [
   {
     id: 'covered_and_chill',
     name: 'Covered & Chill',
-    families: ['THETA'],
+    // EVENT, not THETA: on the Income desk every trade is short premium, so as a cheap THETA card
+    // it was mostly a ticket to the THETA family bonus (+15.7 points of win rate in the simulator).
+    families: ['EVENT'],
     desks: ['income'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Covered calls that expire out of the money: +1 mult.',
+    text: 'Covered calls that expire out of the money: +2 mult.',
     synergies: ['the_wheel', 'dividend_radar'],
-    score: ({ facts }) => when(facts.win && facts.coveredCallExpiredOtm, add('Covered & Chill', 1)),
+    score: ({ facts }) => when(facts.win && facts.coveredCallExpiredOtm, add('Covered & Chill', 2)),
   },
   {
     id: 'assignment_artist',
