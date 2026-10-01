@@ -108,6 +108,12 @@ export interface RpcMap {
   'schwab.store': () => SchwabStoreStatus;
   'system.info': () => SystemInfo;
   'system.quit': () => void;
+  /** A line in game.log from the screen (stalls, errors). */
+  'system.log': (level: 'info' | 'warn' | 'error', message: string, detail?: unknown) => void;
+  /** A heartbeat every second with the screen's recent actions, so a freeze leaves a record. */
+  'system.heartbeat': (beat: { trail: string[]; visible: boolean }) => void;
+  /** True once after the watchdog reloaded a stuck screen. */
+  'system.recovered': () => boolean;
   'system.toggleFullscreen': () => boolean;
   'system.openPath': (path: string) => void;
   'system.saveTextFile': (suggestedName: string, content: string) => string | null;

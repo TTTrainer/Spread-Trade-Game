@@ -97,7 +97,7 @@ export function meetsRR(id: StructureId, m: TradeMetrics, ctx: MarketContext, dt
     case 'ivrAtMost':
       return ctx.ivr !== null && ctx.ivr <= rule.threshold;
     case 'annualYield': {
-      const credit = id === 'covered_call' ? ctx.spot - net : -net;
+      const credit = -net;
       return dte > 0 && ctx.spot > 0 && (credit / ctx.spot) * (365 / dte) >= rule.threshold;
     }
     case 'profitOverDebit':
@@ -105,10 +105,20 @@ export function meetsRR(id: StructureId, m: TradeMetrics, ctx: MarketContext, dt
   }
 }
 
+/** Covered calls are sold against 500 shares you're assumed to own: at most 5 contracts. */
+export const COVERED_SHARES = 500;
+
+/** The most contracts a structure allows (covered calls: one per 100 of your shares). */
+export function maxQtyFor(structureId: StructureId): number {
+  return structureId === 'covered_call' ? COVERED_SHARES / 100 : Number.POSITIVE_INFINITY;
+}
+
 /**
- * The risk the cap is measured against. Defined-risk spreads: their max loss. Covered calls and
- * cash-secured puts can in theory lose nearly the whole collateral, so the cap uses a stress loss
- * (a drop of 3 expected moves, at least 25%) and the full collateral must still fit in equity.
+ * The risk the cap is measured against. Defined-risk spreads: their max loss. A cash-secured put
+ * can lose nearly all its collateral in theory, so the cap uses a stress loss (a drop of 3
+ * expected moves, at least 25%) and the full collateral must still fit in equity. A covered call
+ * is the call alone (the shares are yours already, off the books): its risk is the same stress
+ * move upward, the upside given away past the strike, and it needs no cash.
  */
 function riskFor(
   id: StructureId,
@@ -120,17 +130,15 @@ function riskFor(
   const maxLoss = contractCents(m.maxLoss, qty);
   if (id === 'cash_secured_put' || id === 'covered_call') {
     const emPct = m.expectedMove !== null && spot > 0 ? m.expectedMove / spot : 0.08;
-    const drop = Math.max(0.25, 3 * emPct);
-    const stressSpot = spot * (1 - drop);
+    const move = Math.max(0.25, 3 * emPct);
     const k = optionLegs(legs)[0]?.strike ?? spot;
-    const credit = id === 'covered_call' ? spot - m.entryNet : -m.entryNet;
-    const stressLoss =
-      id === 'cash_secured_put'
-        ? Math.max(0, k - stressSpot - credit)
-        : Math.max(0, spot - stressSpot - credit);
-    const collateral =
-      id === 'cash_secured_put' ? contractCents(k - credit, qty) : contractCents(spot - credit, qty);
-    return { risk: contractCents(stressLoss, qty), collateral, maxLoss };
+    const credit = -m.entryNet;
+    if (id === 'covered_call') {
+      const stressLoss = contractCents(Math.max(0, spot * (1 + move) - k - credit), qty);
+      return { risk: stressLoss, collateral: 0, maxLoss: stressLoss };
+    }
+    const stressLoss = Math.max(0, k - spot * (1 - move) - credit);
+    return { risk: contractCents(stressLoss, qty), collateral: contractCents(k - credit, qty), maxLoss };
   }
   const collateral = m.entryNet > 0 ? contractCents(m.entryNet, qty) : maxLoss;
   return { risk: maxLoss, collateral: Math.max(collateral, maxLoss), maxLoss };
@@ -138,6 +146,11 @@ function riskFor(
 
 export function planTrade(i: PlanInput): TradePlan {
   if (i.qty < 1 || !Number.isInteger(i.qty)) return empty(i, 'Contracts must be a whole number, at least 1.');
+  if (i.structureId === 'covered_call' && i.qty * 100 > COVERED_SHARES)
+    return empty(
+      i,
+      `You own ${COVERED_SHARES} shares of each stock: at most ${COVERED_SHARES / 100} covered calls (100 shares each).`,
+    );
   let legs: Leg[];
   if (i.legs) legs = i.legs;
   else {
@@ -151,7 +164,7 @@ export function planTrade(i: PlanInput): TradePlan {
   const def = STRUCTURES[i.structureId];
   const metrics = computeMetrics(legs, i.chain, def, i.rate, i.ctx.divYield, mid);
   if (!metrics) return { ...empty(i, 'One of the legs has no quote today.'), legs };
-  if (def.credit && metrics.entryNet >= 0 && i.structureId !== 'covered_call')
+  if (def.credit && metrics.entryNet >= 0)
     return {
       ...empty(i, 'This build collects no credit at mid. Move the short strike closer or widen.'),
       legs,

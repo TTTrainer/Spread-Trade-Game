@@ -105,8 +105,9 @@ export const useApp = create<AppState>((set, get) => ({
   },
   toast: (text, tone = 'info') => {
     const id = ++toastId;
-    set((st) => ({ toasts: [...st.toasts.slice(-4), { id, text, tone }] }));
-    setTimeout(() => get().dismissToast(id), 3800);
+    // Three at a time, each up long enough to read (longer messages stay longer).
+    set((st) => ({ toasts: [...st.toasts.slice(-2), { id, text, tone }] }));
+    setTimeout(() => get().dismissToast(id), Math.min(9000, Math.max(4500, text.length * 65)));
   },
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
   setHelp: (open) => set({ helpOpen: open }),

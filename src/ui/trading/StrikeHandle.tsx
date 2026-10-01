@@ -7,12 +7,13 @@ import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { chartBridge } from './chartBridge';
 
 /** Follow the chart as it scrolls and zooms. */
-function useChartTick(ms = 150): void {
+function useChartTick(on: boolean, ms = 150): void {
   const [, setTick] = useState(0);
   useEffect(() => {
+    if (!on) return;
     const id = setInterval(() => setTick((t) => t + 1), ms);
     return () => clearInterval(id);
-  }, [ms]);
+  }, [on, ms]);
 }
 
 /**
@@ -53,6 +54,8 @@ function Handle({
   const setDragging = useTrading((s) => s.setDragging);
   const [drag, setDrag] = useState(false);
   const host = useRef<HTMLDivElement>(null);
+  // A handle that disappears mid-drag (the clock started, the card changed) ends the drag.
+  useEffect(() => () => setDragging(false), [setDragging]);
   const chain = session && cardId ? session.chain(cardId) : null;
   const raw = chartBridge.priceToY(leg.strike);
   const h = chartBridge.paneHeight();
@@ -128,12 +131,16 @@ export function StrikeHandle() {
   const setBuilder = useTrading((s) => s.setBuilder);
   const nudgeStrike = useTrading((s) => s.nudgeStrike);
   const open = useTrading(tradeOpen);
-  const plan = useTrading((s) => s.plan)();
-  useChartTick();
+  // Only while a trade can be shaped: pricing the plan is work a playing day shouldn't pay for.
+  useChartTick(open);
+  const planFn = useTrading((s) => s.plan);
+  const plan = open ? planFn() : null;
   const opts = plan?.legs.filter((l): l is OptionLeg => l.kind === 'option') ?? [];
   const lead = opts[0];
   const chain = session && cardId ? session.chain(cardId) : null;
-  if (!open || !lead || !chain) return null;
+  // One trade per card: a card with an open trade has nothing left to shape.
+  const hasTrade = !!session && !!cardId && session.openPositions().some((p) => p.cardId === cardId);
+  if (!open || !lead || !chain || hasTrade) return null;
   if (['iron_condor', 'bwb_condor'].includes(builder.structureId)) {
     // A condor has two short strikes to move: the put side and the call side.
     const sp = opts.find((l) => l.ratio < 0 && l.right === 'P');

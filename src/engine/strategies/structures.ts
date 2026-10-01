@@ -122,13 +122,15 @@ export const STRUCTURES: Record<StructureId, StructureDef> = {
     name: 'Covered Call',
     short: 'COV CALL',
     family: 'income',
-    bias: 'bull',
+    // Only the call counts (the shares are yours already): it pays while the stock stays below.
+    bias: 'bear',
     credit: true,
     baseChips: 25,
     twoExpiries: false,
     reverse: 'cash_secured_put',
     defaults: { delta: 0.3, width: 0 },
-    blurb: 'Own 100 shares, sell a call against them. Income with capped upside.',
+    blurb:
+      'Sell a call against 100 of the 500 shares you own. Keep the premium if the stock stays below the strike; above it, the shares are called away at the strike.',
   },
   cash_secured_put: {
     id: 'cash_secured_put',
@@ -141,7 +143,8 @@ export const STRUCTURES: Record<StructureId, StructureDef> = {
     twoExpiries: false,
     reverse: 'covered_call',
     defaults: { delta: 0.3, width: 0 },
-    blurb: 'Sell a put with the cash to buy the shares. Get paid to wait for a lower price.',
+    blurb:
+      'Sell a put with the cash set aside to buy 100 shares. Keep the premium if the stock stays above the strike; below it, you buy the shares at the strike.',
   },
   calendar: {
     id: 'calendar',
@@ -363,7 +366,8 @@ export function buildStructure(id: StructureId, chain: Chain, p: BuildParams): B
     case 'covered_call': {
       const k = anchorOrDelta(chain, e, 'C', p);
       if (k === null) return { ok: false, reason: 'No call near that delta.' };
-      return { ok: true, legs: [{ kind: 'stock', ratio: 1 }, opt('C', k, e, -1)] };
+      // The shares are the 500 you already own (off the books): the trade is the call alone.
+      return { ok: true, legs: [opt('C', k, e, -1)] };
     }
     case 'cash_secured_put': {
       const k = anchorOrDelta(chain, e, 'P', p);

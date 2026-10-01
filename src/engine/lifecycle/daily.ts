@@ -23,6 +23,9 @@ import {
   settleLegAtIntrinsic,
   stockRatio,
   applyDividend,
+  isIncomeTrade,
+  noteCoveredDividend,
+  settleIncomeAssignment,
 } from './position';
 import type { DayBook, DecisionKind, DecisionPoint, Position } from './types';
 
@@ -90,7 +93,11 @@ const dpId = (pos: Position, kind: DecisionKind, date: string) => `${pos.id}:${k
 export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseStepResult {
   let pos = input;
   if (pos.status !== 'open') return { pos, decisions: [], autoClosed: false };
-  if (book.exDivToday) pos = applyDividend(pos, book.exDivToday.amount, book.date);
+  if (book.exDivToday)
+    pos =
+      pos.structureId === 'covered_call' && stockRatio(pos.legs) === 0
+        ? noteCoveredDividend(pos, book.exDivToday.amount, book.date)
+        : applyDividend(pos, book.exDivToday.amount, book.date);
   pos = markPosition(pos, book);
   const mark = lastMark(pos);
   const decisions: DecisionPoint[] = [];
@@ -308,7 +315,11 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
       if (leg.right === 'P' && leg.strike > book.spot * 1.02 && extrinsic < 0.05 && ctx.rng.chance(0.2))
         assign = true;
       if (assign) {
-        pos = convertLegToStock(pos, leg, book.date, 'assigned');
+        // Trades saved before 1.5 still hold their shares and take the old path.
+        pos =
+          isIncomeTrade(pos.structureId) && stockRatio(pos.legs) === 0
+            ? settleIncomeAssignment(pos, leg, book.date, book.spot)
+            : convertLegToStock(pos, leg, book.date, 'assigned');
         assignedToday = true;
       }
     }
@@ -324,7 +335,10 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
       // settle at max value (the share legs cancel).
       for (const leg of expiring) {
         const exercised = intrinsic(leg, book.spot) >= 0.01;
-        if (exercised) {
+        if (exercised && leg.ratio < 0 && isIncomeTrade(pos.structureId) && stockRatio(pos.legs) === 0) {
+          pos = settleIncomeAssignment(pos, leg, book.date, book.spot);
+          assignedToday = true;
+        } else if (exercised) {
           pos = convertLegToStock(pos, leg, book.date, leg.ratio < 0 ? 'assigned' : 'exercise');
           if (leg.ratio < 0) assignedToday = true;
         } else {
@@ -335,9 +349,8 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
     pos = addEvent(pos, { date: book.date, kind: 'expired', detail: `${expiring.length} leg(s) expired` });
   }
 
-  // A covered call is done when its call expires worthless: the premium is kept and the shares
-  // are sold at that close, so the trade's result stops at expiration instead of drifting with
-  // shares held afterwards.
+  // A covered call saved before 1.5 still holds its shares: when its call expires worthless the
+  // premium is kept and the shares are sold at that close, so the trade ends at expiration.
   if (
     pos.structureId === 'covered_call' &&
     expiring.length > 0 &&

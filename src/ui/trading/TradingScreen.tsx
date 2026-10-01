@@ -256,7 +256,9 @@ export function TradingLayout({
   const setRightTab = useTrading((s) => s.setRightTab);
   // Only this yes/no is watched, so the layout doesn't re-render on every tick.
   const engaged = useTrading((s) => {
-    const card = s.session && s.selectedCardId ? s.session.card(s.selectedCardId) : null;
+    // A reroll or a new round can leave the selection on a card that is gone: never throw here
+    // (a selector that throws takes the whole screen down with it).
+    const card = s.session?.cards.find((c) => c.id === s.selectedCardId) ?? null;
     return !!card && (s.touched || s.session!.openPositions().some((p) => p.cardId === card.id));
   });
   const controls = useAnimationControls();

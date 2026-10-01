@@ -17,6 +17,7 @@ import { cartridgePoolFor, perksFor, recordDaily } from '../../engine/meta/profi
 import { heatOf } from '../../content/meta';
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import { playRun } from '../../engine/sim/bot';
+import { crumb } from '../trail';
 
 export const CAREER_SLOT = 'career';
 export type RunSlot = 'career' | 'daily' | 'tutorial';
@@ -265,8 +266,10 @@ export const useRun = create<RunStore>((set, get) => {
     const e = get().engine;
     if (!e) return;
     toastEvents(e.events);
+    // In the tutorial Ines's lessons are the only voice, so the other characters stay quiet.
     const said = e.events.filter((x) => x.kind === 'say' && x.line).at(-1);
-    if (said?.line) set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
+    if (said?.line && e.state.config.mode !== 'tutorial')
+      set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
     const pts = e.events.filter((x) => x.kind === 'score');
     if (pts.length)
       set({
@@ -376,7 +379,8 @@ export const useRun = create<RunStore>((set, get) => {
         set({ engine: e, lastPoints: null });
         attach(e);
         const hello = e.events.find((x) => x.kind === 'say' && x.line);
-        if (hello?.line) set({ speech: { line: hello.line, n: (get().speech?.n ?? 0) + 1 } });
+        if (hello?.line && config.mode !== 'tutorial')
+          set({ speech: { line: hello.line, n: (get().speech?.n ?? 0) + 1 } });
         await persist(e, slot);
         set({ version: get().version + 1, saveSummary: summaryOf(e) });
         return true;
@@ -415,6 +419,7 @@ export const useRun = create<RunStore>((set, get) => {
       serial(async () => {
         const e = get().engine;
         if (!e) return null;
+        crumb(`run ${a.t === 's' ? `s.${a.a.t}` : a.t}`);
         const r = await e.dispatch(a);
         await afterAction();
         return r;

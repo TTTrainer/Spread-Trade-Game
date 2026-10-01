@@ -181,6 +181,8 @@ export function CountUp({
   );
 }
 
+const TOAST_ICONS: Record<string, string> = { good: '✔', bad: '✖', warn: '⚠', info: '◆' };
+
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   return (
@@ -189,10 +191,14 @@ export function Toasts() {
         <motion.div
           key={t.id}
           className={`toast tone-${t.tone}`}
-          initial={{ x: 60, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
+          initial={{ y: 24, scale: 0.9, opacity: 0 }}
+          animate={{ y: 0, scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 26 }}
         >
-          {t.text}
+          <span className="toast-ico" aria-hidden="true">
+            {TOAST_ICONS[t.tone] ?? '◆'}
+          </span>
+          <span>{t.text}</span>
         </motion.div>
       ))}
     </div>

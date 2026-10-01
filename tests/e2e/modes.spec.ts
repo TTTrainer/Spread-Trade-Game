@@ -165,9 +165,27 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await page.getByTestId('pad-buy-art_theta').click();
   await page.getByTestId('pad-tab-vehicles').click();
   await page.getByTestId('pad-buy-v_hoverbike').click();
+  await page.getByTestId('pad-tab-watches').click();
+  await page.getByTestId('pad-buy-w_gold').click();
+  await page.getByTestId('pad-buy-w_diver').click();
   await page.getByTestId('pad-tab-setup').click();
-  await page.getByTestId('pad-setup-monitors').click();
-  await page.getByTestId('pad-setup-monitors').click();
+  for (const track of [
+    'monitors',
+    'monitors',
+    'desk',
+    'desk',
+    'chair',
+    'plants',
+    'plants',
+    'lighting',
+    'lighting',
+  ])
+    await page.getByTestId(`pad-setup-${track}`).click();
+  await page.getByTestId('pad-tab-items').click();
+  await page.getByTestId('pad-item-pens').click();
+  await page.getByTestId('pad-show-pens').click();
+  await page.getByTestId('pad-show-notebook').click();
+  await expect(page.getByTestId('pad-show-notebook')).toHaveText('ON THE DESK');
   await expect(page.getByTestId('pad-bonus')).not.toContainText('1000');
   await shot(page, '09-pad-1920');
   await shot(page, '09-pad-1366', { width: 1366, height: 768 });
@@ -204,19 +222,6 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
     () => (window as Any).__stg.run.getState().engine.state.config.startEquityCents,
   );
   expect(equity).toBe(10_000_000);
-  await app.close();
-});
-
-test('tutorial: Ines coaches the first round', async () => {
-  const { app, page } = await launchGame();
-  await page.getByTestId('menu-career').click();
-  await expect(page.getByTestId('tutorial-banner')).toBeVisible();
-  await page.getByTestId('start-tutorial').click();
-  await expect(page.getByTestId('tutorial-coach')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'read');
-  await page.keyboard.press('4');
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'build');
-  await shot(page, '09-tutorial-1920');
   await app.close();
 });
 

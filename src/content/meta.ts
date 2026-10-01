@@ -107,7 +107,7 @@ export const PAD_TIERS: PadTier[] = [
     tier: 0,
     id: 'studio',
     name: 'Studio',
-    blurb: 'One room, one window, one radiator that knocks at 3 a.m.',
+    blurb: 'One room: the bed, the desk and the skyline, all within reach.',
     cost: 0,
     rank: 0,
     perkText: 'No perk. It builds character.',
@@ -117,7 +117,7 @@ export const PAD_TIERS: PadTier[] = [
     tier: 1,
     id: 'loft',
     name: 'Loft',
-    blurb: 'Exposed brick, a big window, and a neighbor who DJs.',
+    blurb: 'A real living room: shelves, a couch and a view of the towers.',
     cost: 150,
     rank: 3,
     perkText: '+$2 shop cash at the start of every run.',
@@ -127,7 +127,7 @@ export const PAD_TIERS: PadTier[] = [
     tier: 2,
     id: 'penthouse',
     name: 'Penthouse',
-    blurb: 'The skyline is your screensaver.',
+    blurb: 'Floor-to-ceiling glass. The skyline is your screensaver.',
     cost: 400,
     rank: 5,
     perkText: '+1 lineup reroll in every Month 1 round.',
@@ -136,8 +136,8 @@ export const PAD_TIERS: PadTier[] = [
   {
     tier: 3,
     id: 'orbital',
-    name: 'Orbital Suite',
-    blurb: 'Low Earth orbit. The market still closes at 4.',
+    name: 'Sky Villa',
+    blurb: 'Top floor, a fireplace and the whole skyline. The market still closes at 4.',
     cost: 1000,
     rank: 7,
     perkText: '-5 stress at the start of every new quarter.',
@@ -164,6 +164,8 @@ export interface CollectionItem {
   blurb: string;
   /** Two palette colors the Pad scene draws it with. */
   colors: [string, string];
+  /** No longer sold (no picture for it); still shown if you already own it. */
+  retired?: boolean;
 }
 
 export const COLLECTIONS: Record<
@@ -177,8 +179,8 @@ export const COLLECTIONS: Record<
     items: [
       {
         id: 'art_candle5',
-        name: 'Candle No. 5',
-        blurb: 'A single green candle on raw canvas.',
+        name: 'Candle Chart No. 5',
+        blurb: 'A month of candles in neon on navy.',
         colors: ['#2de2a6', '#10131f'],
       },
       {
@@ -198,23 +200,24 @@ export const COLLECTIONS: Record<
         name: 'Iron Condor in Flight',
         blurb: 'Four wings, zero directional opinion.',
         colors: ['#47d7ff', '#152040'],
+        retired: true,
       },
       {
         id: 'art_vix',
-        name: 'VIX Spike (Study)',
-        blurb: 'A single jagged line. Collectors weep.',
+        name: 'The Great VIX Wave',
+        blurb: 'After Hokusai, after a bad Tuesday.',
         colors: ['#ff2fd0', '#0d0d20'],
       },
       {
         id: 'art_smile',
-        name: 'The Volatility Smile',
-        blurb: 'It is not smiling at you.',
+        name: 'Order Book (Abstract)',
+        blurb: 'Bids in pink, offers in blue, none of them real.',
         colors: ['#9d7bff', '#1d1340'],
       },
       {
         id: 'art_greeks',
-        name: 'Five Greeks',
-        blurb: 'Delta, gamma, theta, vega, rho. Rho is in the corner, ignored.',
+        name: 'Option Chain, Nocturne',
+        blurb: 'Every strike lit like a city window.',
         colors: ['#f7f06d', '#2a2a14'],
       },
       {
@@ -222,11 +225,12 @@ export const COLLECTIONS: Record<
         name: 'Pinned at the Strike',
         blurb: 'Tense, minimalist, expires Friday.',
         colors: ['#ff8a3d', '#291606'],
+        retired: true,
       },
       {
         id: 'art_tape',
-        name: 'Endless Tape',
-        blurb: 'Ticker symbols scrolling into infinity.',
+        name: 'Skyline After the Close',
+        blurb: 'Every lit window a trader who cannot sleep.',
         colors: ['#6dff8a', '#06200e'],
       },
       {
@@ -234,13 +238,15 @@ export const COLLECTIONS: Record<
         name: 'Gap Down, 4 A.M.',
         blurb: 'Earnings night, as remembered.',
         colors: ['#5b8cff', '#0a1024'],
+        retired: true,
       },
-      { id: 'art_bull', name: 'Bull, Resting', blurb: 'For once.', colors: ['#3ce07a', '#26142e'] },
+      { id: 'art_bull', name: 'Bull, Rampant', blurb: 'Charging, for once.', colors: ['#3ce07a', '#26142e'] },
       {
         id: 'art_ledger',
         name: 'The Ledger',
         blurb: 'Every trade, in gold leaf. Even that one.',
         colors: ['#e8c15a', '#1a1408'],
+        retired: true,
       },
     ],
   },
@@ -251,8 +257,8 @@ export const COLLECTIONS: Record<
     items: [
       {
         id: 'w_digital',
-        name: 'Calculator Watch',
-        blurb: 'It can compute a breakeven. Barely.',
+        name: 'Steel Field Watch',
+        blurb: 'Tells the time. Nothing else. Refreshing.',
         colors: ['#c0c0c0', '#202020'],
       },
       {
@@ -263,7 +269,7 @@ export const COLLECTIONS: Record<
       },
       {
         id: 'w_chrono',
-        name: 'Chronograph',
+        name: 'Red Chronograph',
         blurb: 'Times the gap between the open and your first mistake.',
         colors: ['#e0e0e0', '#303040'],
       },
@@ -278,6 +284,12 @@ export const COLLECTIONS: Record<
         name: 'Skeleton Dial',
         blurb: 'You can see its gamma.',
         colors: ['#d0d8e8', '#101018'],
+      },
+      {
+        id: 'w_emerald',
+        name: 'Emerald Dial',
+        blurb: 'Green on green. It only shows profitable hours.',
+        colors: ['#2de2a6', '#c8d0e0'],
       },
       {
         id: 'w_moon',
@@ -306,39 +318,48 @@ export const COLLECTIONS: Record<
     items: [
       {
         id: 'v_hoverbike',
-        name: 'Hover-Bike',
-        blurb: 'Two seats, zero wheels, one very loud fan.',
+        name: 'Superbike',
+        blurb: 'Two wheels, zero patience.',
         colors: ['#ff4f7b', '#222233'],
       },
       {
         id: 'v_roadster',
-        name: 'Electric Roadster',
-        blurb: '0 to 100 faster than an earnings gap.',
+        name: 'Sports Coupe',
+        blurb: '0 to 60 faster than an earnings gap.',
         colors: ['#47d7ff', '#101828'],
       },
       {
         id: 'v_skysedan',
-        name: 'Sky Sedan',
-        blurb: 'For commuting above the traffic and below the regulators.',
+        name: 'Luxury Sedan',
+        blurb: 'For commuting past the traffic and below the regulators.',
         colors: ['#e8e8f0', '#303050'],
+      },
+      {
+        id: 'v_suv',
+        name: 'Night SUV',
+        blurb: 'Room for the whole desk. And the lawyers.',
+        colors: ['#2a3a8a', '#101828'],
       },
       {
         id: 'v_subyacht',
         name: 'Submarine Yacht',
         blurb: 'Goes under when the market does.',
         colors: ['#f0c040', '#0a2a40'],
+        retired: true,
       },
       {
         id: 'v_jet',
         name: 'Suborbital Jet',
         blurb: 'Tokyo open to London open in one coffee.',
         colors: ['#c0c8ff', '#202040'],
+        retired: true,
       },
       {
         id: 'v_orbital',
         name: 'Orbital Yacht',
         blurb: 'The last thing money can buy. Then more.',
         colors: ['#ff2fd0', '#0a0a24'],
+        retired: true,
       },
     ],
   },
@@ -352,49 +373,63 @@ export function collectionPrice(col: CollectionId, owned: number): number {
   return Math.round(c.base * c.growth ** owned);
 }
 
-export type SetupTrack = 'monitors' | 'chair' | 'plants' | 'lighting';
+export type SetupTrack = 'desk' | 'monitors' | 'chair' | 'plants' | 'lighting';
 
 export const SETUP_TRACKS: Record<SetupTrack, { name: string; levels: { name: string; cost: number }[] }> = {
+  desk: {
+    name: 'Desk',
+    levels: [
+      { name: 'Basic desk', cost: 0 },
+      { name: 'Modern desk', cost: 10 },
+      { name: 'Pro desk', cost: 25 },
+      { name: 'Executive desk', cost: 45 },
+      { name: 'Legendary desk', cost: 80 },
+    ],
+  },
   monitors: {
     name: 'Monitors',
     levels: [
       { name: 'One laptop', cost: 0 },
       { name: 'Two monitors', cost: 10 },
-      { name: 'Three monitors', cost: 20 },
-      { name: 'Four monitors', cost: 35 },
-      { name: 'Six-monitor wall', cost: 60 },
+      { name: 'Three monitors', cost: 25 },
+      { name: 'Command center', cost: 50 },
     ],
   },
   chair: {
     name: 'Chair',
     levels: [
-      { name: 'Folding chair', cost: 0 },
+      { name: 'Basic chair', cost: 0 },
       { name: 'Mesh office chair', cost: 15 },
-      { name: 'Racing chair', cost: 30 },
-      { name: 'Leather throne', cost: 60 },
+      { name: 'Racing chair', cost: 25 },
+      { name: 'Leather chair', cost: 40 },
+      { name: 'Executive throne', cost: 60 },
     ],
   },
   plants: {
     name: 'Plants',
     levels: [
       { name: 'None', cost: 0 },
-      { name: 'Succulent', cost: 5 },
-      { name: 'Fern', cost: 10 },
-      { name: 'Indoor tree', cost: 25 },
+      { name: 'Potted plant', cost: 5 },
+      { name: 'Palm', cost: 8 },
+      { name: 'Monstera', cost: 12 },
+      { name: 'Bonsai', cost: 18 },
+      { name: 'Snake plant', cost: 25 },
+      { name: 'Hanging vine', cost: 35 },
     ],
   },
   lighting: {
     name: 'Lighting',
     levels: [
-      { name: 'Fluorescent tube', cost: 0 },
-      { name: 'Desk lamp', cost: 10 },
-      { name: 'Neon strip', cost: 20 },
-      { name: 'Aurora ceiling', cost: 45 },
+      { name: 'Desk lamp', cost: 0 },
+      { name: 'Bar lamp', cost: 10 },
+      { name: "Banker's lamp", cost: 20 },
+      { name: 'Neon tube', cost: 30 },
+      { name: 'Glow orb', cost: 45 },
     ],
   },
 };
 
-export const SETUP_ORDER: SetupTrack[] = ['monitors', 'chair', 'plants', 'lighting'];
+export const SETUP_ORDER: SetupTrack[] = ['desk', 'monitors', 'chair', 'plants', 'lighting'];
 
 // ---------------- cosmetics ----------------
 
@@ -520,7 +555,13 @@ export const COSMETICS: CosmeticDef[] = [
     name: 'Rubber Duck',
     unlock: { kind: 'bonus', cost: 10 },
   },
-  { id: 'item_bonsai', kind: 'deskitem', value: 'bonsai', name: 'Bonsai', unlock: { kind: 'rank', rank: 3 } },
+  {
+    id: 'item_bonsai',
+    kind: 'deskitem',
+    value: 'bonsai',
+    name: 'Succulent',
+    unlock: { kind: 'rank', rank: 3 },
+  },
   { id: 'item_lava', kind: 'deskitem', value: 'lava', name: 'Lava Lamp', unlock: { kind: 'heat', heat: 12 } },
   {
     id: 'item_bell',
@@ -535,6 +576,71 @@ export const COSMETICS: CosmeticDef[] = [
     value: 'trophy',
     name: 'Tier 8 Trophy',
     unlock: { kind: 'tier', tier: 8 },
+  },
+  {
+    id: 'item_notebook',
+    kind: 'deskitem',
+    value: 'notebook',
+    name: 'Trade Journal',
+    unlock: { kind: 'free' },
+  },
+  {
+    id: 'item_water',
+    kind: 'deskitem',
+    value: 'water',
+    name: 'Water Bottle',
+    unlock: { kind: 'bonus', cost: 5 },
+  },
+  { id: 'item_pens', kind: 'deskitem', value: 'pens', name: 'Pen Cup', unlock: { kind: 'bonus', cost: 5 } },
+  {
+    id: 'item_sticky',
+    kind: 'deskitem',
+    value: 'sticky',
+    name: 'Sticky Notes',
+    unlock: { kind: 'rank', rank: 1 },
+  },
+  {
+    id: 'item_phone',
+    kind: 'deskitem',
+    value: 'phone',
+    name: 'Burner Phone',
+    unlock: { kind: 'bonus', cost: 12 },
+  },
+  {
+    id: 'item_headphones',
+    kind: 'deskitem',
+    value: 'headphones',
+    name: 'Studio Headphones',
+    unlock: { kind: 'bonus', cost: 15 },
+  },
+  {
+    id: 'item_books',
+    kind: 'deskitem',
+    value: 'books',
+    name: 'Book Stack',
+    unlock: { kind: 'rank', rank: 2 },
+  },
+  {
+    id: 'item_controller',
+    kind: 'deskitem',
+    value: 'controller',
+    name: 'Game Controller',
+    unlock: { kind: 'bonus', cost: 18 },
+  },
+  {
+    id: 'item_photo',
+    kind: 'deskitem',
+    value: 'photo',
+    name: 'Framed Photo',
+    unlock: { kind: 'rank', rank: 4 },
+  },
+  { id: 'item_cube', kind: 'deskitem', value: 'cube', name: 'Glow Cube', unlock: { kind: 'heat', heat: 5 } },
+  {
+    id: 'item_coins',
+    kind: 'deskitem',
+    value: 'coins',
+    name: 'Coin Stacks',
+    unlock: { kind: 'rank', rank: 5 },
   },
 ];
 

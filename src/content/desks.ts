@@ -21,7 +21,8 @@ export const DESKS: Record<DeskId, DeskDef> = {
   income: {
     id: 'income',
     name: 'Income',
-    blurb: 'Covered calls, cash-secured puts and the wheel. Get paid to own stocks you like.',
+    blurb:
+      'Covered calls and cash-secured puts on 500 shares you own of each stock (off the books: only the options count). Get paid to wait.',
     structures: ['cash_secured_put', 'covered_call'],
     passiveText: 'Assignment is not a loss event (no stress). Dividends pay +25 chips each.',
     startingAnalysts: [],

@@ -288,6 +288,17 @@ describe('career run loop', () => {
     expect(e.state.phase).toBe('defeat');
   }, 60_000);
 
+  it('practice (the tutorial) never writes anyone up for a missed round', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'writeup-practice', practice: true, quarters: 1 }));
+    const stress0 = e.state.stress;
+    await e.dispatch({ t: 'endRound' });
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('shop');
+    expect(e.state.writeUps ?? []).toEqual([]);
+    expect(e.state.stress).toBe(stress0);
+    expect(e.state.nextReview ?? null).toBeNull();
+  }, 60_000);
+
   it('skips Month 1 for a tag, then deals Month 2 with no shop', async () => {
     const e = await RunEngine.create(src, config({ seed: 'skip-1' }));
     const tag = e.state.round.skipTag;

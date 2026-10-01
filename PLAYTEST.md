@@ -6,10 +6,10 @@ The first three items can only be checked on your Windows PC. They matter most, 
 
 | # | Try this | What to look for | Score (1–5) | Notes |
 |---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.4.2.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
+| 1 | **Install** with `SpreadTradingGame-Setup-1.5.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
 | 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
 | 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
-| 4 | **Tutorial** (Career → TUTORIAL). | Are Ines's tips clear? Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
+| 4 | **Tutorial** (Career → TUTORIAL; rebuilt in 1.5.0, see item 40). | Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
 | 5 | **Your first real run** on the Verticals desk. | Does it feel fair? Is 30–40 minutes about right? Were the targets too easy or too hard? | | |
 | 6 | **Calling your shot** with keys `1`–`5` and `Shift+1`–`5`. | Quick and natural, or a chore? | | |
 | 7 | **Building and placing** a bull put: expiration chips, delta and width, the price ladder on the chart, Alt+S. | Do the payoff, POP and max loss make sense before you click? | | |
@@ -45,5 +45,12 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 37 | **New: strike lines.** Drag a strike line far past the chart's edge; try an iron condor. | Does the line stay pinned at the edge instead of vanishing? Can you drag both the put side and the call side of a condor? While dragging, are the labels on the right out of the way? | | |
 | 38 | **New: your trades on the chart.** Open a trade and play a few days. | Can you see where the trade sits (the shaded box from entry to expiry, the SOLD tag) without it getting in the way? Does the expiration line keep up with the DTE slider? | | |
 | 39 | **New: small fixes.** Career → CHALLENGE & OPTIONS (risk tiers); the shop with Ines talking. | Does the tier list read cleanly? Is Ines's box out of the way of the shop? | | |
+| 40 | **New in 1.5.0: the tutorial, as a beginner would see it.** Career → TUTORIAL (START OVER if you've played it). Pretend you've never traded an option. Ideally, hand it to a friend who hasn't. | Does the desk start empty and light up one thing at a time? Is each lesson short enough to take in? Is anything said before it's shown, or shown without being explained? Does SKIP LESSONS turn everything on? | | |
+| 41 | **New: open trades vs a planned trade on the chart.** Shape a trade on one card, then look at a card where a trade is open. | Bold solid "● YOUR" lines and an OPEN TRADE badge for a real trade, thin dashed PLAN lines and a "not placed yet" badge for a planned one. Can you tell them apart at a glance? | | |
+| 42 | **New: which cards have trades.** Open trades on two cards and click around during the round. | Do the lineup cards' **● IN TRADE** banner (with live P/L) and **✓ CLOSED** banner make it obvious where your positions are? | | |
+| 43 | **New: shop windows in plain words** (CARTRIDGES · powerups, YOUR BUILD · family bonuses, …) and **bigger messages** (the pop-ups in the middle of the screen). | Easier to read? Do the messages catch your eye now without getting in the way? | | |
+| 44 | **New: covered calls and cash-secured puts against 500 assumed shares.** Start an Income run. Sell a covered call at delta .30, then at .15. Sell a cash-secured put. | Does the covered call show as bearish (a call above the price) and its chance of profit go **up** as the strike moves further away? Do P/L and equity count only the option, never the shares? Is "RISK IF IT JUMPS" clear? | | |
+| 45 | **New: the screen recovers on its own.** Play normally; if the screen ever freezes again, wait 15 seconds. | Does it come back by itself with "The screen stopped responding and was restarted"? If so, send the `game.log` (Settings → OPEN LOG FOLDER): it now records the last 40 things the screen did before the freeze. | | |
+| 46 | **New: The Pad with real art.** The Pad (title screen). Buy a desk, monitors, a chair, a plant, a lamp, a painting, a watch, a vehicle; put desk items on the desk. | Does everything sit in a sensible place in each of the four homes? Anything floating, overlapping or too small? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

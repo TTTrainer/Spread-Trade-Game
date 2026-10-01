@@ -62,7 +62,7 @@ export interface Profile {
     tier: number;
     items: string[];
     setup: Record<SetupTrack, number>;
-    /** Desk items on display (up to four). */
+    /** Desk items on display (up to six). */
     deskItems: string[];
   };
   /** Cosmetics bought with Bonus (rank, heat, tier and tutorial unlocks are computed). */
@@ -91,7 +91,12 @@ export function defaultProfile(): Profile {
     maxTier: 0,
     tierCleared: {},
     heatBest: 0,
-    pad: { tier: 0, items: [], setup: { monitors: 0, chair: 0, plants: 0, lighting: 0 }, deskItems: [] },
+    pad: {
+      tier: 0,
+      items: [],
+      setup: { desk: 0, monitors: 0, chair: 0, plants: 0, lighting: 0 },
+      deskItems: [],
+    },
     cosmetics: [],
     paidRuns: {},
     paidAchievements: [],
@@ -105,11 +110,21 @@ export function defaultProfile(): Profile {
 export function mergeProfile(saved: unknown): Profile {
   const d = defaultProfile();
   const s = (saved ?? {}) as Partial<Profile>;
+  const setup = { ...d.pad.setup, ...s.pad?.setup };
+  // Tracks change length between versions (1.5 re-cut the plants and lights to the new art).
+  for (const t of Object.keys(SETUP_TRACKS) as SetupTrack[])
+    setup[t] = Math.max(0, Math.min(SETUP_TRACKS[t].levels.length - 1, Math.floor(setup[t] || 0)));
+  const deskValues = new Set(COSMETICS.filter((c) => c.kind === 'deskitem').map((c) => c.value));
   return {
     ...d,
     ...s,
     desks: Array.from(new Set<DeskId>(['verticals', ...(s.desks ?? [])])),
-    pad: { ...d.pad, ...s.pad, setup: { ...d.pad.setup, ...s.pad?.setup } },
+    pad: {
+      ...d.pad,
+      ...s.pad,
+      setup,
+      deskItems: (s.pad?.deskItems ?? []).filter((v) => deskValues.has(v)).slice(0, DESK_ITEM_LIMIT),
+    },
     daily: { ...d.daily, ...s.daily, results: { ...s.daily?.results } },
     contracts: { ...d.contracts, ...s.contracts, done: { ...s.contracts?.done } },
     tierCleared: { ...s.tierCleared },
@@ -176,7 +191,7 @@ export function cartridgePoolFor(p: Profile): string[] {
 
 export function buyPadTier(p: Profile): Buy {
   const next = PAD_TIERS[p.pad.tier + 1];
-  if (!next) return fail('You already live in orbit.');
+  if (!next) return fail('You already own the top floor.');
   if (rankOf(p) < next.rank) return fail(`The ${next.name} needs the rank of ${RANKS[next.rank].name}.`);
   return spend(p, next.cost, (q) => {
     q.pad.tier = next.tier;
@@ -192,6 +207,7 @@ export function buyCollectionItem(p: Profile, col: CollectionId, itemId: string)
   const item = COLLECTIONS[col].items.find((i) => i.id === itemId);
   if (!item) return fail('No such item.');
   if (p.pad.items.includes(itemId)) return fail('Already in your collection.');
+  if (item.retired) return fail('No longer for sale.');
   return spend(p, nextCollectionPrice(p, col), (q) => q.pad.items.push(itemId));
 }
 
@@ -204,14 +220,18 @@ export function buySetup(p: Profile, track: SetupTrack): Buy {
   });
 }
 
-/** Put a desk item on display or take it off (at most four at once). */
+/** How many desk items fit on the desk at once. */
+export const DESK_ITEM_LIMIT = 6;
+
+/** Put a desk item on display or take it off (at most six at once). */
 export function toggleDeskItem(p: Profile, value: string): Buy {
   const c = COSMETICS.find((x) => x.kind === 'deskitem' && x.value === value);
   if (!c || !cosmeticUnlocked(p, c)) return fail('You do not own that yet.');
   const q = structuredClone(p);
   if (q.pad.deskItems.includes(value)) q.pad.deskItems = q.pad.deskItems.filter((x) => x !== value);
   else {
-    if (q.pad.deskItems.length >= 4) return fail('The desk holds four items. Take one off first.');
+    if (q.pad.deskItems.length >= DESK_ITEM_LIMIT)
+      return fail('The desk holds six items. Take one off first.');
     q.pad.deskItems.push(value);
   }
   return { ok: true, profile: q };
@@ -396,7 +416,10 @@ export function unlockEverything(p: Profile): Profile {
   q.heatBest = Math.max(q.heatBest, ...HEAT_MILESTONES.map((m) => m.heat));
   q.pad.tier = PAD_TIERS[PAD_TIERS.length - 1].tier;
   q.pad.items = [
-    ...new Set([...q.pad.items, ...Object.values(COLLECTIONS).flatMap((c) => c.items.map((i) => i.id))]),
+    ...new Set([
+      ...q.pad.items,
+      ...Object.values(COLLECTIONS).flatMap((c) => c.items.filter((i) => !i.retired).map((i) => i.id)),
+    ]),
   ];
   for (const t of Object.keys(SETUP_TRACKS) as SetupTrack[])
     q.pad.setup[t] = SETUP_TRACKS[t].levels.length - 1;

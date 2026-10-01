@@ -238,7 +238,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   max_profit: { title: 'Max profit', body: 'The most this trade can make, at expiration.' },
   max_loss_trade: {
     title: 'Max loss',
-    body: 'The most this trade can lose. Defined risk: it can never lose more.',
+    body: 'The most this trade can lose; defined risk never loses more. A covered call shows its loss if the stock jumps 25% instead (the gain past the strike you give up). A cash-secured put can lose the strike minus the credit.',
   },
   breakeven: {
     title: 'Breakeven',

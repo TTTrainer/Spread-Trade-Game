@@ -631,9 +631,9 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['income'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Covered calls that expire out of the money: +2 mult.',
+    text: 'Covered calls that expire out of the money: +1 mult.',
     synergies: ['the_wheel', 'dividend_radar'],
-    score: ({ facts }) => when(facts.win && facts.coveredCallExpiredOtm, add('Covered & Chill', 2)),
+    score: ({ facts }) => when(facts.win && facts.coveredCallExpiredOtm, add('Covered & Chill', 1)),
   },
   {
     id: 'assignment_artist',

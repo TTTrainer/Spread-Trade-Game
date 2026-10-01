@@ -147,7 +147,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   },
   rivals_bet: { when: "Outscore Bradley's ghost this round", get: '+$10', kind: 'cash', catch: 'Lose: −$5' },
   the_wheel: { when: 'Covered call after a put assignment', get: '×2', kind: 'xmult' },
-  covered_and_chill: { when: 'Covered call expires out of the money', get: '+2 mult', kind: 'mult' },
+  covered_and_chill: { when: 'Covered call expires out of the money', get: '+1 mult', kind: 'mult' },
   assignment_artist: { when: 'You get assigned', get: '+50 chips, no stress', kind: 'chips' },
   delta_neutral: {
     when: 'Portfolio delta under 5 at every close',

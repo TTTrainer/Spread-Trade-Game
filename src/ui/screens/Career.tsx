@@ -26,6 +26,7 @@ import { money } from '../format';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
+import { bridge, hasBridge } from '../bridge';
 import { TradingLayout } from '../trading/TradingScreen';
 import { RunEnd, ReviewIntro, ShopView, TallyView } from '../run/RunPhases';
 import { CartridgeMini } from '../run/Shop';
@@ -56,8 +57,14 @@ export function CareerScreen() {
   const [tab, setTab] = useState<'start' | 'options'>('start');
   const [capAsk, setCapAsk] = useState(false);
   const updateSettings = useApp((s) => s.updateSettings);
+  // A tutorial left part-way can be picked up again at the same lesson.
+  const [tutorialSaved, setTutorialSaved] = useState(false);
 
   useEffect(() => {
+    if (hasBridge())
+      void bridge()
+        .invoke('user.listSaves')
+        .then((slots) => setTutorialSaved(slots.some((x) => x.slot === 'tutorial')));
     void checkSave('career');
     void load().then((p) => setTier(Math.min(p.maxTier, tier)));
   }, []);
@@ -80,8 +87,14 @@ export function CareerScreen() {
     sfx('whoosh');
     if (await resume('career')) go('run');
   };
+  const resumeTutorial = async () => {
+    sfx('whoosh');
+    if (await resume('tutorial')) go('run');
+  };
   const tutorial = async () => {
     sfx('whoosh');
+    // A new tutorial starts its lessons from the top.
+    useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: null } }));
     if (
       await newRun({
         deskId: 'verticals',
@@ -158,17 +171,27 @@ export function CareerScreen() {
               <div className="panel tutorial-banner" data-testid="tutorial-banner">
                 <Portrait id="ines" mood="happy" scale={1} />
                 <div>
-                  <b>New here?</b> Ines walks you through three practice rounds: the lineup, calling your
-                  shot, building a bull put, the clock, the tally and the shop. Nothing counts, and you keep
-                  her mug.
+                  <b>New to options?</b> Ines starts you on an empty desk and switches it on one piece at a
+                  time: the goal, your first trade, the clock, the score, then the powerups. Nothing counts,
+                  and you keep her mug.
                 </div>
+                {tutorialSaved && (
+                  <button
+                    className="pixel-btn primary"
+                    onClick={() => void resumeTutorial()}
+                    disabled={busy}
+                    data-testid="continue-tutorial"
+                  >
+                    CONTINUE ▶
+                  </button>
+                )}
                 <button
-                  className="pixel-btn primary"
+                  className={`pixel-btn ${tutorialSaved ? '' : 'primary'}`}
                   onClick={() => void tutorial()}
                   disabled={busy}
                   data-testid="start-tutorial"
                 >
-                  TUTORIAL ▶
+                  {tutorialSaved ? 'START OVER' : 'TUTORIAL ▶'}
                 </button>
               </div>
             )}
@@ -435,7 +458,8 @@ const INCOME_PRESETS = [2_500_000, 5_000_000, 10_000_000, 25_000_000];
 
 /**
  * Starting capital for an Income run. A cash-secured put sets aside the whole strike (a $60 stock
- * is $6,000 a contract) and a covered call buys 100 shares, so $5,000 barely opens one trade.
+ * is $6,000 a contract), so $5,000 barely opens one. Covered calls need no cash: they are sold
+ * against 500 shares of each stock the player is assumed to own, kept off the books.
  */
 function IncomeCapital({
   initial,
@@ -452,10 +476,11 @@ function IncomeCapital({
     <Modal onClose={onClose} testId="income-capital">
       <h2>Starting capital for this Income run</h2>
       <p>
-        Cash-secured puts set aside the whole strike (a $60 stock ties up $6,000 per contract) and covered
-        calls buy 100 shares, so a small account can barely open one. <b>At least $50,000 is recommended.</b>{' '}
-        Targets, risk caps and the Max-Loss Line are all percentages, so a bigger account doesn't make the run
-        easier.
+        Cash-secured puts set aside the whole strike (a $60 stock ties up $6,000 per contract), so a small
+        account can barely open one. <b>At least $50,000 is recommended.</b> Covered calls need no cash: you
+        own 500 shares of every stock, kept off the books, and sell calls against them. Only the options count
+        in your P/L. Targets, risk caps and the Max-Loss Line are all percentages, so a bigger account doesn't
+        make the run easier.
       </p>
       <div className="modal-actions income-presets">
         {INCOME_PRESETS.map((c) => (

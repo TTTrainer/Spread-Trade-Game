@@ -231,6 +231,7 @@ function ShopCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number 
 /** One window on the shop's desktop. */
 function Win({
   title,
+  sub: purpose,
   icon,
   className = '',
   delay = 0,
@@ -238,6 +239,8 @@ function Win({
   testId,
 }: {
   title: string;
+  /** What the window is for, in a few plain words. */
+  sub: string;
   icon: string;
   className?: string;
   delay?: number;
@@ -256,6 +259,7 @@ function Win({
       <header className="os-title num">
         <span className="os-ico">{icon}</span>
         <span className="os-name">{title}</span>
+        <span className="os-sub">{purpose}</span>
         <span className="os-ctl" aria-hidden="true">
           <i>_</i>
           <i>□</i>
@@ -364,7 +368,14 @@ export function ShopView({ e }: { e: RunEngine }) {
   return (
     <div className="screen run-shop os" data-testid="shop-screen">
       <div className="os-desktop">
-        <Win title="CARTRIDGES.EXE" icon="▣" className="w-carts" delay={0.05} testId="win-carts">
+        <Win
+          title="CARTRIDGES"
+          sub="powerups: boost how your trades score"
+          icon="▣"
+          className="w-carts"
+          delay={0.05}
+          testId="win-carts"
+        >
           <div className="os-shelf">
             {carts.map(card)}
             {carts.length === 0 && <Empty text="SOLD OUT" />}
@@ -374,7 +385,14 @@ export function ShopView({ e }: { e: RunEngine }) {
           </div>
         </Win>
         <div className="os-side">
-          <Win title="LAST_ROUND.LOG" icon="▤" className="w-log" delay={0.12} testId="win-log">
+          <Win
+            title="LAST ROUND"
+            sub="what you earned"
+            icon="▤"
+            className="w-log"
+            delay={0.12}
+            testId="win-log"
+          >
             <div className={`log-stamp ${r.status === 'passed' ? 'ok' : 'miss'}`}>
               {r.status === 'passed' ? '✔ TARGET MET' : '✖ MISSED (saved)'}
             </div>
@@ -398,38 +416,73 @@ export function ShopView({ e }: { e: RunEngine }) {
               Interest: $1 per ${BALANCE.cash.interestPer} held (up to ${BALANCE.cash.interestCap})
             </div>
           </Win>
-          <Win title="BUILD.SYS" icon="⚙" className="w-build" delay={0.16} testId="win-build">
+          <Win
+            title="YOUR BUILD"
+            sub="family bonuses"
+            icon="⚙"
+            className="w-build"
+            delay={0.16}
+            testId="win-build"
+          >
             <BuildPanel e={e} />
             <Primer compact />
           </Win>
         </div>
-        <Win title="ANALYSTS.DIR" icon="◧" className="w-analyst" delay={0.19} testId="win-analysts">
+        <Win
+          title="ANALYSTS"
+          sub="hire extra information"
+          icon="◧"
+          className="w-analyst"
+          delay={0.19}
+          testId="win-analysts"
+        >
           <div className="os-shelf">
             {analysts.map(card)}
             {analysts.length === 0 && <Empty text="ALL HIRED" />}
           </div>
         </Win>
         <div className="os-pair">
-          <Win title="MEMOS.TXT" icon="✉" className="w-memo" delay={0.24} testId="win-memos">
+          <Win title="MEMOS" sub="one-use tricks" icon="✉" className="w-memo" delay={0.24} testId="win-memos">
             <div className="os-shelf">
               {memos.map(card)}
               {memos.length === 0 && <Empty text="SOLD OUT" />}
             </div>
           </Win>
-          <Win title="PLAYBOOK.PDF" icon="▦" className="w-page" delay={0.29} testId="win-pages">
+          <Win
+            title="PLAYBOOK"
+            sub="level up a trade type"
+            icon="▦"
+            className="w-page"
+            delay={0.29}
+            testId="win-pages"
+          >
             <div className="os-shelf">
               {pages.map(card)}
               {pages.length === 0 && <Empty text="SOLD OUT" />}
             </div>
           </Win>
         </div>
-        <Win title="VOUCHER.SYS" icon="✦" className="w-voucher" delay={0.34} testId="win-voucher">
+        <Win
+          title="VOUCHERS"
+          sub="permanent upgrades"
+          icon="✦"
+          className="w-voucher"
+          delay={0.34}
+          testId="win-voucher"
+        >
           <div className="os-shelf">
             {vouchers.map(card)}
             {vouchers.length === 0 && <Empty text="ALL OWNED" />}
           </div>
         </Win>
-        <Win title="MY_DESK.CFG" icon="⌂" className="w-loadout" delay={0.4} testId="win-loadout">
+        <Win
+          title="YOUR DESK"
+          sub="what you own · fires left to right"
+          icon="⌂"
+          className="w-loadout"
+          delay={0.4}
+          testId="win-loadout"
+        >
           <div className="ld-rail">
             <CartridgeRail e={e} editable />
             <div className="sell-row">

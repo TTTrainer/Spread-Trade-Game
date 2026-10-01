@@ -11,7 +11,7 @@ export function DialogueBox() {
   const speech = useRun((s) => s.speech);
   const clear = useRun((s) => s.clearSpeech);
   const reduced = useApp((s) => s.settings.display.reducedMotion);
-  // Over the chart during a round; in the shop, inside BUILD.SYS's empty middle (clear of the
+  // Over the chart during a round; in the shop, inside YOUR BUILD's empty middle (clear of the
   // offers, the payouts at the top right and the NEXT button); at the bottom elsewhere.
   const phase = useRun((s) => s.engine?.state.phase);
   const inRun = useApp((s) => s.screen === 'run');

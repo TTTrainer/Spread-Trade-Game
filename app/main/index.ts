@@ -7,6 +7,7 @@ import { registerIpc } from './ipc';
 import { registerDataHandlers } from './dataService';
 import { registerSchwabHandlers } from './schwab';
 import { registerUserHandlers } from './userDb';
+import { watchWindow } from './watchdog';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -69,9 +70,20 @@ function createWindow(): void {
     void shell.openExternal(url);
     return { action: 'deny' };
   });
-  mainWindow.webContents.on('render-process-gone', (_e, details) => log('error', 'renderer gone', details));
+  watchWindow(mainWindow);
+  // At most 20 console errors per 10 seconds reach the log: a burst (a chart redrawn every frame
+  // with a bad number, say) must never tie the main process up writing the same line.
+  let errWindow = 0;
+  let errCount = 0;
   mainWindow.webContents.on('console-message', (event) => {
-    if (event.level === 'error') log('error', 'renderer console', event.message);
+    if (event.level !== 'error') return;
+    const now = Date.now();
+    if (now - errWindow > 10_000) {
+      if (errCount > 20) log('warn', `${errCount - 20} more screen console errors were not logged`);
+      errWindow = now;
+      errCount = 0;
+    }
+    if (++errCount <= 20) log('error', 'renderer console', event.message);
   });
 
   const devUrl = process.env.ELECTRON_RENDERER_URL;

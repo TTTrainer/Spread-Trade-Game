@@ -91,8 +91,8 @@ export function ChartZones() {
       {curve.openedOn && boxed && (
         <div className="zone-entry num" data-testid="zone-entry">
           {curve.entryNet < 0
-            ? `SOLD +${Math.abs(curve.entryNet).toFixed(2)}`
-            : `BOUGHT −${curve.entryNet.toFixed(2)}`}
+            ? `▶ OPENED · SOLD +${Math.abs(curve.entryNet).toFixed(2)}`
+            : `▶ OPENED · BOUGHT −${curve.entryNet.toFixed(2)}`}
         </div>
       )}
       {wide.map((b, i) => (

@@ -25,6 +25,7 @@ import {
 import { useApp } from '../store/app';
 import { useProfile } from '../store/profile';
 import { drawPad, PAD_H, PAD_SCALE, PAD_W, whenPadArtLoads } from '../pad/scene';
+import { artUrl } from '../art';
 import './screens.css';
 import './pad.css';
 
@@ -174,19 +175,21 @@ export function PadScreen() {
           )}
           {tab === 'items' && (
             <div className="pad-list">
-              <p className="dim">Up to four on the desk. Some are bought with Bonus; others are earned.</p>
+              <p className="dim">Up to six on the desk. Some are bought with Bonus; others are earned.</p>
               {COSMETICS.filter((c) => c.kind === 'deskitem').map((c) => {
                 const open = cosmeticUnlocked(profile, c);
                 const shown = profile.pad.deskItems.includes(c.value);
                 return (
                   <div key={c.id} className={`pad-row ${open ? '' : 'locked'}`}>
-                    <div>
+                    <PadThumb id={`item_${c.value}`} />
+                    <div className="pad-row-text">
                       <b>{c.name}</b> {!open && <span className="dim">{unlockText(c.unlock)}</span>}
                     </div>
                     {open ? (
                       <button
                         className={`pixel-btn ${shown ? 'primary' : ''}`}
                         onClick={() => void apply((p) => toggleDeskItem(p, c.value))}
+                        data-testid={`pad-show-${c.value}`}
                       >
                         {shown ? 'ON THE DESK' : 'DISPLAY'}
                       </button>
@@ -245,18 +248,21 @@ function CollectionList({ col }: { col: CollectionId }) {
   const { profile, apply } = useProfile();
   const c = COLLECTIONS[col];
   const price = nextCollectionPrice(profile, col);
-  const owned = c.items.filter((i) => profile.pad.items.includes(i.id)).length;
+  // Retired pieces stay listed only for players who already own one.
+  const items = c.items.filter((i) => !i.retired || profile.pad.items.includes(i.id));
+  const forSale = c.items.filter((i) => !i.retired);
+  const owned = forSale.filter((i) => profile.pad.items.includes(i.id)).length;
   return (
     <div className="pad-list">
       <p className="dim num">
-        {c.name}: {owned}/{c.items.length} collected. Next piece costs {price} Bonus (each one costs more).
-        {owned === c.items.length && ' Collection complete.'}
+        {c.name}: {owned}/{forSale.length} collected. Next piece costs {price} Bonus (each one costs more).
+        {owned === forSale.length && ' Collection complete.'}
       </p>
-      {c.items.map((i) => {
+      {items.map((i) => {
         const has = profile.pad.items.includes(i.id);
         return (
           <div key={i.id} className={`pad-row ${has ? 'owned' : ''}`}>
-            <span className="pad-swatch" style={{ background: i.colors[1], borderColor: i.colors[0] }} />
+            <PadThumb id={i.id} colors={i.colors} />
             <div className="pad-row-text">
               <b>{i.name}</b> <span className="dim">{i.blurb}</span>
             </div>
@@ -277,6 +283,14 @@ function CollectionList({ col }: { col: CollectionId }) {
       })}
     </div>
   );
+}
+
+/** A piece's picture in its shop row (or a color swatch when it has none). */
+function PadThumb({ id, colors }: { id: string; colors?: [string, string] }) {
+  const url = artUrl('pad', id);
+  if (url) return <img className="pad-thumb" src={url} alt="" draggable={false} />;
+  if (!colors) return <span className="pad-thumb" />;
+  return <span className="pad-swatch" style={{ background: colors[1], borderColor: colors[0] }} />;
 }
 
 /** Kept for other screens that list what a collection holds. */

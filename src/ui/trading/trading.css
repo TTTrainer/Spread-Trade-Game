@@ -880,7 +880,7 @@
 .news-ticker {
   position: absolute;
   left: 8px;
-  top: 28px;
+  top: 62px;
   right: 90px;
   z-index: 4;
   display: flex;
@@ -2962,21 +2962,33 @@
   }
 }
 
-/* The trade's box on the chart: from the day it opened (or today, for a plan) to expiration. */
+/* The trade's box on the chart: from the day it opened (or today, for a plan) to expiration.
+   An open trade is a solid, framed box; a plan is a faint hatched ghost of one. */
 .chart-zones.boxed {
   border-left: 1px dashed rgba(164, 157, 224, 0.4);
 }
 .chart-zones.boxed.open {
-  border-left: 1px solid rgba(164, 157, 224, 0.55);
+  border: 2px solid rgba(255, 62, 165, 0.7);
+  border-right: none;
+}
+.chart-zones.boxed.plan .zone {
+  opacity: 0.55;
+  background-image: repeating-linear-gradient(135deg, rgba(164, 157, 224, 0.1) 0 2px, transparent 2px 9px);
+}
+.chart-zones.boxed.open .zone.win {
+  background: linear-gradient(90deg, rgba(77, 255, 154, 0.08), rgba(77, 255, 154, 0.16));
+}
+.chart-zones.boxed.open .zone.lose {
+  background: linear-gradient(90deg, rgba(255, 79, 109, 0.08), rgba(255, 79, 109, 0.16));
 }
 .zone-entry {
   position: absolute;
-  top: 26px;
+  top: 62px;
   left: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
-  color: var(--text-dim);
-  background: rgba(7, 5, 26, 0.8);
+  color: #16051a;
+  background: var(--magenta);
   padding: 2px 4px;
   pointer-events: none !important;
   white-space: nowrap;
@@ -2997,4 +3009,57 @@
 .strike-handle.edge {
   opacity: 0.9;
   border-style: dashed;
+}
+
+/* Which lines are a placed trade and which are a plan (top left of the chart, under the legend). */
+.trade-badge {
+  position: absolute;
+  left: 8px;
+  top: 28px;
+  z-index: 4;
+  padding: 3px 10px;
+  font-size: 17px;
+  background: rgba(11, 8, 32, 0.88);
+  border: 2px solid var(--magenta);
+  box-shadow: 0 0 12px rgba(255, 62, 165, 0.35);
+}
+.trade-badge b {
+  color: var(--magenta);
+  font-weight: 400;
+  margin-right: 4px;
+}
+.trade-badge.plan {
+  border: 2px dashed rgba(164, 157, 224, 0.7);
+  box-shadow: none;
+  color: var(--text-dim);
+}
+.trade-badge.plan b {
+  color: var(--text);
+}
+
+/* Lineup cards: a trade on the card is impossible to miss. */
+.lineup-card.has-open {
+  outline: 3px solid var(--magenta);
+  outline-offset: -3px;
+  box-shadow: 0 0 14px rgba(255, 62, 165, 0.45);
+}
+.lc-trade {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin: -2px -2px 4px;
+  padding: 2px 8px;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+.lc-trade.open {
+  background: var(--magenta);
+  color: #16051a;
+}
+.lc-trade.closed {
+  background: rgba(164, 157, 224, 0.18);
+  color: var(--text-dim);
+}
+.lc-trade .pnl {
+  color: inherit;
 }

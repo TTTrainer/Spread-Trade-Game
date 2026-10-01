@@ -23,7 +23,7 @@ import { streamFor, type Rng } from '../rng';
 import type { Bucket } from '../scoring/calls';
 import { expirationsOf, STRUCTURES } from '../strategies/structures';
 import type { BuildParams, StructureId } from '../strategies/types';
-import { maxContracts, type TradePlan } from '../trading/plan';
+import { maxContracts, maxQtyFor, type TradePlan } from '../trading/plan';
 import type { OrderSpec, TradingSession } from '../trading/session';
 import type { RunEngine } from '../run/engine';
 import type { RunAction, RunResult } from '../run/types';
@@ -223,7 +223,10 @@ function chooseTrade(
 function sizeFor(engine: RunEngine, pick: Pick, o: BotOptions, rng: Rng): number {
   const s = engine.session;
   if (!s) return 1;
-  const max = maxContracts(pick.plan, s.equityCents(), s.config.riskCapPct, s.reservedCents());
+  const max = Math.min(
+    maxQtyFor(pick.plan.structureId),
+    maxContracts(pick.plan, s.equityCents(), s.config.riskCapPct, s.reservedCents()),
+  );
   if (max < 1) return 0;
   if (o.kind === 'greedy') return max;
   if (o.kind === 'random') return rng.int(1, max);

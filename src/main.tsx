@@ -11,6 +11,7 @@ import { playRun, type BotKind } from './engine/sim/bot';
 import { useMusic } from './audio/music';
 import { fx } from './fx/overlay';
 import { chartBridge } from './ui/trading/chartBridge';
+import { startDiagnostics } from './ui/diagnostics';
 
 // Stores are reachable from the console and from end-to-end tests.
 (window as unknown as { __stg: unknown }).__stg = {
@@ -30,6 +31,8 @@ import { chartBridge } from './ui/trading/chartBridge';
     return playRun(e, { kind, dispatch: (a) => useRun.getState().act(a) }, maxSteps);
   },
 };
+
+startDiagnostics();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('root element missing');

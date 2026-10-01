@@ -296,7 +296,8 @@ describe('Contracts board', () => {
   it('allows only the structures of unlocked desks that fit, and pays for filling plus profit', () => {
     const bear = CLIENT_BY_ID.garage;
     expect(contractStructures(bear, ['verticals'])).toEqual(['bear_call', 'bear_put']);
-    expect(contractStructures(bear, ['income'])).toEqual([]);
+    // A covered call pays while the stock stays below its strike: a bearish trade here.
+    expect(contractStructures(bear, ['income'])).toEqual(['covered_call']);
     expect(contractPayout(15, true, 500)).toBe(23);
     expect(contractPayout(15, true, -500)).toBe(15);
     expect(contractPayout(15, false, 500)).toBe(0);

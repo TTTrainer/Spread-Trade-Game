@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STRUCTURES } from '../../src/engine/strategies/structures';
 import {
   adx,
   atr,
@@ -171,7 +172,28 @@ describe('trade planner', () => {
       params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
       qty: 1,
     });
-    expect(cc.collateralCents).toBeGreaterThan(900_000);
+    // A covered call is the call alone against 500 shares you already own: a credit, no cash
+    // set aside, bearish-leaning, at most 5 contracts, and risk measured as a 25%+ jump.
+    expect(cc.ok).toBe(true);
+    expect(cc.legs).toHaveLength(1);
+    expect(cc.legs[0]).toMatchObject({ kind: 'option', right: 'C', ratio: -1 });
+    expect(cc.mid).toBeLessThan(0);
+    expect(cc.collateralCents).toBe(0);
+    expect(cc.riskCents).toBeGreaterThan(0);
+    expect(STRUCTURES.covered_call.bias).toBe('bear');
+    const ccAt = (delta: number, qty = 1) =>
+      planTrade({
+        ...input,
+        equityCents: 5_000_000,
+        structureId: 'covered_call',
+        params: { expiration: '2025-01-31', delta, width: 0 },
+        qty,
+      });
+    // Further from the price, less premium but a better chance of keeping it.
+    expect(ccAt(0.15).metrics!.pop).toBeGreaterThan(ccAt(0.3).metrics!.pop);
+    expect(ccAt(0.3, 5).reason ?? '').not.toContain('500 shares');
+    expect(ccAt(0.3, 6).ok).toBe(false);
+    expect(ccAt(0.3, 6).reason).toContain('500 shares');
     expect(
       planTrade({
         ...input,

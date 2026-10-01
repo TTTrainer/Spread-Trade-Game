@@ -8,8 +8,8 @@ If you received the game in pieces (`...exe.part1` to `part4` plus a `Join-Porta
 
 Then you have two ways to run the game. Use either one.
 
-- **`SpreadTradingGame-Setup-1.4.2.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
-- **`SpreadTradingGame-Portable-1.4.2.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
+- **`SpreadTradingGame-Setup-1.5.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
+- **`SpreadTradingGame-Portable-1.5.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 
@@ -17,7 +17,7 @@ Then you have two ways to run the game. Use either one.
 
 There are two Mac builds: **Apple chip** (M1 and later, the `arm64` files) and **Intel** (the `x64` files). If you're not sure, choose Apple menu → About This Mac: "Chip: Apple M…" means Apple chip.
 
-1. Put the parts (`SpreadTradingGame-mac-arm64-1.4.2.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
+1. Put the parts (`SpreadTradingGame-mac-arm64-1.5.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
 2. Open **Terminal** (press ⌘ Space, type Terminal, press Return).
 3. Type `bash ` (with a space after it), drag `join-mac.sh` from Finder into the Terminal window, and press Return.
 
@@ -37,7 +37,7 @@ It starts on the **SIM market**: 18 invented companies (Helix Robotics, MemeSton
 
 Good first steps:
 
-1. **Career → TUTORIAL.** Ines walks you through three practice rounds. Nothing counts, and you get her mug for your desk.
+1. **Career → TUTORIAL.** Made for someone who has never traded an option: Ines starts you on an almost empty desk and switches it on one piece at a time (the goal, your first trade, the clock, the score, then the powerups), with a spotlight on whatever she's talking about. Nothing counts, SKIP LESSONS turns the whole desk on at any time, and you get her mug for your desk.
 2. **Career → START RUN** on the Verticals desk. That's a real run: a fiscal year of 12 rounds, about 30–40 minutes once you know the controls.
 3. **Drills** for quick 60-second chart reads when you only have a few minutes.
 

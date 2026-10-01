@@ -1130,7 +1130,18 @@
   font-size: 15px;
 }
 .os-name {
+  letter-spacing: 1px;
+}
+/* What the window is for, right after its name. */
+.os-sub {
   flex: 1;
+  margin-left: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.85em;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .os-ctl {
   display: flex;
@@ -2117,8 +2128,8 @@
     font-size: 13px;
   }
 }
-/* In the shop: the middle of the BUILD.SYS column, where nothing needs reading. */
-/* BUILD.SYS's empty middle: under the family rows, above the tips at its foot, at any height. */
+/* In the shop: the middle of the YOUR BUILD column, where nothing needs reading. */
+/* YOUR BUILD's empty middle: under the family rows, above the tips at its foot, at any height. */
 .dialogue.at-corner.at-shop {
   top: 52%;
   bottom: auto;

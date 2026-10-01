@@ -6,7 +6,7 @@ import type {
   OrderSpec,
   PlaceResult,
 } from '../../engine/trading/session';
-import { premiumOf, type TradePlan } from '../../engine/trading/plan';
+import { maxQtyFor, premiumOf, type TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
 import { computeFacts } from '../../engine/run/facts';
 import { STRUCTURES, expirationsOf, reverseOf, stepStrike } from '../../engine/strategies/structures';
@@ -26,6 +26,7 @@ import type { TradeRow } from '../../shared/userData';
 import type { DayPace } from '../../shared/settings';
 import { lastMark, optionLegsOf } from '../../engine/lifecycle/position';
 import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
+import { crumb } from '../trail';
 
 export interface BuilderState {
   structureId: StructureId;
@@ -184,6 +185,10 @@ interface TradingState {
   /** A strike handle is being dragged: the chart hides everything but the trade being shaped. */
   dragging: boolean;
   setDragging: (v: boolean) => void;
+  /** The tutorial keeps the clock locked during a lesson; this is what it says if you try. */
+  clockHold: string | null;
+  /** The tutorial keeps the planned trade off the chart until it has explained the chart itself. */
+  planHidden: boolean;
   /** A decision is tucked into a bar so the full chart can be reviewed. */
   reviewChart: boolean;
   setReviewChart: (v: boolean) => void;
@@ -358,9 +363,18 @@ export function tradeOpen(t: Pick<TradingState, 'ff' | 'dayAnim' | 'session'>): 
 }
 
 export const useTrading = create<TradingState>((set, get) => {
+  /** A tutorial lesson is up that the clock must wait for: say so and stay put. */
+  const holdClock = (): boolean => {
+    const why = get().clockHold;
+    if (!why) return false;
+    useApp.getState().toast(why, 'info');
+    sfx('error');
+    return true;
+  };
   const dispatch = async (a: SessionAction, quiet = false) => {
     const s = get().session;
     if (!s) return null;
+    crumb(`trade ${a.t}`);
     const ext = get().external;
     const bump = () => {
       if (!quiet || s.decisions.length > 0) set({ version: get().version + 1 });
@@ -382,6 +396,7 @@ export const useTrading = create<TradingState>((set, get) => {
   const dispatchHeld = async (a: SessionAction): Promise<SessionEvent[]> => {
     const s = get().session;
     if (!s) return [];
+    crumb(`trade ${a.t}`);
     const ext = get().external;
     if (ext) return (await ext(a)).events;
     await s.dispatch(a);
@@ -732,8 +747,12 @@ export const useTrading = create<TradingState>((set, get) => {
     recap: null,
     recapHold: false,
     dismissRecap: () => set({ recap: null }),
+    clockHold: null,
+    planHidden: false,
     dragging: false,
-    setDragging: (v) => set({ dragging: v }),
+    setDragging: (v) => {
+      if (get().dragging !== v) set({ dragging: v });
+    },
     reviewChart: false,
     setReviewChart: (v) => set({ reviewChart: v }),
     chainOpen: false,
@@ -872,11 +891,14 @@ export const useTrading = create<TradingState>((set, get) => {
           builder.legs ?? undefined,
         );
         const qty = one.ok
-          ? convictionQty(
-              one.maxLossCents,
-              session.markedEquityCents(),
-              session.config.riskCapPct,
-              confidence,
+          ? Math.min(
+              maxQtyFor(builder.structureId),
+              convictionQty(
+                one.maxLossCents,
+                session.markedEquityCents(),
+                session.config.riskCapPct,
+                confidence,
+              ),
             )
           : 1;
         const value =
@@ -1145,6 +1167,7 @@ export const useTrading = create<TradingState>((set, get) => {
     start: () => {
       const s = get().session;
       if (!s) return;
+      if (holdClock()) return;
       // A desk whose cards all move with the clock (Career, a Live month) may watch days pass untraded.
       const watchable = get().external || s.config.advanceIdle;
       if (!watchable && s.openPositions().length === 0 && s.orders.length === 0) {
@@ -1172,6 +1195,7 @@ export const useTrading = create<TradingState>((set, get) => {
       if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;
       if (!s) return;
+      if (holdClock()) return;
       const watchable = get().external || s.config.advanceIdle;
       if (!watchable && !s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');

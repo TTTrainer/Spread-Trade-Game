@@ -1115,7 +1115,14 @@ export class RunEngine {
     });
     // One missed Month target per quarter is a write-up, not the end: more stress, no round-win
     // cash, and a bigger Review. A breach, a missed Review or a second miss still ends the run.
-    const writeUp = !passed && !r.breached && r.index < 2 && !this.writtenUp(st.quarter) && !st.endless;
+    // Practice (the tutorial) never writes anyone up: a miss there is only a lesson.
+    const writeUp =
+      !passed &&
+      !r.breached &&
+      r.index < 2 &&
+      !this.writtenUp(st.quarter) &&
+      !st.endless &&
+      !st.config.practice;
     if (writeUp) {
       st.writeUps = [...(st.writeUps ?? []), st.quarter];
       this.addStress(BALANCE.stress.writeUp, `Written up: missed the ${ROUND_NAMES[r.index]} target`);

@@ -283,7 +283,7 @@ const CASES: Record<string, () => void> = {
     expect(one('the_wheel', { structureId: 'covered_call' }, {}, {})).toBeNull();
   },
   covered_and_chill: () => {
-    expect(one('covered_and_chill', { coveredCallExpiredOtm: true })).toEqual({ op: 'add', value: 2 });
+    expect(one('covered_and_chill', { coveredCallExpiredOtm: true })).toEqual({ op: 'add', value: 1 });
     expect(one('covered_and_chill', {})).toBeNull();
   },
   assignment_artist: () => {

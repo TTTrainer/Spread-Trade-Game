@@ -1,21 +1,21 @@
 /**
- * The Pad: a pixel-art apartment drawn in code on a 320x180 canvas (scaled up with crisp pixels).
- * Everything is original: rectangles and a few hand-placed pixels, no image files.
+ * The Pad: the player's apartment on a 320x180 grid, drawn at twice that. Each piece is a picture
+ * from assets/art (pad-<id>.png) placed into its spot; any piece without a picture falls back to a
+ * small code drawing, so the scene is never empty.
  */
 
 import { COLLECTIONS, PAD_TIERS, type CollectionId } from '../../content/meta';
-import { PAD_ART_BY_ID } from '../../content/padArt';
 import type { Profile } from '../../engine/meta/profile';
 import { artUrl } from '../art';
 
-/** The scene's grid. The canvas is twice this, so uploaded art gets half-step detail. */
+/** The scene's grid. The canvas is twice this, so pictures keep twice the grid's detail. */
 export const PAD_W = 320;
 export const PAD_H = 180;
 export const PAD_SCALE = 2;
 
 const images = new Map<string, HTMLImageElement>();
 let onArtLoaded: (() => void) | null = null;
-/** Redraw once uploaded Pad art finishes loading. */
+/** Redraw once Pad pictures finish loading. */
 export function whenPadArtLoads(cb: (() => void) | null): void {
   onArtLoaded = cb;
 }
@@ -33,20 +33,34 @@ function padImage(id: string): HTMLImageElement | null {
   return im.complete && im.naturalWidth > 0 ? im : null;
 }
 
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /**
- * Draw an uploaded Pad picture at its anchor (or at `at`, for pieces placed by the scene), at its
- * native pixels. Returns false when none is uploaded, so the code drawing runs instead.
+ * Draw a Pad picture standing on (cx, bottom), scaled to the given width or height (or to fit
+ * both). Pieces are cut bottom-centered on a fixed canvas per kind, so scaling the whole PNG keeps
+ * every piece of a kind in proportion. Returns null when there is no picture, so the code drawing
+ * runs instead.
  */
-function sprite(g: Ctx, id: string, at?: { x: number; y: number }): boolean {
+function put(g: Ctx, id: string, cx: number, bottom: number, size: { w?: number; h?: number }): Box | null {
   const im = padImage(id);
-  const a = PAD_ART_BY_ID[id];
-  if (!im || !a) return false;
-  const w = im.naturalWidth / PAD_SCALE;
-  const h = im.naturalHeight / PAD_SCALE;
-  const x = at?.x ?? a.x;
-  const y = at?.y ?? a.y;
-  g.drawImage(im, a.anchor === 'bottom' ? x - w / 2 : x, a.anchor === 'bottom' ? y - h : y, w, h);
-  return true;
+  if (!im) return null;
+  const iw = im.naturalWidth;
+  const ih = im.naturalHeight;
+  const k = Math.min(
+    size.w !== undefined ? size.w / iw : Infinity,
+    size.h !== undefined ? size.h / ih : Infinity,
+  );
+  if (!Number.isFinite(k)) return null;
+  const w = iw * k;
+  const h = ih * k;
+  const box = { x: cx - w / 2, y: bottom - h, w, h };
+  g.drawImage(im, box.x, box.y, w, h);
+  return box;
 }
 
 type Ctx = CanvasRenderingContext2D;
@@ -314,21 +328,6 @@ function plant(g: Ctx, level: number): void {
 
 // ---------------- collections ----------------
 
-const ART_SPOTS: [number, number][] = [
-  [140, 20],
-  [172, 16],
-  [204, 22],
-  [236, 16],
-  [268, 22],
-  [140, 50],
-  [172, 48],
-  [204, 54],
-  [236, 48],
-  [268, 54],
-  [300, 16],
-  [300, 46],
-];
-
 function artPiece(g: Ctx, id: string, x: number, y: number, colors: [string, string]): void {
   const w = 22;
   const h = 18;
@@ -351,9 +350,7 @@ function artPiece(g: Ctx, id: string, x: number, y: number, colors: [string, str
   }
 }
 
-function watchCase(g: Ctx, owned: string[]): void {
-  const items = COLLECTIONS.watches.items.filter((w) => owned.includes(w.id));
-  if (!items.length) return;
+function watchCaseFallback(g: Ctx, items: { colors: [string, string] }[]): void {
   const x = 18;
   const y = 102;
   rect(g, x - 2, y - 2, 58, 32, '#8890b0');
@@ -361,34 +358,10 @@ function watchCase(g: Ctx, owned: string[]): void {
   items.forEach((w, i) => {
     const cx = x + 1 + (i % 4) * 13;
     const cy = y + 1 + Math.floor(i / 4) * 13;
-    if (sprite(g, w.id, { x: cx, y: cy })) return;
     rect(g, cx + 4, cy + 2, 4, 7, w.colors[1]);
     rect(g, cx + 3, cy + 4, 6, 3, w.colors[0]);
   });
   rect(g, x - 2, y + 30, 58, 12, '#3a3448');
-}
-
-function vehicle(g: Ctx, owned: string[]): void {
-  const items = COLLECTIONS.vehicles.items.filter((v) => owned.includes(v.id));
-  if (!items.length) return;
-  const top = items[items.length - 1];
-  // A landing pad or garage bay in the lower left, the newest vehicle on it.
-  const x = 30;
-  const y = 150;
-  // A showroom plinth with a neon edge and a spotlight.
-  g.globalAlpha = 0.05;
-  for (let i = 0; i < 20; i++) rect(g, x + 26 - i, y - 40 + i * 2.5, 6 + i * 2, 3, '#ffffff');
-  g.globalAlpha = 1;
-  rect(g, x - 8, y + 15, 74, 6, '#2a2a3a');
-  rect(g, x - 8, y + 15, 74, 1, '#00e5ff');
-  rect(g, x - 8, y + 21, 74, 1, '#ff2fd0');
-  const [a, b] = top.colors;
-  if (!sprite(g, top.id)) drawCar(g, x, y, a, b);
-  // The rest of the fleet as badges.
-  items.slice(0, -1).forEach((v, i) => {
-    rect(g, 118 + i * 12, 170, 10, 5, v.colors[0]);
-    rect(g, 120 + i * 12, 168, 6, 3, v.colors[1]);
-  });
 }
 
 function drawCar(g: Ctx, x: number, y: number, a: string, b: string): void {
@@ -400,42 +373,170 @@ function drawCar(g: Ctx, x: number, y: number, a: string, b: string): void {
   rect(g, x + 44, y + 11, 8, 4, '#101018');
 }
 
-function deskItems(g: Ctx, items: string[]): void {
-  const x0 = 136;
-  const y = 110;
-  let x = x0;
-  for (const it of items) {
-    if (sprite(g, `item_${it}`, { x: x + 4, y })) {
-      x -= 13;
-      continue;
-    }
-    if (it === 'mug') {
-      rect(g, x, y - 7, 6, 7, '#f0e8d8');
-      rect(g, x + 6, y - 5, 2, 3, '#f0e8d8');
-      rect(g, x + 1, y - 5, 4, 1, '#c04040');
-    } else if (it === 'duck') {
-      rect(g, x, y - 4, 7, 4, '#ffd23a');
-      rect(g, x + 4, y - 7, 4, 4, '#ffd23a');
-      rect(g, x + 8, y - 6, 2, 1, '#ff8a3d');
-    } else if (it === 'bonsai') {
-      rect(g, x, y - 3, 8, 3, '#6a4a3a');
-      rect(g, x + 3, y - 7, 2, 4, '#6a4020');
-      rect(g, x - 1, y - 11, 10, 4, '#2e9a52');
-    } else if (it === 'lava') {
-      rect(g, x + 1, y - 12, 5, 12, '#402060');
-      rect(g, x + 2, y - 10, 3, 3, '#ff4f7b');
-      rect(g, x + 2, y - 5, 3, 2, '#ff8a3d');
-    } else if (it === 'bell') {
-      rect(g, x, y - 2, 8, 2, '#6a4020');
-      rect(g, x + 1, y - 7, 6, 5, '#e8c15a');
-      rect(g, x + 3, y - 9, 2, 2, '#e8c15a');
-    } else if (it === 'trophy') {
-      rect(g, x + 1, y - 2, 6, 2, '#6a4020');
-      rect(g, x + 3, y - 5, 2, 3, '#e8c15a');
-      rect(g, x, y - 11, 8, 6, '#e8c15a');
-    }
-    x -= 11;
+function vehicleFallback(g: Ctx, colors: [string, string]): void {
+  const x = 30;
+  const y = 150;
+  rect(g, x - 8, y + 15, 74, 6, '#2a2a3a');
+  rect(g, x - 8, y + 15, 74, 1, '#00e5ff');
+  rect(g, x - 8, y + 21, 74, 1, '#ff2fd0');
+  drawCar(g, x, y, colors[0], colors[1]);
+}
+
+/** A desk item drawn in code (for items with no picture), standing on (x, y). */
+function deskItemFallback(g: Ctx, it: string, cx: number, y: number): void {
+  const x = cx - 4;
+  if (it === 'mug') {
+    rect(g, x, y - 7, 6, 7, '#f0e8d8');
+    rect(g, x + 6, y - 5, 2, 3, '#f0e8d8');
+    rect(g, x + 1, y - 5, 4, 1, '#c04040');
+  } else if (it === 'duck') {
+    rect(g, x, y - 4, 7, 4, '#ffd23a');
+    rect(g, x + 4, y - 7, 4, 4, '#ffd23a');
+    rect(g, x + 8, y - 6, 2, 1, '#ff8a3d');
+  } else if (it === 'bonsai') {
+    rect(g, x, y - 3, 8, 3, '#6a4a3a');
+    rect(g, x + 3, y - 7, 2, 4, '#6a4020');
+    rect(g, x - 1, y - 11, 10, 4, '#2e9a52');
+  } else if (it === 'lava') {
+    rect(g, x + 1, y - 12, 5, 12, '#402060');
+    rect(g, x + 2, y - 10, 3, 3, '#ff4f7b');
+    rect(g, x + 2, y - 5, 3, 2, '#ff8a3d');
+  } else if (it === 'bell') {
+    rect(g, x, y - 2, 8, 2, '#6a4020');
+    rect(g, x + 1, y - 7, 6, 5, '#e8c15a');
+    rect(g, x + 3, y - 9, 2, 2, '#e8c15a');
+  } else if (it === 'trophy') {
+    rect(g, x + 1, y - 2, 6, 2, '#6a4020');
+    rect(g, x + 3, y - 5, 2, 3, '#e8c15a');
+    rect(g, x, y - 11, 8, 6, '#e8c15a');
+  } else {
+    // A small box in the item's spot, so nothing owned is ever invisible.
+    rect(g, x, y - 6, 8, 6, '#9d7bff');
+    rect(g, x + 1, y - 5, 6, 1, '#d8ccff');
   }
+}
+
+// ---------------- layout (grid units) ----------------
+
+interface RoomSpots {
+  /** Paintings: [center x, bottom, width?, height?] (default size when left out). */
+  art: [number, number, number?, number?][];
+  /** Watch case: center x and bottom. */
+  watch: [number, number];
+}
+
+/** Where each room has wall to hang things, picked to sit on its bare wall and old frames. */
+const ROOM_SPOTS: RoomSpots[] = [
+  {
+    art: [
+      [215, 76, 52, 38],
+      [175, 54],
+      [215, 34],
+      [140, 30],
+    ],
+    watch: [262, 56],
+  },
+  {
+    art: [
+      [98, 64, 40, 30],
+      [165, 42],
+      [240, 42],
+      [98, 30],
+    ],
+    watch: [283, 44],
+  },
+  {
+    art: [
+      [183, 68, 36, 27],
+      [250, 68, 36, 27],
+      [183, 36],
+      [250, 36],
+    ],
+    watch: [147, 56],
+  },
+  {
+    art: [
+      [135, 74, 50, 36],
+      [112, 34],
+      [158, 34],
+      [250, 30],
+    ],
+    watch: [192, 60],
+  },
+];
+const ART_W = 30;
+const ART_H = 23;
+
+const DESK = { cx: 160, bottom: 196, w: 236 };
+/** The desk top in the desk picture (where things stand). */
+const DESK_SURFACE = 120;
+const MONITOR_W = [0, 96, 106, 112];
+const LAPTOP_W = 40;
+const LAMP = { dx: -76, h: 40 };
+const ITEM_W = 20;
+/** Desk item spots, as offsets from the desk's center: beside the screens first, then in front. */
+const ITEM_X = [58, 76, -52, 32, -30, 0];
+const CHAIR = { cx: 264, bottom: 184, h: 64 };
+const PLANT = { cx: 300, bottom: 178, h: 60 };
+const HANGING = { cx: 22, bottom: 64, h: 64 };
+const VEHICLE = { cx: 46, bottom: 186, w: 96 };
+const WATCH_CELL = 11;
+
+/** The glow each lamp throws (the color of its light). */
+const LAMP_GLOW = ['#ffcf7a', '#fff0d0', '#b8ff9a', '#ff2fd0', '#ffb347'];
+
+function glow(g: Ctx, x: number, y: number, r: number, color: string, alpha: number): void {
+  const grad = g.createRadialGradient(x, y, 0, x, y, r);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = alpha;
+  g.fillStyle = grad;
+  g.fillRect(x - r, y - r, r * 2, r * 2);
+  g.globalAlpha = 1;
+}
+
+function watchCase(g: Ctx, tier: number, owned: string[]): void {
+  const items = COLLECTIONS.watches.items.filter((w) => owned.includes(w.id));
+  if (!items.length) return;
+  if (!items.some((w) => padImage(w.id))) {
+    watchCaseFallback(g, items);
+    return;
+  }
+  const [x, bottom] = ROOM_SPOTS[tier].watch;
+  const cols = Math.min(3, items.length);
+  const rows = Math.ceil(items.length / 3);
+  const w = cols * WATCH_CELL + 4;
+  const h = rows * WATCH_CELL + 4;
+  const x0 = x - w / 2;
+  const y0 = bottom - h;
+  // A shadow box: gold frame, dark velvet, the watches in rows of three.
+  rect(g, x0 - 1, y0 - 1, w + 2, h + 2, '#c8a45a');
+  rect(g, x0, y0, w, h, '#10142a');
+  items.forEach((it, i) => {
+    const cx = x0 + 2 + (i % 3) * WATCH_CELL + WATCH_CELL / 2;
+    const by = y0 + 2 + (Math.floor(i / 3) + 1) * WATCH_CELL;
+    if (!put(g, it.id, cx, by, { w: WATCH_CELL, h: WATCH_CELL })) {
+      rect(g, cx - 1, by - 8, 3, 7, it.colors[1]);
+      rect(g, cx - 2, by - 6, 5, 3, it.colors[0]);
+    }
+  });
+  g.globalAlpha = 0.18;
+  rect(g, x0, y0, w, 2, '#ffffff');
+  g.globalAlpha = 1;
+}
+
+function vehicle(g: Ctx, owned: string[]): void {
+  const items = COLLECTIONS.vehicles.items.filter((v) => owned.includes(v.id) && !v.retired);
+  const top = items[items.length - 1] ?? COLLECTIONS.vehicles.items.filter((v) => owned.includes(v.id)).pop();
+  if (!top) return;
+  // A floor shadow, so the cars with no turntable of their own still sit on the floor.
+  g.globalAlpha = 0.45;
+  g.fillStyle = '#05040c';
+  g.beginPath();
+  g.ellipse(VEHICLE.cx, VEHICLE.bottom - 8, VEHICLE.w * 0.44, 6, 0, 0, Math.PI * 2);
+  g.fill();
+  g.globalAlpha = 1;
+  if (!put(g, top.id, VEHICLE.cx, VEHICLE.bottom, { w: VEHICLE.w })) vehicleFallback(g, top.colors);
 }
 
 export interface PadView {
@@ -446,27 +547,57 @@ export interface PadView {
 }
 
 export function drawPad(g: Ctx, v: PadView): void {
-  // Draw on the 320x180 grid; the canvas is twice that, so uploaded art keeps its full detail.
+  // Draw on the 320x180 grid; the canvas is twice that, so the pictures keep their full detail.
   g.setTransform(PAD_SCALE, 0, 0, PAD_SCALE, 0, 0);
-  g.imageSmoothingEnabled = false;
+  // Pictures are scaled by fractions, so smooth them; the code drawings are whole-grid rectangles.
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
   g.clearRect(0, 0, PAD_W, PAD_H);
   const tier = Math.max(0, Math.min(3, v.tier));
-  if (!sprite(g, `room_${PAD_TIERS[tier].id}`)) [studio, loft, penthouse, orbital][tier](g);
+  const setup = v.setup;
+  if (!put(g, `room_${PAD_TIERS[tier].id}`, PAD_W / 2, PAD_H, { w: PAD_W, h: PAD_H }))
+    [studio, loft, penthouse, orbital][tier](g);
+
+  // The wall: paintings (newest purchases last), then the watch case.
   const cols: CollectionId[] = ['art'];
+  const spots = ROOM_SPOTS[tier].art;
   let spot = 0;
   for (const col of cols)
-    for (const item of COLLECTIONS[col].items)
-      if (v.items.includes(item.id) && spot < ART_SPOTS.length) {
-        const [x, y] = ART_SPOTS[spot++];
-        if (!sprite(g, item.id, { x: x - 1, y: y - 1 })) artPiece(g, item.id, x, y, item.colors);
-      }
-  if (!sprite(g, `light_${v.setup.lighting}`)) lighting(g, v.setup.lighting);
-  if (v.setup.plants > 0 && !sprite(g, `plant_${v.setup.plants}`)) plant(g, v.setup.plants);
-  if (!sprite(g, 'desk')) deskBase(g);
-  if (!sprite(g, `monitors_${v.setup.monitors}`)) screens(g, v.setup.monitors);
-  deskItems(g, v.deskItems);
-  if (!sprite(g, `chair_${v.setup.chair}`)) chair(g, v.setup.chair);
-  watchCase(g, v.items);
+    for (const item of COLLECTIONS[col].items) {
+      if (!v.items.includes(item.id) || item.retired) continue;
+      if (spot >= spots.length) break;
+      const [x, bottom, w, h] = spots[spot++];
+      if (!put(g, item.id, x, bottom, { w: w ?? ART_W, h: h ?? ART_H }))
+        artPiece(g, item.id, x - 11, bottom - 19, item.colors);
+    }
+  watchCase(g, tier, v.items);
+
+  if (setup.plants > 0) {
+    const hanging = setup.plants === 6;
+    const at = hanging ? HANGING : PLANT;
+    if (!put(g, `plant_${setup.plants}`, at.cx, at.bottom, { h: at.h })) plant(g, Math.min(3, setup.plants));
+  }
   vehicle(g, v.items);
+
+  const deskDrawn = !!put(g, `desk_${setup.desk ?? 0}`, DESK.cx, DESK.bottom, { w: DESK.w });
+  if (!deskDrawn) deskBase(g);
+  const surf = deskDrawn ? DESK_SURFACE : 110;
+  const lampX = DESK.cx + LAMP.dx;
+  const lamp = put(g, `light_${setup.lighting}`, lampX, surf + 1, { h: LAMP.h });
+  if (lamp) glow(g, lampX + 4, lamp.y + lamp.h * 0.25, 34, LAMP_GLOW[setup.lighting] ?? '#ffcf7a', 0.22);
+  else lighting(g, Math.min(3, setup.lighting));
+  const mon = setup.monitors;
+  const screensDrawn =
+    mon === 0
+      ? put(g, 'item_laptop', DESK.cx, surf + 1, { w: LAPTOP_W })
+      : put(g, `monitors_${mon}`, DESK.cx, surf + 1, { w: MONITOR_W[mon] ?? MONITOR_W[3] });
+  if (!screensDrawn) screens(g, mon);
+  if (screensDrawn) glow(g, DESK.cx, surf - 20, 60, '#47d7ff', 0.08);
+  v.deskItems.slice(0, ITEM_X.length).forEach((it, i) => {
+    const x = DESK.cx + ITEM_X[i];
+    if (!put(g, `item_${it}`, x, surf + 1, { w: ITEM_W })) deskItemFallback(g, it, x, surf);
+  });
+  if (!put(g, `chair_${setup.chair}`, CHAIR.cx, CHAIR.bottom, { h: CHAIR.h }))
+    chair(g, Math.min(3, setup.chair));
   g.setTransform(1, 0, 0, 1, 0, 0);
 }

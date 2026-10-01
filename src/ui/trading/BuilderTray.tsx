@@ -111,10 +111,9 @@ export function OrderTicket() {
   const mid = plan?.mid ?? null;
   const nat = plan?.natural ?? null;
   const spot = plan?.entry?.spot ?? null;
-  // Premium collected per share (a covered call counts only its call, not the shares it buys).
+  // Premium collected per share.
   const premium = premiumOf(mid, plan?.legs ?? [], spot);
   const credit = premium !== null;
-  const shares = (plan?.legs ?? []).reduce((a, l) => a + (l.kind === 'stock' ? l.ratio : 0), 0);
   const limit = mid !== null && nat !== null ? mid + (nat - mid) * builder.limitFrac : null;
   const prob =
     mid !== null && nat !== null && limit !== null
@@ -252,7 +251,11 @@ export function OrderTicket() {
             SELL {credit && premium !== null ? `+${price(premium)}` : ''}
             {credit && plan?.ok && (
               <span className="btn-sub num">
-                {shares > 0 && spot !== null ? `buys ${shares * 100 * plan.qty} sh @ ${price(spot)} · ` : ''}
+                {plan.structureId === 'covered_call'
+                  ? `covers ${plan.qty * 100} of your 500 sh · `
+                  : plan.structureId === 'cash_secured_put'
+                    ? `sets aside $${Math.round(plan.collateralCents / 100).toLocaleString()} · `
+                    : ''}
                 risk ${Math.round(plan.maxLossCents / 100).toLocaleString()} · POP{' '}
                 {pct(plan.metrics?.pop ?? 0, 0)}
               </span>
@@ -289,7 +292,8 @@ export function OrderTicket() {
               · fill chance {Math.round(prob * 100)}%
             </div>
             <div>
-              Max loss {money(plan.maxLossCents)} · max profit{' '}
+              {plan.structureId === 'covered_call' ? 'Risk if the stock jumps 25%+' : 'Max loss'}{' '}
+              {money(plan.maxLossCents)} · max profit{' '}
               {plan.maxProfitCents === null ? 'unlimited' : money(plan.maxProfitCents)} · POP{' '}
               {pct(plan.metrics?.pop ?? 0, 0)}
             </div>

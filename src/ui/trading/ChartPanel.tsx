@@ -31,9 +31,12 @@ import { optionLegsOf } from '../../engine/lifecycle/position';
 import { diffDays } from '../../engine/calendar';
 import { barsAhead } from './expiry';
 import type { Leg } from '../../engine/strategies/types';
-import { useTrading, type StudyId } from '../store/trading';
+import { tradeOpen, useTrading, type StudyId } from '../store/trading';
+import type { Position } from '../../engine/lifecycle/types';
+import type { TradePlan } from '../../engine/trading/plan';
+import { STRUCTURES } from '../../engine/strategies/structures';
 import { chartBridge } from './chartBridge';
-import { PositionHud } from './DayPlayer';
+import { LivePnl, PositionHud } from './DayPlayer';
 import { StrikeHandle } from './StrikeHandle';
 import { DayRecapPanel } from './DayRecap';
 import { ChartZones } from './ChartZones';
@@ -78,6 +81,8 @@ const COLORS = {
   magenta: '#ff3ea5',
   amber: '#ffbf3e',
   violet: '#9d6bff',
+  planShort: 'rgba(255, 62, 165, 0.6)',
+  planLong: 'rgba(62, 242, 255, 0.55)',
 };
 
 function line(data: (number | null)[], bars: Bar[]): LineData<Time>[] {
@@ -424,8 +429,10 @@ export function ChartPanel() {
   }, [clockOn]);
 
   // Overlays: strikes, breakevens, expected move, support/resistance, drawings.
-  const plan = useTrading((s) => s.plan)();
+  const planHidden = useTrading((s) => s.planHidden);
   const position = session && cardId ? session.openPositions().find((p) => p.cardId === cardId) : undefined;
+  const fullPlan = useTrading((s) => s.plan)();
+  const plan = planHidden && !position ? null : fullPlan;
   const legs: Leg[] = position ? position.legs : (plan?.legs ?? []);
   const breakevens = position ? [] : (plan?.metrics?.breakevens ?? []);
   const em = plan?.metrics?.expectedMove ?? null;
@@ -460,7 +467,7 @@ export function ChartPanel() {
       color: string,
       title: string,
       style: LineStyle = LineStyle.Solid,
-      width: 1 | 2 = 1,
+      width: 1 | 2 | 3 = 1,
     ) =>
       linesRef.current.push(
         candles.createPriceLine({
@@ -473,25 +480,36 @@ export function ChartPanel() {
         }),
       );
     // Keep the trade's strikes in view (but not mid-drag, or the scale would chase the cursor).
-    const strikes = optionLegsOf(legs).map((l) => l.strike);
+    const strikes = optionLegsOf(legs)
+      .map((l) => l.strike)
+      .filter((k) => Number.isFinite(k) && k > 0);
     candles.applyOptions({
       autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
         const r = base();
         if (!r || dragging || !strikes.length) return r;
-        const lo = Math.min(r.priceRange.minValue, ...strikes);
-        const hi = Math.max(r.priceRange.maxValue, ...strikes);
+        const { minValue, maxValue } = r.priceRange;
+        if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) return r;
+        // Never zoom out past three times the candles' own range for a far-away strike.
+        const span = Math.max(maxValue - minValue, maxValue * 0.01);
+        const lo = Math.max(minValue - span, Math.min(minValue, ...strikes));
+        const hi = Math.min(maxValue + span, Math.max(maxValue, ...strikes));
+        if (!(hi > lo)) return r;
         return { ...r, priceRange: { minValue: lo - (hi - lo) * 0.03, maxValue: hi + (hi - lo) * 0.03 } };
       },
     });
+    // Your open trade: bold solid lines marked YOUR. A trade still being planned: thin dashed
+    // PLAN lines in paler colors, so the two can never be mistaken for each other.
+    const live = !!position;
     for (const l of optionLegsOf(legs)) {
+      const short = l.ratio < 0;
       add(
         l.strike,
-        l.ratio < 0 ? COLORS.magenta : COLORS.cyan,
-        `${l.ratio < 0 ? 'S' : 'L'} ${l.right}`,
-        l.ratio < 0 ? LineStyle.Solid : LineStyle.Dashed,
-        2,
+        short ? (live ? COLORS.magenta : COLORS.planShort) : live ? COLORS.cyan : COLORS.planLong,
+        `${live ? '● YOUR' : 'PLAN'} ${short ? 'S' : 'L'} ${l.right}`,
+        live ? LineStyle.Solid : LineStyle.Dashed,
+        live ? (short ? 3 : 2) : 1,
       );
-      if (l.ratio < 0) shortLinesRef.current.push(linesRef.current[linesRef.current.length - 1]);
+      if (short) shortLinesRef.current.push(linesRef.current[linesRef.current.length - 1]);
     }
     for (const b of breakevens) add(b, COLORS.amber, 'BE', LineStyle.Dotted);
     const spot = session.view(cardId).spot();
@@ -571,9 +589,10 @@ export function ChartPanel() {
           {drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}
         </div>
       )}
-      <ChartZones />
+      {(!planHidden || position) && <ChartZones />}
+      <TradeBadge position={position} plan={plan} />
       {expAhead !== null && expDte !== null && <ExpiryLine ahead={expAhead} dte={expDte} open={!!position} />}
-      <StrikeHandle />
+      {!planHidden && <StrikeHandle />}
       <PositionHud />
       <DayRecapPanel />
       <AnimatePresence>
@@ -611,6 +630,45 @@ export function ChartPanel() {
 }
 
 /** The expiration as a vertical line: solid once the trade is on, dotted while it's a plan. */
+/** Top left of the chart: are these lines a trade you placed, or one you're still shaping? */
+function TradeBadge({ position, plan }: { position: Position | undefined; plan: TradePlan | null }) {
+  const canTrade = useTrading(tradeOpen);
+  if (position) {
+    const strikes = optionLegsOf(position.legs)
+      .map((l) => l.strike)
+      .join('/');
+    return (
+      <div
+        className="trade-badge open num"
+        data-testid="trade-badge"
+        data-kind="open"
+        data-tip-title="Your open trade"
+        data-tip-body="The solid lines marked YOUR are the trade you placed on this card. The shaded box runs from the day you opened it to its expiration."
+      >
+        <b>● OPEN TRADE</b> {STRUCTURES[position.structureId].short} {strikes} ×{position.qty}{' '}
+        <LivePnl pos={position} />
+      </div>
+    );
+  }
+  if (plan && plan.legs.length && canTrade) {
+    const strikes = optionLegsOf(plan.legs)
+      .map((l) => l.strike)
+      .join('/');
+    return (
+      <div
+        className="trade-badge plan num"
+        data-testid="trade-badge"
+        data-kind="plan"
+        data-tip-title="A plan, not a trade"
+        data-tip-body="The dashed PLAN lines show the trade you're shaping. Nothing is placed until you press SELL or BUY."
+      >
+        <b>◌ PLANNING</b> {STRUCTURES[plan.structureId].short} {strikes} · not placed yet
+      </div>
+    );
+  }
+  return null;
+}
+
 function ExpiryLine({ ahead, dte, open }: { ahead: number; dte: number; open: boolean }) {
   const [, setTick] = useState(0);
   useEffect(() => {

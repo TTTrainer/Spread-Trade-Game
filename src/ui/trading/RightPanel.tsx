@@ -100,9 +100,12 @@ export function PayoffChart({ height = 190 }: { height?: number }) {
     const n = 90;
     const xs = Array.from({ length: n + 1 }, (_, i) => lo + ((hi - lo) * i) / n);
     const mult = 100 * curve.qty;
-    const exp = xs.map((x) => payoffAtExpiry(curve.legs, curve.entryNet, x, curve.env) * mult);
-    const now = xs.map(
-      (x) => payoffNow(curve.legs, curve.entryNet, x, curve.env, whatIf.days, whatIf.ivPts / 100) * mult,
+    // A price the model can't value (an expired leg, a missing IV) draws as flat, never as NaN:
+    // one bad point would otherwise break the whole chart's scale.
+    const finite = (v: number) => (Number.isFinite(v) ? v : 0);
+    const exp = xs.map((x) => finite(payoffAtExpiry(curve.legs, curve.entryNet, x, curve.env) * mult));
+    const now = xs.map((x) =>
+      finite(payoffNow(curve.legs, curve.entryNet, x, curve.env, whatIf.days, whatIf.ivPts / 100) * mult),
     );
     const all = [...exp, ...now];
     const ymin = Math.min(0, ...all);
@@ -414,7 +417,12 @@ export function StatsBlock() {
         <div className="key-stats">
           <Stat k="OPEN P/L" v={<LivePnl pos={pos} />} tip="g:pl_open" testId="stat-pl" />
           <Stat k="% OF RISK" v={pct(pl / Math.max(1, pos.entry.maxLossCents))} tip="g:pct_risk" />
-          <Stat k="MAX LOSS" v={money(pos.entry.maxLossCents)} tip="g:max_loss_trade" tone="down" />
+          <Stat
+            k={pos.structureId === 'covered_call' ? 'RISK IF IT JUMPS' : 'MAX LOSS'}
+            v={money(pos.entry.maxLossCents)}
+            tip="g:max_loss_trade"
+            tone="down"
+          />
           <Stat
             k="DAYS LEFT"
             v={pos.entry.dte - diffDays(pos.openedOn, session.view(cardId).now)}

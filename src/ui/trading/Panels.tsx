@@ -93,7 +93,7 @@ export function LineupColumn({
             key={c.id}
             selected={selected === c.id}
             onClick={() => select(c.id)}
-            className="lineup-card"
+            className={`lineup-card ${pos ? 'has-open' : closed.length ? 'has-closed' : ''}`}
             testId={`card-${i}`}
           >
             <div
@@ -102,6 +102,19 @@ export function LineupColumn({
               style={{ animationDelay: `${i * 90}ms`, ...cardBackImage(cardBack) }}
               aria-hidden="true"
             />
+            {pos ? (
+              <div className="lc-trade open num" data-testid={`card-trade-${i}`}>
+                <span>● IN TRADE</span>
+                <LivePnl pos={pos} />
+              </div>
+            ) : (
+              closed.length > 0 && (
+                <div className="lc-trade closed num" data-testid={`card-trade-${i}`}>
+                  <span>✓ CLOSED</span>
+                  <Pnl cents={pl} />
+                </div>
+              )
+            )}
             <div className="lc-top" data-tip="g:lineup_card">
               <span className="lc-sym">{c.displaySymbol}</span>
               <LivePx cardId={c.id} settled={view.spot()} />
@@ -152,7 +165,6 @@ export function LineupColumn({
               ) : (
                 <span className="dim">no call</span>
               )}
-              {pos ? <LivePnl pos={pos} /> : closed.length > 0 && <Pnl cents={pl} />}
             </div>
           </TiltCard>
         );

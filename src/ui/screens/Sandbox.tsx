@@ -203,7 +203,7 @@ export function SandboxSetup() {
           />
           {capital < 50000 && (
             <div className="dim small" data-testid="capital-hint">
-              Cash-secured puts and covered calls tie up the whole share price: $50,000 or more recommended.
+              Cash-secured puts set aside the whole strike price: $50,000 or more recommended for them.
             </div>
           )}
           <div className="section-title" data-tip="g:plan_set">
