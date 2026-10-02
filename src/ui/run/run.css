@@ -2532,12 +2532,23 @@
 
 /* The twist on the chart: one line in the boss's color, top left under the trade badge (over the
    oldest candles, clear of today's price). */
-.boss-banner {
+.boss-stack {
   position: absolute;
   top: 60px;
   left: 8px;
   z-index: 6;
   max-width: 58%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+}
+.boss-stack > * {
+  pointer-events: auto;
+}
+.boss-banner {
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2567,6 +2578,84 @@
   padding: 0 6px;
   background: var(--boss-accent);
   color: #000;
+}
+
+/* The style bonus under the banner: its condition and where it stands. */
+.boss-style {
+  padding: 1px 8px;
+  border: 1px dashed var(--boss-accent);
+  background: color-mix(in srgb, var(--boss-tint) 85%, #000);
+  font-size: 14px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.boss-style b {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.boss-style.met b {
+  color: var(--up);
+}
+.boss-style.broken {
+  opacity: 0.7;
+}
+.boss-style.broken b {
+  color: var(--down);
+}
+
+/* The Rebalancer's race: you and SPY since the round began. */
+.boss-race {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 2px solid var(--boss-accent);
+  background: color-mix(in srgb, var(--boss-tint) 90%, #000);
+  box-shadow: 3px 3px 0 #000;
+}
+.boss-race svg {
+  width: 220px;
+  height: 46px;
+}
+.br-zero {
+  stroke: var(--line);
+  stroke-dasharray: 2 3;
+}
+.br-zero,
+.br-spy,
+.br-you {
+  vector-effect: non-scaling-stroke;
+}
+.br-spy,
+.br-you {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.br-spy {
+  stroke: var(--text-dim);
+  stroke-dasharray: 5 3;
+}
+.br-you {
+  stroke: var(--boss-accent);
+}
+.br-legend {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.br-k.you {
+  color: var(--boss-accent);
+}
+.br-k.spy {
+  color: var(--text-dim);
+}
+.br-legend b {
+  font-weight: 400;
 }
 
 /* A number a boss has sealed (P/L, equity, days to expiry). */
@@ -2628,9 +2717,21 @@
     font-size: 17px;
     grid-template-columns: 120px 1fr;
   }
+  .boss-stack {
+    max-width: 72%;
+  }
   .boss-banner {
     font-size: 13px;
-    max-width: 72%;
+  }
+  .boss-style {
+    font-size: 13px;
+  }
+  .boss-race svg {
+    width: 140px;
+    height: 34px;
+  }
+  .br-legend {
+    font-size: 13px;
   }
 }
 
@@ -2786,6 +2887,9 @@
   line-height: 1.25;
   max-width: 34ch;
 }
+.mm-boss-style {
+  font-size: 14px;
+}
 .mm-r-target {
   font-size: 20px;
 }
@@ -2874,4 +2978,34 @@
   transform: none;
   font-size: 12px;
   padding: 0 4px;
+}
+
+/* The Allocator's second goal on the round goal card. */
+.goal-second {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--boss-accent, var(--line));
+  font-size: 14px;
+}
+.goal-second b {
+  font-weight: 400;
+}
+.goal-second.met b {
+  color: var(--up);
+}
+.gs-pips {
+  display: inline-flex;
+  gap: 3px;
+}
+.gs-pips i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--boss-accent, var(--line-bright));
+}
+.gs-pips i.on {
+  background: var(--boss-accent, var(--up));
 }

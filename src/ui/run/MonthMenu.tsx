@@ -8,6 +8,7 @@
 import { motion } from 'motion/react';
 import { useEffect, type CSSProperties } from 'react';
 import { BALANCE } from '../../content/balance';
+import { STYLE_TEXT } from '../../engine/run/style';
 import { BOSSES } from '../../content/bosses';
 import { DESKS } from '../../content/desks';
 import { REVIEWS } from '../../content/reviews';
@@ -85,6 +86,9 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
                 {boss.name}
               </div>
               <div className="mm-boss-twist">{boss.twistText}</div>
+              <div className="mm-boss-style dim">
+                ★ style +${BALANCE.run.styleCash}: {STYLE_TEXT[boss.style]}
+              </div>
             </div>
           </div>
         ) : (

@@ -24,6 +24,10 @@ export type RoundRule = ReviewDef['rule'] & {
   multKeep?: number;
   /** Information sealed for the round. */
   hide?: SealedInfo[];
+  /** Second goal: this many different structure types (capped at what the desk trades). */
+  variety?: number;
+  /** The full victory needs this round's trades to beat SPY on the same capital. */
+  beatSpy?: boolean;
 };
 
 export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null): RoundRule {
@@ -50,8 +54,10 @@ export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null): Ro
       return { ...traits, lossStreakStep: t.step };
     case 'multCut':
       return { ...traits, multKeep: t.keep };
+    case 'variety':
+      return { ...traits, variety: t.count };
     case 'annual':
-      return { ...traits, targetMult: market.targetMult, needsAlpha: market.needsAlpha };
+      return { ...traits, targetMult: market.targetMult, beatSpy: true };
     case 'pending':
       return traits;
   }

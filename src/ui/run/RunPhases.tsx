@@ -4,6 +4,7 @@ import { ArtIcon, artUrl } from '../art';
 import { useEffect, useMemo, useState } from 'react';
 import { REVIEWS } from '../../content/reviews';
 import { BOSSES } from '../../content/bosses';
+import { STYLE_TEXT } from '../../engine/run/style';
 import { BALANCE } from '../../content/balance';
 import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
 import type { TradeTally } from '../../engine/run/types';
@@ -367,8 +368,20 @@ function BossCaseFile({ e }: { e: RunEngine }) {
             <span className="bf-k num">TARGET</span>
             <span className="bf-v num">{st.round.target.toLocaleString()} points</span>
           </div>
+          <div className="bf-row style" data-testid="boss-style-row">
+            <span className="bf-k num">★ STYLE</span>
+            <span className="bf-v">
+              {STYLE_TEXT[boss.style]}: <span className="amber-text">+${BALANCE.run.styleCash}</span>
+            </span>
+          </div>
         </div>
-        {BALANCE.run.bossFailEndsRun && <div className="bf-warn num">Miss the target and the run ends.</div>}
+        {BALANCE.run.bossFailEndsRun && (
+          <div className="bf-warn num">
+            Miss the target and the run ends.
+            {boss.twist.kind === 'variety' ? ' Miss the second goal and it ends too.' : ''}
+            {boss.twist.kind === 'annual' ? ' Trail SPY and you only survive.' : ''}
+          </div>
+        )}
         <button className="pixel-btn primary bf-go" onClick={accept} data-testid="review-accept">
           TAKE THE REVIEW <Kbd>Enter</Kbd>
         </button>

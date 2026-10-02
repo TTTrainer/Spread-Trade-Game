@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { skip } from './sitout';
+import { day, skip } from './sitout';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
 import { computeTarget, RunEngine } from '../../src/engine/run/engine';
 import { BALANCE } from '../../src/content/balance';
@@ -278,6 +278,53 @@ describe('bosses', () => {
       expect(e.bossFor(2)).toBe(picks[1]);
     }
   });
+});
+
+describe('boss goals', () => {
+  async function inBossRound(id: (typeof BOSS_IDS)[number], seed: string) {
+    const e = await RunEngine.create(src, config(seed));
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id } });
+    expect(e.state.phase).toBe('review_intro');
+    await e.dispatch({ t: 'startReview' });
+    expect(e.state.round.bossId).toBe(id);
+    return e;
+  }
+
+  it('the Allocator needs 3 structure types as well as the target', async () => {
+    const e = await inBossRound('allocator', 'goal-alloc');
+    expect(e.secondGoal()).toEqual({ need: 3, have: 0, met: false });
+    await placeOn(e, 0);
+    expect(e.secondGoal()?.have).toBe(1);
+    // The target alone isn't enough.
+    await e.dispatch({ t: 'dev', op: { k: 'meter', delta: e.state.round.target * 3 } });
+    for (let i = 0; i < 40 && e.state.phase === 'round'; i++) await day(e);
+    expect(e.state.phase).toBe('tally');
+    expect(e.state.round.status).toBe('failed');
+  }, 60_000);
+
+  it('the Rebalancer records the race against SPY each day', async () => {
+    const e = await RunEngine.create(src, config('goal-rebal', { quarters: 1 }));
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'rebalancer' } });
+    await e.dispatch({ t: 'startReview' });
+    expect(e.rule().beatSpy).toBe(true);
+    await placeOn(e, 0);
+    const before = e.race();
+    expect(before).not.toBeNull();
+    await day(e);
+    await day(e);
+    const race = e.state.round.race ?? [];
+    expect(race.length).toBe(2);
+    // The race is the trades' P/L against the same capital in SPY.
+    expect(race[1]).toEqual(e.race());
+    // Other bosses keep no race.
+    const o = await inBossRound('underwriter', 'goal-under');
+    expect(o.race()).toBeNull();
+  }, 60_000);
+
+  it('a boss round reports its style and pays for it when met', async () => {
+    const e = await inBossRound('underwriter', 'goal-style');
+    expect(e.bossStyle()).toMatchObject({ id: 'no_loser', state: 'on_track', cash: BALANCE.run.styleCash });
+  }, 30_000);
 });
 
 describe('the month menu', () => {

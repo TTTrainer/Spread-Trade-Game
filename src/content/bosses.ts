@@ -8,6 +8,7 @@
  * Rebalancer. A boss is `ready: false` until its twist is built, and stays out of the draw.
  */
 
+import type { StyleId } from '../engine/run/style';
 import type { ReviewId } from './types';
 
 export type BossId =
@@ -36,6 +37,9 @@ export type BossTwist =
   | { kind: 'hide'; what: SealedInfo[] }
   | { kind: 'lossStreak'; step: number }
   | { kind: 'multCut'; keep: number }
+  /** A second goal: open this many different structure types (all of them on a smaller desk). */
+  | { kind: 'variety'; count: number }
+  /** The year end: a bigger target, and the full victory needs this round to beat SPY. */
   | { kind: 'annual' }
   /** Designed, not built yet (waiting on a design answer or a later phase). */
   | { kind: 'pending' };
@@ -60,6 +64,8 @@ export interface BossDef {
   intro: string;
   /** The board's colors while it's on: accent, plus a dark tint for the backgrounds. */
   palette: { accent: string; tint: string };
+  /** The style bonus: extra cash for playing the round this way (shown during the round). */
+  style: StyleId;
   ready: boolean;
 }
 
@@ -77,6 +83,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Your running P/L and equity',
     intro: 'Every dollar has a job. You will find out what yours did at the end of the month.',
     palette: { accent: '#7fd4c1', tint: '#0b2a26' },
+    style: 'plan_exits',
     ready: true,
   },
   margin_clerk: {
@@ -92,6 +99,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Half of your risk cap',
     intro: 'Six months of cash, minimum. Until I see it, you trade half size.',
     palette: { accent: '#ffd23e', tint: '#2a2208' },
+    style: 'green',
     ready: true,
   },
   underwriter: {
@@ -107,6 +115,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Cheap losses',
     intro: 'Every loss is a claim. This quarter, claims pay out double.',
     palette: { accent: '#ff5a4f', tint: '#2a0b0e' },
+    style: 'no_loser',
     ready: true,
   },
   landlord: {
@@ -122,6 +131,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: '35% of your mult',
     intro: 'Put everything in the house. The house never goes down. I am the house.',
     palette: { accent: '#e39b5b', tint: '#2a1a0b' },
+    style: 'three_wins',
     ready: true,
   },
   early_retiree: {
@@ -137,6 +147,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'The cards to yourself',
     intro: 'I quit at thirty-four. Beat my number on your own cards, or keep the day job.',
     palette: { accent: '#4dff9a', tint: '#08261a' },
+    style: 'green',
     ready: false,
   },
   tax_man: {
@@ -152,6 +163,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Quick flips',
     intro: 'Short-term gains are taxed like a salary. Hold them a little, or pay me.',
     palette: { accent: '#9ad14b', tint: '#16240a' },
+    style: 'hold_wins',
     ready: true,
   },
   bursar: {
@@ -167,6 +179,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Your leftmost cartridge',
     intro: 'Tuition is due this quarter. I will be holding your first cartridge until it clears.',
     palette: { accent: '#5aa8ff', tint: '#0a1830' },
+    style: 'two_wins',
     ready: true,
   },
   allocator: {
@@ -177,12 +190,13 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'MATRIX-8',
     role: 'Allocation engine',
     market: 'the_chop',
-    twist: { kind: 'pending' },
+    twist: { kind: 'variety', count: 3 },
     twistText: 'Second goal: trade 3 different structure types.',
     blocks: 'One-trick rounds',
     intro: 'Your allocation is a single cell. Diversify, or be rebalanced.',
     palette: { accent: '#c58bff', tint: '#1c0f30' },
-    ready: false,
+    style: 'all_types_green',
+    ready: true,
   },
   shell_company: {
     id: 'shell_company',
@@ -197,6 +211,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Chart studies and IV rank',
     intro: 'Who owns what is protected information. So is everything else.',
     palette: { accent: '#9aa3b5', tint: '#14161c' },
+    style: 'no_stop',
     ready: true,
   },
   executor: {
@@ -212,6 +227,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'When your options expire',
     intro: 'The terms are read after the papers are signed. That is how wills work.',
     palette: { accent: '#b9a27a', tint: '#1f1a12' },
+    style: 'no_expiry',
     ready: true,
   },
   collector: {
@@ -227,6 +243,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     blocks: 'Shrugging off a losing streak',
     intro: 'Miss one payment, fine. Miss two in a row and the interest starts to compound.',
     palette: { accent: '#ff7ac8', tint: '#2a0b20' },
+    style: 'no_streak',
     ready: true,
   },
   rebalancer: {
@@ -238,10 +255,11 @@ export const BOSSES: Record<BossId, BossDef> = {
     role: 'Chair of the Board',
     market: 'annual_review',
     twist: { kind: 'annual' },
-    twistText: 'Target x1.25, and the full victory needs a year that beats SPY.',
+    twistText: 'Target x1.25, and the full victory needs this round to beat SPY.',
     blocks: 'Coasting into year end',
     intro: 'Once a year we put everything back where it belongs. Including you.',
     palette: { accent: '#ff3ea5', tint: '#24082a' },
+    style: 'three_wins',
     ready: true,
   },
 };

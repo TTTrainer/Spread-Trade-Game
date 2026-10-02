@@ -137,3 +137,51 @@ test('the Controller seals running P/L and equity; the Executor seals expiry unt
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });
+
+test('the Allocator shows its second goal; the Rebalancer races SPY on the chart; styles show live', async () => {
+  test.setTimeout(240_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await page.evaluate(() =>
+    (window as any).__stg.app.getState().updateSettings((x: any) => ({
+      ...x,
+      game: { ...x.game, ffSecondsPerDay: 0.3, dayPace: 'step', pauseOnTest: false },
+    })),
+  );
+
+  await faceBoss(page, 'allocator', 'e2e-allocator');
+  await expect(page.getByTestId('second-goal')).toContainText('0/3');
+  await expect(page.getByTestId('boss-live')).toContainText('types 0/3');
+  await expect(page.getByTestId('boss-style')).toContainText('STYLE');
+  await sellBullPut(page);
+  await expect(page.getByTestId('second-goal')).toContainText('1/3');
+  await page.waitForTimeout(500);
+  await shot(page, '17-boss-allocator-1920');
+  await shot(page, '17-boss-allocator-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  await faceBoss(page, 'rebalancer', 'e2e-rebalancer');
+  await sellBullPut(page);
+  await expect(page.getByTestId('spy-race')).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect
+    .poll(
+      () => page.evaluate(() => (window as any).__stg.run.getState().engine.state.round.race?.length ?? 0),
+      {
+        timeout: 20_000,
+      },
+    )
+    .toBeGreaterThan(0);
+  await expect(page.getByTestId('spy-race')).toContainText('SPY');
+  // Close the day's recap to see the race on the chart.
+  const x = page.locator('.dr-x');
+  if (await x.isVisible().catch(() => false)) await x.click();
+  await page.waitForTimeout(800);
+  await shot(page, '17-boss-rebalancer-1920');
+  await shot(page, '17-boss-rebalancer-1366', { width: 1366, height: 768 });
+  expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});

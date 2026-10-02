@@ -489,6 +489,26 @@ function ClientCard({ e }: { e: RunEngine }) {
  * The round goal in one glance: points still needed, a bar that shows where the meter is and where
  * it would be if the open trades closed now, and a plain line on what that means.
  */
+/** The Allocator's second goal as a progress chip: one pip per structure type needed. */
+function SecondGoal({ e }: { e: RunEngine }) {
+  const g = e.secondGoal();
+  if (!g) return null;
+  return (
+    <div className={`goal-second num ${g.met ? 'met' : ''}`} data-testid="second-goal">
+      <span className="dim">SECOND GOAL</span> {g.need} structure types{' '}
+      <span className="gs-pips">
+        {Array.from({ length: g.need }, (_, i) => (
+          <i key={i} className={i < g.have ? 'on' : ''} />
+        ))}
+      </span>{' '}
+      <b>
+        {Math.min(g.have, g.need)}/{g.need}
+        {g.met ? ' ✔' : ''}
+      </b>
+    </div>
+  );
+}
+
 export function GoalCard({ e }: { e: RunEngine }) {
   useTrading((s) => s.version);
   useRun((s) => s.version);
@@ -567,6 +587,7 @@ export function GoalCard({ e }: { e: RunEngine }) {
           )}
         </div>
       )}
+      <SecondGoal e={e} />
       <div className="goal-note">{note}</div>
     </div>
   );

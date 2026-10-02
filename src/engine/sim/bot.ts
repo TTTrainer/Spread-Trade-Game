@@ -92,8 +92,25 @@ interface Setup {
   qualifies: boolean;
 }
 
-/** What each desk's player reaches for on this card. */
+/**
+ * What each desk's player reaches for on this card. Under the Allocator's second goal, a type
+ * already traded this round gives way to an untraded one leaning the same way when there is one.
+ */
 function setupFor(engine: RunEngine, cardId: string, o: BotOptions, rng: Rng): Setup {
+  const base = baseSetup(engine, cardId, o, rng);
+  const goal = engine.secondGoal();
+  if (!goal || goal.met) return base;
+  const traded = new Set((engine.session?.positions ?? []).map((p) => p.structureId));
+  if (!traded.has(base.structureId)) return base;
+  const fresh = DESKS[engine.state.config.deskId].structures.filter((x) => !traded.has(x));
+  const bias = STRUCTURES[base.structureId].bias;
+  const pick = fresh.find((x) => STRUCTURES[x].bias === bias) ?? fresh[0];
+  return pick
+    ? { ...base, structureId: pick, deltas: STRUCTURES[pick].credit ? base.deltas : [0.5, 0.4] }
+    : base;
+}
+
+function baseSetup(engine: RunEngine, cardId: string, o: BotOptions, rng: Rng): Setup {
   const s = engine.session as TradingSession;
   const desk = DESKS[engine.state.config.deskId];
   const ctx = s.context(cardId);

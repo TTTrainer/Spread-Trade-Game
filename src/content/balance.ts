@@ -32,6 +32,8 @@ export const BALANCE = {
     bossFailEndsRun: true,
     /** Rerolling a boss (once per boss) costs more for each boss of the run: 1st, 2nd, 3rd, later. */
     bossRerollCosts: [10, 25, 40, 60],
+    /** Cash for a boss round played in the boss's style (on top of the round win). */
+    styleCash: 3,
   },
 
   /**

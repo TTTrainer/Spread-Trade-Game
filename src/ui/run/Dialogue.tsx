@@ -9,16 +9,20 @@ import { monthMenuUp } from './MonthMenu';
 
 /** The speech box: a portrait, a name and a typed line. Clicks pass through it; it fades on its own. */
 /** The chart panel's box on screen while `on` (read again on resize). */
-function useChartBox(on: boolean): DOMRect | null {
-  const [box, setBox] = useState<DOMRect | null>(null);
+/** The chart's box, and the bottom of a boss's banner stack over it (to speak below it). */
+function useChartBox(on: boolean, key: unknown): { box: DOMRect; stackBottom: number | null } | null {
+  const [box, setBox] = useState<{ box: DOMRect; stackBottom: number | null } | null>(null);
   useEffect(() => {
     if (!on) return;
-    const read = () =>
-      setBox(document.querySelector('[data-testid="chart-panel"]')?.getBoundingClientRect() ?? null);
+    const read = () => {
+      const chart = document.querySelector('[data-testid="chart-panel"]')?.getBoundingClientRect();
+      const stack = document.querySelector('[data-testid="boss-stack"]')?.getBoundingClientRect();
+      setBox(chart ? { box: chart, stackBottom: stack ? stack.bottom : null } : null);
+    };
     read();
     window.addEventListener('resize', read);
     return () => window.removeEventListener('resize', read);
-  }, [on]);
+  }, [on, key]);
   return on ? box : null;
 }
 
@@ -41,9 +45,10 @@ export function DialogueBox() {
   // During a round the line sits over the chart's oldest candles (its left side), clear of today's
   // price, the clock controls and the trade card: the top left, or the bottom left while the
   // day's recap fills the middle (the trade card steps aside for the recap too).
-  const chartBox = useChartBox(onChart && !!speech);
-  // A boss's banner sits under the trade badge: speak below it.
-  const bossRound = useRun((s) => !!s.engine?.state.round.bossId);
+  // A boss's banner (with its style line and race) sits under the trade badge: speak below it.
+  const measured = useChartBox(onChart && !!speech, speech?.n);
+  const chartBox = measured?.box ?? null;
+  const top = measured ? Math.max(measured.box.top + 46, (measured.stackBottom ?? 0) + 8) : 0;
   const chartStyle: React.CSSProperties | undefined =
     onChart && chartBox
       ? {
@@ -51,7 +56,7 @@ export function DialogueBox() {
           width: Math.min(440, chartBox.width * 0.45),
           ...(recapUp
             ? { top: 'auto', bottom: window.innerHeight - chartBox.bottom + 40 }
-            : { top: chartBox.top + (bossRound ? 96 : 46), bottom: 'auto' }),
+            : { top, bottom: 'auto' }),
         }
       : undefined;
   // A line said while the month menu is up waits for it to close (its timer starts then).

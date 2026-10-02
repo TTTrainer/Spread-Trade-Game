@@ -93,6 +93,10 @@ export interface RoundState {
   bossId?: BossId | null;
   /** The month menu (target, build, plan, the quarter's boss) has been seen for this round. */
   boardSeen?: boolean;
+  /** The Rebalancer's race at each day's close: the round's trades vs SPY on the same capital. */
+  race?: { you: number; spy: number }[];
+  /** The boss's style bonus was earned (set when the round settles). */
+  styleMet?: boolean;
   target: number;
   meter: number;
   startEquityCents: number;

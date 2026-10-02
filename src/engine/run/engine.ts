@@ -19,6 +19,15 @@ import { MEMOS, TAG_IDS, VOUCHERS } from '../../content/items';
 import { ANNUAL_MIX, REVIEWS } from '../../content/reviews';
 import { BOSSES, quarterBossPool, type BossId } from '../../content/bosses';
 import { roundRule, type RoundRule } from './rules';
+import { raceNow, type RacePoint } from './race';
+import {
+  STYLE_TEXT,
+  styleState,
+  structureTypes,
+  type StyleId,
+  type StyleState,
+  type StyleTrade,
+} from './style';
 import { tierMods } from '../../content/tiers';
 import { complianceMods } from '../../content/meta';
 import { pickLine, type CharacterId, type Trigger } from '../../content/characters';
@@ -640,6 +649,58 @@ export class RunEngine {
     };
   }
 
+  /** The round's trades as the style and second-goal checks see them, in the order they closed. */
+  private styleTrades(): StyleTrade[] {
+    const s = this.session ?? this.finishedSession;
+    if (!s) return [];
+    const order = this.state.round.tallies.map((t) => t.positionId);
+    const rank = (id: string) => {
+      const i = order.indexOf(id);
+      return i < 0 ? order.length : i;
+    };
+    return s.positions
+      .slice()
+      .sort((a, b) => rank(a.id) - rank(b.id))
+      .map((p) => ({
+        structureId: p.structureId,
+        open: p.status === 'open',
+        realizedCents: p.realizedCents ?? 0,
+        exitReason: p.exitReason ?? null,
+        daysHeld: Math.max(0, p.marks.length - 1),
+      }));
+  }
+
+  /** The Allocator's second goal: how many structure types, of how many needed. */
+  secondGoal(): { need: number; have: number; met: boolean } | null {
+    const st = this.state;
+    const want = st.round.bossId ? this.rule().variety : undefined;
+    if (!want) return null;
+    const need = Math.min(want, DESKS[st.config.deskId].structures.length);
+    const have = structureTypes(this.styleTrades()).length;
+    return { need, have, met: have >= need };
+  }
+
+  /** This boss round's style bonus and where it stands. */
+  bossStyle(): { id: StyleId; text: string; cash: number; state: StyleState } | null {
+    const st = this.state;
+    const id = st.round.bossId;
+    if (!id || (st.phase !== 'round' && st.phase !== 'tally')) return null;
+    const style = BOSSES[id].style;
+    const state =
+      st.phase === 'tally'
+        ? st.round.styleMet
+          ? 'met'
+          : 'broken'
+        : styleState(style, this.styleTrades(), false);
+    return { id: style, text: STYLE_TEXT[style], cash: BALANCE.run.styleCash, state };
+  }
+
+  /** The Rebalancer's race right now (null outside its round). */
+  race(): RacePoint | null {
+    if (!this.session || !this.state.round.bossId || !this.rule().beatSpy) return null;
+    return raceNow(this.session);
+  }
+
   // ---------- actions ----------
 
   async dispatch(a: RunAction): Promise<PlaceResult | null> {
@@ -901,6 +962,7 @@ export class RunEngine {
     }
     if (hadOrder) r.ticketsUsed = Math.max(0, r.ticketsUsed - 1);
     if (sa.t === 'end') this.afterDayClose();
+    if (sa.t === 'end' && r.bossId && this.rule().beatSpy) r.race = [...(r.race ?? []), raceNow(s)];
     this.scoreClosed();
     if (sa.t === 'end' || sa.t === 'close' || sa.t === 'decide') await this.checkLine();
     if (this.session !== s) return res;
@@ -1189,7 +1251,14 @@ export class RunEngine {
         points: r.greenBonus,
       });
     }
-    r.status = !r.breached && r.meter >= r.target ? 'passed' : 'failed';
+    const goal = this.secondGoal();
+    if (goal && !goal.met)
+      this.events.push({
+        kind: 'warn',
+        text: `Second goal missed: ${goal.have} of ${goal.need} structure types. The Review needs both.`,
+      });
+    r.status = !r.breached && r.meter >= r.target && (!goal || goal.met) ? 'passed' : 'failed';
+    if (r.bossId) r.styleMet = styleState(BOSSES[r.bossId].style, this.styleTrades(), true) === 'met';
     // Part of a surplus carries into the next round, so a strong round leaves a cushion.
     st.carry = r.status === 'passed' ? Math.round((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;
     if (r.breached) this.say('breach', 9);
@@ -1239,6 +1308,11 @@ export class RunEngine {
     }
     if (passed) {
       r.payouts.push({ label: `Round win (${ROUND_NAMES[r.index]})`, cash: BALANCE.cash.roundWin[r.index] });
+      if (r.bossId && r.styleMet)
+        r.payouts.push({
+          label: `Style: ${STYLE_TEXT[BOSSES[r.bossId].style]}`,
+          cash: BALANCE.run.styleCash,
+        });
       if (unused)
         r.payouts.push({
           label: `${unused} unused ticket${unused > 1 ? 's' : ''}`,
@@ -1331,7 +1405,9 @@ export class RunEngine {
       }
     }
     if (this.isLastRound()) {
-      const alpha = st.totals.alphaCents;
+      // The Rebalancer asks this round to beat SPY; a year-end without one asks the whole year.
+      const roundSpy = !!r.bossId && this.rule().beatSpy;
+      const alpha = roundSpy ? r.debriefs.reduce((a, d) => a + d.alphaCents, 0) : st.totals.alphaCents;
       if (st.config.practice) {
         const cleared = st.history.filter((h) => h.status === 'passed').length;
         this.finishRun(
@@ -1343,8 +1419,12 @@ export class RunEngine {
       this.finishRun(
         alpha > 0 ? 'victory' : 'survived',
         alpha > 0
-          ? 'You beat the year and beat SPY.'
-          : "You survived, but the board asks why you didn't just buy SPY.",
+          ? roundSpy
+            ? 'You beat the year, the Rebalancer and SPY.'
+            : 'You beat the year and beat SPY.'
+          : roundSpy
+            ? "You survived the Rebalancer, but your last round trailed SPY. The board asks why you didn't just buy SPY."
+            : "You survived, but the board asks why you didn't just buy SPY.",
       );
       return;
     }
