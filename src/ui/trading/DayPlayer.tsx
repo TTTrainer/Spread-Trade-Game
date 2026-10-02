@@ -20,7 +20,8 @@ import { formingBar, livePl, priceAt } from './dayPath';
 import { MiniCandles } from './DayRecap';
 import { boundsOf, PlRange, shareText } from './PlRange';
 import { RollDialog } from './RollDialog';
-import { useActiveBoss } from '../boss';
+import { useActiveBoss, useSealed } from '../boss';
+import { SealedText } from './BossBanner';
 
 /** Progress (0..1) of the day being played, redrawn about 30 times a second; null between days. */
 export function useDayProgress(): { anim: DayAnim; t: number } | null {
@@ -63,6 +64,8 @@ export function useLivePl(positionId: string, settledCents: number): number {
 export function LivePnl({ pos }: { pos: Position }) {
   const settled = pos.status === 'open' ? (lastMark(pos)?.plCents ?? 0) : (pos.realizedCents ?? 0);
   const cents = useLivePl(pos.id, settled);
+  const sealed = useSealed('pnl');
+  if (sealed && pos.status === 'open') return <SealedText by={sealed} />;
   return <span className={`pnl num ${pnlClass(cents)}`}>{pnlText(cents)}</span>;
 }
 
@@ -70,11 +73,12 @@ export function LivePnl({ pos }: { pos: Position }) {
 export function LiveVsMax({ pos }: { pos: Position }) {
   const settled = pos.status === 'open' ? (lastMark(pos)?.plCents ?? 0) : (pos.realizedCents ?? 0);
   const cents = useLivePl(pos.id, settled);
+  const sealed = useSealed('pnl') && pos.status === 'open';
   const b = boundsOf(pos);
   return (
     <div className="pos-range">
-      <PlRange cents={cents} bounds={b} size="mini" />
-      <span className={cents >= 0 ? 'up' : 'down'}>{shareText(cents, b)}</span>
+      <PlRange cents={sealed ? null : cents} bounds={b} size="mini" />
+      {!sealed && <span className={cents >= 0 ? 'up' : 'down'}>{shareText(cents, b)}</span>}
     </div>
   );
 }
@@ -110,6 +114,8 @@ function HudRow({
       : null;
   const theta = (lastMark(p)?.greeks.theta ?? 0) * p.qty;
   const tax = useActiveBoss()?.rule.shortWinTax;
+  const sealedBy = useSealed('pnl');
+  const plSealed = p.status === 'open' ? sealedBy : null;
   const held = Math.max(0, p.marks.length - 1);
   return (
     <div className={`hud-row ${selected ? 'sel' : ''} ${p.status}`} data-testid={`hud-${p.id}`}>
@@ -122,11 +128,18 @@ function HudRow({
         <span className="hud-inhand num dim" data-tip="g:credit_view">
           {p.openNet < 0 ? 'IN HAND' : 'PAID'} {money(Math.round(Math.abs(p.openNet) * 100 * 100 * p.qty))}
         </span>
-        <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:credit_view">
-          <span className="hud-pl-k">{p.status === 'open' ? 'IF CLOSED' : 'REALIZED'}</span> {pnlText(cents)}
-        </span>
+        {plSealed ? (
+          <span className="hud-pl num">
+            <span className="hud-pl-k">IF CLOSED</span> <SealedText by={plSealed} />
+          </span>
+        ) : (
+          <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:credit_view">
+            <span className="hud-pl-k">{p.status === 'open' ? 'IF CLOSED' : 'REALIZED'}</span>{' '}
+            {pnlText(cents)}
+          </span>
+        )}
         <AnimatePresence>
-          {floats.map((f) => (
+          {(plSealed ? [] : floats).map((f) => (
             <motion.span
               key={f.id}
               className={`hud-float unreal num ${f.cents >= 0 ? 'up' : 'down'}`}
@@ -141,11 +154,13 @@ function HudRow({
       </div>
       {p.status === 'open' ? (
         <>
-          <PlRange cents={cents} bounds={bounds} />
+          <PlRange cents={plSealed ? null : cents} bounds={bounds} />
           <div className="hud-facts num dim">
-            <span className={cents >= 0 ? 'up' : 'down'} data-testid="hud-share">
-              {shareText(cents, bounds)}
-            </span>
+            {!plSealed && (
+              <span className={cents >= 0 ? 'up' : 'down'} data-testid="hud-share">
+                {shareText(cents, bounds)}
+              </span>
+            )}
             {dte !== null && <span data-tip="g:dte">{dte} DTE</span>}
             {tax && (
               <span className={held <= tax.days ? 'down' : 'up'} data-testid="hud-tax">
@@ -186,6 +201,8 @@ function MiniTile({ p }: { p: Position }) {
   const view = session?.view(p.cardId);
   const settled = p.status === 'open' ? (lastMark(p)?.plCents ?? 0) : (p.realizedCents ?? 0);
   const cents = useLivePl(p.id, settled);
+  const sealedBy = useSealed('pnl');
+  const plSealed = p.status === 'open' ? sealedBy : null;
   if (!view) return null;
   let bars = view.bars().slice(-18);
   const card = prog?.anim.cards[p.cardId];
@@ -197,7 +214,7 @@ function MiniTile({ p }: { p: Position }) {
   const legs = optionLegsOf(p.legs);
   return (
     <button
-      className={`mini-tile ${p.status} ${cents >= 0 ? 'up' : 'down'}`}
+      className={`mini-tile ${p.status} ${plSealed ? '' : cents >= 0 ? 'up' : 'down'}`}
       data-testid={`mini-${p.id}`}
       onClick={() => {
         sfx('select');
@@ -208,7 +225,11 @@ function MiniTile({ p }: { p: Position }) {
     >
       <span className="mt-head">
         <span className="mt-sym">{p.symbol}</span>
-        <span className={`mt-pl num ${pnlClass(cents)}`}>{pnlText(cents)}</span>
+        {plSealed ? (
+          <span className="mt-pl num sealed-num">🔒</span>
+        ) : (
+          <span className={`mt-pl num ${pnlClass(cents)}`}>{pnlText(cents)}</span>
+        )}
       </span>
       <MiniCandles
         bars={bars}
@@ -218,7 +239,7 @@ function MiniTile({ p }: { p: Position }) {
         height={44}
       />
       {p.status === 'open' ? (
-        <PlRange cents={cents} bounds={boundsOf(p)} size="mini" />
+        <PlRange cents={plSealed ? null : cents} bounds={boundsOf(p)} size="mini" />
       ) : (
         <span className="mt-closed num">CLOSED · {p.exitReason}</span>
       )}

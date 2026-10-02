@@ -317,7 +317,9 @@ export type DevOp =
   | { k: 'cartridge'; id: string }
   | { k: 'analyst'; id: AnalystId }
   | { k: 'memo'; id: MemoId }
-  | { k: 'voucher'; id: VoucherId };
+  | { k: 'voucher'; id: VoucherId }
+  /** Straight to this quarter's Review with this boss (from a Month before its clock starts). */
+  | { k: 'boss'; id: BossId };
 
 export interface RunEvent {
   kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say';

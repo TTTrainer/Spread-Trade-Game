@@ -13,6 +13,8 @@ import { sfx } from '../../audio/sfx';
 import { money, pnlClass, pnlText } from '../format';
 import { Kbd } from '../components/ui';
 import { useTrading, type DayRecap as Recap } from '../store/trading';
+import { useSealed } from '../boss';
+import { SealedText } from './BossBanner';
 
 /** A small candlestick chart with the trade's strike lines. */
 export function MiniCandles({
@@ -110,6 +112,7 @@ function RecapTrade({ t }: { t: Recap['trades'][number] }) {
   const session = useTrading((s) => s.session);
   const closePosition = useTrading((s) => s.closePosition);
   const ff = useTrading((s) => s.ff);
+  const plSealed = useSealed('pnl');
   const p = session?.position(t.positionId);
   if (!session || !p) return null;
   const view = session.view(t.cardId);
@@ -153,6 +156,10 @@ function RecapTrade({ t }: { t: Recap['trades'][number] }) {
         {t.closed ? (
           <div className="rt-money num">
             Realized <b className={pnlClass(p.realizedCents ?? 0)}>{pnlText(p.realizedCents ?? 0)}</b>
+          </div>
+        ) : plSealed ? (
+          <div className="rt-money num">
+            {cv.label} {money(cv.entryCents)} · if closed now <SealedText by={plSealed} />
           </div>
         ) : (
           <div className="rt-money num" data-tip="g:credit_view">

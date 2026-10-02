@@ -17,6 +17,8 @@ import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
 import { briefFor, StreetChip } from './NewsBrief';
 import { LiveVsMax, LivePnl, PaceControls, useDayProgress } from './DayPlayer';
+import { useSealed } from '../boss';
+import { LockStamp, SealedText } from './BossBanner';
 import { priceAt } from './dayPath';
 import type { BriefAccess } from '../../engine/news/brief';
 import { RollDialog } from './RollDialog';
@@ -195,6 +197,8 @@ export function PositionsDock() {
   const selectedPos = useTrading((s) => s.selectedPositionId);
   const selectPosition = useTrading((s) => s.selectPosition);
   const [rolling, setRolling] = useState<Position | null>(null);
+  // The Controller seals the running P/L, and the mark with it (open minus mark is the P/L).
+  const plSealed = useSealed('pnl');
   useHotkeys({
     flatten: () => {
       const id = selectedPos ?? session?.openPositions()[0]?.id;
@@ -254,7 +258,15 @@ export function PositionsDock() {
                 </td>
                 <td>{p.qty}</td>
                 <td>{price(Math.abs(p.openNet))}</td>
-                <td>{p.status === 'open' ? price(Math.abs(m?.value ?? 0)) : p.exitReason}</td>
+                <td>
+                  {p.status !== 'open' ? (
+                    p.exitReason
+                  ) : plSealed ? (
+                    <SealedText by={plSealed} text="?" />
+                  ) : (
+                    price(Math.abs(m?.value ?? 0))
+                  )}
+                </td>
                 <td>{p.status === 'open' ? <LivePnl pos={p} /> : <Pnl cents={pl} />}</td>
                 <td>
                   <LiveVsMax pos={p} />
@@ -348,6 +360,7 @@ export function DecisionModal() {
   const selected = useTrading((s) => s.selectedCardId);
   const select = useTrading((s) => s.select);
   const [rolling, setRolling] = useState<DecisionPoint | null>(null);
+  const plSealed = useSealed('pnl');
   // Reviewing the chart: the dialog tucks into a bar so the full chart can be scrolled and zoomed.
   const peek = useTrading((s) => s.reviewChart);
   const setPeek = useTrading((s) => s.setReviewChart);
@@ -434,7 +447,7 @@ export function DecisionModal() {
           {dp.title}: {pos.symbol}
         </div>
         <span className="num">
-          P/L <Pnl cents={m?.plCents ?? 0} />
+          P/L {plSealed ? <SealedText by={plSealed} /> : <Pnl cents={m?.plCents ?? 0} />}
         </span>
         <div className="dp-actions">{buttons}</div>
         <button className="pixel-btn" onClick={() => setPeek(false)} data-testid="dp-back">
@@ -484,9 +497,7 @@ export function DecisionModal() {
         />
       </div>
       <div className="num dp-facts">
-        <span>
-          P/L <Pnl cents={m?.plCents ?? 0} />
-        </span>
+        <span>P/L {plSealed ? <SealedText by={plSealed} /> : <Pnl cents={m?.plCents ?? 0} />}</span>
         <span>spot {view.spot().toFixed(2)}</span>
         <span>short {pos.entry.shortStrikes.join('/') || '—'}</span>
       </div>
@@ -650,6 +661,8 @@ export function AnalyzePanel() {
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
   const [heat, setHeat] = useState(true);
+  // The Executor seals how long the planned trade has: no day axis to read it off.
+  const dteSealed = useSealed('dte');
   if (!session || !cardId) return null;
   const chain = session.chain(cardId);
   const exp = builder.expiration;
@@ -690,17 +703,23 @@ export function AnalyzePanel() {
             onChange={(e) => setWhatIf({ pricePct: Number(e.target.value) })}
           />
         </label>
-        <label>
-          Days +{whatIf.days}
-          <input
-            type="range"
-            min={0}
-            max={Math.max(1, dte)}
-            step={1}
-            value={whatIf.days}
-            onChange={(e) => setWhatIf({ days: Number(e.target.value) })}
-          />
-        </label>
+        {dteSealed ? (
+          <label>
+            Days <LockStamp text="SEALED" by={dteSealed} />
+          </label>
+        ) : (
+          <label>
+            Days +{whatIf.days}
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, dte)}
+              step={1}
+              value={whatIf.days}
+              onChange={(e) => setWhatIf({ days: Number(e.target.value) })}
+            />
+          </label>
+        )}
         <label>
           IV {whatIf.ivPts > 0 ? '+' : ''}
           {whatIf.ivPts} pts
@@ -723,7 +742,7 @@ export function AnalyzePanel() {
                   plan.mid,
                   spot * (1 + whatIf.pricePct / 100),
                   env,
-                  whatIf.days,
+                  dteSealed ? 0 : whatIf.days,
                   whatIf.ivPts / 100,
                 ) *
                   100 *
@@ -743,7 +762,7 @@ export function AnalyzePanel() {
             const d = Math.round((dte * r) / 5);
             return (
               <div key={r} className="heat-row">
-                <span className="heat-lbl">+{d}d</span>
+                <span className="heat-lbl">{dteSealed ? (r === 5 ? 'EXP' : `T${r}`) : `+${d}d`}</span>
                 {Array.from({ length: 13 }, (_, c) => {
                   const px = spot * (1 + (c - 6) * 0.02);
                   const v = payoffNow(plan.legs, plan.mid as number, px, env, d, 0) * 100 * builder.qty;

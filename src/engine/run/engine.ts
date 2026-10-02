@@ -704,7 +704,8 @@ export class RunEngine {
           this.finishRun('forfeit', 'You walked away from the desk.');
           break;
         case 'dev':
-          this.devOp(a.op);
+          if (a.op.k === 'boss') await this.devBoss(a.op.id);
+          else this.devOp(a.op);
           break;
       }
     this.flushSpeech(String(this.log.length));
@@ -1964,6 +1965,20 @@ export class RunEngine {
   }
 
   /** Developer mode's levers: game-layer only, logged like any action. */
+  /** Developer mode: skip the rest of this quarter's Months and face this boss now. */
+  private async devBoss(id: BossId): Promise<void> {
+    const st = this.state;
+    if (st.phase !== 'round' || st.roundIndex === 2 || st.round.clockStarted)
+      return this.warn('Jump to a boss from a Month, before its clock starts.');
+    if (this.session?.positions.length) return this.warn('Close this Month’s trades first.');
+    st.dev = true;
+    st.bosses = [...(st.bosses ?? []).filter((b) => b.quarter !== st.quarter), { quarter: st.quarter, id }];
+    st.roundIndex = 1;
+    this.session = null;
+    this.events.push({ kind: 'info', text: `DEV: straight to ${BOSSES[id].name}` });
+    await this.advanceRound();
+  }
+
   private devOp(op: DevOp): void {
     const st = this.state;
     const r = st.round;
@@ -2014,6 +2029,9 @@ export class RunEngine {
         st.vouchers.push(op.id);
         st.cash += VOUCHERS[op.id].cashNow ?? 0;
         return note(`voucher ${VOUCHERS[op.id].name}`);
+      case 'boss':
+        // Async: handled by devBoss.
+        return;
     }
   }
 

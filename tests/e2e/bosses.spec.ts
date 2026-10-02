@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { launchGame } from './helpers';
+import { launchGame, shot } from './helpers';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -52,5 +52,88 @@ test('a full year of bosses draws without one error', async () => {
   expect(bosses.length).toBe(4);
   expect(bosses[3]).toBe('THE REBALANCER');
   expect(new Set(bosses).size).toBe(4);
+  await app.close();
+});
+
+async function faceBoss(page: Page, id: string, seed: string): Promise<void> {
+  await page.evaluate(
+    async ([bossId, s]) => {
+      const w = window as any;
+      await w.__stg.run.getState().newRun({ deskId: 'verticals', seed: s, practice: true });
+      w.__stg.app.getState().go('run');
+      await w.__stg.run.getState().act({ t: 'boardDone' });
+      await w.__stg.run.getState().act({ t: 'dev', op: { k: 'boss', id: bossId } });
+    },
+    [id, seed],
+  );
+  await expect(page.getByTestId('review-intro')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('review-accept').click();
+  await expect(page.getByTestId('boss-banner')).toBeVisible({ timeout: 60_000 });
+}
+
+async function sellBullPut(page: Page): Promise<void> {
+  await page.keyboard.press('4');
+  await page.keyboard.press('Shift+2');
+  await page.getByTestId('structure-bull_put').click();
+  await expect(page.getByTestId('score-preview')).toBeVisible();
+  await page.keyboard.press('Alt+S');
+  await expect(page.getByTestId('toasts')).toContainText('Filled');
+}
+
+test('the Controller seals running P/L and equity; the Executor seals expiry until the trade is open', async () => {
+  test.setTimeout(240_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await page.evaluate(() =>
+    (window as any).__stg.app.getState().updateSettings((x: any) => ({
+      ...x,
+      game: { ...x.game, ffSecondsPerDay: 0.3, dayPace: 'step', pauseOnTest: false },
+    })),
+  );
+
+  // The Controller: equity and the room above the line are sealed before and after a trade.
+  await faceBoss(page, 'controller', 'e2e-controller');
+  await expect(page.getByTestId('boss-banner')).toContainText('THE CONTROLLER');
+  await expect(page.getByTestId('equity-sealed')).toBeVisible();
+  await expect(page.getByTestId('maxloss-gauge')).toHaveCount(0);
+  await sellBullPut(page);
+  // A day passes: the trade card shows its range, but not where the trade sits on it.
+  await page.keyboard.press('Space');
+  await expect(page.getByTestId('pos-hud')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('pos-hud').getByTestId('sealed-num').first()).toBeVisible();
+  await expect(page.getByTestId('hud-share')).toHaveCount(0);
+  await page.waitForTimeout(600);
+  await shot(page, '17-boss-controller-1920');
+  await shot(page, '17-boss-controller-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  // Let the day finish before leaving.
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__stg.trading.getState().ff), { timeout: 20_000 })
+    .not.toBe('running');
+
+  // The Executor: no expiration line or day count while planning; both appear once it's open.
+  await page.evaluate(() => (window as any).__stg.trading.getState().pause?.());
+  await faceBoss(page, 'executor', 'e2e-executor');
+  await expect(page.getByTestId('boss-banner')).toContainText('THE EXECUTOR');
+  await page.keyboard.press('4');
+  await page.getByTestId('structure-bull_put').click();
+  await expect(page.getByTestId('exp-sealed')).toBeVisible();
+  await expect(page.getByTestId('exp-sealed-readout')).toContainText('?');
+  await expect(page.getByTestId('exp-line')).toHaveCount(0);
+  // Max profit and max loss still show on the plan.
+  await expect(page.getByTestId('score-preview')).toBeVisible();
+  await page.waitForTimeout(400);
+  await shot(page, '17-boss-executor-plan-1920');
+  await shot(page, '17-boss-executor-plan-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.keyboard.press('Shift+2');
+  await page.keyboard.press('Alt+S');
+  await expect(page.getByTestId('toasts')).toContainText('Filled');
+  await expect(page.getByTestId('exp-line')).toBeVisible();
+  await expect(page.getByTestId('exp-sealed')).toHaveCount(0);
+  expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });

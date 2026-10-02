@@ -37,10 +37,12 @@ export const BALANCE = {
   /**
    * Each boss's Review target, as a share of the normal Review target, tuned in the simulator so a
    * good player beats a typical boss about 9 times in 10 and the year-end Rebalancer about 7 in 10
-   * (on top of the Annual Review's own x1.25). A harsher twist gets a lower bar.
+   * (on top of the Annual Review's own x1.25). A harsher twist gets a lower bar. The simulator's
+   * bots don't read the screen, so the bosses that only seal information (the Controller, the
+   * Executor, the Shell Company) are set by hand a little under 1.
    */
   bossTargets: {
-    controller: 1,
+    controller: 0.9,
     margin_clerk: 0.8,
     underwriter: 0.85,
     landlord: 0.6,
@@ -49,7 +51,7 @@ export const BALANCE = {
     bursar: 0.85,
     allocator: 1,
     shell_company: 0.75,
-    executor: 1,
+    executor: 0.9,
     collector: 0.95,
     rebalancer: 2,
   } as Record<string, number>,

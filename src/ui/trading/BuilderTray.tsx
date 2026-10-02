@@ -9,6 +9,7 @@ import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
+import { useSealed } from '../boss';
 
 export function StructureCards({
   allowed,
@@ -145,6 +146,9 @@ export function OrderTicket() {
                     : null;
   const disabled = !plan?.ok || !open || hasPosition || !!runBlock;
   const earnings = plan?.entry?.earningsInside;
+  // With the Executor sealing the term, whether earnings fall inside it is sealed too: the toggle
+  // is always there, worded for either case.
+  const dteSealed = useSealed('dte');
 
   const go = (side: 'buy' | 'sell') => {
     if (disabled) {
@@ -236,14 +240,16 @@ export function OrderTicket() {
         <div className="plan-chip" data-tip="g:plan_set">
           PLAN · take profit at {Math.round(builder.targetPct * 100)}% · stop at {builder.stopMult}× credit
         </div>
-        {earnings && (
+        {(earnings || dteSealed) && (
           <label className="toggle warn-text" data-testid="earnings-ack" data-tip="g:earnings_ack">
             <input
               type="checkbox"
               checked={builder.earningsAck}
               onChange={(e) => setBuilder({ earningsAck: e.target.checked })}
             />{' '}
-            Earnings inside: holding through on purpose
+            {dteSealed
+              ? 'If earnings land inside: holding through on purpose'
+              : 'Earnings inside: holding through on purpose'}
           </label>
         )}
         <div className="ticket-buttons">

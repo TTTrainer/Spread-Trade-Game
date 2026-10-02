@@ -15,6 +15,7 @@ import { price } from '../format';
 import { Kbd } from '../components/ui';
 import { useApp } from '../store/app';
 import { liveCardId, tradeOpen, useTrading } from '../store/trading';
+import { useSealed } from '../boss';
 
 const g = (x: number | undefined, d = 2) => (x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(d));
 
@@ -25,6 +26,8 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
   const allowed = useTrading((s) => s.allowed);
   const plan = useTrading((s) => s.plan)();
   const [exp, setExp] = useState<string | null>(builder.expiration);
+  // The Executor seals how far out each expiration is: the tabs are numbered instead.
+  const dteSealed = useSealed('dte');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -80,7 +83,7 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
     useApp
       .getState()
       .toast(
-        `${side === 'sell' ? 'Selling' : 'Buying'} the ${q.strike}${q.right} (${diffDays(now, e)} days).`,
+        `${side === 'sell' ? 'Selling' : 'Buying'} the ${q.strike}${q.right} (${dteSealed ? 'term sealed' : `${diffDays(now, e)} days`}).`,
         'good',
       );
   };
@@ -138,21 +141,25 @@ export function ChainScreen({ onClose }: { onClose: () => void }) {
           <span className="num dim">{spot.toFixed(2)}</span>
         </h2>
         <span className="dim num">
-          {em !== null && `Expected move to this date ±${price(em)} (${((em / spot) * 100).toFixed(1)}%)`}
+          {em !== null &&
+            !dteSealed &&
+            `Expected move to this date ±${price(em)} (${((em / spot) * 100).toFixed(1)}%)`}
         </span>
         <button className="pixel-btn" onClick={onClose}>
           ◂ CHART <Kbd>Esc</Kbd>
         </button>
       </div>
       <div className="chain-exps num">
-        {exps.map((x) => (
+        {exps.map((x, i) => (
           <button
             key={x}
             className={`exp-chip ${x === e ? 'sel' : ''}`}
             onClick={() => (sfx('click'), setExp(x))}
-            data-testid={`chain-exp-${diffDays(now, x)}`}
+            data-testid={`chain-exp-${dteSealed ? `t${i + 1}` : diffDays(now, x)}`}
           >
-            {diffDays(now, x)}d{session.config.blind ? '' : ` ${x.slice(5)}`}
+            {dteSealed
+              ? `🔒 TERM ${i + 1}`
+              : `${diffDays(now, x)}d${session.config.blind ? '' : ` ${x.slice(5)}`}`}
           </button>
         ))}
       </div>

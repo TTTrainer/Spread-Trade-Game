@@ -35,7 +35,7 @@ import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
 import { CashReadout } from '../trading/CashDeposit';
 import './run.css';
-import { BOSSES } from '../../content/bosses';
+import { BOSSES, type SealedInfo } from '../../content/bosses';
 import { LockStamp } from '../trading/BossBanner';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
@@ -192,6 +192,9 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
   const room = eq - floor;
   const span = Math.max(1, r.startEquityCents - floor);
   const review = r.reviewId ? REVIEWS[r.reviewId] : null;
+  // The Controller seals equity and the room above the line (both move with running P/L); the
+  // line itself still fires.
+  const plSealed = sealedBy(e).pnl;
   return (
     <div className="topbar panel run-topbar" data-testid="run-topbar">
       <div className="rtb-row">
@@ -264,13 +267,17 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
           >
             <span className="rtb-k">MAX-LOSS</span>
-            <Meter
-              value={room}
-              max={span}
-              tone={room / span < 0.35 ? 'down' : 'amber'}
-              label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
-              testId="maxloss-gauge"
-            />
+            {plSealed ? (
+              <LockStamp text="ROOM SEALED" by={plSealed} />
+            ) : (
+              <Meter
+                value={room}
+                max={span}
+                tone={room / span < 0.35 ? 'down' : 'amber'}
+                label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
+                testId="maxloss-gauge"
+              />
+            )}
           </div>
           <button
             className="rtb-stress"
@@ -289,7 +296,14 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         </div>
         <div className="rtb-tile rtb-account num">
           <span className="rtb-k" data-tip="g:equity">
-            EQUITY <b className="rtb-eq">{money(eq)}</b>
+            EQUITY{' '}
+            {plSealed ? (
+              <b className="rtb-eq sealed-num" data-testid="equity-sealed">
+                🔒 SEALED
+              </b>
+            ) : (
+              <b className="rtb-eq">{money(eq)}</b>
+            )}
           </span>
           <CashReadout />
         </div>
@@ -325,11 +339,12 @@ export function careerBriefAccess(e: RunEngine): BriefAccess {
 }
 
 /** Which information this round's boss has sealed, by the boss's name. */
-function sealedBy(e: RunEngine): { ivr: string | null; studies: string | null } {
+function sealedBy(e: RunEngine): Record<SealedInfo, string | null> {
   const r = e.state.round;
   const hide = e.state.phase === 'round' && r.bossId ? (e.rule().hide ?? []) : [];
   const name = r.bossId ? BOSSES[r.bossId].name : '';
-  return { ivr: hide.includes('ivr') ? name : null, studies: hide.includes('studies') ? name : null };
+  const of = (w: SealedInfo) => (hide.includes(w) ? name : null);
+  return { ivr: of('ivr'), studies: of('studies'), pnl: of('pnl'), dte: of('dte') };
 }
 
 export function careerBadges(
@@ -483,17 +498,21 @@ export function GoalCard({ e }: { e: RunEngine }) {
   const hole = g.meter < 0;
   const frac = (v: number) => Math.max(0, Math.min(1, v / Math.max(1, g.target)));
   const now = frac(g.meter);
-  const withOpen = frac(g.meter + g.openPoints);
+  // With the running P/L sealed, so is what the open trades would score.
+  const plSealed = sealedBy(e).pnl;
+  const withOpen = plSealed ? now : frac(g.meter + g.openPoints);
   const ifClosedToGo = g.target - (g.meter + g.openPoints);
   const note = met
     ? 'Target met. Anything more is bonus; protect it.'
     : hole
       ? 'Losses score against you. Small, planned exits climb back out.'
-      : g.openCount > 0 && ifClosedToGo <= 0
-        ? 'Closing your open trades now would clear the target.'
-        : g.openCount > 0
-          ? `If your open trades closed now: ${Math.max(0, ifClosedToGo).toLocaleString()} still to go.`
-          : 'Winning trades fill the bar; confident, exact calls multiply it.';
+      : plSealed && g.openCount > 0
+        ? `${plSealed} has sealed how your open trades stand. Read the chart.`
+        : g.openCount > 0 && ifClosedToGo <= 0
+          ? 'Closing your open trades now would clear the target.'
+          : g.openCount > 0
+            ? `If your open trades closed now: ${Math.max(0, ifClosedToGo).toLocaleString()} still to go.`
+            : 'Winning trades fill the bar; confident, exact calls multiply it.';
   return (
     <div
       className={`goal-card ${met ? 'met' : hole ? 'hole' : ''}`}
@@ -533,13 +552,19 @@ export function GoalCard({ e }: { e: RunEngine }) {
       {g.openCount > 0 && (
         <div className="goal-open num" data-testid="goal-open">
           <span className="dim">OPEN ×{g.openCount}</span>{' '}
-          <span className={g.openPlCents >= 0 ? 'up-text' : 'down-text'}>{pnlText(g.openPlCents)}</span>{' '}
-          <span className="dim">≈</span>{' '}
-          <span className={g.openPoints >= 0 ? 'up-text' : 'down-text'}>
-            {g.openPoints >= 0 ? '+' : ''}
-            {g.openPoints.toLocaleString()}
-            {g.openPoints > 0 ? '+' : ''} pts
-          </span>
+          {plSealed ? (
+            <span className="sealed-num">🔒 SEALED</span>
+          ) : (
+            <>
+              <span className={g.openPlCents >= 0 ? 'up-text' : 'down-text'}>{pnlText(g.openPlCents)}</span>{' '}
+              <span className="dim">≈</span>{' '}
+              <span className={g.openPoints >= 0 ? 'up-text' : 'down-text'}>
+                {g.openPoints >= 0 ? '+' : ''}
+                {g.openPoints.toLocaleString()}
+                {g.openPoints > 0 ? '+' : ''} pts
+              </span>
+            </>
+          )}
         </div>
       )}
       <div className="goal-note">{note}</div>
@@ -869,7 +894,8 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
   const fam = e.families();
   const deskCal = e.state.config.deskId === 'calendar';
   const review = e.rule();
-  const ivSealed = sealedBy(e).ivr;
+  const sealed = sealedBy(e);
+  const ivSealed = sealed.ivr;
   if (ivSealed && (has('quant') || has('vol_surfer')))
     out.push(
       <Readout key="sealed" title="IV desk">
@@ -906,9 +932,9 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
         {vrp !== null ? (vrp >= 5 ? '(premium rich)' : vrp < 0 ? '(premium cheap)' : '') : ''}
         {(has('vol_surfer') || deskCal) && ts.length > 1 && (
           <div className="term num">
-            {ts.slice(0, 6).map((t) => (
+            {ts.slice(0, 6).map((t, i) => (
               <span key={t.expiration}>
-                {t.dte}d {pct(t.iv, 0)}
+                {sealed.dte ? `T${i + 1}` : `${t.dte}d`} {pct(t.iv, 0)}
               </span>
             ))}
             <div className="dim">
@@ -1012,7 +1038,13 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
       </Readout>,
     );
   }
-  if (has('ghost') && plan?.ok && plan.entry && plan.dte) {
+  if (has('ghost') && sealed.dte)
+    out.push(
+      <Readout key="ghost" title="The Ghost">
+        A base rate needs the trade's length, and {sealed.dte} has sealed it.
+      </Readout>,
+    );
+  else if (has('ghost') && plan?.ok && plan.entry && plan.dte) {
     const shorts = plan.entry.shortStrikes;
     const spot = plan.entry.spot;
     const def = STRUCTURES[builder.structureId];

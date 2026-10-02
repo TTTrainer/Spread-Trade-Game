@@ -17,7 +17,7 @@ import { SetupPresets } from './BuilderTray';
 import { LONG_ANCHOR, STRUCTURE_COACH, type CoachControl } from '../../content/structureCoach';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
-import { useActiveBoss } from '../boss';
+import { useActiveBoss, useSealed } from '../boss';
 import { LockStamp } from './BossBanner';
 
 const DELTA_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
@@ -93,6 +93,8 @@ export function SetupSliders() {
   const seen = useApp((s) => s.settings.game.seenStructures);
   const boss = useActiveBoss();
   const inTutorial = useRun((s) => s.engine?.state.config.mode === 'tutorial');
+  // The Executor seals expirations until the trade is open: evenly spaced, unlabeled stops.
+  const dteSealed = useSealed('dte');
   if (!session || !cardId) return null;
   const sid = builder.structureId;
   // The first time a structure is picked, each control says what it moves for that structure.
@@ -170,13 +172,17 @@ export function SetupSliders() {
         testId="slider-exp"
         accent="amber"
         hint={hint('exp')}
-        byValue
+        byValue={!dteSealed}
         disabled={off || exps.length === 0}
-        options={exps.map((e) => ({
-          value: diffDays(now, e),
-          major: isMonthly(e),
-          mark: isMonthly(e) ? `${diffDays(now, e)}d` : undefined,
-        }))}
+        options={exps.map((e, i) =>
+          dteSealed
+            ? { value: i }
+            : {
+                value: diffDays(now, e),
+                major: isMonthly(e),
+                mark: isMonthly(e) ? `${diffDays(now, e)}d` : undefined,
+              },
+        )}
         index={expIdx}
         onIndex={(i) =>
           setBuilder({
@@ -186,7 +192,14 @@ export function SetupSliders() {
           })
         }
         readout={
-          builder.expiration ? (
+          builder.expiration && dteSealed ? (
+            <span data-testid="exp-sealed-readout">
+              🔒 ? days{' '}
+              <span className="dim">
+                · term {expIdx + 1} of {exps.length}
+              </span>
+            </span>
+          ) : builder.expiration ? (
             <>
               {diffDays(now, builder.expiration)} days{' '}
               <span className="dim">
@@ -204,12 +217,18 @@ export function SetupSliders() {
           label="Back month"
           accent="amber"
           hint={hint('back')}
-          byValue
+          byValue={!dteSealed}
           disabled={off || backs.length === 0}
-          options={backs.map((e) => ({ value: diffDays(now, e) }))}
+          options={backs.map((e, i) => ({ value: dteSealed ? i : diffDays(now, e) }))}
           index={Math.max(0, backs.indexOf(builder.backExpiration ?? ''))}
           onIndex={(i) => setBuilder({ backExpiration: backs[i], legs: null })}
-          readout={builder.backExpiration ? `${diffDays(now, builder.backExpiration)} days` : '—'}
+          readout={
+            builder.backExpiration
+              ? dteSealed
+                ? '🔒 ? days'
+                : `${diffDays(now, builder.backExpiration)} days`
+              : '—'
+          }
         />
       )}
       <SnapSlider

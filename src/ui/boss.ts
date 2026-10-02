@@ -4,7 +4,7 @@
  */
 
 import { useEffect } from 'react';
-import { BOSSES, type BossDef } from '../content/bosses';
+import { BOSSES, type BossDef, type SealedInfo } from '../content/bosses';
 import { roundRule, type RoundRule } from '../engine/run/rules';
 import type { RunEngine } from '../engine/run/engine';
 import { useApp } from './store/app';
@@ -30,10 +30,21 @@ export function useActiveBoss(): ActiveBoss | null {
   return activeBoss(e, screen);
 }
 
-/** Is this piece of information sealed by the boss? Returns the boss's name if so. */
-export function useSealed(what: 'studies' | 'ivr'): string | null {
+/**
+ * Is this piece of information sealed by the boss? Returns the boss's name if so. Only during the
+ * boss's round: the case file before it still shows everything.
+ */
+export function useSealed(what: SealedInfo): string | null {
   const b = useActiveBoss();
-  return b?.rule.hide?.includes(what) ? b.def.name : null;
+  const phase = useRun((s) => s.engine?.state.phase);
+  return phase === 'round' && b?.rule.hide?.includes(what) ? b.def.name : null;
+}
+
+/** The same check outside a component (the text of a toast, a store action). */
+export function sealedNow(what: SealedInfo): string | null {
+  const e = useRun.getState().engine;
+  const b = activeBoss(e, useApp.getState().screen);
+  return e?.state.phase === 'round' && b?.rule.hide?.includes(what) ? b.def.name : null;
 }
 
 /** While a boss is up, the whole board takes its colors (a data attribute and two CSS colors). */

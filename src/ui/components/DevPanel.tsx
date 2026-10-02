@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { ANALYSTS, ANALYST_IDS } from '../../content/analysts';
+import { BOSSES, BOSS_IDS, type BossId } from '../../content/bosses';
 import { CARTRIDGES } from '../../content/cartridges';
 import { MEMOS, MEMO_IDS, VOUCHERS, VOUCHER_IDS } from '../../content/items';
 import type { AnalystId, MemoId, VoucherId } from '../../content/types';
@@ -87,6 +88,7 @@ function DevPanel({ onClose }: { onClose: () => void }) {
   const [cart, setCart] = useState(CARTRIDGES[0].id);
   const [analyst, setAnalyst] = useState<AnalystId>(ANALYST_IDS[0]);
   const [memo, setMemo] = useState<MemoId>(MEMO_IDS[0]);
+  const [boss, setBoss] = useState<BossId>('controller');
   const [voucher, setVoucher] = useState<VoucherId>(VOUCHER_IDS[0]);
   const [ctx] = useState(contextLine);
   useEffect(() => {
@@ -288,6 +290,23 @@ function DevPanel({ onClose }: { onClose: () => void }) {
                 ))}
               </select>
               <button onClick={() => lever({ k: 'analyst', id: analyst })}>HIRE / LEVEL UP</button>
+            </div>
+            <div className="dev-row">
+              <select
+                value={boss}
+                onChange={(e) => setBoss(e.target.value as BossId)}
+                data-testid="dev-boss-pick"
+              >
+                {BOSS_IDS.map((b) => (
+                  <option key={b} value={b}>
+                    {BOSSES[b].name}
+                    {BOSSES[b].ready ? '' : ' (not built)'}
+                  </option>
+                ))}
+              </select>
+              <button onClick={() => lever({ k: 'boss', id: boss })} data-testid="dev-boss-go">
+                FACE THIS BOSS NOW
+              </button>
             </div>
             <div className="dev-row">
               <select value={memo} onChange={(e) => setMemo(e.target.value as MemoId)}>

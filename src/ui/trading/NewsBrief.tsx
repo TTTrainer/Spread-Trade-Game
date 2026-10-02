@@ -12,6 +12,7 @@ import type { TradingSession } from '../../engine/trading/session';
 import { sfx } from '../../audio/sfx';
 import { Modal } from '../components/ui';
 import { liveCardId, useTrading } from '../store/trading';
+import { useSealed } from '../boss';
 
 const cache = new Map<string, NewsBrief | null>();
 
@@ -510,6 +511,8 @@ function useTradeDays(): { expDays: number | null; posDays: number[] } {
   const session = useTrading((s) => s.session);
   const cardId = useTrading(liveCardId);
   const exp = useTrading((s) => s.builder.expiration);
+  // A planned trade's expiration sealed by the Executor stays off the timeline; open ones show.
+  const dteSealed = useSealed('dte');
   if (!session || !cardId) return { expDays: null, posDays: [] };
   const now = session.view(cardId).now;
   const posDays = session
@@ -517,7 +520,7 @@ function useTradeDays(): { expDays: number | null; posDays: number[] } {
     .filter((p) => p.cardId === cardId)
     .flatMap((p) => p.legs.filter((l) => l.kind === 'option').map((l) => diffDays(now, l.expiration)))
     .filter((d, i, a) => a.indexOf(d) === i);
-  return { expDays: exp ? diffDays(now, exp) : null, posDays };
+  return { expDays: exp && !dteSealed ? diffDays(now, exp) : null, posDays };
 }
 
 export function NewsBriefPanel({ access = FULL_ACCESS }: { access?: BriefAccess }) {

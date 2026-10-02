@@ -449,7 +449,10 @@ export function ChartPanel() {
   // Expiration: solid for the open trade, dotted for the one being planned. Future days have no
   // bars, so it sits that many trading days (or weeks) past the newest candle.
   const exps = optionLegsOf(legs).map((l) => l.expiration);
-  const exp = exps.length ? exps.reduce((a, b) => (a < b ? a : b)) : null;
+  // The Executor seals a planned trade's expiration: no line to read it off until it's open.
+  const dteSealed = useSealed('dte');
+  const expHidden = !!dteSealed && !position && exps.length > 0;
+  const exp = exps.length && !expHidden ? exps.reduce((a, b) => (a < b ? a : b)) : null;
   const expAhead = exp && now && exp > now ? barsAhead(now, exp, timeframe) : null;
   const expDte = exp && now ? diffDays(now, exp) : null;
   // Leave room on the right to see the expiration, up to 40% of the chart; beyond that an arrow
@@ -460,8 +463,14 @@ export function ChartPanel() {
     const ts = chart.timeScale();
     const visible = ts.width() / ts.options().barSpacing;
     const room = visible > 20 ? Math.floor(visible * 0.4) : 30;
-    ts.applyOptions({ rightOffset: expAhead === null ? 6 : Math.min(Math.max(6, expAhead + 3), room) });
-  }, [expAhead, clockOn, chartGen]);
+    // A sealed expiration gets the same fixed room whatever it is, so the room can't give it away.
+    const offset = expHidden
+      ? Math.min(14, room)
+      : expAhead === null
+        ? 6
+        : Math.min(Math.max(6, expAhead + 3), room);
+    ts.applyOptions({ rightOffset: offset });
+  }, [expAhead, expHidden, clockOn, chartGen]);
 
   useEffect(() => {
     const candles = candleRef.current;
@@ -600,6 +609,7 @@ export function ChartPanel() {
       {(!planHidden || position) && <ChartZones />}
       <TradeBadge position={position} plan={plan} />
       {expAhead !== null && expDte !== null && <ExpiryLine ahead={expAhead} dte={expDte} open={!!position} />}
+      {expHidden && dteSealed && <SealedExpiry by={dteSealed} />}
       {!planHidden && <StrikeHandle />}
       <PositionHud />
       <BossBanner />
@@ -676,6 +686,23 @@ function TradeBadge({ position, plan }: { position: Position | undefined; plan: 
     );
   }
   return null;
+}
+
+/** The Executor's seal where the expiration line would be: at the chart's right edge. */
+function SealedExpiry({ by }: { by: string }) {
+  const w = chartBridge.plotWidth();
+  if (w <= 0) return null;
+  return (
+    <div
+      className="exp-edge num plan sealed"
+      style={{ left: w - 2 }}
+      data-testid="exp-sealed"
+      data-tip-title="Expiration sealed"
+      data-tip-body={`${by} has sealed when this trade would expire. It shows once the trade is open; max profit and max loss still show.`}
+    >
+      🔒 EXP ?
+    </div>
+  );
 }
 
 function ExpiryLine({ ahead, dte, open }: { ahead: number; dte: number; open: boolean }) {

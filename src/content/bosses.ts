@@ -24,13 +24,16 @@ export type BossId =
   | 'collector'
   | 'rebalancer';
 
+/** Information a boss can seal for its round. */
+export type SealedInfo = 'studies' | 'ivr' | 'pnl' | 'dte';
+
 /** The single twist a boss applies. */
 export type BossTwist =
   | { kind: 'riskCap'; mult: number }
   | { kind: 'lossMult'; mult: number }
   | { kind: 'shortWinTax'; days: number; mult: number }
   | { kind: 'leftCartOff' }
-  | { kind: 'hide'; what: ('studies' | 'ivr')[] }
+  | { kind: 'hide'; what: SealedInfo[] }
   | { kind: 'lossStreak'; step: number }
   | { kind: 'multCut'; keep: number }
   | { kind: 'annual' }
@@ -69,12 +72,12 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'Dana Pruitt',
     role: 'Corporate Controller',
     market: 'dead_calm',
-    twist: { kind: 'pending' },
-    twistText: 'Running P/L is hidden until a trade closes.',
-    blocks: 'Your running P/L',
+    twist: { kind: 'hide', what: ['pnl'] },
+    twistText: 'Running P/L and equity are sealed until a trade closes.',
+    blocks: 'Your running P/L and equity',
     intro: 'Every dollar has a job. You will find out what yours did at the end of the month.',
     palette: { accent: '#7fd4c1', tint: '#0b2a26' },
-    ready: false,
+    ready: true,
   },
   margin_clerk: {
     id: 'margin_clerk',
@@ -204,12 +207,12 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'Mortimer Graves',
     role: 'Estate Attorney',
     market: 'earnings_gauntlet',
-    twist: { kind: 'pending' },
+    twist: { kind: 'hide', what: ['dte'] },
     twistText: 'Days to expiration stay sealed until the trade is open.',
     blocks: 'When your options expire',
     intro: 'The terms are read after the papers are signed. That is how wills work.',
     palette: { accent: '#b9a27a', tint: '#1f1a12' },
-    ready: false,
+    ready: true,
   },
   collector: {
     id: 'collector',

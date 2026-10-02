@@ -11,6 +11,7 @@ import { chartBridge } from './chartBridge';
 import { useCurve } from './RightPanel';
 import { liveCardId, useTrading } from '../store/trading';
 import { barsAhead } from './expiry';
+import { useSealed } from '../boss';
 
 interface Band {
   top: number;
@@ -24,6 +25,7 @@ export function ChartZones() {
   const session = useTrading((s) => s.session);
   const cardId = useTrading(liveCardId);
   const timeframe = useTrading((s) => s.timeframe);
+  const dteSealed = useSealed('dte');
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 150);
     return () => clearInterval(id);
@@ -73,7 +75,9 @@ export function ChartZones() {
   const exps = curve.legs.filter((l): l is OptionLeg => l.kind === 'option').map((l) => l.expiration);
   const exp = exps.length ? exps.reduce((a, b) => (a < b ? a : b)) : null;
   const todayX = chartBridge.xAhead(0);
-  const expX = now && exp ? chartBridge.xAhead(barsAhead(now, exp, timeframe)) : null;
+  // A plan's sealed expiration leaves its box open to the chart's edge.
+  const expX =
+    now && exp && !(dteSealed && !curve.openedOn) ? chartBridge.xAhead(barsAhead(now, exp, timeframe)) : null;
   const openX = curve.openedOn ? chartBridge.xForDate(curve.openedOn) : todayX;
   const left = Math.max(0, Math.min(w, openX ?? 0));
   const right = Math.max(0, Math.min(w, expX ?? w));

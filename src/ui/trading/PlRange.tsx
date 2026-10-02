@@ -48,18 +48,22 @@ function xOf(cents: number, b: PlBounds): number {
 }
 
 export function PlRange({
-  cents,
+  cents: maybe,
   bounds: b,
   size = 'hud',
 }: {
-  cents: number;
+  /** null: sealed by a boss (the ends, stop and target still show; where the trade sits doesn't). */
+  cents: number | null;
   bounds: PlBounds;
   /** hud: the trade card · big: the take-profit dialog · mini: a table cell (no labels). */
   size?: 'hud' | 'big' | 'mini';
 }) {
+  const sealed = maybe === null;
+  const cents = maybe ?? 0;
   const x = xOf(cents, b);
-  const hot =
-    b.stop !== null && cents <= -b.stop * 0.8
+  const hot = sealed
+    ? 'sealed'
+    : b.stop !== null && cents <= -b.stop * 0.8
       ? 'near-stop'
       : b.target !== null && cents >= b.target * 0.8
         ? 'near-target'
@@ -72,10 +76,12 @@ export function PlRange({
       <span className="tug-track">
         <span className="tug-half loss" />
         <span className="tug-half gain" />
-        <span
-          className={`rng-fill ${cents >= 0 ? 'gain' : 'loss'}`}
-          style={cents >= 0 ? { left: '50%', width: `${x - 50}%` } : { left: `${x}%`, width: `${50 - x}%` }}
-        />
+        {!sealed && (
+          <span
+            className={`rng-fill ${cents >= 0 ? 'gain' : 'loss'}`}
+            style={cents >= 0 ? { left: '50%', width: `${x - 50}%` } : { left: `${x}%`, width: `${50 - x}%` }}
+          />
+        )}
         <span className="tug-mid" />
         {b.stop !== null && (
           <span className="rng-tick stop" style={{ left: `${xOf(-b.stop, b)}%` }}>
@@ -87,7 +93,11 @@ export function PlRange({
             {labels && <span className="rng-lab num">{amounts ? `TARGET +${money(b.target)}` : 'TGT'}</span>}
           </span>
         )}
-        <span className="tug-dot" style={{ left: `${x}%` }} />
+        {sealed ? (
+          <span className="rng-sealed num">?</span>
+        ) : (
+          <span className="tug-dot" style={{ left: `${x}%` }} />
+        )}
       </span>
       {labels && (
         <span className="tug-end up num">

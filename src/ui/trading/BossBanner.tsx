@@ -45,3 +45,12 @@ export function LockStamp({ text, by }: { text: string; by: string }) {
     </span>
   );
 }
+
+/** A number a boss has sealed: a lock in its color, and who did it on hover. */
+export function SealedText({ by, text = 'SEALED' }: { by: string; text?: string }) {
+  return (
+    <span className="sealed-num num" title={`${by} has sealed this for the round`} data-testid="sealed-num">
+      🔒 {text}
+    </span>
+  );
+}

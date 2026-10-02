@@ -15,6 +15,7 @@ import { money, pct, price } from '../format';
 
 import { liveCardId, useTrading } from '../store/trading';
 import { LivePnl } from './DayPlayer';
+import { SealedText } from './BossBanner';
 import { LockStamp } from './BossBanner';
 import { useSealed } from '../boss';
 
@@ -408,6 +409,7 @@ export function StatsBlock() {
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
   const ivSealed = useSealed('ivr');
+  const plSealed = useSealed('pnl');
   if (!session || !cardId) return null;
   const ctx = session.context(cardId);
   const pos = session.openPositions().find((p) => p.cardId === cardId);
@@ -419,7 +421,13 @@ export function StatsBlock() {
       <div className="stats" data-testid="stats-block">
         <div className="key-stats">
           <Stat k="OPEN P/L" v={<LivePnl pos={pos} />} tip="g:pl_open" testId="stat-pl" />
-          <Stat k="% OF RISK" v={pct(pl / Math.max(1, pos.entry.maxLossCents))} tip="g:pct_risk" />
+          <Stat
+            k="% OF RISK"
+            v={
+              plSealed ? <SealedText by={plSealed} text="?" /> : pct(pl / Math.max(1, pos.entry.maxLossCents))
+            }
+            tip="g:pct_risk"
+          />
           <Stat
             k={pos.structureId === 'covered_call' ? 'RISK IF IT JUMPS' : 'MAX LOSS'}
             v={money(pos.entry.maxLossCents)}

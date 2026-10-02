@@ -5,7 +5,7 @@
  * (an older save) keeps its old rule.
  */
 
-import { BOSSES, type BossId } from '../../content/bosses';
+import { BOSSES, type BossId, type SealedInfo } from '../../content/bosses';
 import { REVIEWS } from '../../content/reviews';
 import type { ReviewDef, ReviewId } from '../../content/types';
 
@@ -23,7 +23,7 @@ export type RoundRule = ReviewDef['rule'] & {
   /** A winner's total mult keeps this share (applied after every other mult source). */
   multKeep?: number;
   /** Information sealed for the round. */
-  hide?: ('studies' | 'ivr')[];
+  hide?: SealedInfo[];
 };
 
 export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null): RoundRule {
