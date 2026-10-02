@@ -9,8 +9,10 @@ import { BALANCE } from '../../content/balance';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
 import { familyAddSteps, familyMulSteps } from '../../content/families';
+import { BOSSES, type BossId } from '../../content/bosses';
 import { REVIEWS } from '../../content/reviews';
 import type { CartState, DeskId, Family, ReviewId, RunView, TradeFacts } from '../../content/types';
+import { roundRule } from './rules';
 import { edgeStep, levelSteps, type ScoreStep } from '../scoring/mult';
 import { STRUCTURES } from '../strategies/structures';
 
@@ -21,6 +23,10 @@ export interface PipelineInput {
   goodRR: boolean;
   edgeTier: 'top10' | 'top25' | 'none' | null;
   reviewId: ReviewId | null;
+  /** This round's boss (its one twist replaces the market type's old Review rule). */
+  bossId?: BossId | null;
+  /** Losing trades in a row closed just before this one, this round. */
+  lossStreak?: number;
   families: Record<Family, number>;
   cartridges: string[];
   cartState: Record<string, CartState>;
@@ -32,7 +38,8 @@ export interface PipelineInput {
 export function scoreSteps(i: PipelineInput): ScoreStep[] {
   const f = i.facts;
   const s = BALANCE.scoring;
-  const rule = i.reviewId ? REVIEWS[i.reviewId].rule : {};
+  const rule = roundRule(i.reviewId, i.bossId);
+  const boss = i.bossId ? BOSSES[i.bossId].name : '';
   const steps: ScoreStep[] = [];
 
   // 1. Additive sources.
@@ -92,6 +99,30 @@ export function scoreSteps(i: PipelineInput): ScoreStep[] {
       op: 'meter',
       value: rule.counterTrendLossMult,
     });
+  // A boss's one twist.
+  if (rule.lossMult !== undefined && !f.win)
+    steps.push({
+      label: `${boss}: loss x${rule.lossMult}`,
+      kind: 'review',
+      op: 'meter',
+      value: rule.lossMult,
+    });
+  if (rule.lossStreakStep !== undefined && !f.win && (i.lossStreak ?? 0) > 0) {
+    const value = rule.lossStreakStep ** (i.lossStreak ?? 0);
+    steps.push({
+      label: `${boss}: ${(i.lossStreak ?? 0) + 1} losses in a row`,
+      kind: 'review',
+      op: 'meter',
+      value: Math.round(value * 1000) / 1000,
+    });
+  }
+  if (rule.shortWinTax && f.win && f.daysOpen <= rule.shortWinTax.days)
+    steps.push({
+      label: `${boss}: closed in ${f.daysOpen} day${f.daysOpen === 1 ? '' : 's'}`,
+      kind: 'review',
+      op: 'meter',
+      value: rule.shortWinTax.mult,
+    });
 
   // 4. Cartridges in slot order.
   for (const id of i.cartridges) {
@@ -101,6 +132,15 @@ export function scoreSteps(i: PipelineInput): ScoreStep[] {
       ...c.score({ facts: f, run: i.run, state: i.cartState[id] ?? {} }).map((s) => ({ ...s, source: id })),
     );
   }
+
+  // The Landlord's cut comes off the finished mult, after every cartridge.
+  if (rule.multKeep !== undefined && f.win)
+    steps.push({
+      label: `${boss}: the house keeps ${Math.round((1 - rule.multKeep) * 100)}%`,
+      kind: 'review',
+      op: 'mul',
+      value: rule.multKeep,
+    });
 
   // 5. Memos.
   if (i.doubleDown) steps.push({ label: 'Double Down memo', kind: 'memo', op: 'meter', value: 2 });

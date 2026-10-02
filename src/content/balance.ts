@@ -19,7 +19,40 @@ export const BALANCE = {
     tradeWindowDays: 10,
     /** A skip sits the round out for this many trading days before its Tag pays. */
     sitOutDays: 5,
+    /**
+     * A "flat" chart, judged only from history up to the entry date: weak trend strength (ADX)
+     * and a nearly level 50-day average (% per day). Desks that sell a range always get one.
+     */
+    flatMaxAdx: 20,
+    flatMaxSlope: 0.1,
+    /**
+     * A failed Review (boss) ends the run. Set false and a failed boss becomes a write-up instead
+     * (more stress, and the run ends only at a second miss in the same quarter).
+     */
+    bossFailEndsRun: true,
+    /** Rerolling a boss (once per boss) costs more for each boss of the run: 1st, 2nd, 3rd, later. */
+    bossRerollCosts: [10, 25, 40, 60],
   },
+
+  /**
+   * Each boss's Review target, as a share of the normal Review target, tuned in the simulator so a
+   * good player beats a typical boss about 9 times in 10 and the year-end Rebalancer about 7 in 10
+   * (on top of the Annual Review's own x1.25). A harsher twist gets a lower bar.
+   */
+  bossTargets: {
+    controller: 1,
+    margin_clerk: 0.8,
+    underwriter: 0.85,
+    landlord: 0.6,
+    early_retiree: 1,
+    tax_man: 1,
+    bursar: 0.85,
+    allocator: 1,
+    shell_company: 0.75,
+    executor: 1,
+    collector: 0.95,
+    rebalancer: 2,
+  } as Record<string, number>,
 
   targets: {
     // Round 1 needs more than one typical trade (a median Verticals win scores about 220 on the

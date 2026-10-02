@@ -5,6 +5,7 @@ import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { Portrait } from '../components/Portrait';
+import { monthMenuUp } from './MonthMenu';
 
 /** The speech box: a portrait, a name and a typed line. Clicks pass through it; it fades on its own. */
 /** The chart panel's box on screen while `on` (read again on resize). */
@@ -41,6 +42,8 @@ export function DialogueBox() {
   // price, the clock controls and the trade card: the top left, or the bottom left while the
   // day's recap fills the middle (the trade card steps aside for the recap too).
   const chartBox = useChartBox(onChart && !!speech);
+  // A boss's banner sits under the trade badge: speak below it.
+  const bossRound = useRun((s) => !!s.engine?.state.round.bossId);
   const chartStyle: React.CSSProperties | undefined =
     onChart && chartBox
       ? {
@@ -48,17 +51,19 @@ export function DialogueBox() {
           width: Math.min(440, chartBox.width * 0.45),
           ...(recapUp
             ? { top: 'auto', bottom: window.innerHeight - chartBox.bottom + 40 }
-            : { top: chartBox.top + 46, bottom: 'auto' }),
+            : { top: chartBox.top + (bossRound ? 96 : 46), bottom: 'auto' }),
         }
       : undefined;
+  // A line said while the month menu is up waits for it to close (its timer starts then).
+  const menuUp = useRun((s) => inRun && monthMenuUp(s.engine));
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {
     setN(reduced ? text.length : 0);
-    if (!speech) return;
+    if (!speech || menuUp) return;
     const id = setTimeout(() => clear(), Math.max(5000, text.length * 70));
     return () => clearTimeout(id);
-  }, [speech?.n]);
+  }, [speech?.n, menuUp]);
   useEffect(() => {
     if (n >= text.length) return;
     const id = setTimeout(() => setN((x) => Math.min(text.length, x + 2)), 16);
@@ -66,7 +71,7 @@ export function DialogueBox() {
   }, [n, text]);
   return (
     <AnimatePresence>
-      {speech && (
+      {speech && !menuUp && (
         <motion.div
           key={speech.n}
           className={`dialogue who-${speech.line.who} ${place}`}

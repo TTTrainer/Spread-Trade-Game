@@ -2,7 +2,9 @@
  * Dealing lineup cards. Windows come 75% of the time from the last three years and 25% from
  * earlier, a Review deals only windows that match its regime filter, and a card never repeats a
  * symbol already on the table or a window already used this run. If a filter leaves nothing to
- * deal, it is relaxed (and the round says so) rather than stalling the run.
+ * deal, it is relaxed (and the round says so) rather than stalling the run. Desks that sell a
+ * range (condors, calendars) always get at least one flat chart, so their trades are never
+ * impossible: that one card may step outside a Review's filter.
  */
 
 import { BALANCE } from '../../content/balance';
@@ -21,6 +23,13 @@ export interface DealOptions {
   /** Index-like symbols (SPY, DIA) are context, dealt only when a Review asks for one. */
   indexSymbols: Set<string>;
   forceIndexCard?: boolean;
+  /** Deal one flat chart (none of the cards kept on the table is flat). */
+  needFlat?: boolean;
+}
+
+/** Range-bound going in, judged only from data up to the entry date (ADX and the 50-day slope). */
+export function isFlat(w: WindowDef): boolean {
+  return w.tags.adx < BALANCE.run.flatMaxAdx && Math.abs(w.tags.trendSlope) < BALANCE.run.flatMaxSlope;
 }
 
 export interface DealResult {
@@ -39,6 +48,8 @@ export function dealWindows(all: WindowDef[], rng: Rng, o: DealOptions): DealRes
   const out: WindowDef[] = [];
   const symbols = new Set(o.excludeSymbols);
   let relaxed = false;
+  // The flat card takes the first slot that isn't the index card.
+  const flatSlot = o.needFlat ? Math.min(o.count - 1, o.forceIndexCard ? 1 : 0) : -1;
   for (let i = 0; i < o.count; i++) {
     const wantIndex = !!o.forceIndexCard && i === 0;
     const f = o.mix ? o.mix[i % o.mix.length] : o.filter;
@@ -46,7 +57,12 @@ export function dealWindows(all: WindowDef[], rng: Rng, o: DealOptions): DealRes
       !o.excludeWindows.has(w.id) &&
       !symbols.has(w.symbol) &&
       (wantIndex ? o.indexSymbols.has(w.symbol) : !o.indexSymbols.has(w.symbol));
-    let pool = all.filter((w) => base(w) && (!f || matchesFilter(w, f)));
+    let pool: WindowDef[] = [];
+    if (i === flatSlot && !wantIndex) {
+      pool = all.filter((w) => base(w) && isFlat(w) && (!f || matchesFilter(w, f)));
+      if (!pool.length) pool = all.filter((w) => base(w) && isFlat(w));
+    }
+    if (!pool.length) pool = all.filter((w) => base(w) && (!f || matchesFilter(w, f)));
     if (!pool.length && f && Object.keys(f).length) {
       pool = all.filter(base);
       if (!o.mix) relaxed = true;

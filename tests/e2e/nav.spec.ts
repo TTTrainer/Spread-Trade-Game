@@ -105,7 +105,12 @@ test('second-level screens: each way back lands where you came from, and home st
   // A Career run: SAVE & EXIT goes home, and Career's BACK afterwards still goes home.
   await page.getByTestId('menu-career').click();
   await page.getByTestId('start-run').click();
-  await expect(page.getByTestId('run-menu')).toBeVisible({ timeout: 60_000 });
+  // SAVE & EXIT from the month menu goes home; so does the top bar's after the month starts.
+  await page.getByTestId('mm-exit').click({ timeout: 60_000 });
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.getByTestId('menu-career').click();
+  await page.getByTestId('continue-run').click();
+  await page.getByTestId('board-play').click({ timeout: 60_000 });
   await page.getByTestId('run-menu').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
   await page.getByTestId('menu-career').click();

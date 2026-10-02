@@ -3,6 +3,8 @@ import { burstAt, fx } from '../../fx/overlay';
 import { ArtIcon, artUrl } from '../art';
 import { useEffect, useMemo, useState } from 'react';
 import { REVIEWS } from '../../content/reviews';
+import { BOSSES } from '../../content/bosses';
+import { BALANCE } from '../../content/balance';
 import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
 import type { TradeTally } from '../../engine/run/types';
 import type { TraceRow } from '../../engine/scoring/mult';
@@ -304,12 +306,84 @@ function Typed({ text }: { text: string }) {
   return <span>{text.slice(0, n)}</span>;
 }
 
+/**
+ * A boss's case file: who it is, which pillar it plays on, the market it brings (with its logo),
+ * its one twist and what it takes away, then the target. Full screen, in the boss's colors.
+ */
+function BossCaseFile({ e }: { e: RunEngine }) {
+  const act = useRun((s) => s.act);
+  const st = e.state;
+  const boss = BOSSES[st.round.bossId!];
+  const market = REVIEWS[boss.market];
+  const accept = () => (sfx('stamp'), void act({ t: 'startReview' }));
+  return (
+    <div className="screen run-review boss-file" data-testid="review-intro" data-boss-file={boss.id}>
+      <motion.div
+        className="bf-card panel"
+        initial={{ scale: 1.15, opacity: 0, rotate: -1.5 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      >
+        <div className="bf-top num">
+          <span>CASE FILE · {quarterLabel(st.quarter)} REVIEW</span>
+          <span className="bf-pillar">
+            PILLAR {boss.pillar} · {boss.pillarName.toUpperCase()}
+          </span>
+        </div>
+        <div className="bf-head">
+          <div className="bf-emblem" data-tip={`review:${boss.market}`}>
+            <ArtIcon category="review" id={boss.market} name={market.name} scale={1.5} />
+          </div>
+          <div>
+            <h1 className="bf-name" data-testid="boss-name">
+              {boss.name.toUpperCase()}
+            </h1>
+            <div className="bf-person num">
+              {boss.person} · {boss.role}
+            </div>
+            <p className="bf-intro">
+              “<Typed text={boss.intro} />”
+            </p>
+          </div>
+        </div>
+        <div className="bf-rows">
+          <div className="bf-row twist">
+            <span className="bf-k num">THE TWIST</span>
+            <span className="bf-v" data-testid="boss-twist">
+              {boss.twistText}
+            </span>
+          </div>
+          <div className="bf-row blocked">
+            <span className="bf-k num">🔒 BLOCKED</span>
+            <span className="bf-v">{boss.blocks}</span>
+          </div>
+          <div className="bf-row">
+            <span className="bf-k num">MARKET</span>
+            <span className="bf-v">
+              {market.name}: {market.filterText}
+            </span>
+          </div>
+          <div className="bf-row">
+            <span className="bf-k num">TARGET</span>
+            <span className="bf-v num">{st.round.target.toLocaleString()} points</span>
+          </div>
+        </div>
+        {BALANCE.run.bossFailEndsRun && <div className="bf-warn num">Miss the target and the run ends.</div>}
+        <button className="pixel-btn primary bf-go" onClick={accept} data-testid="review-accept">
+          TAKE THE REVIEW <Kbd>Enter</Kbd>
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
 export function ReviewIntro({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   const st = e.state;
   const id = st.nextReview;
   useHotkeys({ confirm: () => void act({ t: 'startReview' }) });
   if (!id) return null;
+  if (st.round.bossId) return <BossCaseFile e={e} />;
   const rv = REVIEWS[id];
   return (
     <div className="screen run-review" data-testid="review-intro">

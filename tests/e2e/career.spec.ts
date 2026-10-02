@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launchGame, shot } from './helpers';
+import { dismissBoard, launchGame, shot } from './helpers';
 import { BALANCE } from '../../src/content/balance';
 
 const Q1 = BALANCE.targets.q1;
@@ -110,6 +110,15 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('round-meter')).toContainText(`0 / ${Q1[0]}`);
+  // The month menu comes up over the first Month: the quarter, the build and the exit plan.
+  await expect(page.getByTestId('month-menu')).toBeVisible();
+  await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');
+  await expect(page.getByTestId('mm-boss-name')).toBeVisible();
+  await page.waitForTimeout(600);
+  await shot(page, '06-month-menu-1920');
+  await shot(page, '06-month-menu-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await dismissBoard(page);
   // Director Kessler (or a colleague) greets the new run.
   await expect(page.getByTestId('dialogue')).toBeVisible();
   await expect(page.getByTestId('dialogue').locator('canvas')).toBeVisible();
@@ -160,6 +169,7 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
       .go('run'),
   );
   await expect(page.getByTestId('run-topbar')).toBeVisible();
+  await dismissBoard(page);
 
   // Round 1 through the real UI.
   await sellBullPut(page);
@@ -202,6 +212,7 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   const cashBefore = (await runState(page))?.cash ?? 0;
   await page.getByTestId('leave-shop').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible();
+  await dismissBoard(page);
   const r2 = await runState(page);
   expect(r2?.roundIndex).toBe(1);
   expect(r2?.round.target).toBe(Q1[1]);
@@ -259,18 +270,45 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
 
   // Let the bot finish the year through the same store actions, stopping to look at the Review.
   let sawReview = false;
+  let sawNextBoss = false;
   for (let i = 0; i < 400; i++) {
     const st = await runState(page);
     if (!st || st.phase === 'victory' || st.phase === 'defeat') break;
     if (st.phase === 'review_intro' && !sawReview) {
+      // The boss's case file, in the boss's colors.
       await expect(page.getByTestId('review-intro')).toBeVisible();
+      await expect(page.getByTestId('boss-name')).toBeVisible();
+      await expect(page.getByTestId('boss-twist')).not.toBeEmpty();
+      await expect(page.getByTestId('boss-vignette')).toBeAttached();
+      expect(await page.evaluate(() => document.documentElement.dataset.boss)).toBeTruthy();
       await page.waitForTimeout(1200);
       await shot(page, '06-review-1920');
+      await shot(page, '06-review-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      // Into its round: the twist sits on the chart, and the top bar names the boss.
+      await page.getByTestId('review-accept').click();
+      await expect(page.getByTestId('boss-banner')).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId('boss-chip')).toBeVisible();
+      await page.waitForTimeout(800);
+      await shot(page, '06-boss-round-1920');
+      await shot(page, '06-boss-round-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
       sawReview = true;
+      continue;
+    }
+    if (st.phase === 'shop' && st.roundIndex === 2 && !sawNextBoss) {
+      // After a Review the shop shows the next quarter's boss, a quarter ahead.
+      await expect(page.getByTestId('shop-next-boss')).toBeVisible();
+      await page.waitForTimeout(1200);
+      await shot(page, '06-shop-next-boss-1920');
+      await shot(page, '06-shop-next-boss-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      sawNextBoss = true;
     }
     await page.evaluate(() => (window as unknown as { __stg: Stg }).__stg.botPlay('disciplined', 1));
   }
   expect(sawReview).toBe(true);
+  expect(sawNextBoss).toBe(true);
   const end = await runState(page);
   expect(['victory', 'defeat']).toContain(end?.phase);
   expect(end?.history.length).toBe(12);

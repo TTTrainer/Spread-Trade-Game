@@ -20,6 +20,7 @@ import { formingBar, livePl, priceAt } from './dayPath';
 import { MiniCandles } from './DayRecap';
 import { boundsOf, PlRange, shareText } from './PlRange';
 import { RollDialog } from './RollDialog';
+import { useActiveBoss } from '../boss';
 
 /** Progress (0..1) of the day being played, redrawn about 30 times a second; null between days. */
 export function useDayProgress(): { anim: DayAnim; t: number } | null {
@@ -108,6 +109,8 @@ function HudRow({
       ? Math.min(...optionLegsOf(p.legs).map((l) => diffDays(view.now, l.expiration)))
       : null;
   const theta = (lastMark(p)?.greeks.theta ?? 0) * p.qty;
+  const tax = useActiveBoss()?.rule.shortWinTax;
+  const held = Math.max(0, p.marks.length - 1);
   return (
     <div className={`hud-row ${selected ? 'sel' : ''} ${p.status}`} data-testid={`hud-${p.id}`}>
       <div className="hud-head">
@@ -144,6 +147,13 @@ function HudRow({
               {shareText(cents, bounds)}
             </span>
             {dte !== null && <span data-tip="g:dte">{dte} DTE</span>}
+            {tax && (
+              <span className={held <= tax.days ? 'down' : 'up'} data-testid="hud-tax">
+                {held <= tax.days
+                  ? `TAXED x${tax.mult} for ${tax.days - held + 1} more day${tax.days - held + 1 === 1 ? '' : 's'}`
+                  : 'TAX-FREE'}
+              </span>
+            )}
             <span data-tip="g:pos_theta" className={theta >= 0 ? 'up' : 'down'}>
               Θ {theta >= 0 ? '+' : '−'}${Math.abs(theta).toFixed(0)}/day
             </span>

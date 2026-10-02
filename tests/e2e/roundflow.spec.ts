@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launchGame, shot } from './helpers';
+import { dismissBoard, launchGame, shot } from './helpers';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
@@ -19,6 +19,7 @@ async function startRun(page: Page, seed: string): Promise<void> {
   );
   await page.evaluate(() => (window as Any).__stg.app.getState().go('run'));
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 60_000 });
+  await dismissBoard(page);
 }
 
 const day = (page: Page) =>

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launchGame, shot } from './helpers';
+import { dismissBoard, launchGame, shot } from './helpers';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -65,6 +65,7 @@ test('daily: seeded quarter with Bradley’s ghost, save and continue', async ()
   await page.getByTestId('daily-start').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('ghost-chip')).toContainText('BRADLEY');
+  await dismissBoard(page);
   await shot(page, '09-daily-run-1920');
   await page.getByTestId('run-menu').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
@@ -260,6 +261,9 @@ test('endless: a Career victory continues into Year 2', async () => {
   await page.getByTestId('end-endless').click();
   await expect(page.getByTestId('shop-screen')).toBeVisible();
   await page.getByTestId('leave-shop').click();
+  await expect(page.getByTestId('board-play')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');
+  await page.getByTestId('board-play').click();
   await expect(page.locator('.rtb-round')).toContainText('Y2 Q1', { timeout: 60_000 });
   await expect(page.locator('.rtb-round')).toContainText('ENDLESS');
   await shot(page, '09-endless-round-1920');

@@ -16,7 +16,9 @@ import { CARTRIDGE_BY_ID, CARTRIDGES } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
 import { emptyFamilies, familyPassives } from '../../content/families';
 import { MEMOS, TAG_IDS, VOUCHERS } from '../../content/items';
-import { ANNUAL_MIX, QUARTER_REVIEWS, REVIEWS } from '../../content/reviews';
+import { ANNUAL_MIX, REVIEWS } from '../../content/reviews';
+import { BOSSES, quarterBossPool, type BossId } from '../../content/bosses';
+import { roundRule, type RoundRule } from './rules';
 import { tierMods } from '../../content/tiers';
 import { complianceMods } from '../../content/meta';
 import { pickLine, type CharacterId, type Trigger } from '../../content/characters';
@@ -50,7 +52,7 @@ import {
   type SessionConfig,
   type SessionEvent,
 } from '../trading/session';
-import { dealWindows } from './deal';
+import { dealWindows, isFlat } from './deal';
 import { computeFacts } from './facts';
 import { scoreSteps } from './score';
 import {
@@ -64,6 +66,7 @@ import {
 } from './shop';
 import type {
   DevOp,
+  ExitPlan,
   RoundState,
   RunAction,
   RunConfig,
@@ -94,6 +97,8 @@ export function computeTarget(
   cfg: Pick<RunConfig, 'tier'> & Partial<Pick<RunConfig, 'compliance' | 'quarters' | 'deskId'>>,
   /** The quarter already has a written-up Month: its Review asks for more. */
   writtenUp = false,
+  /** The boss running this Review (its own target share). */
+  bossId: BossId | null = null,
 ): number {
   const t = BALANCE.targets;
   const rule = reviewId ? REVIEWS[reviewId].rule : {};
@@ -108,7 +113,8 @@ export function computeTarget(
     tierMods(cfg.tier).targetMult *
     complianceMods(cfg.compliance).targetMult *
     ((cfg.deskId && DESKS[cfg.deskId].targetMult) || 1) *
-    (writtenUp && index === 2 ? t.writeUpReviewMult : 1);
+    (writtenUp && index === 2 ? t.writeUpReviewMult : 1) *
+    (bossId ? (BALANCE.bossTargets[bossId] ?? 1) : 1);
   return Math.round(raw / 10) * 10;
 }
 
@@ -353,10 +359,126 @@ export class RunEngine {
 
   activeCartridges(): string[] {
     const inert = this.state.config.inert;
+    // The Bursar holds the leftmost cartridge for the round.
+    const held = this.state.phase === 'round' && this.rule().leftCartOff ? this.state.cartridges[0] : null;
     return this.state.cartridges.filter(
       (id) =>
-        !(this.state.config.pureMarket && CARTRIDGE_BY_ID[id]?.tag === 'ARCADE') && !inert?.includes(id),
+        id !== held &&
+        !(this.state.config.pureMarket && CARTRIDGE_BY_ID[id]?.tag === 'ARCADE') &&
+        !inert?.includes(id),
     );
+  }
+
+  /** The rules in force this round: the boss's one twist, or a Month's none. */
+  rule(): RoundRule {
+    const r = this.state.round;
+    return roundRule(r.reviewId, r.bossId);
+  }
+
+  /** Where new trades take profit and stop: the run's plan, else the desk's defaults. */
+  exitPlan(): ExitPlan {
+    const desk = DESKS[this.state.config.deskId];
+    return (
+      this.state.plan ?? {
+        creditTargetPct: BALANCE.brackets.creditTargetPct,
+        creditStopMult: BALANCE.brackets.creditStopMult,
+        debitTargetPct: BALANCE.brackets.debitTargetPct,
+        debitStopPct: BALANCE.brackets.debitStopPct,
+        ...desk.brackets,
+      }
+    );
+  }
+
+  /** Change the run's exit plan (new trades use it; open ones keep theirs). */
+  private setPlan(p: Partial<ExitPlan>): void {
+    const clamp = (x: number | undefined, lo: number, hi: number, d: number) =>
+      x === undefined || !Number.isFinite(x) ? d : Math.max(lo, Math.min(hi, x));
+    const cur = this.exitPlan();
+    const next: ExitPlan = {
+      creditTargetPct: clamp(p.creditTargetPct, 0.2, 0.9, cur.creditTargetPct),
+      creditStopMult: clamp(p.creditStopMult, 1, 4, cur.creditStopMult),
+      debitTargetPct: clamp(p.debitTargetPct, 0.1, 1.5, cur.debitTargetPct),
+      debitStopPct: clamp(p.debitStopPct, 0.2, 0.9, cur.debitStopPct),
+    };
+    this.state.plan = next;
+    if (this.session) this.session.config.bracketDefaults = { ...next };
+  }
+
+  /** The quarter whose boss is the next one up (after a Review, the next quarter's). */
+  upcomingBossQuarter(): number {
+    const st = this.state;
+    return st.roundIndex === 2 && (st.phase === 'tally' || st.phase === 'shop') ? st.quarter + 1 : st.quarter;
+  }
+
+  /** What rerolling the upcoming boss costs, or why it can't be rerolled now. */
+  bossReroll(): { cost: number } | { blocked: string; cost?: number } {
+    const st = this.state;
+    const q = this.upcomingBossQuarter();
+    const boss = this.knownBoss(q);
+    if (st.phase !== 'round' && st.phase !== 'shop' && st.phase !== 'tally')
+      return { blocked: 'Bosses can be rerolled from the month menu or the shop.' };
+    if (st.phase === 'round' && (st.roundIndex === 2 || st.round.clockStarted))
+      return { blocked: 'This boss is already under way.' };
+    if (!boss) return { blocked: 'The next boss is not known yet.' };
+    if (boss === 'rebalancer') return { blocked: 'The year-end Rebalancer cannot be rerolled.' };
+    if ((st.bossRerolled ?? []).includes(q)) return { blocked: 'This boss has already been rerolled once.' };
+    const costs = BALANCE.run.bossRerollCosts;
+    const cost = costs[Math.min(costs.length - 1, Math.max(0, q - 1))];
+    if (st.cash < cost) return { blocked: `Rerolling this boss costs $${cost}.`, cost };
+    return { cost };
+  }
+
+  private rerollBoss(): void {
+    const st = this.state;
+    const r = this.bossReroll();
+    if ('blocked' in r) return this.warn(r.blocked);
+    const q = this.upcomingBossQuarter();
+    const year = Math.floor((q - 1) / 4);
+    const thisYear = (st.bosses ?? [])
+      .filter((b) => Math.floor((b.quarter - 1) / 4) === year)
+      .map((b) => b.id);
+    const pool = quarterBossPool().filter((x) => !thisYear.includes(x));
+    if (!pool.length) return this.warn('No other boss is left for this year.');
+    const id = this.rng(`bossReroll:q${q}`).pick(pool);
+    st.bosses = (st.bosses ?? []).map((b) => (b.quarter === q ? { quarter: q, id } : b));
+    st.bossRerolled = [...(st.bossRerolled ?? []), q];
+    st.cash -= r.cost;
+    this.events.push({
+      kind: 'good',
+      text: `Boss rerolled for $${r.cost}: ${BOSSES[id].name} runs the Review now.`,
+    });
+  }
+
+  /** A quarter's boss if it has been picked already (never picks one). */
+  knownBoss(quarter: number): BossId | null {
+    return this.state.bosses?.find((b) => b.quarter === quarter)?.id ?? null;
+  }
+
+  /** A round's target as the player will meet it: a Review's includes its boss's share. */
+  upcomingTarget(quarter: number, index: number): number {
+    const st = this.state;
+    const boss = index === 2 ? this.knownBoss(quarter) : null;
+    const review = index === 2 ? (boss ? BOSSES[boss].market : null) : null;
+    return computeTarget(quarter, index, review, st.config, this.writtenUp(quarter), boss);
+  }
+
+  /** This quarter's boss, picked the first time it's asked for and remembered. */
+  bossFor(quarter: number): BossId {
+    const st = this.state;
+    st.bosses ??= [];
+    const known = st.bosses.find((b) => b.quarter === quarter);
+    if (known) return known.id;
+    // The year ends with the Rebalancer; in Endless every fourth quarter is another year end.
+    const last = st.endless ? quarter % 4 === 0 : quarter >= st.config.quarters;
+    let id: BossId = 'rebalancer';
+    if (!last) {
+      const year = Math.floor((quarter - 1) / 4);
+      const thisYear = st.bosses.filter((b) => Math.floor((b.quarter - 1) / 4) === year).map((b) => b.id);
+      const pool = quarterBossPool().filter((x) => !thisYear.includes(x));
+      id = this.rng(`boss:q${quarter}`).pick(pool.length ? pool : quarterBossPool());
+    }
+    st.bosses.push({ quarter, id });
+    return id;
   }
 
   families(): Record<Family, number> {
@@ -568,6 +690,15 @@ export class RunEngine {
           break;
         case 'startReview':
           await this.startReview();
+          break;
+        case 'boardDone':
+          if (this.state.phase === 'round') this.state.round.boardSeen = true;
+          break;
+        case 'rerollBoss':
+          this.rerollBoss();
+          break;
+        case 'setPlan':
+          this.setPlan(a.plan);
           break;
         case 'forfeit':
           this.finishRun('forfeit', 'You walked away from the desk.');
@@ -877,6 +1008,14 @@ export class RunEngine {
       if (p.status === 'closed' && !this.state.round.scored.includes(p.id)) this.scoreTrade(p);
   }
 
+  /** Losing trades in a row at the end of this round's tally (the Collector compounds them). */
+  lossStreak(): number {
+    const t = this.state.round.tallies;
+    let n = 0;
+    for (let i = t.length - 1; i >= 0 && !t[i].winner; i--) n++;
+    return n;
+  }
+
   private scoreTrade(p: Position): void {
     const s = this.session as TradingSession;
     const st = this.state;
@@ -895,6 +1034,8 @@ export class RunEngine {
       goodRR: !!p.entry.goodRR,
       edgeTier: p.entry.edgeTier,
       reviewId: r.reviewId,
+      bossId: r.bossId,
+      lossStreak: this.lossStreak(),
       families: this.families(),
       cartridges: carts,
       cartState: st.cartState,
@@ -1124,11 +1265,16 @@ export class RunEngine {
     }
     if (passed && r.reviewId && !st.stats.reviewsPassed.includes(r.reviewId))
       st.stats.reviewsPassed.push(r.reviewId);
+    if (passed && r.bossId) {
+      st.stats.bossesBeaten ??= [];
+      if (!st.stats.bossesBeaten.includes(r.bossId)) st.stats.bossesBeaten.push(r.bossId);
+    }
     st.cash = Math.max(0, st.cash + r.payouts.reduce((a, p) => a + p.cash, 0));
     st.history.push({
       quarter: st.quarter,
       index: r.index,
       reviewId: r.reviewId,
+      bossId: r.bossId ?? null,
       target: r.target,
       meter: r.meter,
       status: r.status,
@@ -1142,7 +1288,7 @@ export class RunEngine {
     const writeUp =
       !passed &&
       !r.breached &&
-      r.index < 2 &&
+      (r.index < 2 || !BALANCE.run.bossFailEndsRun) &&
       !this.writtenUp(st.quarter) &&
       !st.endless &&
       !st.config.practice;
@@ -1277,7 +1423,7 @@ export class RunEngine {
     const cfg = st.config;
     const tier = tierMods(cfg.tier);
     const r = st.round;
-    const rule = r.reviewId ? REVIEWS[r.reviewId].rule : {};
+    const rule = this.rule();
     const p = this.passives();
     const desk = DESKS[cfg.deskId];
     const comp = complianceMods(cfg.compliance);
@@ -1285,7 +1431,7 @@ export class RunEngine {
       seed: r.sessionSeed,
       mode: cfg.mode === 'sim' ? 'sim' : 'run',
       startEquityCents: r.startEquityCents,
-      riskCapPct: tier.riskCapPct * p.riskCapMult,
+      riskCapPct: tier.riskCapPct * p.riskCapMult * (rule.riskCapMult ?? 1),
       realism: {
         ...cfg.realism,
         ...Object.fromEntries(Object.entries(comp.realism).filter(([, v]) => v)),
@@ -1302,13 +1448,7 @@ export class RunEngine {
         fillPenalty: tier.fillPenalty,
         marketOrdersDisabled: !!rule.marketOrdersDisabled || comp.marketOrdersDisabled,
       },
-      bracketDefaults: {
-        creditTargetPct: BALANCE.brackets.creditTargetPct,
-        creditStopMult: BALANCE.brackets.creditStopMult,
-        debitTargetPct: BALANCE.brackets.debitTargetPct,
-        debitStopPct: BALANCE.brackets.debitStopPct,
-        ...desk.brackets,
-      },
+      bracketDefaults: this.exitPlan(),
       benchmark: cfg.benchmark,
       callMode: cfg.callMode,
       blind: true,
@@ -1340,9 +1480,12 @@ export class RunEngine {
     const q = st.quarter;
     const idx = st.roundIndex;
     const rng = this.rng(`round:q${q}r${idx}`);
-    const rule = reviewId ? REVIEWS[reviewId].rule : {};
+    // The quarter's boss is known from its first day (so it can be shown ahead); it runs the Review.
+    const quarterBoss = this.bossFor(q);
+    const bossId = reviewId && BOSSES[quarterBoss].market === reviewId ? quarterBoss : null;
+    const rule = roundRule(reviewId, bossId);
     const p = this.passives();
-    const target = computeTarget(q, idx, reviewId, cfg, this.writtenUp(q));
+    const target = computeTarget(q, idx, reviewId, cfg, this.writtenUp(q), bossId);
     const comp = complianceMods(cfg.compliance);
     const line = Math.max(
       0.02,
@@ -1363,6 +1506,9 @@ export class RunEngine {
       quarter: q,
       index: idx,
       reviewId,
+      bossId,
+      // The month menu comes before each Month (a Review has its case file instead).
+      boardSeen: !!reviewId || cfg.mode === 'tutorial' || cfg.mode === 'sim',
       target,
       startEquityCents: st.equityCents,
       maxLossLinePct: line,
@@ -1429,9 +1575,11 @@ export class RunEngine {
     const st = this.state;
     const r = st.round;
     const review = r.reviewId ? REVIEWS[r.reviewId] : null;
-    const keepSymbols = keepCardIds
-      .map((id) => this.windowById.get(r.cards.find((c) => c.cardId === id)?.windowId ?? -1)?.symbol)
-      .filter((x): x is string => !!x);
+    const rule = this.rule();
+    const keepWindows = keepCardIds
+      .map((id) => this.windowById.get(r.cards.find((c) => c.cardId === id)?.windowId ?? -1))
+      .filter((x): x is WindowDef => !!x);
+    const keepSymbols = keepWindows.map((w) => w.symbol);
     const hasIndex = keepSymbols.some((sym) => this.indexSymbols.has(sym));
     const res = dealWindows(all, this.rng(`deal:q${st.quarter}r${st.roundIndex}:${r.cardCounter}`), {
       count,
@@ -1440,11 +1588,17 @@ export class RunEngine {
       excludeWindows: new Set(st.usedWindows),
       excludeSymbols: new Set(keepSymbols),
       indexSymbols: this.indexSymbols,
-      forceIndexCard: !!review?.rule.forceContextCard && !hasIndex,
+      forceIndexCard: !!rule.forceContextCard && !hasIndex,
+      needFlat: this.deskSellsRange() && !keepWindows.some(isFlat),
     });
     if (!res.windows.length)
       throw new Error('No market windows left to deal. Rebuild the market data (Settings > Data).');
     return res;
+  }
+
+  /** The desk's playbook sells a range (condors, flies, calendars): its lineups need a flat chart. */
+  deskSellsRange(): boolean {
+    return DESKS[this.state.config.deskId].structures.some((id) => STRUCTURES[id].bias === 'neutral');
   }
 
   private async rerollLineup(free: boolean): Promise<boolean> {
@@ -1596,19 +1750,16 @@ export class RunEngine {
     const relief = st.config.perks?.quarterStressRelief ?? 0;
     if (i === 0 && q > 1 && relief > 0) this.addStress(-relief, 'The Pad: a quiet evening at home');
     if (i === 2) {
-      // The year ends with the Annual Review; in Endless every fourth quarter is another one.
-      const last = st.endless ? q % 4 === 0 : q >= st.config.quarters;
-      let review: ReviewId = 'annual_review';
-      if (!last) {
-        const pool = QUARTER_REVIEWS.filter((x) => !st.reviewsSeen.includes(x));
-        review = this.rng(`review:q${q}`).pick(pool.length ? pool : QUARTER_REVIEWS);
-      }
+      // The quarter's boss runs the Review, in its market; the year ends with the Rebalancer.
+      const bossId = this.bossFor(q);
+      const review: ReviewId = BOSSES[bossId].market;
       st.nextReview = review;
       st.phase = 'review_intro';
+      // (The line quotes the Review's own target, not the Month that just ended.)
       this.say(
         'review_intro',
         4,
-        { target: st.round.target || computeTarget(q, 2, review, st.config, this.writtenUp(q)) },
+        { target: computeTarget(q, 2, review, st.config, this.writtenUp(q), bossId) },
         'kessler',
       );
       st.round = {
@@ -1616,9 +1767,10 @@ export class RunEngine {
         quarter: q,
         index: 2,
         reviewId: review,
-        target: computeTarget(q, 2, review, st.config, this.writtenUp(q)),
+        bossId,
+        target: computeTarget(q, 2, review, st.config, this.writtenUp(q), bossId),
       };
-      this.addStress(BALANCE.stress.enterReview, `Entering a Review: ${REVIEWS[review].name}`);
+      this.addStress(BALANCE.stress.enterReview, `Entering a Review: ${BOSSES[bossId].name}`);
       return;
     }
     await this.enterRound(null);
@@ -1733,6 +1885,9 @@ export class RunEngine {
     st.shop = { items, rerolls: 0, freeRerolls: fx.freeRerolls };
     fx.freeRerolls = 0;
     st.phase = 'shop';
+    // After a Review the next quarter's boss is drawn now, so the shop can show (and reroll) it a
+    // quarter ahead.
+    if (st.roundIndex === 2) this.bossFor(st.quarter + 1);
     if (this.rng(`shopline:${st.quarter}:${st.roundIndex}`).chance(0.4)) this.say('shop', 2);
   }
 

@@ -75,6 +75,9 @@ export interface BriefAccess {
   earningsDetail: boolean;
   /** IV rank and IV against realized volatility. */
   ivDetail: boolean;
+  /** A boss has sealed IV rank / the studies for the round (its name, for the lock). */
+  ivSealedBy?: string;
+  studiesSealedBy?: string;
 }
 
 export const FULL_ACCESS: BriefAccess = { earningsDetail: true, ivDetail: true };

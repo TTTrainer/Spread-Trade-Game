@@ -2402,3 +2402,446 @@
   font-family: var(--font-display);
   font-size: 15px;
 }
+
+/* ---------- bosses ----------
+ * While a boss is up the whole board takes its colors: the backgrounds and lines are remixed
+ * from its tint and accent, and a slow pulse darkens the edges. */
+:root[data-boss] {
+  --bg-0: color-mix(in srgb, var(--boss-tint) 60%, #000);
+  --bg-1: var(--boss-tint);
+  --bg-2: color-mix(in srgb, var(--boss-tint) 88%, var(--boss-accent));
+  --bg-3: color-mix(in srgb, var(--boss-tint) 78%, var(--boss-accent));
+  --line: color-mix(in srgb, var(--boss-accent) 40%, var(--boss-tint));
+  --line-bright: color-mix(in srgb, var(--boss-accent) 75%, var(--boss-tint));
+}
+.boss-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    color-mix(in srgb, var(--boss-accent) 22%, transparent) 85%,
+    color-mix(in srgb, var(--boss-accent) 38%, #000) 100%
+  );
+  animation: boss-pulse 3.2s ease-in-out infinite;
+}
+@keyframes boss-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+:root[data-reduced-motion='true'] .boss-vignette {
+  animation: none;
+  opacity: 0.8;
+}
+
+/* The case file. */
+.boss-file {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+}
+.bf-card {
+  width: min(860px, 92vw);
+  padding: 18px 24px 20px;
+  border: 3px solid var(--boss-accent);
+  background: color-mix(in srgb, var(--boss-tint) 85%, #000);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 40px color-mix(in srgb, var(--boss-accent) 45%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bf-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+.bf-pillar {
+  color: var(--boss-accent);
+}
+.bf-head {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.bf-emblem {
+  padding: 6px;
+  border: 2px solid var(--boss-accent);
+  background: #000;
+  line-height: 0;
+}
+.bf-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 54px;
+  line-height: 1;
+  color: var(--boss-accent);
+  text-shadow:
+    4px 4px 0 #000,
+    0 0 20px color-mix(in srgb, var(--boss-accent) 60%, transparent);
+}
+.bf-person {
+  font-size: 18px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.bf-intro {
+  margin: 8px 0 0;
+  font-size: 19px;
+  font-style: italic;
+}
+.bf-rows {
+  display: grid;
+  gap: 6px;
+}
+.bf-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 19px;
+}
+.bf-k {
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+}
+.bf-row.twist .bf-v {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--boss-accent);
+}
+.bf-row.blocked .bf-v {
+  color: var(--down);
+}
+.bf-warn {
+  font-size: 17px;
+  color: var(--down);
+  letter-spacing: 0.06em;
+}
+.bf-go {
+  align-self: flex-start;
+  border-color: var(--boss-accent);
+}
+
+/* The twist on the chart: one line in the boss's color, top left under the trade badge (over the
+   oldest candles, clear of today's price). */
+.boss-banner {
+  position: absolute;
+  top: 60px;
+  left: 8px;
+  z-index: 6;
+  max-width: 58%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  border: 2px solid var(--boss-accent);
+  background: color-mix(in srgb, var(--boss-tint) 90%, #000);
+  box-shadow:
+    3px 3px 0 #000,
+    0 0 14px color-mix(in srgb, var(--boss-accent) 40%, transparent);
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.bb-skull {
+  color: var(--boss-accent);
+}
+.bb-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--boss-accent);
+}
+.bb-twist {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bb-live {
+  padding: 0 6px;
+  background: var(--boss-accent);
+  color: #000;
+}
+
+/* A locked panel. */
+.lock-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 2px solid var(--boss-accent, var(--down));
+  color: var(--boss-accent, var(--down));
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  transform: rotate(-3deg);
+}
+.cart-chip.held {
+  position: relative;
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+.cart-chip.held .lock-stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-6deg);
+  filter: none;
+}
+@media (max-width: 1500px) {
+  .bf-name {
+    font-size: 40px;
+  }
+  .bf-row {
+    font-size: 17px;
+    grid-template-columns: 120px 1fr;
+  }
+  .boss-banner {
+    font-size: 13px;
+    max-width: 72%;
+  }
+}
+
+/* The next quarter's boss in the shop's taskbar. */
+.os-boss {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 10px;
+  border: 2px solid var(--boss-accent);
+  background: color-mix(in srgb, var(--boss-tint) 85%, #000);
+  white-space: nowrap;
+}
+.osb-k {
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+.os-boss b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--boss-accent);
+}
+.osb-reroll {
+  padding: 0 8px;
+  font-size: 16px;
+  background: var(--bg-3);
+  color: var(--text);
+}
+.osb-reroll:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- the month menu ----------
+ * Over a freshly dealt Month: the quarter's three rounds as cards (the boss card in its own colors),
+ * the build, and the run-wide exit plan. Above the board, under modals and the tutorial. */
+.month-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg-0) 82%, transparent);
+  backdrop-filter: blur(2px);
+  overflow: auto;
+}
+.mm-card {
+  width: min(1180px, 96vw);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 18px;
+  box-shadow: 6px 6px 0 #000;
+}
+.mm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.mm-head .screen-title {
+  margin: 0;
+}
+.mm-sub {
+  font-size: 18px;
+  color: var(--text-dim);
+}
+.mm-quarter {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 12px;
+}
+.mm-round {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 2px solid var(--line);
+  background: var(--bg-2);
+  text-align: center;
+  min-width: 0;
+}
+.mm-round.now {
+  border-color: var(--amber);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 16px color-mix(in srgb, var(--amber) 35%, transparent);
+  transform: translateY(-3px);
+}
+.mm-round.passed {
+  opacity: 0.65;
+}
+.mm-round.failed {
+  opacity: 0.65;
+  border-color: var(--down);
+}
+.mm-round.boss {
+  border: 3px solid var(--boss-accent, var(--down));
+  background: color-mix(in srgb, var(--boss-tint, var(--bg-2)) 88%, #000);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 22px color-mix(in srgb, var(--boss-accent, var(--down)) 35%, transparent);
+}
+.mm-r-name {
+  font-size: 16px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+.mm-round.boss .mm-r-name {
+  color: var(--boss-accent, var(--down));
+}
+.mm-r-glyph {
+  font-size: 34px;
+  line-height: 1.2;
+  color: var(--line-bright);
+}
+.mm-boss-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.mm-boss-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.mm-emblem {
+  flex: none;
+  line-height: 0;
+  padding: 4px;
+  border: 2px solid var(--boss-accent, var(--down));
+  background: #000;
+}
+.mm-boss-name {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.05;
+  color: var(--boss-accent, var(--down));
+  text-shadow: 3px 3px 0 #000;
+}
+.mm-boss-twist {
+  font-size: 16px;
+  line-height: 1.25;
+  max-width: 34ch;
+}
+.mm-r-target {
+  font-size: 20px;
+}
+.mm-r-target b {
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--amber);
+}
+.mm-r-pay {
+  font-size: 15px;
+}
+.mm-r-state {
+  min-height: 20px;
+  font-size: 16px;
+  color: var(--text-dim);
+}
+.mm-round.now .mm-r-state {
+  color: var(--amber);
+}
+.mm-reroll {
+  border-color: var(--boss-accent, var(--line));
+}
+.mm-cols {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.mm-build,
+.mm-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.mm-plan .snap {
+  grid-template-columns: 96px 1fr 118px;
+}
+.mm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.mm-foot {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.mm-foot > :first-child {
+  justify-self: start;
+}
+.mm-go {
+  min-width: 280px;
+  font-size: 22px;
+}
+@media (max-width: 1500px) {
+  .mm-card {
+    gap: 10px;
+    padding: 12px 14px 14px;
+  }
+  .mm-boss-name {
+    font-size: 22px;
+  }
+  .mm-r-glyph {
+    font-size: 26px;
+  }
+  .mm-cols {
+    grid-template-columns: 1fr 1.1fr;
+  }
+  .mm-boss-twist {
+    font-size: 15px;
+  }
+  .mm-plan .snap {
+    grid-template-columns: 92px 1fr 104px;
+    gap: 6px;
+  }
+  .mm-plan .snap-readout {
+    font-size: 14px;
+    min-width: 0;
+  }
+}

@@ -46,3 +46,11 @@ export async function shot(
   await page.waitForTimeout(250);
   await page.screenshot({ path: join(screenshotDir, `${name}.png`) });
 }
+
+/** Close the month menu that opens over each freshly dealt Month, once it is up. */
+export async function dismissBoard(page: Page, timeout = 30_000): Promise<void> {
+  const play = page.getByTestId('board-play');
+  await play.waitFor({ state: 'visible', timeout });
+  await play.click();
+  await play.waitFor({ state: 'hidden' });
+}

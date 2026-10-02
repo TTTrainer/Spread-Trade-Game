@@ -139,6 +139,7 @@ export function previewScore(
     goodRR: plan.goodRR,
     edgeTier: plan.edge?.tier ?? null,
     reviewId: r.reviewId,
+    bossId: r.bossId,
     families: engine.families(),
     cartridges: engine.activeCartridges(),
     // Previews never mutate cartridge state.

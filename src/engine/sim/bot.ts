@@ -427,6 +427,8 @@ export async function playRun(engine: RunEngine, o: BotOptions, maxSteps = 400):
   for (let i = 0; i < maxSteps && !engine.over; i++) {
     switch (engine.state.phase) {
       case 'round':
+        // A bot driving the real UI closes the month menu the way a player does.
+        if (!engine.state.round.boardSeen) await send(engine, o, { t: 'boardDone' });
         // Memos when they help: Vacation Day when stressed, Extra Ticket before the clock.
         for (const m of engine.state.memos.slice())
           if (

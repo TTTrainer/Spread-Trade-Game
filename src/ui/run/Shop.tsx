@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'motion/react';
-import { Fragment, useEffect, type ReactNode } from 'react';
+import { Fragment, useEffect, type CSSProperties, type ReactNode } from 'react';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
@@ -24,7 +24,8 @@ import {
   type EffectKind,
 } from '../../content/summaries';
 import { BALANCE } from '../../content/balance';
-import { ROUND_NAMES, computeTarget, quarterLabel, sellPrice, type RunEngine } from '../../engine/run/engine';
+import { BOSSES } from '../../content/bosses';
+import { ROUND_NAMES, quarterLabel, sellPrice, type RunEngine } from '../../engine/run/engine';
 import type { ShopItem } from '../../engine/run/types';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
@@ -422,14 +423,7 @@ export function ShopView({ e }: { e: RunEngine }) {
   const nextIndex = (st.roundIndex + 1) % 3;
   const nextQ = st.roundIndex === 2 ? st.quarter + 1 : st.quarter;
   const nextName = nextIndex === 2 ? 'the Review' : `${quarterLabel(nextQ)} ${ROUND_NAMES[nextIndex]}`;
-  const annual = st.endless ? nextQ % 4 === 0 : nextQ >= st.config.quarters;
-  const nextTarget = computeTarget(
-    nextQ,
-    nextIndex,
-    nextIndex === 2 && annual ? 'annual_review' : null,
-    st.config,
-    e.writtenUp(nextQ),
-  );
+  const nextTarget = e.upcomingTarget(nextQ, nextIndex);
   const payout = r.payouts.reduce((a, p) => a + p.cash, 0);
   const cost = e.shopRerollCost();
   const byKind = (k: ShopItem['kind']) =>
@@ -648,6 +642,7 @@ export function ShopView({ e }: { e: RunEngine }) {
           <span className="dim">STRESS</span> {st.stress}
         </span>
         <span className="os-spacer" />
+        <NextBoss e={e} />
         <button
           className="os-btn reroll"
           onClick={() => (sfx('deal'), void act({ t: 'rerollShop' }))}
@@ -673,6 +668,36 @@ export function ShopView({ e }: { e: RunEngine }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** The next quarter's boss, a quarter ahead, with its one reroll. */
+function NextBoss({ e }: { e: RunEngine }) {
+  const act = useRun((s) => s.act);
+  const q = e.upcomingBossQuarter();
+  const id = q !== e.state.quarter ? e.knownBoss(q) : null;
+  if (!id) return null;
+  const b = BOSSES[id];
+  const reroll = e.bossReroll();
+  return (
+    <span
+      className="os-boss"
+      data-testid="shop-next-boss"
+      style={{ '--boss-accent': b.palette.accent, '--boss-tint': b.palette.tint } as CSSProperties}
+      data-tip-title={`${quarterLabel(q)} boss: ${b.name}`}
+      data-tip-body={b.twistText}
+    >
+      <span className="osb-k">☠ {quarterLabel(q)} BOSS</span> <b>{b.name}</b>
+      <button
+        className="os-btn osb-reroll"
+        disabled={'blocked' in reroll}
+        onClick={() => (sfx('deal'), void act({ t: 'rerollBoss' }))}
+        title={'blocked' in reroll ? reroll.blocked : 'Swap this boss for another, once.'}
+        data-testid="shop-boss-reroll"
+      >
+        ⟳{reroll.cost !== undefined ? ` $${reroll.cost}` : ''}
+      </button>
+    </span>
   );
 }
 

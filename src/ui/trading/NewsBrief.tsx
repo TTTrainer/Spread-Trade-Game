@@ -267,8 +267,15 @@ function PriceWidget({ v, b }: { v: BriefVisuals; b: NewsBrief }) {
   );
 }
 
-function MomentumWidget({ v }: { v: BriefVisuals }) {
+function MomentumWidget({ v, sealedBy }: { v: BriefVisuals; sealedBy?: string }) {
   const r = v.rsi;
+  if (sealedBy)
+    return (
+      <div className="bw" data-testid="bw-momentum">
+        <div className="bw-k">RSI 14</div>
+        <div className="bw-lock num">🔒 SEALED · {sealedBy.toUpperCase()}</div>
+      </div>
+    );
   const trendChip = (label: string, avg: number | null) =>
     avg === null ? null : (
       <span className={`trend-chip ${v.spot >= avg ? 'up' : 'down'}`}>
@@ -353,9 +360,13 @@ function VolWidget({ v, b, access }: { v: BriefVisuals; b: NewsBrief; access: Br
         <div
           className="bw-lock num"
           data-tip-title="Locked"
-          data-tip-body="Hire a volatility analyst to see IV rank and implied against actual movement."
+          data-tip-body={
+            access.ivSealedBy
+              ? `${access.ivSealedBy} has sealed IV rank for this round.`
+              : 'Hire a volatility analyst to see IV rank and implied against actual movement.'
+          }
         >
-          ⚿ IV DETAIL · ANALYST
+          {access.ivSealedBy ? `🔒 SEALED · ${access.ivSealedBy.toUpperCase()}` : '⚿ IV DETAIL · ANALYST'}
         </div>
       )}
     </div>
@@ -536,7 +547,7 @@ export function NewsBriefPanel({ access = FULL_ACCESS }: { access?: BriefAccess 
       <StreetWidget b={b} />
       <div className="bw-grid">
         <PriceWidget v={v} b={b} />
-        <MomentumWidget v={v} />
+        <MomentumWidget v={v} sealedBy={access.studiesSealedBy} />
         <VolWidget v={v} b={b} access={access} />
         <MarketWidget v={v} b={b} />
       </div>
@@ -552,7 +563,7 @@ export function NewsBriefPanel({ access = FULL_ACCESS }: { access?: BriefAccess 
               <StreetWidget b={b} v={v} big />
               <div className="bw-grid">
                 <PriceWidget v={v} b={b} />
-                <MomentumWidget v={v} />
+                <MomentumWidget v={v} sealedBy={access.studiesSealedBy} />
                 <VolWidget v={v} b={b} access={access} />
                 <MarketWidget v={v} b={b} />
               </div>

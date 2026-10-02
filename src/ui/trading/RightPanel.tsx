@@ -15,6 +15,8 @@ import { money, pct, price } from '../format';
 
 import { liveCardId, useTrading } from '../store/trading';
 import { LivePnl } from './DayPlayer';
+import { LockStamp } from './BossBanner';
+import { useSealed } from '../boss';
 
 interface Curve {
   legs: Leg[];
@@ -405,6 +407,7 @@ export function StatsBlock() {
   useTrading((s) => s.version);
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
+  const ivSealed = useSealed('ivr');
   if (!session || !cardId) return null;
   const ctx = session.context(cardId);
   const pos = session.openPositions().find((p) => p.cardId === cardId);
@@ -480,14 +483,18 @@ export function StatsBlock() {
         </div>
       )}
       <div className="stat-chips num">
-        <span
-          className={`chip ${ctx.ivr !== null && ctx.ivr >= 50 ? 'magenta' : ''}`}
-          data-testid="stat-ivr"
-          data-tip-title="IV rank and IV vs HV"
-          data-tip-body={`IV rank ${ctx.ivr === null ? 'n/a' : ctx.ivr.toFixed(0)} (0–100 over the last year). Implied volatility ${pct(ctx.iv30, 0)} against ${pct(ctx.hv20, 0)} realized: options look ${ctx.iv30 !== null && ctx.hv20 !== null && ctx.iv30 > ctx.hv20 ? 'rich (good for selling)' : 'cheap (good for buying)'}.`}
-        >
-          IV RANK {ctx.ivr === null ? '—' : ctx.ivr.toFixed(0)}
-        </span>
+        {ivSealed ? (
+          <LockStamp text="IV RANK SEALED" by={ivSealed} />
+        ) : (
+          <span
+            className={`chip ${ctx.ivr !== null && ctx.ivr >= 50 ? 'magenta' : ''}`}
+            data-testid="stat-ivr"
+            data-tip-title="IV rank and IV vs HV"
+            data-tip-body={`IV rank ${ctx.ivr === null ? 'n/a' : ctx.ivr.toFixed(0)} (0–100 over the last year). Implied volatility ${pct(ctx.iv30, 0)} against ${pct(ctx.hv20, 0)} realized: options look ${ctx.iv30 !== null && ctx.hv20 !== null && ctx.iv30 > ctx.hv20 ? 'rich (good for selling)' : 'cheap (good for buying)'}.`}
+          >
+            IV RANK {ctx.ivr === null ? '—' : ctx.ivr.toFixed(0)}
+          </span>
+        )}
         <span
           className={`chip ${edge && edge.tier !== 'none' ? 'warn' : ''}`}
           data-testid="edge-meter"

@@ -80,6 +80,8 @@ test('many trades closing at once with lines and the target: no errors, and prof
       if (idx !== traded) {
         traded = idx;
         await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 30_000 });
+        const play = page.getByTestId('board-play');
+        if (await play.isVisible().catch(() => false)) await play.click();
         for (let i = 1; i <= 4; i++) {
           await page.keyboard.press(`Alt+${i}`);
           await page.waitForTimeout(120);

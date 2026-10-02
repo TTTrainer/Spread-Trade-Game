@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/content/balance';
 import { CARTRIDGES, CARTRIDGE_BY_ID } from '../../src/content/cartridges';
 import { DESKS } from '../../src/content/desks';
+import { STRUCTURES } from '../../src/engine/strategies/structures';
 import { emptyFamilies, familyPassives } from '../../src/content/families';
 import { ANALYSTS } from '../../src/content/analysts';
 import { REVIEWS, QUARTER_REVIEWS } from '../../src/content/reviews';
@@ -17,7 +18,7 @@ import {
   rerollCost,
   sellPrice,
 } from '../../src/engine/run/shop';
-import { dealWindows } from '../../src/engine/run/deal';
+import { dealWindows, isFlat } from '../../src/engine/run/deal';
 import { baseRate, skew25, termStructure } from '../../src/engine/run/analystTools';
 import { runScore } from '../../src/engine/scoring/mult';
 import { Rng } from '../../src/engine/rng';
@@ -271,6 +272,41 @@ describe('dealing', () => {
     });
     expect(relaxed.relaxed).toBe(true);
     expect(relaxed.windows.length).toBe(2);
+  });
+
+  it('always deals a range-selling desk one flat chart, even against a trend filter', () => {
+    const tilted = windows.map((w) => ({ ...w, tags: { ...w.tags, trendSlope: w.id % 7 === 0 ? 0 : 0.4 } }));
+    for (let k = 0; k < 50; k++) {
+      const { windows: w } = dealWindows(tilted, new Rng(`flat${k}`), {
+        count: 4,
+        filter: { minAdx: 30 },
+        excludeWindows: new Set(),
+        excludeSymbols: new Set(),
+        indexSymbols: new Set(),
+        needFlat: true,
+      });
+      expect(w.length).toBe(4);
+      expect(w.filter(isFlat).length, `deal ${k}`).toBeGreaterThanOrEqual(1);
+      // The rest still follow the Review's market.
+      expect(w.filter((x) => !isFlat(x)).every((x) => x.tags.adx >= 30)).toBe(true);
+    }
+    // Without the flag nothing changes.
+    const plain = dealWindows(tilted, new Rng('plain'), {
+      count: 4,
+      filter: { minAdx: 30 },
+      excludeWindows: new Set(),
+      excludeSymbols: new Set(),
+      indexSymbols: new Set(),
+    });
+    expect(plain.windows.every((x) => x.tags.adx >= 30)).toBe(true);
+  });
+
+  it('knows which desks sell a range', () => {
+    const sells = (d: keyof typeof DESKS) =>
+      DESKS[d].structures.some((id) => STRUCTURES[id].bias === 'neutral');
+    expect(sells('condor')).toBe(true);
+    expect(sells('calendar')).toBe(true);
+    expect(sells('verticals')).toBe(false);
   });
 });
 

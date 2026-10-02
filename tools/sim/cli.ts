@@ -167,8 +167,10 @@ async function main(): Promise<void> {
 
   // ---------------- bots ----------------
   const bots: { bot: SimSpec['bot']; label: string; range: [number, number] }[] = [
-    { bot: 'active', label: 'Active Trader', range: [0.45, 0.65] },
-    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.55, 0.65] },
+    // Bosses: a good player beats a typical boss ~9 times in 10 and the final ~7 in 10, and a
+    // failed boss ends the run, so roughly half of good years are cleared.
+    { bot: 'active', label: 'Active Trader', range: [0.35, 0.55] },
+    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.4, 0.55] },
     { bot: 'hold', label: 'Hold-to-Expiry', range: [0.2, 0.35] },
     { bot: 'greedy', label: 'Greedy', range: [0, 0.15] },
     { bot: 'random', label: 'Random', range: [0, 0.05] },
@@ -282,6 +284,41 @@ async function main(): Promise<void> {
           )} · pass ${pct(rr.filter((x) => x.status === 'passed').length / Math.max(1, rr.length))}`,
         );
       }
+      // Each boss: how often a run that reached it got past it (targets: ~90% typical, ~70% final).
+      const byBoss = new Map<string, { n: number; pass: number }>();
+      for (const r of rs)
+        for (const x of r.rounds)
+          if (x.bossId && x.status !== 'skipped') {
+            const b = byBoss.get(x.bossId) ?? { n: 0, pass: 0 };
+            b.n++;
+            if (x.status === 'passed') b.pass++;
+            byBoss.set(x.bossId, b);
+          }
+      const bossLine = [...byBoss]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, b]) => `${id} ${pct(b.pass / b.n)} (n=${b.n})`)
+        .join(' · ');
+      console.log(`  ${label} vs bosses: ${bossLine}`);
+      if (who === 'disciplined') {
+        const typical = [...byBoss].filter(([id]) => id !== 'rebalancer');
+        const tn = typical.reduce((a, [, x]) => a + x.n, 0);
+        const tp = typical.reduce((a, [, x]) => a + x.pass, 0) / Math.max(1, tn);
+        const fin = byBoss.get('rebalancer');
+        const fp = fin ? fin.pass / fin.n : 0;
+        checks.push({
+          name: 'Typical boss beaten (Disciplined, Q1-Q3)',
+          target: '85%–95%',
+          actual: pct(tp),
+          pass: tp >= 0.85 && tp <= 0.95,
+        });
+        checks.push({
+          name: 'Final boss beaten (Disciplined, the Rebalancer)',
+          target: '62%–78%',
+          actual: pct(fp),
+          pass: fp >= 0.62 && fp <= 0.78,
+        });
+      }
+      lines.push(`**${label} vs bosses** (share of runs that reached a boss and beat it): ${bossLine}`, '');
       console.log(
         `  ${label}: passed-while-losing ${pct(passed.length ? passedLosing / passed.length : 0)}, losing-rounds-passed ${pct(losing.length ? losing.filter((x) => x.status === 'passed').length / losing.length : 0)}, score~P/L r=${corr.toFixed(2)}, score/target by quarter ${[0, 3, 6, 9].map((i) => mean(rs.filter((r) => r.rounds[i]).map((r) => r.rounds[i].meter / Math.max(1, r.rounds[i].target))).toFixed(1)).join('/')}`,
       );

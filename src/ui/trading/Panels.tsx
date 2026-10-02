@@ -11,7 +11,7 @@ import { burstAt } from '../../fx/overlay';
 import { money, pnlText, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { useTrading } from '../store/trading';
+import { liveCardId, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
 import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
@@ -643,7 +643,7 @@ export function FastForwardBar() {
 
 export function AnalyzePanel() {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const whatIf = useTrading((s) => s.whatIf);
   const setWhatIf = useTrading((s) => s.setWhatIf);
   const builder = useTrading((s) => s.builder);

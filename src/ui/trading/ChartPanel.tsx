@@ -31,12 +31,14 @@ import { optionLegsOf } from '../../engine/lifecycle/position';
 import { diffDays } from '../../engine/calendar';
 import { barsAhead } from './expiry';
 import type { Leg } from '../../engine/strategies/types';
-import { tradeOpen, useTrading, type StudyId } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading, type StudyId } from '../store/trading';
 import type { Position } from '../../engine/lifecycle/types';
 import type { TradePlan } from '../../engine/trading/plan';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { chartBridge } from './chartBridge';
 import { LivePnl, PositionHud } from './DayPlayer';
+import { BossBanner } from './BossBanner';
+import { useSealed } from '../boss';
 import { StrikeHandle } from './StrikeHandle';
 import { DayRecapPanel } from './DayRecap';
 import { ChartZones } from './ChartZones';
@@ -95,9 +97,15 @@ function line(data: (number | null)[], bars: Bar[]): LineData<Time>[] {
 
 export function ChartPanel() {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const version = useTrading((s) => s.version);
-  const studies = useTrading((s) => s.studies);
+  const allStudies = useTrading((s) => s.studies);
+  // The Shell Company seals the studies: only volume stays.
+  const studiesSealed = useSealed('studies');
+  const studies = useMemo(
+    () => (studiesSealed ? allStudies.filter((x) => x === 'vol') : allStudies),
+    [allStudies, studiesSealed],
+  );
   const timeframe = useTrading((s) => s.timeframe);
   const drawings = useTrading((s) => (cardId ? s.drawings[cardId] : undefined));
   const drawTool = useTrading((s) => s.drawTool);
@@ -594,6 +602,7 @@ export function ChartPanel() {
       {expAhead !== null && expDte !== null && <ExpiryLine ahead={expAhead} dte={expDte} open={!!position} />}
       {!planHidden && <StrikeHandle />}
       <PositionHud />
+      <BossBanner />
       <DayRecapPanel />
       <AnimatePresence>
         {stamp && (

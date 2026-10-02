@@ -14,13 +14,13 @@ import { sfx } from '../../audio/sfx';
 import { price } from '../format';
 import { Kbd } from '../components/ui';
 import { useApp } from '../store/app';
-import { tradeOpen, useTrading } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 
 const g = (x: number | undefined, d = 2) => (x === undefined || !Number.isFinite(x) ? '—' : x.toFixed(d));
 
 export function ChainScreen({ onClose }: { onClose: () => void }) {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const builder = useTrading((s) => s.builder);
   const allowed = useTrading((s) => s.allowed);
   const plan = useTrading((s) => s.plan)();

@@ -7,7 +7,7 @@ import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { tradeOpen, useTrading } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
 
 export function StructureCards({
@@ -102,7 +102,7 @@ export function OrderTicket() {
   const place = useTrading((s) => s.place);
   const plan = useTrading((s) => s.plan)();
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const open = useTrading(tradeOpen);
   const [confirm, setConfirm] = useState<null | 'buy' | 'sell'>(null);
   const card = session && cardId ? session.card(cardId) : null;

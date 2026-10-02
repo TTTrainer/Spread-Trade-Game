@@ -17,6 +17,8 @@ import { SetupPresets } from './BuilderTray';
 import { LONG_ANCHOR, STRUCTURE_COACH, type CoachControl } from '../../content/structureCoach';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
+import { useActiveBoss } from '../boss';
+import { LockStamp } from './BossBanner';
 
 const DELTA_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
 const NO_WIDTH = [
@@ -89,6 +91,7 @@ export function SetupSliders() {
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
   const seen = useApp((s) => s.settings.game.seenStructures);
+  const boss = useActiveBoss();
   const inTutorial = useRun((s) => s.engine?.state.config.mode === 'tutorial');
   if (!session || !cardId) return null;
   const sid = builder.structureId;
@@ -289,6 +292,12 @@ export function SetupSliders() {
           <span className="cc-v">
             <b>{money(plan.maxLossCents)}</b> · {pct(plan.riskPct)} of account
           </span>
+          {boss?.rule.riskCapMult !== undefined && (
+            <LockStamp
+              text={`${Math.round((1 - boss.rule.riskCapMult) * 100)}% IN RESERVE`}
+              by={boss.def.name}
+            />
+          )}
         </div>
       )}
     </div>

@@ -122,3 +122,26 @@ Recorded as sent; questions 14–22 are still to come.
 11. A failed Review **still ends the run** (Jacob will say if that doesn't feel good).
 12. Rewards: **extra shop cash**, **a choice of 2–3**, and **a permanent buff**.
 13. Yes, a **style bonus**, but make its condition apparent.
+
+---
+
+# Agreed design (after the follow-up questions)
+
+- **One twist per boss**, shown on the chart; the market type's old Review rule is dropped. Bosses never limit trade direction.
+- **Neutral desks always get a flat chart**: every Condor- and Calendar-desk lineup includes at least one range-bound card (judged only from past prices).
+- **No clock pressure**: the game trades on daily prices (no intraday), so no boss stops you pausing. The Margin Clerk's twist is half the usual risk per trade.
+- **No historical-event bosses** (the data starts in 2019 and has no real-estate stocks).
+- **Selection**: Q1-Q3 draw from pillars 1-11 (no repeats within a year); Q4 is always the Rebalancer. The boss is known from the quarter's first day.
+- **Reroll**: once per boss; $10, $25, $40, then $60.
+- **Markets** keep their existing logos; portraits come from an art list (placeholders until then).
+- **Controller**: all running P/L hidden, including equity; profit targets and stops still fire and show their amount.
+- **Executor**: days to expiry show as "?" until the trade is open; max profit and max loss stay visible.
+- **Landlord**: the total mult is cut by 35%.
+- **Allocator**: second goal of up to 3 different structure types (all of them on 2-structure desks).
+- **Rebalancer** (final): beat SPY this round, with the SPY line on the chart; target x1.25. Missing SPY still counts as "You survived".
+- **Difficulty**: about 9 in 10 for a typical boss and 7 in 10 for the final, for a good player.
+- **Month menu** before every round: target, build (reorder/sell), next boss, reroll, plus run-wide settings such as stop and target levels. The tutorial skips it except for the boss case file.
+- **Rewards**: shop cash, pick 1 of 3 free cartridges, and a boss-themed voucher; a style bonus on top, with its condition shown during the round.
+- **Failed boss ends the run** (one switch to change it).
+- **Duel** (Early Retiree) is built last and fully tested.
+- **Developer test checklist**: a dev-mode list of things to try (each boss, the menu, rewards...), each with a button that sets it up, a tick and a note.

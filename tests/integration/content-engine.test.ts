@@ -7,8 +7,9 @@ import type { RunConfig } from '../../src/engine/run/types';
 import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
 import { MEMO_IDS, TAG_IDS, VOUCHER_IDS } from '../../src/content/items';
 import { REVIEWS } from '../../src/content/reviews';
+import { BOSSES, BOSS_IDS, quarterBossPool } from '../../src/content/bosses';
 import { matchesFilter } from '../../src/engine/market/filter';
-import type { MemoId, ReviewId, TagId } from '../../src/content/types';
+import type { MemoId, TagId } from '../../src/content/types';
 import { expirationsOf } from '../../src/engine/strategies/structures';
 import { CLIENTS } from '../../src/content/clients';
 import { clientChecks, clientFitsDesk } from '../../src/engine/run/clients';
@@ -218,39 +219,134 @@ describe('tags', () => {
   }, 30_000);
 });
 
-describe('reviews', () => {
-  const ids = Object.keys(REVIEWS) as ReviewId[];
-  for (const id of ids)
-    it(`${id}: deals matching windows and applies its rule`, async () => {
-      const e = await RunEngine.create(
-        src,
-        config(`review-${id}`, id === 'annual_review' ? { quarters: 1 } : {}),
-      );
+describe('bosses', () => {
+  for (const id of BOSS_IDS)
+    it(`${id}: deals its market, drops the old Review rule, applies one twist`, async () => {
+      const boss = BOSSES[id];
+      const e = await RunEngine.create(src, config(`boss-${id}`, id === 'rebalancer' ? { quarters: 1 } : {}));
+      // Pin this quarter's boss (normally drawn when the quarter starts).
+      e.state.bosses = [{ quarter: 1, id }];
+      const monthCap = e.sessionConfig().riskCapPct;
       await skip(e);
       await skip(e);
       expect(e.state.phase).toBe('review_intro');
-      e.state.nextReview = id;
-      e.state.round.reviewId = id;
+      expect(e.state.round.bossId).toBe(id);
+      // Skipping rounds can hand out a Calm Tag (a looser line next round): not what this checks.
+      e.state.tagEffects.calm = 0;
       await e.dispatch({ t: 'startReview' });
       const r = e.state.round;
-      expect(r.reviewId).toBe(id);
-      const rv = REVIEWS[id];
+      expect(r.reviewId).toBe(boss.market);
+      expect(r.bossId).toBe(id);
+      const rv = REVIEWS[boss.market];
       const windows = await src.windows({});
       const dealt = r.cards.map((c) => windows.find((w) => w.id === c.windowId)!);
-      if (id !== 'annual_review' && !r.filterRelaxed) {
+      if (boss.market !== 'annual_review' && !r.filterRelaxed) {
         const matching = dealt.filter((w) => matchesFilter(w, rv.filter));
         // The Fed swaps one card for the index.
-        expect(matching.length).toBeGreaterThanOrEqual(id === 'the_fed' ? dealt.length - 1 : dealt.length);
+        expect(matching.length).toBeGreaterThanOrEqual(
+          boss.market === 'the_fed' ? dealt.length - 1 : dealt.length,
+        );
       }
+      if (boss.market === 'the_fed')
+        expect(dealt.some((w) => w.symbol === 'MKTX' || w.symbol === 'INDX')).toBe(true);
+      // The market type's old rule is gone: one twist only.
       const cfg = e.sessionConfig();
-      if (rv.rule.marketOrdersDisabled) expect(cfg.execution.marketOrdersDisabled).toBe(true);
-      if (rv.rule.earlyAssignmentAlways) expect(cfg.realism.earlyAssignment).toBe(true);
-      if (rv.rule.noDecisionsOnGap) expect(cfg.suppressOnGap).toBe(true);
-      if (rv.rule.maxLossLineDelta)
-        expect(r.maxLossLinePct).toBeCloseTo(BALANCE.risk.maxLossLinePct + rv.rule.maxLossLineDelta);
-      if (rv.rule.targetMult) expect(r.target).toBe(computeTarget(1, 2, id, e.state.config));
-      if (id === 'the_fed') expect(dealt.some((w) => w.symbol === 'MKTX' || w.symbol === 'INDX')).toBe(true);
+      expect(cfg.execution.marketOrdersDisabled).toBe(false);
+      expect(cfg.suppressOnGap).toBe(false);
+      expect(r.maxLossLinePct).toBeCloseTo(BALANCE.risk.maxLossLinePct);
+      expect(r.target).toBe(computeTarget(1, 2, boss.market, e.state.config, false, id));
+      // The twist itself.
+      const t = boss.twist;
+      if (t.kind === 'riskCap') expect(cfg.riskCapPct).toBeCloseTo(monthCap * t.mult);
+      else expect(cfg.riskCapPct).toBeCloseTo(monthCap);
+      if (t.kind === 'leftCartOff') {
+        expect(e.state.cartridges.length).toBeGreaterThan(0);
+        expect(e.activeCartridges()).not.toContain(e.state.cartridges[0]);
+      } else expect(e.activeCartridges()).toEqual(e.state.cartridges);
+      if (t.kind === 'annual')
+        expect(r.target).toBe(computeTarget(1, 2, 'annual_review', e.state.config, false, 'rebalancer'));
     }, 30_000);
+
+  it('picks Q1-Q3 bosses from the built ones without repeats in a year, and Q4 is the Rebalancer', async () => {
+    for (const seed of ['pick-a', 'pick-b', 'pick-c']) {
+      const e = await RunEngine.create(src, config(seed));
+      const picks = [1, 2, 3, 4].map((q) => e.bossFor(q));
+      expect(picks[3]).toBe('rebalancer');
+      expect(new Set(picks.slice(0, 3)).size).toBe(3);
+      for (const p of picks.slice(0, 3)) expect(quarterBossPool()).toContain(p);
+      // Asking again gives the same boss (it is remembered, not redrawn).
+      expect(e.bossFor(2)).toBe(picks[1]);
+    }
+  });
+});
+
+describe('the month menu', () => {
+  it('comes up over each Month (not a Review, the tutorial or the simulator) and closes once', async () => {
+    const e = await RunEngine.create(src, config('menu-1'));
+    expect(e.state.round.boardSeen).toBe(false);
+    await e.dispatch({ t: 'boardDone' });
+    expect(e.state.round.boardSeen).toBe(true);
+    await skip(e);
+    expect(e.state.round.boardSeen).toBe(false);
+    await skip(e);
+    expect(e.state.phase).toBe('review_intro');
+    await e.dispatch({ t: 'startReview' });
+    expect(e.state.round.boardSeen).toBe(true);
+    for (const mode of ['tutorial', 'sim'] as const)
+      expect((await RunEngine.create(src, config(`menu-${mode}`, { mode }))).state.round.boardSeen).toBe(
+        true,
+      );
+  });
+
+  it('sets the run-wide exit plan: clamped, saved, and used by new trades', async () => {
+    const e = await RunEngine.create(src, config('menu-plan'));
+    const before = e.exitPlan();
+    expect(before.creditTargetPct).toBeCloseTo(BALANCE.brackets.creditTargetPct);
+    await e.dispatch({ t: 'setPlan', plan: { creditTargetPct: 0.75, creditStopMult: 9 } });
+    const after = e.exitPlan();
+    expect(after.creditTargetPct).toBeCloseTo(0.75);
+    // Out-of-range values are held to the sensible range; untouched ones stay.
+    expect(after.creditStopMult).toBe(4);
+    expect(after.debitStopPct).toBeCloseTo(before.debitStopPct);
+    expect(e.state.plan).toEqual(after);
+    expect(e.session!.config.bracketDefaults).toEqual(after);
+    expect(e.sessionConfig().bracketDefaults).toEqual(after);
+  });
+
+  it('rerolls the quarter’s boss once, for the listed price, before the clock starts', async () => {
+    const e = await RunEngine.create(src, config('menu-reroll'));
+    e.state.cash = 30;
+    const first = e.bossFor(1);
+    expect(e.bossReroll()).toEqual({ cost: BALANCE.run.bossRerollCosts[0] });
+    await e.dispatch({ t: 'rerollBoss' });
+    const now = e.knownBoss(1)!;
+    expect(now).not.toBe(first);
+    expect(quarterBossPool()).toContain(now);
+    expect(e.state.cash).toBe(30 - BALANCE.run.bossRerollCosts[0]);
+    // Once per boss.
+    expect(e.bossReroll()).toHaveProperty('blocked');
+    await e.dispatch({ t: 'rerollBoss' });
+    expect(e.knownBoss(1)).toBe(now);
+    expect(e.state.cash).toBe(30 - BALANCE.run.bossRerollCosts[0]);
+    // Q2's boss costs the next price, and not after its Month's clock has started.
+    const e2 = await RunEngine.create(src, config('menu-reroll-2'));
+    e2.state.cash = 100;
+    e2.state.quarter = 2;
+    e2.bossFor(2);
+    expect(e2.bossReroll()).toEqual({ cost: BALANCE.run.bossRerollCosts[1] });
+    e2.state.round.clockStarted = true;
+    expect(e2.bossReroll()).toHaveProperty('blocked');
+    // The year-end Rebalancer stays.
+    const e3 = await RunEngine.create(src, config('menu-reroll-3', { quarters: 1 }));
+    e3.state.cash = 100;
+    expect(e3.bossFor(1)).toBe('rebalancer');
+    expect(e3.bossReroll()).toHaveProperty('blocked');
+    // Too little cash.
+    const e4 = await RunEngine.create(src, config('menu-reroll-4'));
+    e4.state.cash = 5;
+    e4.bossFor(1);
+    expect(e4.bossReroll()).toHaveProperty('blocked');
+  });
 });
 
 describe('clients', () => {

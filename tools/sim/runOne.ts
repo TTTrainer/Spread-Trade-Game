@@ -50,6 +50,7 @@ export interface SimResult {
     meter: number;
     status: string;
     realizedCents: number;
+    bossId: string | null;
   }[];
   ms: number;
   error?: string;
@@ -133,6 +134,7 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
       meter: h.meter,
       status: h.status,
       realizedCents: h.realizedCents,
+      bossId: h.bossId ?? null,
     })),
     ms: Date.now() - t0,
     error,

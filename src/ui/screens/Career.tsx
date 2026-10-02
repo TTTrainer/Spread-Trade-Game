@@ -42,6 +42,8 @@ import {
 } from '../run/RunParts';
 import './screens.css';
 import '../run/run.css';
+import { useActiveBoss, useBossPalette } from '../boss';
+import { MonthMenu, monthMenuUp } from '../run/MonthMenu';
 
 export function CareerScreen() {
   const go = useApp((s) => s.go);
@@ -534,6 +536,9 @@ export function RunScreen() {
     // Leaving the screen pauses the clock; the run is already saved.
     return () => useTrading.getState().pause();
   }, []);
+  // A boss recolors the whole board while its case file and its round are up.
+  useBossPalette();
+  const bossOn = !!useActiveBoss();
   // A new phase starts clean: the trading desk's notices don't follow you into the tally or shop.
   const phaseNow = engine?.state.phase;
   useEffect(() => {
@@ -595,9 +600,13 @@ export function RunScreen() {
       />
     );
   }
+  // The month menu comes up over a freshly dealt Month (not in the tutorial).
+  const menu = monthMenuUp(engine) ? <MonthMenu e={engine} onExit={exit} /> : null;
   return (
     <>
       {body}
+      {menu}
+      {bossOn && <div className="boss-vignette" aria-hidden="true" data-testid="boss-vignette" />}
       {coach}
     </>
   );

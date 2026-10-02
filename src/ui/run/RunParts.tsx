@@ -30,11 +30,13 @@ import { Kbd, Meter, Modal, CountUp } from '../components/ui';
 import { money, pct, pnlText, signed } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useRun } from '../store/run';
-import { tradeOpen, useTrading } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
 import { CashReadout } from '../trading/CashDeposit';
 import './run.css';
+import { BOSSES } from '../../content/bosses';
+import { LockStamp } from '../trading/BossBanner';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
@@ -45,14 +47,21 @@ export function CartridgeChip({
   index,
   onMove,
   extra,
+  held,
 }: {
   def: CartridgeDef;
   index?: number;
   onMove?: (dir: -1 | 1) => void;
   extra?: ReactNode;
+  /** Switched off by a boss for the round. */
+  held?: boolean;
 }) {
   return (
-    <div className={`cart-chip rar-${def.rarity}`} data-tip={`cart:${def.id}`} data-testid={`cart-${def.id}`}>
+    <div
+      className={`cart-chip rar-${def.rarity} ${held ? 'held' : ''}`}
+      data-tip={`cart:${def.id}`}
+      data-testid={`cart-${def.id}`}
+    >
       {onMove && (
         <button className="cart-move" onClick={() => onMove(-1)} aria-label="Move left">
           ◀
@@ -84,6 +93,12 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
   const slots = e.cartridgeSlots();
   const fam = e.families();
   const owned = e.state.cartridges;
+  // The Bursar holds the leftmost cartridge for the round: it shows, stamped, but does nothing.
+  const r = e.state.round;
+  const held =
+    r.bossId && (e.state.phase === 'round' || e.state.phase === 'review_intro') && e.rule().leftCartOff
+      ? owned[0]
+      : null;
   return (
     <div className="cart-rail" data-testid="cartridge-rail" data-tip="g:cartridge_rail">
       <div className="cart-slots">
@@ -101,7 +116,9 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
               key={id}
               def={def}
               index={i}
+              held={id === held}
               onMove={editable ? (d) => void act({ t: 'move', from: i, to: i + d }) : undefined}
+              extra={id === held ? <LockStamp text="TUITION" by={BOSSES[r.bossId!].name} /> : undefined}
             />
           );
         })}
@@ -191,8 +208,8 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           <span className="rtb-name">{ROUND_NAMES[r.index].toUpperCase()}</span>
           <span className="rtb-chips">
             {review && (
-              <span className="chip magenta" data-tip={`review:${review.id}`}>
-                {review.name.toUpperCase()}
+              <span className="chip magenta" data-tip={`review:${review.id}`} data-testid="boss-chip">
+                {(r.bossId ? BOSSES[r.bossId].name : review.name).toUpperCase()}
               </span>
             )}
             <ModeChips e={e} />
@@ -298,10 +315,21 @@ function hasEarningsDetail(e: RunEngine): boolean {
 
 /** The news brief is free for everyone; its finer detail comes from the same analysts as the badges. */
 export function careerBriefAccess(e: RunEngine): BriefAccess {
+  const sealed = sealedBy(e);
   return {
     earningsDetail: hasEarningsDetail(e),
-    ivDetail: e.hasAnalyst('quant') || e.hasAnalyst('vol_surfer'),
+    ivDetail: !sealed.ivr && (e.hasAnalyst('quant') || e.hasAnalyst('vol_surfer')),
+    ivSealedBy: sealed.ivr ?? undefined,
+    studiesSealedBy: sealed.studies ?? undefined,
   };
+}
+
+/** Which information this round's boss has sealed, by the boss's name. */
+function sealedBy(e: RunEngine): { ivr: string | null; studies: string | null } {
+  const r = e.state.round;
+  const hide = e.state.phase === 'round' && r.bossId ? (e.rule().hide ?? []) : [];
+  const name = r.bossId ? BOSSES[r.bossId].name : '';
+  return { ivr: hide.includes('ivr') ? name : null, studies: hide.includes('studies') ? name : null };
 }
 
 export function careerBadges(
@@ -309,7 +337,8 @@ export function careerBadges(
   symbolSector: (sym: string) => string | null,
 ): (cardId: string) => CardBadges {
   const fam = e.families();
-  const quant = e.hasAnalyst('quant');
+  // IV rank badges go dark while a boss has IV rank sealed.
+  const quant = e.hasAnalyst('quant') && !sealedBy(e).ivr;
   const whisper = hasEarningsDetail(e);
   const scout = e.hasAnalyst('scout') || e.state.round.memo.lens;
   const trend = fam.DELTA >= 2;
@@ -708,7 +737,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
 export function ScorePreviewBox({ e }: { e: RunEngine }) {
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const session = useTrading((s) => s.session);
   const open = useTrading(tradeOpen);
   const implied = useTrading((s) => s.impliedCall)();
@@ -826,7 +855,7 @@ function Readout({ title, children }: { title: string; children: ReactNode }) {
 /** What each hired analyst says about the selected card. */
 export function AnalystDesk({ e }: { e: RunEngine }) {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const builder = useTrading((s) => s.builder);
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
@@ -839,8 +868,15 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
   const out: ReactNode[] = [];
   const fam = e.families();
   const deskCal = e.state.config.deskId === 'calendar';
-  const review = e.state.round.reviewId ? REVIEWS[e.state.round.reviewId].rule : {};
-  if (has('quant')) {
+  const review = e.rule();
+  const ivSealed = sealedBy(e).ivr;
+  if (ivSealed && (has('quant') || has('vol_surfer')))
+    out.push(
+      <Readout key="sealed" title="IV desk">
+        <LockStamp text="IV RANK SEALED" by={ivSealed} />
+      </Readout>,
+    );
+  else if (has('quant')) {
     const hist = view
       .vol()
       .slice(-120)

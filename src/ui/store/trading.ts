@@ -930,7 +930,8 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     },
     plan: () => {
-      const { session, selectedCardId, builder, version, confidence } = get();
+      const { session, builder, version, confidence } = get();
+      const selectedCardId = liveCardId(get());
       if (!session || !selectedCardId || !builder.expiration) return null;
       const key = JSON.stringify([session.config.seed, version, selectedCardId, builder, confidence]);
       if (planCache.key === key) return planCache.value;
@@ -974,7 +975,8 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     },
     impliedCall: () => {
-      const { session, selectedCardId, builder, confidence } = get();
+      const { session, builder, confidence } = get();
+      const selectedCardId = liveCardId(get());
       const plan = get().plan();
       if (!session || !selectedCardId || !plan?.ok) return null;
       const spot = session.view(selectedCardId).spot();
@@ -995,7 +997,8 @@ export const useTrading = create<TradingState>((set, get) => {
     },
     setAllowed: (ids) => set({ allowed: ids }),
     nudgeStrike: (dir) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const plan = get().plan();
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
       if (!chain || !builder.expiration || !tradeOpen(get())) return;
@@ -1014,7 +1017,8 @@ export const useTrading = create<TradingState>((set, get) => {
       get().setBuilder({ anchor: next, legs: null });
     },
     nudgeExpiration: (dir) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
       if (!chain || !tradeOpen(get())) return;
       const now = session!.view(selectedCardId!).now;
@@ -1040,7 +1044,8 @@ export const useTrading = create<TradingState>((set, get) => {
       void get().setConfidence(step.confidence);
     },
     applyPreset: (p) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
       if (!chain || !session || !tradeOpen(get())) return;
       const now = session.view(selectedCardId!).now;
@@ -1092,7 +1097,8 @@ export const useTrading = create<TradingState>((set, get) => {
         );
     },
     saveMySetup: () => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const plan = get().plan();
       if (!session || !selectedCardId || !builder.expiration) return;
       const setup = {
@@ -1120,7 +1126,8 @@ export const useTrading = create<TradingState>((set, get) => {
       sfx('multPop', 0.6 + c * 0.6);
     },
     place: async (side) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       if (!session || !selectedCardId || !builder.expiration) return false;
       const plan = get().plan();
       if (!plan || !plan.ok || plan.mid === null || plan.natural === null) {

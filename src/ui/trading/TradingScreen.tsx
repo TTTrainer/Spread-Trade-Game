@@ -27,6 +27,8 @@ import { NewsBriefPanel } from './NewsBrief';
 import type { BriefAccess } from '../../engine/news/brief';
 import { DebriefStrip } from './Debrief';
 import './trading.css';
+import { LockStamp } from './BossBanner';
+import { useSealed } from '../boss';
 
 const STUDY_LABELS: Record<StudyId, string> = {
   bb: 'Bollinger Bands',
@@ -263,6 +265,7 @@ export function TradingLayout({
   });
   const controls = useAnimationControls();
   const [studiesOpen, setStudiesOpen] = useStudyPicker();
+  const studiesSealed = useSealed('studies');
   const chainOpen = useTrading((s) => s.chainOpen);
   const setChainOpen = useTrading((s) => s.setChainOpen);
   const chainKey = useApp((s) => s.settings.hotkeys.chain);
@@ -284,7 +287,7 @@ export function TradingLayout({
     nextPanel: () => setPanel(tabs[(tabs.indexOf(panel) + 1) % tabs.length]),
     prevPanel: () => setPanel(tabs[(tabs.indexOf(panel) + tabs.length - 1) % tabs.length]),
     reverse: () => reverse(),
-    studies: () => setStudiesOpen(true),
+    studies: () => !studiesSealed && setStudiesOpen(true),
     chain: () => setChainOpen(!chainOpen),
     timeframe: () => useTrading.getState().setTimeframe(useTrading.getState().timeframe === 'D' ? 'W' : 'D'),
     help: () => setHelp(true),
@@ -413,9 +416,13 @@ export function TradingLayout({
               <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
             </button>
           ))}
-          <button onClick={() => setStudiesOpen(true)}>
-            STUDIES <span className="kbd">Ctrl+E</span>
-          </button>
+          {studiesSealed ? (
+            <LockStamp text="STUDIES SEALED" by={studiesSealed} />
+          ) : (
+            <button onClick={() => setStudiesOpen(true)}>
+              STUDIES <span className="kbd">Ctrl+E</span>
+            </button>
+          )}
           <button onClick={() => setHelp(true)}>
             HELP <span className="kbd">Ctrl+8</span>
           </button>
@@ -434,7 +441,7 @@ export function TradingLayout({
       </div>
       <DecisionModal />
       <CashDeposit />
-      {studiesOpen && <StudyPicker onClose={() => setStudiesOpen(false)} />}
+      {studiesOpen && !studiesSealed && <StudyPicker onClose={() => setStudiesOpen(false)} />}
     </motion.div>
   );
 }

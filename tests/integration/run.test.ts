@@ -406,7 +406,9 @@ describe('career run loop', () => {
     await e.dispatch({ t: 'startReview' });
     expect(e.state.phase).toBe('round');
     expect(e.state.round.reviewId).toBe(id);
-    expect(e.state.round.target).toBe(computeTarget(1, 2, id, e.state.config));
+    // The boss running it sets its share of the target.
+    expect(e.state.round.bossId).toBeTruthy();
+    expect(e.state.round.target).toBe(computeTarget(1, 2, id, e.state.config, false, e.state.round.bossId));
     await skip(e);
     expect(e.events.some((x) => /cannot be skipped/.test(x.text))).toBe(true);
   }, 60_000);

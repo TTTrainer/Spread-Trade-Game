@@ -1,3 +1,4 @@
+import type { BossId } from '../../content/bosses';
 /**
  * Run state: everything about a Career run that is not market data. It is plain JSON, so it
  * autosaves, and together with the action log it replays the run exactly.
@@ -72,10 +73,26 @@ export interface RoundCard {
   timeSkip: number;
 }
 
+/** Where new trades take profit and stop out, for the whole run. */
+export interface ExitPlan {
+  /** Credit trades: take profit at this share of the credit. */
+  creditTargetPct: number;
+  /** Credit trades: stop out when the loss reaches this many times the credit. */
+  creditStopMult: number;
+  /** Debit trades: take profit at this gain on the debit. */
+  debitTargetPct: number;
+  /** Debit trades: stop out at this share of the debit lost. */
+  debitStopPct: number;
+}
+
 export interface RoundState {
   quarter: number;
   index: number; // 0 = Month 1, 1 = Month 2, 2 = Review
   reviewId: ReviewId | null;
+  /** The boss running this Review (its market is `reviewId`); none on Month rounds. */
+  bossId?: BossId | null;
+  /** The month menu (target, build, plan, the quarter's boss) has been seen for this round. */
+  boardSeen?: boolean;
   target: number;
   meter: number;
   startEquityCents: number;
@@ -144,6 +161,7 @@ export interface RoundSummary {
   quarter: number;
   index: number;
   reviewId: ReviewId | null;
+  bossId?: BossId | null;
   target: number;
   meter: number;
   status: RoundState['status'];
@@ -195,6 +213,12 @@ export interface RunState {
   };
   reviewsSeen: ReviewId[];
   nextReview: ReviewId | null;
+  /** Each quarter's boss, picked when the quarter starts (so it can be shown a quarter ahead). */
+  bosses?: { quarter: number; id: BossId }[];
+  /** Quarters whose boss has been rerolled (once per boss). */
+  bossRerolled?: number[];
+  /** The run's exit plan for new trades, set from the month menu (else the desk's defaults). */
+  plan?: ExitPlan;
   round: RoundState;
   shop: ShopState | null;
   history: RoundSummary[];
@@ -231,6 +255,7 @@ export interface RunStats {
   burnouts: number;
   skips: number;
   reviewsPassed: string[];
+  bossesBeaten?: string[];
   maxMult: number;
   maxPoints: number;
   maxCartridges: number;
@@ -271,6 +296,9 @@ export type RunAction =
   | { t: 'rerollShop' }
   | { t: 'leaveShop' }
   | { t: 'startReview' }
+  | { t: 'boardDone' }
+  | { t: 'rerollBoss' }
+  | { t: 'setPlan'; plan: Partial<ExitPlan> }
   | { t: 'endless' }
   | { t: 'forfeit' }
   | { t: 'dev'; op: DevOp };
