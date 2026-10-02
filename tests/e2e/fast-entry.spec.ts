@@ -98,7 +98,7 @@ test('fast trade entry: view picks the structure, presets, sliders, conviction, 
   await expect.poll(async () => (await builder(page)).conviction).toBe(saved.conviction);
 
   // Selling slams the ticket onto the chart.
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.keyboard.press('Alt+S');
   await expect(page.getByTestId('fill-stamp')).toBeVisible();
   await expect(page.getByTestId('fill-stamp')).toContainText('SOLD');

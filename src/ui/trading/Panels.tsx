@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { motion } from 'motion/react';
 import { diffDays } from '../../engine/calendar';
 import { lastMark, optionLegsOf, stockRatio } from '../../engine/lifecycle/position';
 import { BUCKET_GLYPHS } from '../../engine/scoring/calls';
@@ -6,7 +7,8 @@ import { quotesFor, STRUCTURES } from '../../engine/strategies/structures';
 import { payoffNow, type PricingEnv } from '../../engine/strategies/metrics';
 import type { DecisionAction, DecisionPoint, Position } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
-import { money, pct, price } from '../format';
+import { burstAt } from '../../fx/overlay';
+import { money, pnlText, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useTrading } from '../store/trading';
@@ -14,11 +16,12 @@ import { useApp } from '../store/app';
 import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
 import { briefFor, StreetChip } from './NewsBrief';
-import { LivePnl, PaceControls, useDayProgress } from './DayPlayer';
+import { LiveVsMax, LivePnl, PaceControls, useDayProgress } from './DayPlayer';
 import { priceAt } from './dayPath';
 import type { BriefAccess } from '../../engine/news/brief';
 import { RollDialog } from './RollDialog';
 import { MiniCandles } from './DayRecap';
+import { boundsOf, PlRange, shareText } from './PlRange';
 
 export { RollDialog };
 
@@ -217,7 +220,7 @@ export function PositionsDock() {
             <th data-tip="g:open_price">Open</th>
             <th data-tip="g:mark">Mark</th>
             <th data-tip="g:pl_open">P/L</th>
-            <th data-tip="g:pct_risk">% risk</th>
+            <th data-tip="g:pl_range">vs max</th>
             <th data-tip="g:dte">DTE</th>
             <th data-tip="g:pos_delta">Δ</th>
             <th data-tip="g:pos_theta">Θ/day</th>
@@ -253,7 +256,9 @@ export function PositionsDock() {
                 <td>{price(Math.abs(p.openNet))}</td>
                 <td>{p.status === 'open' ? price(Math.abs(m?.value ?? 0)) : p.exitReason}</td>
                 <td>{p.status === 'open' ? <LivePnl pos={p} /> : <Pnl cents={pl} />}</td>
-                <td>{pct(pl / Math.max(1, p.entry.maxLossCents), 0)}</td>
+                <td>
+                  <LiveVsMax pos={p} />
+                </td>
                 <td>{p.status === 'open' ? (dte ?? '—') : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.delta ?? 0).toFixed(0) : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.theta ?? 0).toFixed(1) : '—'}</td>
@@ -346,7 +351,9 @@ export function DecisionModal() {
   // Reviewing the chart: the dialog tucks into a bar so the full chart can be scrolled and zoomed.
   const peek = useTrading((s) => s.reviewChart);
   const setPeek = useTrading((s) => s.setReviewChart);
-  const dp = ff === 'decision' ? session?.decisions[0] : undefined;
+  // The next decision waits for a profit celebration to finish, so the two never stack.
+  const celebrating = useTrading((s) => !!s.deposit?.profit);
+  const dp = ff === 'decision' && !celebrating ? session?.decisions[0] : undefined;
   const pos = dp ? session?.position(dp.positionId) : undefined;
   const act = (a: DecisionAction) => {
     if (!dp) return;
@@ -391,6 +398,15 @@ export function DecisionModal() {
   if (!dp || !pos || !session) return null;
   const m = lastMark(pos);
   const view = session.view(pos.cardId);
+  const closeNow = dp.closeNowCents ?? m?.plCents ?? 0;
+  const label = (o: DecisionAction): string =>
+    dp.kind === 'target_hit' && o === 'close'
+      ? `TAKE PROFIT ${pnlText(closeNow)}`
+      : dp.kind === 'target_hit' && o === 'hold'
+        ? 'LET IT RIDE'
+        : dp.kind === 'stop_hit' && o === 'close'
+          ? `TAKE THE STOP ${pnlText(closeNow)}`
+          : ACTION_LABEL[o];
   const buttons = dp.options.map((o) => (
     <button
       key={o}
@@ -399,7 +415,7 @@ export function DecisionModal() {
       data-testid={`dp-${o}`}
       title={ACTION_KEY[o] ? `Hotkey ${ACTION_KEY[o]}` : undefined}
     >
-      {ACTION_LABEL[o]} {dp.planned === o && <span className="chip good">PLAN</span>}
+      {label(o)} {dp.planned === o && dp.kind !== 'target_hit' && <span className="chip good">PLAN</span>}
     </button>
   ));
   const roll = rolling && (
@@ -428,6 +444,28 @@ export function DecisionModal() {
       </div>
     );
   const legs = optionLegsOf(pos.legs);
+  if (dp.kind === 'target_hit')
+    return (
+      <TakeProfit
+        dp={dp}
+        pos={pos}
+        closeNow={closeNow}
+        dayLabel={view.dayLabel()}
+        daysLeft={legs.length ? Math.min(...legs.map((l) => diffDays(view.now, l.expiration))) : null}
+        onAct={act}
+        onPeek={() => setPeek(true)}
+      >
+        <MiniCandles
+          bars={view.bars().slice(-30)}
+          shorts={legs.filter((l) => l.ratio < 0).map((l) => l.strike)}
+          longs={legs.filter((l) => l.ratio > 0).map((l) => l.strike)}
+          width={440}
+          height={110}
+          tags
+        />
+        {roll}
+      </TakeProfit>
+    );
   return (
     <Modal testId="decision-modal">
       <div className={`dp-kind kind-${dp.kind}`}>DECISION POINT · {view.dayLabel()}</div>
@@ -472,6 +510,98 @@ export function DecisionModal() {
         <Kbd>Enter</Kbd> follows the plan
       </p>
       {roll}
+    </Modal>
+  );
+}
+
+/**
+ * A hit profit target is the payoff moment, so it gets its own dialog: the money you can bank in
+ * big type, how much of the trade's best case that is, and two plain choices. Taking it is the
+ * default; letting it ride removes the target and keeps the trade open.
+ */
+function TakeProfit({
+  dp,
+  pos,
+  closeNow,
+  dayLabel,
+  daysLeft,
+  onAct,
+  onPeek,
+  children,
+}: {
+  dp: DecisionPoint;
+  pos: Position;
+  closeNow: number;
+  dayLabel: string;
+  daysLeft: number | null;
+  onAct: (a: DecisionAction) => void;
+  onPeek: () => void;
+  children: ReactNode;
+}) {
+  const b = boundsOf(pos);
+  const more = b.maxProfit !== null ? Math.max(0, b.maxProfit - closeNow) : null;
+  const giveBack = closeNow + b.maxLoss;
+  useEffect(() => {
+    sfx('win', 1.1, 0.8);
+    const t = setTimeout(
+      () => burstAt(document.querySelector('[data-testid="tp-amount"]'), 'coins', 22),
+      180,
+    );
+    return () => clearTimeout(t);
+  }, [dp.id]);
+  return (
+    <Modal testId="decision-modal">
+      <div className="tp">
+        <div className="dp-kind kind-target_hit">◆ PROFIT TARGET HIT · {dayLabel}</div>
+        <h2>
+          {pos.symbol} · {STRUCTURES[pos.structureId].short} {pos.entry.shortStrikes.join('/')}
+          {pos.qty > 1 ? ` ×${pos.qty}` : ''}
+        </h2>
+        <motion.div
+          className="tp-amount num"
+          data-testid="tp-amount"
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 13 }}
+        >
+          {pnlText(closeNow)}
+        </motion.div>
+        <div className="tp-sub num">
+          ready to bank · <b>{shareText(closeNow, b)}</b>
+          {b.maxProfit !== null && <> ({money(b.maxProfit)})</>}
+        </div>
+        <PlRange cents={closeNow} bounds={b} size="big" />
+        <div className="tp-choices">
+          <button className="pixel-btn primary tp-take" onClick={() => onAct('close')} data-testid="dp-close">
+            <span className="tp-btn-title">TAKE PROFIT</span>
+            <span className="tp-btn-sub num">bank {pnlText(closeNow)} now · Enter</span>
+          </button>
+          <button className="pixel-btn tp-ride" onClick={() => onAct('hold')} data-testid="dp-hold">
+            <span className="tp-btn-title">LET IT RIDE</span>
+            <span className="tp-btn-sub num">
+              {more !== null ? `+${money(more)} more at best` : 'no cap on the upside'}
+              {daysLeft !== null ? ` · ${daysLeft}d left` : ''}
+            </span>
+          </button>
+        </div>
+        <p className="tp-risk dim">
+          Riding removes the target: you close it whenever you like, but from here it can still give back up
+          to {money(giveBack)}.
+        </p>
+        <div className="dp-chart" data-testid="dp-mini-chart">
+          {children}
+        </div>
+        <div className="tp-more">
+          {dp.options.includes('roll') && (
+            <button className="pixel-btn small" onClick={() => onAct('roll')} data-testid="dp-roll">
+              ROLL
+            </button>
+          )}
+          <button className="pixel-btn small" onClick={onPeek} data-testid="dp-peek">
+            ◐ REVIEW CHART <Kbd>V</Kbd>
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

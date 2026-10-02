@@ -12,7 +12,7 @@ import { computeFacts } from '../../engine/run/facts';
 import { STRUCTURES, expirationsOf, reverseOf, stepStrike } from '../../engine/strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../../engine/strategies/types';
 import type { Bucket } from '../../engine/scoring/calls';
-import type { DecisionAction } from '../../engine/lifecycle/types';
+import type { DecisionAction, Position } from '../../engine/lifecycle/types';
 import { brier } from '../../engine/scoring/calls';
 import { diffDays } from '../../engine/calendar';
 import { sfx } from '../../audio/sfx';
@@ -197,9 +197,12 @@ interface TradingState {
   setChainOpen: (v: boolean) => void;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
-  stamp: { id: number; title: string; text: string; credit: boolean } | null;
-  /** A credit landing in the account: the big number that flies into the BALANCE readout. */
-  deposit: { id: number; cents: number } | null;
+  stamp: { id: number; title: string; text: string; credit: boolean; plan?: boolean } | null;
+  /**
+   * Money landing: a credit flies into the BALANCE readout; a profit taken flies into the round
+   * meter (or EQUITY outside a run).
+   */
+  deposit: { id: number; cents: number; label?: string; to?: string; profit?: boolean } | null;
   /** The structures this screen allows (a desk's playbook); null = all. */
   allowed: StructureId[] | null;
   setAllowed: (ids: StructureId[] | null) => void;
@@ -268,7 +271,8 @@ const defaultBuilder = (): BuilderState => ({
   callAnchor: null,
   qty: 1,
   legs: null,
-  orderType: 'limit',
+  // Market by default: it fills now at the price you see. Limits are an option you choose.
+  orderType: 'market',
   limitFrac: 0.5,
   autoSend: !useApp.getState().settings.game.confirmOrders,
   bracketsOn: true,
@@ -471,6 +475,8 @@ export const useTrading = create<TradingState>((set, get) => {
     const s = get().session;
     const day = s?.dayIndex ?? 0;
     const items: FeedItem[] = [];
+    const banked = { cents: 0, n: 0, expired: 0, positionId: undefined as string | undefined };
+    let keptPlan: Position | undefined;
     for (const e of events) {
       const tone: FeedItem['tone'] =
         e.kind === 'reject' || e.kind === 'alert'
@@ -513,6 +519,13 @@ export const useTrading = create<TradingState>((set, get) => {
           const pos = e.positionId ? s?.position(e.positionId) : undefined;
           if (pos?.exitReason === 'stop') sfx('stop');
           else sfx(win ? 'win' : 'loss');
+          if (win && (e.cents ?? 0) > 0) {
+            banked.cents += e.cents ?? 0;
+            banked.n++;
+            if (e.kind === 'expired') banked.expired++;
+            banked.positionId = e.positionId;
+          } else if (!win && pos) keptPlan = pos;
+          // The celebration says it louder; the corner note stays for the record.
           useApp.getState().toast(e.text, win ? 'good' : 'bad');
           break;
         }
@@ -521,6 +534,54 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     }
     if (items.length) set({ feed: [...get().feed, ...items].slice(-60) });
+    if (banked.n) celebrateProfit(banked);
+    else if (keptPlan) celebratePlan(keptPlan);
+  };
+
+  /** Winners closed: a big "+$ PROFIT TAKEN" with coins that flies into the score (or equity). */
+  const celebrateProfit = (b: { cents: number; n: number; expired: number; positionId?: string }) => {
+    const id = ++feedId;
+    const toMeter = !!document.querySelector('[data-testid="round-meter"]');
+    const label = b.n > 1 ? `${b.n} WINS BANKED` : b.expired ? 'EXPIRED WORTHLESS · KEPT IT' : 'PROFIT TAKEN';
+    set({
+      deposit: {
+        id,
+        cents: b.cents,
+        label,
+        profit: true,
+        to: toMeter ? '[data-testid="round-meter"]' : '[data-testid="equity"]',
+      },
+    });
+    setTimeout(() => get().deposit?.id === id && set({ deposit: null }), 1900);
+    const from =
+      (b.positionId && document.querySelector(`[data-testid="hud-${b.positionId}"]`)) ||
+      document.querySelector('[data-testid="pos-hud"]') ||
+      document.querySelector('[data-testid="chart-panel"]');
+    burstAt(from, 'coins', Math.min(60, 18 + Math.round(b.cents / 1500)));
+  };
+
+  /**
+   * A loser closed by the plan: taking the stop (or cutting before it) gets its own stamp, so the
+   * disciplined exit feels like a move, not a defeat.
+   */
+  const celebratePlan = (p: Position) => {
+    const realized = p.realizedCents ?? 0;
+    const stopCents = p.brackets.stopPl !== null ? p.brackets.stopPl * 100 * 100 * p.qty : null;
+    const atStop = p.flags.closedAtPlan === 'stop';
+    const early = !atStop && !p.flags.stopDeclined && stopCents !== null && -realized < stopCents * 0.98;
+    if (!atStop && !early) return;
+    const id = ++feedId;
+    set({
+      stamp: {
+        id,
+        title: atStop ? 'PLAN KEPT' : 'LOSS CUT',
+        text: `${atStop ? 'Stop taken' : 'Out before the stop'} −$${(Math.abs(realized) / 100).toFixed(0)}`,
+        credit: false,
+        plan: true,
+      },
+    });
+    setTimeout(() => get().stamp?.id === id && set({ stamp: null }), 1500);
+    setTimeout(() => sfx('stamp'), 120);
   };
 
   const finishIfDone = async () => {

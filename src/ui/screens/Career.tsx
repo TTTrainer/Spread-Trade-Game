@@ -534,6 +534,11 @@ export function RunScreen() {
     // Leaving the screen pauses the clock; the run is already saved.
     return () => useTrading.getState().pause();
   }, []);
+  // A new phase starts clean: the trading desk's notices don't follow you into the tally or shop.
+  const phaseNow = engine?.state.phase;
+  useEffect(() => {
+    if (phaseNow && phaseNow !== 'round') useApp.getState().clearToasts();
+  }, [phaseNow]);
   if (!engine) {
     return (
       <div className="screen">
@@ -548,6 +553,12 @@ export function RunScreen() {
     useRun.getState().leave();
     home();
   };
+  // End-to-end tests set this to check that a drawing error brings the run straight back.
+  const probe = window as { __stgCrash?: number };
+  if (probe.__stgCrash) {
+    probe.__stgCrash--;
+    throw new Error('test crash');
+  }
   const slot = useRun.getState().slot;
   const coach = engine.state.config.mode === 'tutorial' ? <TutorialCoach e={engine} /> : null;
   const phase = engine.state.phase;

@@ -14,6 +14,9 @@ import { money, pct, price } from '../format';
 import { SnapSlider } from '../components/SnapSlider';
 import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { SetupPresets } from './BuilderTray';
+import { LONG_ANCHOR, STRUCTURE_COACH, type CoachControl } from '../../content/structureCoach';
+import { useApp } from '../store/app';
+import { useRun } from '../store/run';
 
 const DELTA_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
 const NO_WIDTH = [
@@ -85,7 +88,26 @@ export function SetupSliders() {
   const open = useTrading(tradeOpen);
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
+  const seen = useApp((s) => s.settings.game.seenStructures);
+  const inTutorial = useRun((s) => s.engine?.state.config.mode === 'tutorial');
   if (!session || !cardId) return null;
+  const sid = builder.structureId;
+  // The first time a structure is picked, each control says what it moves for that structure.
+  const coach =
+    open &&
+    !inTutorial &&
+    !(seen ?? []).includes(sid) &&
+    !session.positions.some((p) => p.structureId === sid)
+      ? STRUCTURE_COACH[sid]
+      : null;
+  const hint = (k: CoachControl) => coach?.controls[k];
+  const markSeen = () =>
+    useApp.getState().updateSettings((st) => ({
+      ...st,
+      game: { ...st.game, seenStructures: [...new Set([...(st.game.seenStructures ?? []), sid])] },
+    }));
+  // Debit spreads and long premium place the leg you buy (cyan); everything else the leg you sell.
+  const anchorLong = LONG_ANCHOR.includes(sid);
   const chain = session.chain(cardId);
   const now = session.view(cardId).now;
   const exps = chain
@@ -121,11 +143,30 @@ export function SetupSliders() {
   return (
     <div className="tray-section setup" data-testid="setup-sliders">
       <ViewChip />
+      {coach && (
+        <div className="coach-pitch" data-testid="structure-coach">
+          <span className="cp-new num">NEW</span>
+          <span className="cp-text">
+            <b>{STRUCTURES[sid].name}:</b> {coach.pitch}
+          </span>
+          <button
+            className="pixel-btn small"
+            onClick={() => (sfx('click'), markSeen())}
+            data-testid="structure-coach-ok"
+          >
+            GOT IT
+          </button>
+        </div>
+      )}
       <SetupPresets />
+      {/* Each control wears the color of the line it moves on the chart: the amber EXP line, the
+          magenta strike you sell, the cyan strike you buy; size is violet, not P/L green. */}
       <SnapSlider
         label="Expires"
         tip="g:expiration"
         testId="slider-exp"
+        accent="amber"
+        hint={hint('exp')}
         byValue
         disabled={off || exps.length === 0}
         options={exps.map((e) => ({
@@ -158,6 +199,8 @@ export function SetupSliders() {
       {two && (
         <SnapSlider
           label="Back month"
+          accent="amber"
+          hint={hint('back')}
           byValue
           disabled={off || backs.length === 0}
           options={backs.map((e) => ({ value: diffDays(now, e) }))}
@@ -167,10 +210,11 @@ export function SetupSliders() {
         />
       )}
       <SnapSlider
-        label="Short Δ"
+        label={anchorLong ? 'Long Δ' : 'Short Δ'}
         tip="g:delta"
         testId="slider-delta"
-        accent="magenta"
+        accent={anchorLong ? 'cyan' : 'magenta'}
+        hint={hint('strike')}
         disabled={off}
         options={DELTA_STEPS.map((d) => ({
           value: d,
@@ -191,7 +235,8 @@ export function SetupSliders() {
           label="Width"
           tip="g:width"
           testId="slider-width"
-          accent="amber"
+          accent={anchorLong ? 'magenta' : 'cyan'}
+          hint={hint('width')}
           disabled={off}
           options={[1, 2, 3, 4, 5, 6, 7, 8].map((w) => ({ value: w, major: w === 2, mark: `${w}` }))}
           index={Math.max(0, Math.min(7, builder.width - 1))}
@@ -203,7 +248,8 @@ export function SetupSliders() {
         label="Size"
         tip="g:conviction"
         testId="slider-conviction"
-        accent="up"
+        accent="violet"
+        hint={hint('size')}
         disabled={off}
         options={CONVICTION.map((c) => ({
           value: c.confidence,

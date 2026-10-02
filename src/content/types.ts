@@ -29,6 +29,7 @@ export interface TradeFacts {
   credit: boolean;
   creditOfWidth: number | null; // credit / width for credit spreads
   pctOfMaxProfit: number | null; // realized / max profit
+  returnOnRisk: number | null; // realized / max loss at entry
   closedAtPlan: 'target' | 'stop' | null;
   exitReason: string;
   expiredWorthless: boolean; // short premium expired for (nearly) full credit

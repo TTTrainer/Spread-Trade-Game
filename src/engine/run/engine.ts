@@ -38,7 +38,7 @@ import { formatCents } from '../money';
 import { BASE_EXECUTION, combineImprove, type ExecutionMods } from '../orders/fill';
 import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
-import { runScore } from '../scoring/mult';
+import { runScore, winQuality } from '../scoring/mult';
 import { STRUCTURES } from '../strategies/structures';
 import type { StructureId } from '../strategies/types';
 import { buildDebrief } from '../trading/debrief';
@@ -902,7 +902,12 @@ export class RunEngine {
       doubleDown: r.doubleDownFor === p.id,
       hedge: r.memo.hedge,
     });
-    const res = runScore(facts.realizedCents, r.startEquityCents, steps);
+    const res = runScore(
+      facts.realizedCents,
+      r.startEquityCents,
+      steps,
+      winQuality(facts.returnOnRisk, facts.family),
+    );
     r.meter += res.points;
     r.scored.push(p.id);
     const card = s.card(p.cardId);
@@ -1026,7 +1031,25 @@ export class RunEngine {
       });
     }
     st.equityCents = equity;
+    // Money and points pull the same way: a round that made money scores a bonus on top.
+    r.realizedCents = s.realizedCents;
+    if (!r.breached && s.realizedCents !== 0 && r.meter > 0) {
+      const green = s.realizedCents > 0;
+      r.greenBonus = Math.round(
+        r.meter * (green ? BALANCE.scoring.greenRoundBonus : -BALANCE.scoring.redRoundPenalty),
+      );
+      r.meter += r.greenBonus;
+      this.events.push({
+        kind: 'score',
+        text: green
+          ? `Green round: the round made money, +${r.greenBonus} points.`
+          : `Red round: the round lost money, ${r.greenBonus} points.`,
+        points: r.greenBonus,
+      });
+    }
     r.status = !r.breached && r.meter >= r.target ? 'passed' : 'failed';
+    // Part of a surplus carries into the next round, so a strong round leaves a cushion.
+    st.carry = r.status === 'passed' ? Math.round((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;
     if (r.breached) this.say('breach', 9);
     else this.say(r.status === 'passed' ? 'target_met' : 'target_missed', 5);
     const unused = Math.max(0, r.tickets - r.ticketsUsed);
@@ -1365,6 +1388,12 @@ export class RunEngine {
       ghostScore: Math.round(target * rng.range(0.75, 1.35)),
       skipTag: idx < 2 ? rng.pick(TAG_IDS) : null,
     };
+    const carry = Math.max(0, Math.min(st.carry ?? 0, Math.round(target * BALANCE.scoring.carryCap)));
+    st.carry = 0;
+    if (carry > 0) {
+      st.round.meter = carry;
+      st.round.carriedIn = carry;
+    }
     if (!reviewId && rng.chance(1 / 3)) {
       const fits = CLIENTS.filter((c) => clientFitsDesk(c, cfg.deskId));
       if (fits.length) st.round.client = { id: rng.pick(fits).id, status: 'open' };

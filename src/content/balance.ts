@@ -24,8 +24,10 @@ export const BALANCE = {
   targets: {
     // Round 1 needs more than one typical trade (a median Verticals win scores about 220 on the
     // SIM market). Reviews ask a little less: their rules (beat SPY, stay calm) are the hard part.
-    q1: [200, 220, 180] as [number, number, number],
-    quarterGrowth: 1.12,
+    q1: [170, 190, 160] as [number, number, number],
+    // Builds compound, so targets grow 30% a quarter (they grew 12% before 1.6, when a decent
+    // build scored 5 to 14 times the target by the fourth quarter).
+    quarterGrowth: 1.3,
     /** A missed Month target is a write-up, not the end: that quarter's Review target grows this much. */
     writeUpReviewMult: 1.1,
     endlessGrowth: 1.8,
@@ -36,6 +38,11 @@ export const BALANCE = {
     maxLossLinePct: 0.15,
     riskCapPct: 0.1,
     plannedRiskPct: 0.05, // sizing beyond this is flagged "oversized"
+  },
+
+  /** Size: the share of the per-trade risk cap each conviction step uses (FEELER to ALL IN). */
+  conviction: {
+    capShares: [0.2, 0.4, 0.6, 0.8, 1] as [number, number, number, number, number],
   },
 
   brackets: {
@@ -49,7 +56,19 @@ export const BALANCE = {
   scoring: {
     chipsPerUnit: 10_000, // chips = P/L / round-start equity * this (1% = 100 chips)
     /** A loser's chips on the meter, as a share of its P/L chips (the ledger is never touched). */
-    lossChipsScale: 0.4,
+    lossChipsScale: 1,
+    /** Bonus chips are full for a win that earned this share of its risk, and scale down below it. */
+    bonusFullRoR: 0.08,
+    /** The same for covered calls and cash-secured puts (their risk is the stock). */
+    incomeFullRoR: 0.01,
+    /** A round that finished with a profit adds this share of its score... */
+    greenRoundBonus: 0.2,
+    /** ...and one that finished with a loss gives up this share. */
+    redRoundPenalty: 0.2,
+    /** This share of a passed round's surplus carries into the next round's meter... */
+    carryShare: 0.5,
+    /** ...up to this share of the next target. */
+    carryCap: 0.5,
     levelChips: 10,
     levelMult: 0.5,
     rrMult: 1,

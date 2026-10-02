@@ -4,9 +4,10 @@
  * steps before it, and a stall long enough to notice is logged when it ends.
  */
 
+import type { ScreenWhere } from '../shared/rpc';
 import { bridge, hasBridge } from './bridge';
 import { useApp } from './store/app';
-import { useRun } from './store/run';
+import { useRun, type RunSlot } from './store/run';
 import { useTrading } from './store/trading';
 import { crumb, recentTrail } from './trail';
 
@@ -14,7 +15,32 @@ const beat = () =>
   void bridge().invoke('system.heartbeat', {
     trail: recentTrail(),
     visible: document.visibilityState === 'visible',
+    where: whereNow(),
   });
+
+/** Where the screen is: a restarted screen goes straight back there (runs save after every move). */
+function whereNow(): ScreenWhere {
+  const screen = useApp.getState().screen;
+  const run = useRun.getState();
+  return { screen, slot: screen === 'run' && run.engine ? run.slot : null };
+}
+
+/**
+ * Restart the screen after an error it can't draw past. The main process logs it with the trail
+ * and reloads; the new screen comes back to the same run.
+ */
+export function restartScreen(why: string): void {
+  if (!hasBridge()) {
+    location.reload();
+    return;
+  }
+  void bridge().invoke('system.heartbeat', {
+    trail: recentTrail(),
+    visible: true,
+    where: whereNow(),
+  });
+  void bridge().invoke('system.reloadScreen', why);
+}
 
 export function startDiagnostics(): void {
   if (!hasBridge()) return;
@@ -63,20 +89,36 @@ export function startDiagnostics(): void {
   }, 1000);
   // Hidden windows slow their timers: say so at once, so the watchdog doesn't mistake it for a freeze.
   document.addEventListener('visibilitychange', beat);
-  // The watchdog reloaded a stuck screen: say so (the run was autosaved).
+  // The screen was restarted (stuck, or an error it couldn't draw past): go back where it was.
   void bridge()
     .invoke('system.recovered')
-    .then((r) => {
-      if (r)
-        setTimeout(
-          () =>
-            useApp
-              .getState()
-              .toast(
-                'The screen stopped responding and was restarted. Your run was autosaved: continue it from Career. game.log has the details.',
-                'warn',
-              ),
-          1500,
-        );
+    .then(async (w) => {
+      if (!w) return;
+      const back = w.screen === 'run' && w.slot ? await returnToRun(w.slot) : false;
+      setTimeout(
+        () =>
+          useApp
+            .getState()
+            .toast(
+              back
+                ? "The screen stopped responding and restarted. You're back in your run: it saves after every move."
+                : 'The screen stopped responding and was restarted. Your run was autosaved: continue it from Career. game.log has the details.',
+              'warn',
+            ),
+        1200,
+      );
     });
+}
+
+async function returnToRun(slot: string): Promise<boolean> {
+  // Settings first: the run screen draws with them.
+  for (let i = 0; i < 50 && !useApp.getState().settingsLoaded; i++)
+    await new Promise((r) => setTimeout(r, 100));
+  try {
+    const ok = await useRun.getState().resume(slot as RunSlot);
+    if (ok) useApp.getState().go('run');
+    return ok;
+  } catch {
+    return false;
+  }
 }

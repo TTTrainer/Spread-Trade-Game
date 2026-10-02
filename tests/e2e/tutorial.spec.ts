@@ -46,6 +46,9 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await step(page, 'chart');
   await shot(page, 'tut-03-chart-1920');
   await gotIt(page);
+  await step(page, 'spread');
+  await shot(page, 'tut-03b-spread-1920');
+  await gotIt(page);
   await step(page, 'view');
   await shot(page, 'tut-04-view-1920');
   await page.getByTestId('tut-up').click();
@@ -59,13 +62,15 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await page.setViewportSize({ width: 1920, height: 1080 });
   await gotIt(page);
   await step(page, 'strike');
+  await expect(page.locator('.tut-drag .td-hand')).toBeVisible();
   await shot(page, 'tut-07-strike-1920');
+  await shot(page, 'tut-07-strike-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.keyboard.press('Enter');
+  await step(page, 'safe');
+  await shot(page, 'tut-07b-safe-1920');
+  await gotIt(page);
   await step(page, 'place');
-  await page
-    .getByTestId('order-market')
-    .click({ force: true })
-    .catch(() => undefined);
   await page.getByTestId('sell-button').click();
   await step(page, 'placed');
   await shot(page, 'tut-08-placed-1920');

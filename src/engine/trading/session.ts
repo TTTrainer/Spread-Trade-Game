@@ -1104,7 +1104,7 @@ function closeText(p: Position): string {
   const sign = pl >= 0 ? '▲ +' : '▼ −';
   const amt = `$${(Math.abs(pl) / 100).toFixed(2)}`;
   const why: Record<string, string> = {
-    target: 'Target filled',
+    target: 'Profit taken',
     stop: 'Stopped out',
     manual: 'Closed',
     decision: 'Closed',
@@ -1113,7 +1113,7 @@ function closeText(p: Position): string {
     window_end: 'Closed at window end',
     liquidated: 'Liquidated by the risk desk',
   };
-  return `${why[p.exitReason ?? 'manual']}: ${sign}${amt}`;
+  return `${p.symbol} · ${why[p.exitReason ?? 'manual']}: ${sign}${amt}`;
 }
 
 function isSpread(legs: Leg[]): boolean {

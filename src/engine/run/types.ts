@@ -119,6 +119,12 @@ export interface RoundState {
   client: { id: string; status: 'open' | 'filled' | 'missed' } | null;
   /** Sitting the round out (a skip): no trades until the days run out, then the Tag pays. */
   sitOut?: { days: number } | null;
+  /** Points carried in from the last round's surplus (already on the meter). */
+  carriedIn?: number;
+  /** Points added because the round finished with a profit (negative: taken for a loss). */
+  greenBonus?: number;
+  /** The round's realized P/L (set when it settles). */
+  realizedCents?: number;
 }
 
 export type ShopItem =
@@ -205,6 +211,8 @@ export interface RunState {
   parachuteUsed: boolean;
   /** Quarters with a written-up (missed) Month target; a second miss in one ends the run. */
   writeUps?: number[];
+  /** Surplus points waiting to start the next round's meter. */
+  carry?: number;
   burnoutNext: boolean;
   usedWindows: number[];
   result: RunResult | null;

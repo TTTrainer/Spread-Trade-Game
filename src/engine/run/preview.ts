@@ -59,6 +59,7 @@ export function previewFacts(
         ? -(plan.mid ?? 0) / plan.metrics.width
         : null,
     pctOfMaxProfit: 1,
+    returnOnRisk: null,
     closedAtPlan: null,
     exitReason: 'expired',
     expiredWorthless: def.credit,

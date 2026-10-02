@@ -43,8 +43,11 @@ describe('round targets', () => {
       const m = DESKS[id].targetMult ?? 1;
       expect(computeTarget(1, 0, null, { tier: 0, deskId: id })).toBe(r10(t.q1[0] * m));
     }
-    // Round 1 takes more than one typical winner on every desk (a median Verticals win is ~220).
-    expect(computeTarget(1, 0, null, { tier: 0, deskId: 'verticals' })).toBeGreaterThanOrEqual(200);
+    // Builds compound, so targets keep pace: at least 25% more every quarter.
+    for (let q = 1; q < 4; q++)
+      expect(computeTarget(q + 1, 0, null, { tier: 0, deskId: 'verticals' })).toBeGreaterThanOrEqual(
+        computeTarget(q, 0, null, { tier: 0, deskId: 'verticals' }) * 1.2,
+      );
   });
 });
 

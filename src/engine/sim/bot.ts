@@ -9,6 +9,9 @@
  *  - hold: the same entries, no management at all (no brackets, holds every decision).
  *  - random: random structures, strikes, sizes, decisions and purchases.
  *  - greedy: always trades, maximum size, ignores stops.
+ *  - active: plays like a typical player at the builder's defaults: every ticket, a 0.30-delta
+ *    spread with the trend, SOLID conviction (60% of the risk cap), closed at plan, and it builds
+ *    in the shop. The targets are tuned against this one.
  */
 
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
@@ -23,12 +26,13 @@ import { streamFor, type Rng } from '../rng';
 import type { Bucket } from '../scoring/calls';
 import { expirationsOf, STRUCTURES } from '../strategies/structures';
 import type { BuildParams, StructureId } from '../strategies/types';
+import { convictionQty } from '../trading/conviction';
 import { maxContracts, maxQtyFor, type TradePlan } from '../trading/plan';
 import type { OrderSpec, TradingSession } from '../trading/session';
 import type { RunEngine } from '../run/engine';
 import type { RunAction, RunResult } from '../run/types';
 
-export type BotKind = 'disciplined' | 'hold' | 'random' | 'greedy';
+export type BotKind = 'disciplined' | 'hold' | 'random' | 'greedy' | 'active';
 
 export interface BotOptions {
   kind: BotKind;
@@ -110,7 +114,7 @@ function setupFor(engine: RunEngine, cardId: string, o: BotOptions, rng: Rng): S
       return {
         structureId: bullish ? 'bull_put' : 'bear_call',
         bucket: bullish ? 3 : 1,
-        deltas: greedy ? [0.35] : [0.25, 0.2, 0.16],
+        deltas: greedy ? [0.35] : o.kind === 'active' ? [0.3, 0.25, 0.2] : [0.25, 0.2, 0.16],
         qualifies: ivr >= 30,
       };
     case 'income':
@@ -182,7 +186,13 @@ function chooseTrade(
   const back = def.twoExpiries ? exps.find((e) => diffDays(exp, e) >= 21) : undefined;
   if (def.twoExpiries && !back) return null;
   const widths =
-    o.kind === 'random' ? rng.shuffle([1, 2, 3, 5]) : def.defaults.width === 0 ? [0] : [1, 2, 3, 4, 6];
+    o.kind === 'random'
+      ? rng.shuffle([1, 2, 3, 5])
+      : def.defaults.width === 0
+        ? [0]
+        : o.kind === 'active'
+          ? [def.defaults.width, 2, 3, 1, 4]
+          : [1, 2, 3, 4, 6];
   let fallback: Pick | null = null;
   let best: { pick: Pick; score: number } | null = null;
   for (const delta of setup.deltas) {
@@ -201,7 +211,8 @@ function chooseTrade(
         plan,
         params,
         bucket: setup.bucket,
-        confidence: o.kind === 'random' ? rng.pick([0.5, 0.6, 0.7, 0.8, 0.9]) : 0.6,
+        confidence:
+          o.kind === 'random' ? rng.pick([0.5, 0.6, 0.7, 0.8, 0.9]) : o.kind === 'active' ? 0.7 : 0.6,
       };
       if (!picky) return pick;
       if (def.credit && !outsideEm(plan)) {
@@ -230,6 +241,12 @@ function sizeFor(engine: RunEngine, pick: Pick, o: BotOptions, rng: Rng): number
   if (max < 1) return 0;
   if (o.kind === 'greedy') return max;
   if (o.kind === 'random') return rng.int(1, max);
+  // The builder's default: SOLID conviction, 60% of the risk cap.
+  if (o.kind === 'active')
+    return Math.min(
+      max,
+      convictionQty(pick.plan.riskCents / pick.plan.qty, s.equityCents(), s.config.riskCapPct, 0.7),
+    );
   // Spread the same total risk budget over however many tickets the desk gets.
   const perTicket =
     (o.riskPct ?? BALANCE_RISK) * (BALANCE.run.ticketsPerRound / Math.max(1, engine.state.round.tickets));
@@ -292,7 +309,7 @@ export async function playRound(engine: RunEngine, o: BotOptions, rng: Rng): Pro
         params: pick.params,
         qty,
         order: order(engine, pick),
-        brackets: o.kind === 'disciplined' ? undefined : null,
+        brackets: o.kind === 'disciplined' || o.kind === 'active' ? undefined : null,
         earningsAck: true,
       },
     });
@@ -318,12 +335,19 @@ export async function playRound(engine: RunEngine, o: BotOptions, rng: Rng): Pro
         r.ticketsUsed >= r.tickets ||
         r.rerollsUsed >= r.rerolls ||
         o.kind === 'random' ||
-        o.kind === 'greedy'
+        o.kind === 'greedy' ||
+        o.kind === 'active'
       )
         break;
       if (!untraded().length) break;
       await send(engine, o, { t: 'reroll' });
     }
+    // A careful player still plays the round: fill the tickets left with the best of what's there.
+    if (o.kind === 'disciplined')
+      for (const c of untraded()) {
+        if (r.ticketsUsed >= r.tickets) break;
+        await place(c.id, true);
+      }
     // Reviews can't be skipped: with nothing traded, take the best available trade anyway.
     if (!engine.session?.positions.length)
       for (const c of untraded()) if (r.ticketsUsed < r.tickets && (await place(c.id, true))) break;

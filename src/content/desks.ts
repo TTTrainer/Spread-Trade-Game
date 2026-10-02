@@ -55,7 +55,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     ticketsAdd: 1,
     lineupAdd: 1,
     // Two credits a trade score about 2.5x a vertical's: targets scale to match.
-    targetMult: 2.2,
+    targetMult: 2.8,
     passive: (f) =>
       f.win && f.callFlat && f.callExact && f.callBonus > 0
         ? [{ label: 'Condor desk (flat call x2)', kind: 'desk', op: 'add', value: f.callBonus }]
@@ -86,13 +86,14 @@ export const DESKS: Record<DeskId, DeskDef> = {
     name: 'Calendar',
     blurb: 'Calendars, diagonals and double calendars. Trade time and the volatility term structure.',
     structures: ['calendar', 'diagonal', 'double_calendar'],
-    passiveText: 'The IV term-structure panel is always on. +1 ticket and +1 card every round.',
+    passiveText: 'The IV term-structure panel is always on. +2 tickets and +1 card every round.',
     startingAnalysts: [],
     startingCartridges: ['term_structure_tap'],
     unlockCost: 250,
-    ticketsAdd: 1,
+    ticketsAdd: 2,
     lineupAdd: 1,
-    targetMult: 1.2,
+    // Calendars make steady small money; since 1.6 losses count in full, so the bar sits lower.
+    targetMult: 0.9,
     priceRange: [10, 60],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },

@@ -29,7 +29,7 @@ async function giveProfile(page: Page, patch: Record<string, unknown>): Promise<
 async function placeDefault(page: Page): Promise<void> {
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+2');
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.waitForTimeout(300);
   const credit = await page.evaluate(() => ((window as Any).__stg.trading.getState().plan()?.mid ?? 0) < 0);
   await page.keyboard.press(credit ? 'Alt+S' : 'Alt+B');

@@ -9,6 +9,7 @@ import type { TraceRow } from '../../engine/scoring/mult';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { CountUp, Kbd, Meter, Pnl, Stamp } from '../components/ui';
+import { money } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun, type DailyGhost } from '../store/run';
@@ -134,8 +135,12 @@ export function TallyView({ e }: { e: RunEngine }) {
       left -= t.trace.length + 1;
     }
   }, [step]);
-  const meterNow = tallies.reduce((a, t, i) => a + (shownFor[i] > t.trace.length ? t.points : 0), 0);
   const finished = step >= totalSteps;
+  // The meter starts at what carried in from last round and ends with the green/red-round change.
+  const meterNow =
+    (r.carriedIn ?? 0) +
+    tallies.reduce((a, t, i) => a + (shownFor[i] > t.trace.length ? t.points : 0), 0) +
+    (finished ? (r.greenBonus ?? 0) : 0);
   useHotkeys({ confirm: () => (finished ? void act({ t: 'finishTally' }) : setStep(totalSteps)) });
   useEffect(() => {
     if (!finished) return;
@@ -180,7 +185,23 @@ export function TallyView({ e }: { e: RunEngine }) {
       </div>
       {finished && (
         <>
-          {r.debriefs.length > 0 && <DebriefStrip debriefs={r.debriefs} blind />}
+          {/* One thing at a time: the verdict, then why, then the trade-by-trade detail. */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: reduced ? 0 : 0.5, duration: 0.35 }}
+          >
+            <RoundWhy e={e} />
+          </motion.div>
+          {r.debriefs.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduced ? 0 : 1.2, duration: 0.35 }}
+            >
+              <DebriefStrip debriefs={r.debriefs} blind />
+            </motion.div>
+          )}
           <div className="modal-actions">
             <button
               className="pixel-btn primary"
@@ -198,6 +219,77 @@ export function TallyView({ e }: { e: RunEngine }) {
         </button>
       )}
     </motion.div>
+  );
+}
+
+/**
+ * Why the round scored what it did, in money first and points second: what the trades made and
+ * lost, what the build added, what the losses cost, and the round's green/red and carry-over.
+ */
+function RoundWhy({ e }: { e: RunEngine }) {
+  const r = e.state.round;
+  const wins = r.tallies.filter((t) => t.winner);
+  const losses = r.tallies.filter((t) => !t.winner);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const made = sum(wins.map((t) => t.realizedCents));
+  const lost = sum(losses.map((t) => t.realizedCents));
+  const net = r.realizedCents ?? made + lost;
+  const winPts = sum(wins.map((t) => t.points));
+  const lossPts = sum(losses.map((t) => t.points));
+  const avgMult = wins.length ? sum(wins.map((t) => t.mult)) / wins.length : 0;
+  const passed = r.status === 'passed';
+  const verdict =
+    passed && net < 0
+      ? "You passed while losing money: your build's multipliers on the winners outweighed the losses. The red round cost you, and the Max-Loss Line doesn't care about points."
+      : !passed && net > 0
+        ? 'You made money, but not enough points: bigger winners, more of them, or a build that multiplies them.'
+        : passed
+          ? 'Points and money agree: a good round.'
+          : r.breached
+            ? 'The account crossed the Max-Loss Line: the risk desk closed everything.'
+            : 'Points and money agree: a round to learn from. The debrief below shows where it went.';
+  if (!r.tallies.length && !r.carriedIn) return null;
+  return (
+    <div className="panel round-why num" data-testid="tally-why">
+      <div className="section-title">Why this score</div>
+      <div className="rw-grid">
+        <div>
+          <span className="dim">MONEY</span>{' '}
+          {wins.length > 0 && (
+            <span className="up-text">
+              ▲ {money(made)} on {wins.length} winner{wins.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {wins.length > 0 && losses.length > 0 && ' · '}
+          {losses.length > 0 && (
+            <span className="down-text">
+              ▼ {money(-lost)} on {losses.length} loser{losses.length > 1 ? 's' : ''}
+            </span>
+          )}{' '}
+          · round <Pnl cents={net} />
+        </div>
+        <div>
+          <span className="dim">POINTS</span>{' '}
+          {wins.length > 0 && (
+            <span className="up-text">
+              winners +{winPts.toLocaleString()} (your build: ×{avgMult.toFixed(1)} on average)
+            </span>
+          )}
+          {wins.length > 0 && losses.length > 0 && ' · '}
+          {losses.length > 0 && (
+            <span className="down-text">losers {lossPts.toLocaleString()} (losses count in full)</span>
+          )}
+          {!!r.greenBonus && (
+            <span className={r.greenBonus > 0 ? 'up-text' : 'down-text'}>
+              {' '}
+              · {r.greenBonus > 0 ? `green round +${r.greenBonus}` : `red round ${r.greenBonus}`}
+            </span>
+          )}
+          {!!r.carriedIn && <span className="cyan-text"> · carried in +{r.carriedIn}</span>}
+        </div>
+        <div className="rw-verdict">{verdict}</div>
+      </div>
+    </div>
   );
 }
 

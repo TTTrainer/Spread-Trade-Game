@@ -98,7 +98,7 @@ export type TutPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'end';
 export type TutWait = 'next' | 'view' | 'strike' | 'placed' | 'day' | 'phase';
 
 /** Something a lesson sets up as it opens. */
-export type TutEnter = 'simpleChart' | 'fullChart' | 'briefTab' | 'tradeTab';
+export type TutEnter = 'simpleChart' | 'emChart' | 'fullChart' | 'briefTab' | 'tradeTab';
 
 /** A one-time lesson that interrupts the script the first time something happens. */
 export type TutMomentKind = 'recap' | 'decision' | 'closed' | 'stress' | 'endRound';
@@ -204,6 +204,16 @@ export const TUTORIAL_STEPS: TutStep[] = [
     text: 'Each bar is one day of prices: green closed higher, red closed lower. The right edge is today, and nobody can see past it. Not even you.',
   },
   {
+    id: 'spread',
+    part: 2,
+    at: R0,
+    wait: 'next',
+    holdClock: true,
+    beforeTrade: true,
+    title: 'The play: a credit spread',
+    text: "You sell a promise: 'the stock won't cross my line before the trade ends.' You're paid the moment it fills and keep the cash if the promise holds. Think landlord, not gambler.",
+  },
+  {
     id: 'view',
     part: 2,
     at: R0,
@@ -212,7 +222,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     beforeTrade: true,
     target: 'center',
     title: 'Up or down?',
-    text: "Where do you think this stock goes over the next few weeks? You don't have to be exactly right, just not badly wrong.",
+    text: "Which way over the next few weeks? Your line goes on the other side of the price. You don't need to be right, just not badly wrong.",
   },
   {
     id: 'line',
@@ -224,7 +234,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: 'center',
     reveal: ['view'],
     title: 'Your line',
-    text: 'The dashed pink line is your strike. You get paid now, and you keep that money as long as the stock stays {side} this line until the trade ends.',
+    text: "The pink line is your strike. If the stock stays {side} this line until the end, you keep the money. That's the whole promise.",
   },
   {
     id: 'pay',
@@ -236,7 +246,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: '[data-testid="sell-button"]',
     reveal: ['sell'],
     title: 'Paid up front',
-    text: 'SELL pays you this amount (the credit) the moment it fills. "risk" is the most you can lose if the stock crosses your line; POP is the chance you keep money.',
+    text: 'SELL shows the credit you get now, the most you can lose ("risk") and POP: the odds you keep money. Read all three before you press anything.',
   },
   {
     id: 'strike',
@@ -245,10 +255,22 @@ export const TUTORIAL_STEPS: TutStep[] = [
     wait: 'strike',
     holdClock: true,
     beforeTrade: true,
-    target: 'short',
+    target: '[data-testid="strike-handle"]',
     reveal: ['short'],
-    title: 'Safer or richer',
-    text: 'Drag this slider (or the S handle on the chart) to move your line. Farther from the price is safer, with a higher POP, but it pays less.',
+    title: 'Grab the line',
+    text: 'Press on the pink S tag and drag it up or down (the Short Δ slider below does the same). Watch the credit and POP change as you go.',
+  },
+  {
+    id: 'safe',
+    part: 2,
+    at: R0,
+    wait: 'next',
+    enter: 'emChart',
+    holdClock: true,
+    beforeTrade: true,
+    target: 'center',
+    title: 'Safe or spicy?',
+    text: 'Safe: line beyond the purple EM line (the move the market expects): POP 75%+, small credit. Spicy: line near the price: twice the credit, coin-flip odds. Your call.',
   },
   {
     id: 'place',
@@ -258,7 +280,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     holdClock: true,
     target: '[data-testid="sell-button"]',
     title: 'Place it',
-    text: 'Happy with it? Press SELL (or Alt+S). The credit lands in your account straight away.',
+    text: 'Happy? Press SELL (or Alt+S). The credit lands in your account at once. Yes, before anything happens. Finance is strange.',
   },
   {
     id: 'placed',
@@ -267,7 +289,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     wait: 'next',
     target: '.lineup-card.has-open',
     title: "You're in",
-    text: 'The card now says IN TRADE with your profit or loss so far. On the chart, the boxed area is your trade: the green side wins, the red side loses.',
+    text: 'The card says IN TRADE with your P/L so far. On the chart, the box is your trade: green side wins, red side loses.',
   },
   // ---- Part 3: letting time pass ----
   {
@@ -288,7 +310,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: '[data-testid="positions-dock"]',
     reveal: ['plan'],
     title: 'Your exit plan',
-    text: 'Every trade has a plan: take the win at half its max profit, and cut a loss at 2× the credit. When either happens, the clock stops and asks you.',
+    text: 'Every trade has a plan: bank the win at half its max profit, cut the loss at 2× the credit. Hit either and the clock stops so you choose.',
   },
   {
     id: 'keep',
@@ -398,7 +420,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: 'size',
     reveal: ['size', 'width'],
     title: 'How big',
-    text: 'Size is how many contracts: more points if it wins, more loss if it fails. Width is the gap to your safety leg, which caps the loss.',
+    text: 'Size is contracts; RISKING shows what one trade can lose. Careful: small, several trades. Bold: size up on your best idea. Width is the gap to your safety leg: wider pays and risks more.',
   },
   {
     id: 'brief',

@@ -45,6 +45,8 @@ export function computeFacts(session: TradingSession, pos: Position, extra: Fact
   const creditOfWidth = credit && width > 0 && def.family !== 'income' ? -pos.openNet / width : null;
   const maxProfit = pos.entry.maxProfitCents;
   const pctOfMaxProfit = maxProfit && maxProfit > 0 ? realized / maxProfit : null;
+  const risk = pos.entry.maxLossCents;
+  const returnOnRisk = risk > 0 ? realized / risk : null;
   const exitReason = pos.exitReason ?? 'manual';
   const expiredWorthless = def.credit && exitReason === 'expired' && (pctOfMaxProfit ?? 0) >= 0.95;
 
@@ -180,6 +182,7 @@ export function computeFacts(session: TradingSession, pos: Position, extra: Fact
     credit,
     creditOfWidth,
     pctOfMaxProfit,
+    returnOnRisk,
     closedAtPlan: pos.flags.closedAtPlan,
     exitReason,
     expiredWorthless,

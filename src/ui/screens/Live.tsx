@@ -166,7 +166,16 @@ export function LiveScreen() {
 
   return (
     <div className="screen live" data-testid="live-screen">
-      <h1 className="screen-title">LIVE · THE LAST MONTH</h1>
+      <h1 className="screen-title">
+        LIVE · THE LAST MONTH{' '}
+        <span className="title-wip num" data-testid="live-wip">
+          WORK IN PROGRESS
+        </span>
+      </h1>
+      <p className="screen-sub dim" data-testid="live-wip-note">
+        On hold: Live is being redesigned around trading today&apos;s prices for a leaderboard. This version
+        still works, but won&apos;t change until then.
+      </p>
       <p className="screen-sub">
         The market you trade for real, one recent month at a time: real names, real dates, no hindsight. Paper
         only; nothing connects to a broker account.

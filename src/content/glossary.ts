@@ -61,8 +61,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     body: 'DAY BY DAY waits for you after every candle. 1×, 2× and 4× play on their own, but still stop for real decisions and once when price tests your short strike.',
   },
   tug_meter: {
-    title: 'Stop vs target',
-    body: "Where today's P/L sits between your stop (left) and your profit target (right). The dot glows as it nears either one.",
+    title: 'P/L vs max',
+    body: "Where today's P/L sits on everything the trade can do: the most it can lose on the left, the most it can make on the right. The ticks are your stop and target; the dot glows as it nears either one.",
+  },
+  pl_range: {
+    title: 'vs max',
+    body: "How much of the trade's best case (or worst case) today's P/L already is. A credit spread at 60% of max has made most of what it ever can.",
   },
   cartridge_rail: {
     title: 'Cartridges',

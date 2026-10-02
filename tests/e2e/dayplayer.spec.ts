@@ -38,7 +38,7 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
   await expect(page.getByTestId('trading-screen')).toBeVisible();
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+3');
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.keyboard.press('Alt+S');
   await expect(page.getByTestId('toasts')).toContainText('Filled');
 
@@ -67,7 +67,7 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
   await shot(page, '14-day-recap-1920');
   // Hiding the recap shows the trade card with its stop-vs-target meter and a close button.
   await page.locator('.dr-x').click();
-  await expect(page.locator('.tug')).toBeVisible();
+  await expect(page.getByTestId('pos-hud').locator('.tug')).toBeVisible();
   await expect(page.getByTestId('hud-close')).toBeVisible();
   await page.setViewportSize({ width: 1366, height: 768 });
   await shot(page, '12-day-settled-1366');

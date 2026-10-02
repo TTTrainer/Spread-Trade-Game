@@ -83,7 +83,7 @@ test('fast-forward stays smooth: frame times and main-thread stalls', async () =
   const idle = await measure(page, 3000);
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+3');
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.keyboard.press('Alt+S');
   await expect(page.getByTestId('toasts')).toContainText('Filled');
   await page.keyboard.press('Space');

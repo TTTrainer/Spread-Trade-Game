@@ -7,6 +7,20 @@ import { useTrading } from '../store/trading';
 import { Portrait } from '../components/Portrait';
 
 /** The speech box: a portrait, a name and a typed line. Clicks pass through it; it fades on its own. */
+/** The chart panel's box on screen while `on` (read again on resize). */
+function useChartBox(on: boolean): DOMRect | null {
+  const [box, setBox] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    if (!on) return;
+    const read = () =>
+      setBox(document.querySelector('[data-testid="chart-panel"]')?.getBoundingClientRect() ?? null);
+    read();
+    window.addEventListener('resize', read);
+    return () => window.removeEventListener('resize', read);
+  }, [on]);
+  return on ? box : null;
+}
+
 export function DialogueBox() {
   const speech = useRun((s) => s.speech);
   const clear = useRun((s) => s.clearSpeech);
@@ -17,14 +31,26 @@ export function DialogueBox() {
   const inRun = useApp((s) => s.screen === 'run');
   // The day's recap owns the middle of the chart: step aside to the corner while it's up.
   const recapUp = useTrading((s) => !!s.recap && (s.ff === 'paused' || s.ff === 'decision'));
-  const place =
-    inRun && phase === 'round'
-      ? recapUp
-        ? 'at-corner'
-        : ''
-      : inRun && phase === 'shop'
-        ? 'at-corner at-shop'
-        : 'at-bottom';
+  const onChart = inRun && phase === 'round';
+  const place = onChart
+    ? 'at-corner at-chart'
+    : inRun && phase === 'shop'
+      ? 'at-corner at-shop'
+      : 'at-bottom';
+  // During a round the line sits over the chart's oldest candles (its left side), clear of today's
+  // price, the clock controls and the trade card: the top left, or the bottom left while the
+  // day's recap fills the middle (the trade card steps aside for the recap too).
+  const chartBox = useChartBox(onChart && !!speech);
+  const chartStyle: React.CSSProperties | undefined =
+    onChart && chartBox
+      ? {
+          left: chartBox.left + 10,
+          width: Math.min(440, chartBox.width * 0.45),
+          ...(recapUp
+            ? { top: 'auto', bottom: window.innerHeight - chartBox.bottom + 40 }
+            : { top: chartBox.top + 46, bottom: 'auto' }),
+        }
+      : undefined;
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {
@@ -44,6 +70,7 @@ export function DialogueBox() {
         <motion.div
           key={speech.n}
           className={`dialogue who-${speech.line.who} ${place}`}
+          style={chartStyle}
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -10, opacity: 0 }}

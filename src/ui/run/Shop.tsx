@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'motion/react';
-import { useEffect, type ReactNode } from 'react';
+import { Fragment, useEffect, type ReactNode } from 'react';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
@@ -36,7 +36,6 @@ import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { Primer } from './Primer';
-import { CartridgeRail } from './RunParts';
 
 export function itemTitle(it: ShopItem): string {
   switch (it.kind) {
@@ -317,6 +316,86 @@ function BuildPanel({ e }: { e: RunEngine }) {
   );
 }
 
+/**
+ * The cartridges you own, big: one card per slot in firing order, with its picture, what it gives
+ * and its controls (fire earlier or later, sell). Empty slots show as open card outlines.
+ */
+function DeskCartridges({ e }: { e: RunEngine }) {
+  const act = useRun((s) => s.act);
+  const st = e.state;
+  const slots = e.cartridgeSlots();
+  const owned = st.cartridges;
+  return (
+    <div className="desk-carts" data-testid="desk-carts" data-tip="g:cartridge_rail">
+      {Array.from({ length: slots }, (_, i) => {
+        const id = owned[i];
+        const arrow = i < slots - 1 && <span className="dk-arrow">▸</span>;
+        if (!id)
+          return (
+            <Fragment key={`empty-${i}`}>
+              <div className="dk-cart empty num">
+                <span className="dk-n">{i + 1}</span>
+                <span className="dk-empty-plus">+</span>
+                <span>EMPTY SLOT</span>
+              </div>
+              {arrow}
+            </Fragment>
+          );
+        const def = CARTRIDGE_BY_ID[id];
+        const sum = CARTRIDGE_SUMMARY[id];
+        return (
+          <Fragment key={id}>
+            <div
+              className={`dk-cart rar-${def.rarity}`}
+              data-tip={`cart:${id}`}
+              data-testid={`desk-cart-${id}`}
+            >
+              <span className="dk-n num">{i + 1}</span>
+              <ArtIcon category="cartridge" id={id} name={def.name} tone={def.rarity} scale={0.85} />
+              <span className="dk-name">{def.name}</span>
+              {sum && (
+                <span className={`dk-get num fx-${sum.kind}`}>
+                  {EFFECT_GLYPH[sum.kind]} {sum.get}
+                </span>
+              )}
+              <span className="dk-acts">
+                <button
+                  className="dk-move"
+                  disabled={i === 0}
+                  onClick={() => (sfx('click'), void act({ t: 'move', from: i, to: i - 1 }))}
+                  aria-label="Fire earlier"
+                  title="Fire earlier"
+                >
+                  ◀
+                </button>
+                <button
+                  className="dk-sell num"
+                  onClick={() => (sfx('coin'), void act({ t: 'sell', cartridgeId: id }))}
+                  data-testid={`sell-${id}`}
+                  data-tip-title={`Sell ${def.name}`}
+                  data-tip-body={`Frees its slot and pays back $${sellPrice(def)}.`}
+                >
+                  SELL ${sellPrice(def)}
+                </button>
+                <button
+                  className="dk-move"
+                  disabled={i >= owned.length - 1}
+                  onClick={() => (sfx('click'), void act({ t: 'move', from: i, to: i + 1 }))}
+                  aria-label="Fire later"
+                  title="Fire later"
+                >
+                  ▶
+                </button>
+              </span>
+            </div>
+            {arrow}
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 function Empty({ text }: { text: string }) {
   return (
     <div className="shop-card empty-card num">
@@ -477,36 +556,13 @@ export function ShopView({ e }: { e: RunEngine }) {
         </Win>
         <Win
           title="YOUR DESK"
-          sub="what you own · fires left to right"
+          sub="what you own · powerups fire left to right"
           icon="⌂"
           className="w-loadout"
           delay={0.4}
           testId="win-loadout"
         >
-          <div className="ld-rail">
-            <CartridgeRail e={e} editable />
-            <div className="sell-row">
-              {st.cartridges.map((id) => (
-                <button
-                  key={id}
-                  className="sell-chip num"
-                  onClick={() => (sfx('coin'), void act({ t: 'sell', cartridgeId: id }))}
-                  data-testid={`sell-${id}`}
-                  data-tip-title={`Sell ${CARTRIDGE_BY_ID[id].name}`}
-                  data-tip-body={`Frees its slot and pays back $${sellPrice(CARTRIDGE_BY_ID[id])}.`}
-                >
-                  <ArtIcon
-                    category="cartridge"
-                    id={id}
-                    name={CARTRIDGE_BY_ID[id].name}
-                    tone={CARTRIDGE_BY_ID[id].rarity}
-                    scale={0.375}
-                  />
-                  <span>↩ ${sellPrice(CARTRIDGE_BY_ID[id])}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <DeskCartridges e={e} />
           <div className="ld-tiles">
             <div className="ld-group">
               <div className="ld-k num">ANALYSTS</div>
@@ -521,7 +577,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                     );
                   return (
                     <span key={a.id} className="ld-slot" data-tip={`analyst:${a.id}`}>
-                      <ArtIcon category="analyst" id={a.id} name={ANALYSTS[a.id].name} scale={0.5} />
+                      <ArtIcon category="analyst" id={a.id} name={ANALYSTS[a.id].name} scale={0.75} />
                       {a.level > 1 && <i className="ld-lv">L2</i>}
                       <button
                         className="ld-x"
@@ -542,7 +598,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                   const m = st.memos[i];
                   return m ? (
                     <span key={i} className="ld-slot" data-tip={`memo:${m}`}>
-                      <ArtIcon category="memo" id={m} name={MEMOS[m].name} scale={0.5} />
+                      <ArtIcon category="memo" id={m} name={MEMOS[m].name} scale={0.75} />
                     </span>
                   ) : (
                     <span key={i} className="ld-slot vacant">
@@ -557,8 +613,8 @@ export function ShopView({ e }: { e: RunEngine }) {
               <div className="ld-row">
                 {DESKS[st.config.deskId].structures.map((s) => (
                   <span key={s} className="ld-slot page" data-tip={`struct:${s}`}>
-                    <ArtIcon category="page" id={s} name={STRUCTURES[s].name} scale={0.5} />
-                    <i className="ld-lv">{st.levels[s] ?? 1}</i>
+                    <ArtIcon category="page" id={s} name={STRUCTURES[s].name} scale={0.75} />
+                    <i className="ld-lv">LV {st.levels[s] ?? 1}</i>
                   </span>
                 ))}
               </div>
@@ -569,7 +625,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                 {st.vouchers.length === 0 && <span className="ld-slot vacant">·</span>}
                 {st.vouchers.map((v) => (
                   <span key={v} className="ld-slot" data-tip={`voucher:${v}`}>
-                    <ArtIcon category="voucher" id={v} name={VOUCHERS[v].name} scale={0.5} />
+                    <ArtIcon category="voucher" id={v} name={VOUCHERS[v].name} scale={0.75} />
                   </span>
                 ))}
               </div>

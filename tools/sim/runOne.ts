@@ -43,7 +43,14 @@ export interface SimResult {
   ownedAt: Record<string, number>;
   actions: Record<string, number>;
   days: number;
-  rounds: { index: number; quarter: number; target: number; meter: number; status: string }[];
+  rounds: {
+    index: number;
+    quarter: number;
+    target: number;
+    meter: number;
+    status: string;
+    realizedCents: number;
+  }[];
   ms: number;
   error?: string;
 }
@@ -125,6 +132,7 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
       target: h.target,
       meter: h.meter,
       status: h.status,
+      realizedCents: h.realizedCents,
     })),
     ms: Date.now() - t0,
     error,

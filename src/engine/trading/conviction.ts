@@ -7,20 +7,37 @@
  * grades whether your conviction matches how often you are right.
  */
 
+import { BALANCE } from '../../content/balance';
 import type { Bucket } from '../scoring/calls';
 import { STRUCTURES } from '../strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../strategies/types';
 
-/** The five conviction steps: the confidence recorded for the call, and the share of the risk cap used. */
-export const CONVICTION = [
-  { confidence: 0.5, capShare: 0.2, label: 'FEELER' },
-  { confidence: 0.6, capShare: 0.4, label: 'LEAN' },
-  { confidence: 0.7, capShare: 0.6, label: 'SOLID' },
-  { confidence: 0.8, capShare: 0.8, label: 'STRONG' },
-  { confidence: 0.9, capShare: 1, label: 'ALL IN' },
+/**
+ * The five conviction steps: the confidence recorded for the call, and the share of the risk cap
+ * used (read from BALANCE.conviction, so the balance simulator can tune it).
+ */
+const STEPS = [
+  { confidence: 0.5, label: 'FEELER' },
+  { confidence: 0.6, label: 'LEAN' },
+  { confidence: 0.7, label: 'SOLID' },
+  { confidence: 0.8, label: 'STRONG' },
+  { confidence: 0.9, label: 'ALL IN' },
 ] as const;
 
-export function convictionStep(confidence: number): (typeof CONVICTION)[number] {
+export interface ConvictionStep {
+  confidence: (typeof STEPS)[number]['confidence'];
+  label: (typeof STEPS)[number]['label'];
+  readonly capShare: number;
+}
+
+export const CONVICTION: readonly ConvictionStep[] = STEPS.map((s, i) => ({
+  ...s,
+  get capShare() {
+    return BALANCE.conviction.capShares[i];
+  },
+}));
+
+export function convictionStep(confidence: number): ConvictionStep {
   return CONVICTION.reduce((best, c) =>
     Math.abs(c.confidence - confidence) < Math.abs(best.confidence - confidence) ? c : best,
   );

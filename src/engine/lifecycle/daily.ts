@@ -151,15 +151,17 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
       };
       return { pos, decisions: [], autoClosed: true };
     }
+    const closeNowCents = contractCents(plIfClosedAt(pos, q.natural), pos.qty);
     decisions.push({
       id: dpId(pos, 'target_hit', book.date),
       positionId: pos.id,
       kind: 'target_hit',
       date: book.date,
       title: 'Profit target hit',
-      message: `Your target is in reach: closing now locks in about ${(b.targetPl * 100 * pos.qty).toFixed(0)} dollars.`,
+      message: `Your target is in reach: closing now locks in about ${(closeNowCents / 100).toFixed(0)} dollars.`,
       options: ['close', 'hold', 'roll'],
       planned: 'close',
+      closeNowCents,
     });
   } else if (
     b.stopPl !== null &&
@@ -194,6 +196,7 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
         'The trade reached the stop you planned. Taking it now keeps a bad trade from becoming a disaster.',
       options: ['close', 'hold', 'roll'],
       planned: 'close',
+      closeNowCents: contractCents(plIfClosedAt(pos, q.natural), pos.qty),
     });
   }
 

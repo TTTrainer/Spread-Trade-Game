@@ -191,8 +191,8 @@ export function Toasts() {
         <motion.div
           key={t.id}
           className={`toast tone-${t.tone}`}
-          initial={{ y: 24, scale: 0.9, opacity: 0 }}
-          animate={{ y: 0, scale: 1, opacity: 1 }}
+          initial={{ x: 60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 520, damping: 26 }}
         >
           <span className="toast-ico" aria-hidden="true">

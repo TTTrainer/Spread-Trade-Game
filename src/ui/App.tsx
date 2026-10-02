@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Toasts } from './components/ui';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { DevLayer } from './components/DevPanel';
 import { TooltipLayer } from './components/Tooltip';
 import { useHotkeys } from './hotkeys';
@@ -67,9 +68,17 @@ export function App() {
   const Comp = SCREENS[screen] ?? (() => <PlaceholderScreen screen={screen} />);
   return (
     <>
-      {settingsLoaded && <Comp />}
+      {settingsLoaded && (
+        <ErrorBoundary name={`screen ${screen}`} key={screen}>
+          <Comp />
+        </ErrorBoundary>
+      )}
       <HelpModal />
-      {(screen === 'run' || screen === 'career') && <DialogueBox />}
+      {(screen === 'run' || screen === 'career') && (
+        <ErrorBoundary name="dialogue" quiet>
+          <DialogueBox />
+        </ErrorBoundary>
+      )}
       <DevLayer />
       <Toasts />
       <TooltipLayer />

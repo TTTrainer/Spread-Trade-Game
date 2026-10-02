@@ -12,27 +12,37 @@
  *   whole window, so a stall is logged with the calls it was serving.
  */
 import type { BrowserWindow } from 'electron';
+import type { ScreenWhere } from '../../src/shared/rpc';
 import { log } from './log';
 
 const STUCK_AFTER_MS = 12_000;
 
 let trail: string[] = [];
-let recovered = false;
+let where: ScreenWhere | null = null;
+/** Set when the watchdog restarted the screen: where it was, so it can go straight back. */
+let recovered: ScreenWhere | null = null;
+let reloadFn: ((why: string) => void) | null = null;
 let lastBeat = { at: 0, visible: false };
 const inflight = new Map<number, { what: string; since: number }>();
 let callId = 0;
 
 /** A heartbeat from the screen: its trail, and whether the page is visible (timers run freely). */
-export function heartbeat(beat: { trail: string[]; visible: boolean }): void {
+export function heartbeat(beat: { trail: string[]; visible: boolean; where?: ScreenWhere }): void {
   trail = beat.trail.slice(-40);
+  if (beat.where) where = beat.where;
   lastBeat = { at: Date.now(), visible: beat.visible };
 }
 
-/** True once after the window was reloaded by the watchdog (the screen shows a notice). */
-export function takeRecovered(): boolean {
+/** Where the screen was, once, after the watchdog restarted it (the screen returns there). */
+export function takeRecovered(): ScreenWhere | null {
   const r = recovered;
-  recovered = false;
+  recovered = null;
   return r;
+}
+
+/** The screen asked to be restarted (an error it couldn't draw past). */
+export function reloadScreen(why: string): void {
+  reloadFn?.(why);
 }
 
 /** Track one IPC call so a stall can name it. Returns the function that ends the tracking. */
@@ -62,8 +72,12 @@ export function watchWindow(win: BrowserWindow): void {
   const reload = (why: string) => {
     if (reloading || win.isDestroyed()) return;
     reloading = true;
-    log('error', `${why}: reloading the screen (the run is autosaved)`, { trail, inflight: inflightNow() });
-    recovered = true;
+    log('error', `${why}: reloading the screen (the run is autosaved)`, {
+      trail,
+      where,
+      inflight: inflightNow(),
+    });
+    recovered = where ?? { screen: 'title', slot: null };
     lastBeat = { at: 0, visible: false };
     // End the stuck screen process; the reload happens once it's gone (or in 3 s regardless).
     const fallback = setTimeout(reloadNow, 3000);
@@ -77,6 +91,7 @@ export function watchWindow(win: BrowserWindow): void {
       // Already gone.
     }
   };
+  reloadFn = reload;
   wc.on('did-finish-load', () => {
     reloading = false;
   });
@@ -86,7 +101,7 @@ export function watchWindow(win: BrowserWindow): void {
     log('error', 'screen process gone', { details, trail });
     if (details.reason === 'clean-exit' || win.isDestroyed() || reloading) return;
     reloading = true;
-    recovered = true;
+    recovered = where ?? { screen: 'title', slot: null };
     setTimeout(reloadNow, 100);
   });
 

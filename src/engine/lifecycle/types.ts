@@ -77,6 +77,8 @@ export interface DecisionPoint {
   options: DecisionAction[];
   /** For bracket hits: the action that follows the plan. */
   planned?: DecisionAction;
+  /** For bracket hits: the P/L that closing right now books (at the natural price, before fees). */
+  closeNowCents?: Cents;
 }
 
 export type PositionEventKind =

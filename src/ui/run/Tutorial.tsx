@@ -60,6 +60,7 @@ function contextOf(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tut
 function runEnter(what: TutEnter | undefined): void {
   const t = useTrading.getState();
   if (what === 'simpleChart') useTrading.setState({ studies: ['vol'], chainOpen: false });
+  else if (what === 'emChart') useTrading.setState({ studies: ['vol', 'em'], chainOpen: false });
   else if (what === 'fullChart') useTrading.setState({ studies: [...FULL_STUDIES] });
   else if (what === 'briefTab') t.setRightTab('brief');
   else if (what === 'tradeTab') t.setRightTab('trade');
@@ -107,18 +108,98 @@ function useTargetRect(selector: string | null): DOMRect | null {
 const PAD = 6;
 const BUBBLE_W = 380;
 
-/** Put the bubble beside the spotlight where there's room: right, left, below, above. */
-function bubblePlace(rect: DOMRect | null, centered: boolean): React.CSSProperties {
+/**
+ * What a bubble should never sit on if it can help it: the buttons and numbers a lesson is about
+ * to ask for, and the readouts the player is watching.
+ */
+const KEEP_CLEAR = [
+  '[data-testid="sell-button"]',
+  '[data-testid="setup-sliders"]',
+  '[data-testid="goal-card"]',
+  '.rtb-score',
+  '[data-testid="ff-bar"]',
+  '[data-testid="leave-shop"]',
+  '[data-testid="tally-continue"]',
+  '[data-testid="tally-meter"]',
+  '[data-testid="day-recap"]',
+  '[data-testid="decision-modal"]',
+  '[data-testid="pos-hud"]',
+  '.shop-card',
+  '.os-taskbar',
+];
+
+type Box = { x: number; y: number; w: number; h: number };
+const overlap = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+  Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+/**
+ * Put the bubble next to what it talks about, where it covers the least: never the spotlight if
+ * there's any other room, then as little of the key buttons and readouts as possible, then as
+ * close to the spotlight as it can get (so the eye doesn't travel far to act on it).
+ */
+export function bubblePlace(
+  rect: DOMRect | null,
+  centered: boolean,
+  size: { w: number; h: number },
+  avoid: Box[] = [],
+): React.CSSProperties {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  if (!rect) return centered ? { left: vw / 2 - BUBBLE_W / 2, top: vh * 0.3 } : { right: 24, bottom: 24 };
-  const clampTop = (y: number) => Math.max(12, Math.min(vh - 260, y));
-  const clampLeft = (x: number) => Math.max(12, Math.min(vw - BUBBLE_W - 12, x));
-  if (vw - rect.right > BUBBLE_W + 28) return { left: rect.right + PAD + 16, top: clampTop(rect.top) };
-  if (rect.left > BUBBLE_W + 28) return { left: rect.left - PAD - 16 - BUBBLE_W, top: clampTop(rect.top) };
-  if (vh - rect.bottom > 240) return { left: clampLeft(rect.left), top: rect.bottom + PAD + 14 };
-  if (rect.top > 240) return { left: clampLeft(rect.left), bottom: vh - rect.top + PAD + 14 };
-  return { left: clampLeft(rect.left + 24), top: clampTop(rect.top + 24) };
+  const { w, h } = size;
+  if (!rect) return centered ? { left: vw / 2 - w / 2, top: vh * 0.3 } : { right: 24, bottom: 24 };
+  const gap = PAD + 16;
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const raw: { x: number; y: number }[] = [
+    { x: rect.right + gap, y: rect.top },
+    { x: rect.right + gap, y: cy - h / 2 },
+    { x: rect.right + gap, y: rect.bottom - h },
+    { x: rect.left - gap - w, y: rect.top },
+    { x: rect.left - gap - w, y: cy - h / 2 },
+    { x: rect.left - gap - w, y: rect.bottom - h },
+    { x: rect.left, y: rect.bottom + gap },
+    { x: cx - w / 2, y: rect.bottom + gap },
+    { x: rect.right - w, y: rect.bottom + gap },
+    { x: rect.left, y: rect.top - gap - h },
+    { x: cx - w / 2, y: rect.top - gap - h },
+    { x: rect.right - w, y: rect.top - gap - h },
+    // Inside a big spotlight (the chart): its older, left side matters least.
+    { x: rect.left + 16, y: rect.top + 16 },
+    { x: rect.left + 16, y: rect.bottom - h - 16 },
+  ];
+  const target: Box = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+  let best: { x: number; y: number; score: number } | null = null;
+  for (const c of raw) {
+    const x = Math.max(12, Math.min(vw - w - 12, c.x));
+    const y = Math.max(12, Math.min(vh - h - 12, c.y));
+    const me: Box = { x, y, w, h };
+    const onTarget = overlap(me, target);
+    const onKeep = avoid.reduce((a, b) => a + overlap(me, b), 0);
+    const dist = Math.hypot(x + w / 2 - cx, y + h / 2 - cy);
+    const score = onTarget * 4 + onKeep * 2 + dist * 60;
+    if (!best || score < best.score) best = { x, y, score };
+  }
+  return { left: best!.x, top: best!.y };
+}
+
+/** The boxes a bubble should keep clear of (minus the spotlight itself, which is scored apart). */
+function keepClearBoxes(selector: string | null): Box[] {
+  const out: Box[] = [];
+  for (const sel of KEEP_CLEAR) {
+    let els: NodeListOf<Element>;
+    try {
+      els = document.querySelectorAll(sel);
+    } catch {
+      continue;
+    }
+    els.forEach((el) => {
+      if (selector && el.matches(selector)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width > 2 && r.height > 2) out.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+    });
+  }
+  return out;
 }
 
 /**
@@ -231,6 +312,13 @@ export function TutorialCoach({ e }: { e: RunEngine }) {
     return () => window.removeEventListener('keydown', onKey, true);
   });
 
+  // The bubble's real size, so placement knows what it has to fit.
+  const bubbleRef = useRef<HTMLDivElement | null>(null);
+  const [bubbleH, setBubbleH] = useState(230);
+  useEffect(() => {
+    const hNow = bubbleRef.current?.offsetHeight;
+    if (hNow && Math.abs(hNow - bubbleH) > 4) setBubbleH(hNow);
+  });
   const part = partOf(settled);
   const hole = rect
     ? {
@@ -252,12 +340,24 @@ export function TutorialCoach({ e }: { e: RunEngine }) {
       {block && hole && <Blockers hole={hole} />}
       {block && !hole && <div className="tut-block" style={{ inset: 0 }} />}
       {!dim && hole && <div className="tut-ring" style={hole} aria-hidden="true" />}
+      {lesson?.id === 'strike' && rect && (
+        // A hand showing the move: press on the tag and drag it up or down.
+        <div
+          className="tut-drag"
+          style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }}
+          aria-hidden="true"
+        >
+          <span className="td-hand">☝</span>
+          <span className="td-arrows">⇕</span>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {lesson && (
           <motion.div
             key={lesson.id}
             className={`tut-bubble panel ${active?.kind === 'moment' ? 'moment' : ''}`}
-            style={bubblePlace(rect, !selector && dim)}
+            ref={bubbleRef}
+            style={bubblePlace(rect, !selector && dim, { w: BUBBLE_W, h: bubbleH }, keepClearBoxes(selector))}
             initial={{ opacity: 0, y: 14, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8 }}

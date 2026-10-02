@@ -27,6 +27,7 @@ export function SnapSlider({
   testId,
   accent = 'cyan',
   disabled = false,
+  hint,
 }: {
   options: SnapOption[];
   index: number;
@@ -36,8 +37,10 @@ export function SnapSlider({
   tip?: string;
   byValue?: boolean;
   testId?: string;
-  accent?: 'cyan' | 'magenta' | 'amber' | 'up';
+  accent?: 'cyan' | 'magenta' | 'amber' | 'up' | 'violet';
   disabled?: boolean;
+  /** A line under the slider saying what it moves (the first time a structure is used). */
+  hint?: ReactNode;
 }) {
   const track = useRef<HTMLDivElement>(null);
   const n = options.length;
@@ -101,6 +104,7 @@ export function SnapSlider({
         {n > 0 && <span className="snap-thumb" style={{ left: `${posOf(safe) * 100}%` }} />}
       </div>
       <span className="snap-readout num">{readout}</span>
+      {hint && <span className="snap-hint">{hint}</span>}
     </div>
   );
 }

@@ -184,29 +184,32 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           data-testid="run-menu"
           title="Save and return to the title screen"
         >
-          ◀ SAVE & EXIT
+          ◀ EXIT
         </button>
-        <div className="tb-item rtb-round">
-          <span className="amber-text">{quarterLabel(st.quarter)}</span> {ROUND_NAMES[r.index].toUpperCase()}
-          {review && (
-            <span className="chip magenta" data-tip={`review:${review.id}`}>
-              {review.name.toUpperCase()}
-            </span>
-          )}
-          <ModeChips e={e} />
+        <div className={`rtb-round rtb-blind ${review ? 'boss' : ''}`}>
+          <span className="rtb-q amber-text">{quarterLabel(st.quarter)}</span>
+          <span className="rtb-name">{ROUND_NAMES[r.index].toUpperCase()}</span>
+          <span className="rtb-chips">
+            {review && (
+              <span className="chip magenta" data-tip={`review:${review.id}`}>
+                {review.name.toUpperCase()}
+              </span>
+            )}
+            <ModeChips e={e} />
+            {r.memo.waiver && <span className="chip warn">WAIVER</span>}
+          </span>
           <MeterJuice meter={r.meter} target={r.target} />
-          {r.memo.waiver && <span className="chip warn">WAIVER</span>}
         </div>
-        <div className="rtb-meter" data-tip="g:meter">
+        {/* The score is the number the round is about, so it's the biggest thing up here. */}
+        <div className={`rtb-meter rtb-score ${r.meter >= r.target ? 'met' : ''}`} data-tip="g:meter">
+          <span className="rtb-k">SCORE</span>
+          <span className="rtb-score-v num" data-testid="round-meter">
+            <b>{r.meter.toLocaleString()}</b> / {r.target.toLocaleString()}
+          </span>
           <Meter
             value={Math.max(0, r.meter)}
             max={r.target}
             tone={r.meter >= r.target ? 'cyan' : 'magenta'}
-            label={
-              <span data-testid="round-meter">
-                {r.meter.toLocaleString()} / {r.target.toLocaleString()}
-              </span>
-            }
           />
           <AnimatePresence>
             {lastPoints && (
@@ -223,49 +226,56 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             )}
           </AnimatePresence>
         </div>
-        <div
-          className="rtb-line"
-          data-tip-title="Max-Loss Line"
-          data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
-        >
-          <span className="dim">MAX-LOSS</span>
-          <Meter
-            value={room}
-            max={span}
-            tone={room / span < 0.35 ? 'down' : 'amber'}
-            label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
-            testId="maxloss-gauge"
-          />
+        <div className="rtb-tile rtb-cash num" data-testid="cash" data-tip="g:cash">
+          <span className="rtb-k">CASH</span>
+          <span className="rtb-v amber-text">${st.cash}</span>
         </div>
-        <button
-          className="tb-item rtb-stress"
-          onClick={() => setStressOpen(true)}
-          data-testid="stress"
-          data-tip="g:stress"
-        >
-          <span className="dim">STRESS</span>
-          <Meter
-            value={st.stress}
-            max={100}
-            tone={st.stress >= 75 ? 'down' : 'amber'}
-            label={`${st.stress}`}
-          />
-        </button>
-        <div className="tb-item num" data-testid="cash" data-tip="g:cash">
-          <span className="dim">CASH</span> <span className="amber-text">${st.cash}</span>
+        <div className="rtb-tile num" data-testid="tickets" data-tip="g:tickets">
+          <span className="rtb-k">TICKETS</span>
+          <span className="rtb-v">
+            {Array.from({ length: r.tickets }, (_, i) => (
+              <span key={i} className={i < r.ticketsUsed ? 'tk-pip used' : 'tk-pip'}>
+                ■
+              </span>
+            ))}
+          </span>
         </div>
-        <div className="tb-item num" data-testid="tickets" data-tip="g:tickets">
-          <span className="dim">TICKETS</span>{' '}
-          {Array.from({ length: r.tickets }, (_, i) => (
-            <span key={i} className={i < r.ticketsUsed ? 'tk-pip used' : 'tk-pip'}>
-              ■
-            </span>
-          ))}
+        <div className="rtb-gauges">
+          <div
+            className="rtb-line"
+            data-tip-title="Max-Loss Line"
+            data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
+          >
+            <span className="rtb-k">MAX-LOSS</span>
+            <Meter
+              value={room}
+              max={span}
+              tone={room / span < 0.35 ? 'down' : 'amber'}
+              label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
+              testId="maxloss-gauge"
+            />
+          </div>
+          <button
+            className="rtb-stress"
+            onClick={() => setStressOpen(true)}
+            data-testid="stress"
+            data-tip="g:stress"
+          >
+            <span className="rtb-k">STRESS</span>
+            <Meter
+              value={st.stress}
+              max={100}
+              tone={st.stress >= 75 ? 'down' : 'amber'}
+              label={`${st.stress}`}
+            />
+          </button>
         </div>
-        <div className="tb-item num" data-tip="g:equity">
-          <span className="dim">EQUITY</span> {money(eq)}
+        <div className="rtb-tile rtb-account num">
+          <span className="rtb-k" data-tip="g:equity">
+            EQUITY <b className="rtb-eq">{money(eq)}</b>
+          </span>
+          <CashReadout />
         </div>
-        <CashReadout />
         <div className="tb-spacer" />
         <FastForwardBar />
       </div>

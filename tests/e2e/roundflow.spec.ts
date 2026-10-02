@@ -51,7 +51,7 @@ test('watch a day before trading, then trade on day 1; a sit-out locks trading a
   // Trade on day 1: the builder is live between days.
   await page.keyboard.press('4');
   await page.getByTestId('structure-bull_put').click();
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.keyboard.press('Alt+S');
   await expect(page.getByTestId('toasts')).toContainText('Filled');
   const used = await page.evaluate(() => (window as Any).__stg.run.getState().engine.state.round.ticketsUsed);

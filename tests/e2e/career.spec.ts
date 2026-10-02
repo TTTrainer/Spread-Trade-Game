@@ -66,7 +66,7 @@ async function sellBullPut(page: Page): Promise<void> {
   await page.keyboard.press('Shift+2');
   await expect(page.getByTestId('view-chip')).toContainText('UP');
   await page.getByTestId('structure-bull_put').click();
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await expect(page.getByTestId('score-preview')).toBeVisible();
   await page.keyboard.press('Alt+S');
   // Orders send straight away by default (no confirm box).
@@ -175,6 +175,9 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   await shot(page, '06-tally-1920');
   await page.getByTestId('tally-continue').click();
   await expect(page.getByTestId('shop-screen')).toBeVisible();
+  // The windows pop open one by one; shoot the settled desk.
+  await expect(page.getByTestId('desk-carts')).toBeVisible();
+  await page.waitForTimeout(1200);
   await shot(page, '06-shop-1920');
   await shot(page, '06-shop-1366', { width: 1366, height: 768 });
   // A colleague's line in the shop sits in the lower right, clear of the offers and NEXT.

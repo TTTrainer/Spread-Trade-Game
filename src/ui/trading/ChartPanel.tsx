@@ -599,7 +599,7 @@ export function ChartPanel() {
         {stamp && (
           <motion.div
             key={stamp.id}
-            className={`fill-stamp ${stamp.credit ? 'credit' : 'debit'}`}
+            className={`fill-stamp ${stamp.plan ? 'plan' : stamp.credit ? 'credit' : 'debit'}`}
             data-testid="fill-stamp"
             initial={{ scale: 2.4, opacity: 0, rotate: -16 }}
             animate={{ scale: 1, opacity: 1, rotate: -8 }}

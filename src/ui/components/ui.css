@@ -127,35 +127,35 @@
 /* Messages sit low in the middle of the screen, where the eye already is, big enough to notice.
    Clicks pass through them, so a message never covers a button. */
 .toasts {
+  /* Top right, under the top bar's clock: noticeable without sitting on the chart or the buttons. */
   position: fixed;
-  left: 50%;
-  bottom: 26vh;
-  transform: translateX(-50%);
+  right: 14px;
+  top: 92px;
   z-index: 900;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 6px;
   pointer-events: none;
-  width: min(760px, 90vw);
+  width: min(440px, 46vw);
 }
 .toast {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: rgba(20, 14, 52, 0.96);
-  border: 3px solid var(--line-bright);
-  border-left-width: 10px;
-  padding: 10px 18px;
+  border: 2px solid var(--line-bright);
+  border-left-width: 8px;
+  padding: 8px 14px;
   font-family: var(--font-mono);
-  font-size: 23px;
+  font-size: 19px;
   line-height: 1.2;
   box-shadow:
-    4px 4px 0 #000,
-    0 0 26px rgba(157, 107, 255, 0.35);
+    3px 3px 0 #000,
+    0 0 18px rgba(157, 107, 255, 0.3);
 }
 .toast-ico {
-  font-size: 26px;
+  font-size: 21px;
   flex: none;
 }
 .toast.tone-good {
@@ -445,6 +445,22 @@ select:focus-visible,
   color: var(--text-dim);
   white-space: nowrap;
 }
+/* The label's marker wears the color of what the control moves on the chart. */
+.snap-label::before {
+  content: '■';
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--snap-accent, var(--cyan));
+}
+.snap-hint {
+  grid-column: 1 / -1;
+  margin: 4px 0 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--snap-accent, var(--cyan));
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--text);
+}
 .snap-readout {
   font-size: 16px;
   color: var(--text);
@@ -521,6 +537,9 @@ select:focus-visible,
 }
 .snap.accent-amber {
   --snap-accent: var(--amber);
+}
+.snap.accent-violet {
+  --snap-accent: var(--violet);
 }
 .snap.accent-up {
   --snap-accent: var(--up);

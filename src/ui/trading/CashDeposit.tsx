@@ -1,7 +1,8 @@
 /**
  * Selling premium puts cash in the account right away, so a credit fill should feel like it:
  * a big "+$210 CREDIT" pops over the screen and flies into the BALANCE readout, which counts up.
- * (Equity doesn't jump: the spread you now owe is worth about what you collected.)
+ * (Equity doesn't jump: the spread you now owe is worth about what you collected.) Closing a
+ * winner gets the same moment, bigger, flying into the round score instead.
  */
 
 import { AnimatePresence, motion } from 'motion/react';
@@ -55,7 +56,7 @@ export function CashDeposit() {
   const [to, setTo] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (!deposit) return;
-    const el = document.querySelector('[data-testid="balance"]');
+    const el = document.querySelector(deposit.to ?? '[data-testid="balance"]');
     const r = el?.getBoundingClientRect();
     setTo(
       r
@@ -65,14 +66,16 @@ export function CashDeposit() {
           }
         : null,
     );
-    for (let i = 0; i < 5; i++) setTimeout(() => sfx('coin', 1 + i * 0.08, 0.7), 900 + i * 70);
+    // A profit rings longer than a credit: more coins, climbing in pitch.
+    const n = deposit.profit ? 9 : 5;
+    for (let i = 0; i < n; i++) setTimeout(() => sfx('coin', 1 + i * 0.08, 0.7), 900 + i * 70);
   }, [deposit?.id]);
   return (
     <AnimatePresence>
       {deposit && (
         <motion.div
           key={deposit.id}
-          className="cash-deposit num"
+          className={`cash-deposit num ${deposit.profit ? 'profit' : ''}`}
           data-testid="cash-deposit"
           initial={{ scale: 0.3, opacity: 0, x: 0, y: 40 }}
           animate={{
@@ -84,7 +87,7 @@ export function CashDeposit() {
           transition={{ duration: 1.6, times: [0, 0.18, 0.3, 0.55, 1], ease: 'easeInOut' }}
         >
           <div className="cd-amount">+{money(deposit.cents)}</div>
-          <div className="cd-label">CREDIT DEPOSITED</div>
+          <div className="cd-label">{deposit.label ?? 'CREDIT DEPOSITED'}</div>
         </motion.div>
       )}
     </AnimatePresence>

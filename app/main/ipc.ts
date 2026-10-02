@@ -1,10 +1,10 @@
 import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { EventChannel, EventMap, RpcChannel, RpcMap } from '../../src/shared/rpc';
+import type { EventChannel, EventMap, RpcChannel, RpcMap, ScreenWhere } from '../../src/shared/rpc';
 import { defaultGameDbPath, logDir, userDataDir } from './paths';
 import { log } from './log';
-import { heartbeat, takeRecovered, trackCall } from './watchdog';
+import { heartbeat, reloadScreen, takeRecovered, trackCall } from './watchdog';
 
 type Handlers = {
   [C in RpcChannel]: (
@@ -39,8 +39,9 @@ function systemHandlers(): Pick<Handlers, `system.${string}` & RpcChannel> {
     'system.quit': () => app.quit(),
     'system.log': (level: 'info' | 'warn' | 'error', message: string, detail?: unknown) =>
       log(level, `[screen] ${message}`, detail),
-    'system.heartbeat': (beat: { trail: string[]; visible: boolean }) => heartbeat(beat),
+    'system.heartbeat': (beat: { trail: string[]; visible: boolean; where?: ScreenWhere }) => heartbeat(beat),
     'system.recovered': () => takeRecovered(),
+    'system.reloadScreen': (why: string) => reloadScreen(why),
     'system.toggleFullscreen': () => {
       const w = getWindow();
       if (!w) return false;

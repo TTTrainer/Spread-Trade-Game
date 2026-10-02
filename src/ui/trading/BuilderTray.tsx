@@ -183,45 +183,56 @@ export function OrderTicket() {
         </span>
       </div>
       <div className="ticket-grid num">
-        <div className="seg">
-          <button
-            className={builder.orderType === 'limit' ? 'sel' : ''}
-            onClick={() => setBuilder({ orderType: 'limit' })}
-            data-tip="g:order_limit"
-          >
-            LIMIT
-          </button>
-          <button
-            className={builder.orderType === 'market' ? 'sel' : ''}
-            onClick={() => setBuilder({ orderType: 'market' })}
-            data-testid="order-market"
-            data-tip="g:order_market"
-          >
-            MARKET
-          </button>
-        </div>
-        <div className="limit-box">
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={builder.limitFrac}
-            disabled={builder.orderType === 'market'}
-            onChange={(e) => setBuilder({ limitFrac: Number(e.target.value) })}
-            data-testid="limit-slider"
-          />
-          <div className="limit-labels">
-            <span data-tip="g:mid">MID {price(mid !== null ? Math.abs(mid) : null)}</span>
-            <span className="limit-now" data-tip="g:fill_chance">
-              {builder.orderType === 'market'
-                ? 'NATURAL'
-                : `LMT ${price(limit !== null ? Math.abs(limit) : null)}`}{' '}
-              · fill {Math.round(prob * 100)}%
+        {builder.orderType === 'market' ? (
+          <div className="order-simple" data-testid="order-simple">
+            <span className="os-market" data-tip="g:order_market">
+              MARKET · fills now at {price(nat !== null ? Math.abs(nat) : null)}
             </span>
-            <span data-tip="g:natural">NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
+            <button
+              className="linkish"
+              onClick={() => setBuilder({ orderType: 'limit' })}
+              data-testid="order-limit"
+              data-tip="g:order_limit"
+            >
+              use a limit price ▸
+            </button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="order-limit-head">
+              <span className="dim">
+                A limit names your price: between the middle (MID) and the price you'd get now (NAT). Closer
+                to MID pays you better but may not fill today.
+              </span>
+              <button
+                className="linkish"
+                onClick={() => setBuilder({ orderType: 'market' })}
+                data-testid="order-market"
+                data-tip="g:order_market"
+              >
+                ◂ back to market
+              </button>
+            </div>
+            <div className="limit-box">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={builder.limitFrac}
+                onChange={(e) => setBuilder({ limitFrac: Number(e.target.value) })}
+                data-testid="limit-slider"
+              />
+              <div className="limit-labels">
+                <span data-tip="g:mid">MID {price(mid !== null ? Math.abs(mid) : null)}</span>
+                <span className="limit-now" data-tip="g:fill_chance">
+                  LMT {price(limit !== null ? Math.abs(limit) : null)} · fill {Math.round(prob * 100)}%
+                </span>
+                <span data-tip="g:natural">NAT {price(nat !== null ? Math.abs(nat) : null)}</span>
+              </div>
+            </div>
+          </>
+        )}
         <div className="plan-chip" data-tip="g:plan_set">
           PLAN · take profit at {Math.round(builder.targetPct * 100)}% · stop at {builder.stopMult}× credit
         </div>

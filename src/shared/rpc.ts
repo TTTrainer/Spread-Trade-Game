@@ -4,6 +4,13 @@
  * generic `invoke`, and both sides are checked against this map.
  */
 
+/** Where the screen was (sent with each heartbeat), so a restarted screen can return there. */
+export interface ScreenWhere {
+  screen: string;
+  /** The save slot of the run on screen (career, daily, tutorial), if any. */
+  slot: string | null;
+}
+
 export interface SystemInfo {
   version: string;
   electron: string;
@@ -111,9 +118,11 @@ export interface RpcMap {
   /** A line in game.log from the screen (stalls, errors). */
   'system.log': (level: 'info' | 'warn' | 'error', message: string, detail?: unknown) => void;
   /** A heartbeat every second with the screen's recent actions, so a freeze leaves a record. */
-  'system.heartbeat': (beat: { trail: string[]; visible: boolean }) => void;
+  'system.heartbeat': (beat: { trail: string[]; visible: boolean; where?: ScreenWhere }) => void;
   /** True once after the watchdog reloaded a stuck screen. */
-  'system.recovered': () => boolean;
+  'system.recovered': () => ScreenWhere | null;
+  /** The screen hit an error it can't draw past: log it and reload, returning to the same place. */
+  'system.reloadScreen': (why: string) => void;
   'system.toggleFullscreen': () => boolean;
   'system.openPath': (path: string) => void;
   'system.saveTextFile': (suggestedName: string, content: string) => string | null;

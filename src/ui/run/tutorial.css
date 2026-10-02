@@ -168,3 +168,56 @@
     animation: none;
   }
 }
+
+/* The drag lesson: a hand presses on the S tag and slides it up and down. */
+.tut-drag {
+  position: fixed;
+  z-index: 840;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.td-hand {
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  font-size: 34px;
+  color: #fff;
+  text-shadow:
+    2px 2px 0 #000,
+    0 0 10px var(--amber);
+  animation: td-drag 1.6s ease-in-out infinite;
+}
+.td-arrows {
+  position: absolute;
+  left: 30px;
+  top: -14px;
+  font-size: 28px;
+  color: var(--amber);
+  text-shadow: 2px 2px 0 #000;
+  animation: td-pulse 1.6s ease-in-out infinite;
+}
+@keyframes td-drag {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    transform: translateY(0) scale(0.9);
+  }
+  45% {
+    transform: translateY(-42px) scale(0.9);
+  }
+  75% {
+    transform: translateY(42px) scale(0.9);
+  }
+}
+@keyframes td-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+:root[data-reduced-motion='true'] .td-hand,
+:root[data-reduced-motion='true'] .td-arrows {
+  animation: none;
+}

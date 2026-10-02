@@ -30,7 +30,9 @@
   color: var(--cyan);
 }
 
-/* ---------- run top bar ---------- */
+/* ---------- run top bar ----------
+ * Balatro-style: a round badge, the score as the hero number, then small boxed tiles with the
+ * label on top and the value below, instead of one long line of label/value pairs. */
 .run-topbar {
   flex-direction: column;
   align-items: stretch;
@@ -39,29 +41,88 @@
 }
 .rtb-row {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  align-items: stretch;
+  gap: 8px;
+}
+.rtb-row > * {
+  flex-shrink: 0;
 }
 .rtb-exit {
   white-space: nowrap;
   font-size: 14px;
-  padding: 4px 10px;
+  padding: 4px 8px;
+  align-self: center;
 }
-.rtb-round {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.rtb-k {
+  display: block;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.rtb-blind {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: baseline;
+  padding: 2px 10px;
+  border: 2px solid var(--line-bright);
+  background: rgba(7, 5, 26, 0.7);
   font-family: var(--font-display);
-  font-size: 17px;
 }
-.rtb-meter {
+.rtb-blind.boss {
+  border-color: var(--magenta);
+  box-shadow: 0 0 12px rgba(255, 62, 165, 0.35);
+}
+.rtb-q {
+  font-size: 15px;
+}
+.rtb-name {
+  font-size: 18px;
+  white-space: nowrap;
+}
+.rtb-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  min-height: 0;
+}
+.rtb-chips:empty {
+  display: none;
+}
+.rtb-chips .chip {
+  font-size: 11px;
+  padding: 0 4px;
+}
+.rtb-score {
   position: relative;
-  width: 230px;
+  width: 250px;
+  padding: 2px 10px 3px;
+  border: 2px solid var(--magenta);
+  background: linear-gradient(180deg, rgba(255, 62, 165, 0.16), rgba(7, 5, 26, 0.7));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
-.rtb-meter .meter,
-.rtb-line .meter,
-.rtb-stress .meter {
-  height: 22px;
+.rtb-score.met {
+  border-color: var(--cyan);
+  background: linear-gradient(180deg, rgba(62, 231, 255, 0.16), rgba(7, 5, 26, 0.7));
+}
+.rtb-score-v {
+  font-size: 18px;
+  line-height: 1.05;
+  color: var(--text-dim);
+}
+.rtb-score-v b {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--text);
+}
+.rtb-score .meter {
+  height: 7px;
 }
 .meter-pop {
   position: absolute;
@@ -71,31 +132,63 @@
   pointer-events: none;
   text-shadow: 1px 1px 0 #000;
 }
-.rtb-line {
+.rtb-tile {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 230px;
-  font-size: 16px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  background: rgba(7, 5, 26, 0.55);
+  white-space: nowrap;
 }
-.rtb-line .meter {
-  flex: 1;
+.rtb-v {
+  font-size: 22px;
+  line-height: 1.1;
+}
+.rtb-cash .rtb-v {
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+.rtb-gauges {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 200px;
+}
+.rtb-line,
+.rtb-stress {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  align-items: center;
+  gap: 4px;
 }
 .rtb-stress {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 150px;
   background: none;
   border: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
   padding: 0;
-  font-size: 16px;
+  text-align: left;
 }
+.rtb-line .meter,
 .rtb-stress .meter {
-  flex: 1;
+  height: 15px;
+  font-size: 13px;
+}
+.rtb-account .rtb-eq {
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--text);
+  letter-spacing: 0;
+}
+.rtb-account .cash-readout {
+  font-size: 15px;
+  line-height: 1.1;
+}
+.run-topbar .ffbar {
+  align-self: center;
 }
 .tk-pip {
   color: var(--cyan);
@@ -684,25 +777,20 @@
 }
 
 @media (max-width: 1500px) {
-  .rtb-meter,
-  .rtb-line {
-    width: 170px;
-    flex-shrink: 0;
+  .rtb-score {
+    width: 190px;
   }
-  /* Labels stack over their numbers so the gauges keep their width on a laptop screen. */
-  .rtb-row > .tb-item.num {
-    line-height: 1;
-    white-space: nowrap;
-  }
-  .rtb-row > .tb-item.num > .dim:first-child {
-    display: block;
-    font-size: 12px;
-  }
-  .rtb-stress {
-    width: 110px;
+  .rtb-gauges {
+    width: 160px;
   }
   .rtb-row {
-    gap: 9px;
+    gap: 6px;
+  }
+  .rtb-tile {
+    padding: 2px 6px;
+  }
+  .rtb-name {
+    font-size: 16px;
   }
   .cart-chip {
     min-width: 120px;
@@ -1095,6 +1183,37 @@
   /* Its contents wrap to fit; they must not widen the shelf columns above. */
   contain: inline-size;
 }
+/* Big screens: every shelf in the top row, YOUR DESK wide underneath with vouchers beside it. */
+@media (min-width: 1501px) {
+  .os-desktop {
+    grid-template-columns: max-content max-content max-content max-content minmax(300px, 1fr);
+    grid-template-areas:
+      'carts analyst memo page side'
+      'load load load voucher side';
+  }
+  .os-pair {
+    display: contents;
+  }
+  .w-memo {
+    grid-area: memo;
+  }
+  .w-page {
+    grid-area: page;
+  }
+  .dk-cart {
+    width: 150px;
+    padding: 10px 8px 8px;
+  }
+  .dk-name {
+    font-size: 17px;
+  }
+  .dk-get {
+    font-size: 14px;
+  }
+  .dk-cart.empty {
+    min-height: 190px;
+  }
+}
 .os-win {
   display: flex;
   flex-direction: column;
@@ -1376,15 +1495,130 @@
   margin-top: auto;
 }
 
-/* the loadout window */
+/* the loadout window: owned cartridges as big cards in firing order, the rest of the kit beside */
 .w-loadout .os-body {
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 10px 18px;
 }
-.ld-rail {
-  flex: 1 1 520px;
-  min-width: 0;
+.desk-carts {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.dk-cart {
+  position: relative;
+  width: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 6px 6px;
+  border: 2px solid var(--line-bright);
+  background: linear-gradient(180deg, rgba(157, 107, 255, 0.14), rgba(7, 5, 26, 0.6));
+  box-shadow: 3px 3px 0 #000;
+  text-align: center;
+}
+.dk-cart.rar-R {
+  border-color: var(--cyan);
+}
+.dk-cart.rar-L {
+  border-color: var(--amber);
+  box-shadow:
+    3px 3px 0 #000,
+    0 0 12px rgba(255, 191, 62, 0.35);
+}
+.dk-cart.empty {
+  justify-content: center;
+  border-style: dashed;
+  background: none;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 13px;
+  min-height: 140px;
+}
+@media (max-width: 1500px) {
+  .dk-cart {
+    width: 100px;
+    padding: 6px 4px 4px;
+  }
+  .dk-cart .art-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .dk-name {
+    font-size: 13px;
+  }
+  .dk-get {
+    font-size: 12px;
+  }
+  .dk-cart.empty {
+    min-height: 120px;
+  }
+  .ld-slot {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .ld-slot .art-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
+.dk-empty-plus {
+  font-size: 34px;
+  line-height: 1;
+}
+.dk-n {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.dk-name {
+  font-size: 15px;
+  line-height: 1.1;
+}
+.dk-get {
+  font-size: 13px;
+  line-height: 1.15;
+  color: var(--text-dim);
+}
+.dk-acts {
+  margin-top: auto;
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+.dk-move {
+  width: 22px;
+  padding: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--line-bright);
+  color: var(--text);
+  cursor: pointer;
+}
+.dk-move:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.dk-sell {
+  flex: 1;
+  background: var(--bg-2);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 13px;
+  cursor: pointer;
+}
+.dk-sell:hover,
+.dk-move:not(:disabled):hover {
+  background: rgba(255, 191, 62, 0.18);
+}
+.dk-arrow {
+  align-self: center;
+  color: var(--text-faint);
+  font-size: 12px;
 }
 .sell-chip {
   display: inline-flex;
@@ -1403,8 +1637,9 @@
 }
 .ld-tiles {
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 8px 16px;
+  grid-template-columns: repeat(4, auto);
+  justify-content: start;
+  gap: 8px 22px;
   align-content: start;
 }
 .ld-k {
@@ -1419,8 +1654,8 @@
 }
 .ld-slot {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
   border: 1px solid var(--line-bright);
@@ -2128,11 +2363,42 @@
     font-size: 13px;
   }
 }
-/* In the shop: the middle of the YOUR BUILD column, where nothing needs reading. */
-/* YOUR BUILD's empty middle: under the family rows, above the tips at its foot, at any height. */
+/* In the shop: bottom right, just above the taskbar (under the build window on a big screen, over
+   its tips on a laptop), clear of the offers, the payouts and NEXT. */
 .dialogue.at-corner.at-shop {
-  top: 52%;
-  bottom: auto;
-  right: 24px;
+  top: auto;
+  bottom: 62px;
+  right: 14px;
   width: min(420px, 29vw);
+}
+@media (max-width: 1500px) {
+  .dialogue.at-corner.at-shop {
+    width: 300px;
+  }
+  .dialogue.at-corner.at-shop .portrait {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+/* On the chart: compact, over the oldest candles (placed from the chart's box). */
+.dialogue.at-corner.at-chart {
+  right: auto;
+  opacity: 0.97;
+}
+
+/* Why this score: money first, then points. */
+.round-why {
+  margin: 10px 0;
+  padding: 10px 14px;
+  font-size: 17px;
+}
+.rw-grid {
+  display: grid;
+  gap: 4px;
+}
+.rw-verdict {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: 15px;
 }

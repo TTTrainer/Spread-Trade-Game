@@ -55,6 +55,10 @@ describe('tutorial script', () => {
     // The goal comes first, then the trade, then the powerups.
     const idx = (id: string) => TUTORIAL_STEPS.findIndex((s) => s.id === id);
     expect(idx('goal')).toBeLessThan(idx('view'));
+    // The strategy is described before the player picks a side; safe vs bold before placing.
+    expect(idx('spread')).toBeLessThan(idx('view'));
+    expect(idx('strike')).toBeLessThan(idx('safe'));
+    expect(idx('safe')).toBeLessThan(idx('place'));
     expect(idx('place')).toBeLessThan(idx('carts'));
     // Every region has a selector, and the whole desk is on by the end.
     for (const r of TUT_REGIONS) expect(REGION_SELECTORS[r], r).toBeTruthy();
@@ -84,7 +88,7 @@ describe('tutorial flow', () => {
     expect(settle(at('view'), ctx({ touched: true }), null).idx).toBe(at('line').idx);
     // Moving the strike since the lesson opened.
     expect(settle(at('strike'), ctx({ strikeKey: 'k0' }), 'k0').idx).toBe(at('strike').idx);
-    expect(settle(at('strike'), ctx({ strikeKey: 'k1' }), 'k0').idx).toBe(at('place').idx);
+    expect(settle(at('strike'), ctx({ strikeKey: 'k1' }), 'k0').idx).toBe(at('safe').idx);
     // A trade placed early skips the rest of the how-to-trade lessons.
     expect(settle(at('line'), ctx({ placed: 1, touched: true }), null).idx).toBe(at('placed').idx);
     expect(settle(at('clock'), ctx({ placed: 1, day: 1 }), null).idx).toBe(at('exitplan').idx);

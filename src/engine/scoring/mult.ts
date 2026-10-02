@@ -51,6 +51,19 @@ export interface ScoreResult {
   trace: TraceRow[];
 }
 
+/**
+ * How much of its bonus chips a win keeps: all of them once it earned BONUS_FULL_ROR of what it
+ * risked (a credit spread closed at its 50% target is about 0.2), less for a scrape. Measured on
+ * risk, not account size, so a careful small trade scores as well as a big one.
+ */
+export function winQuality(returnOnRisk: number | null, family?: string): number {
+  if (returnOnRisk === null) return 1;
+  // Covered calls and cash-secured puts risk the stock itself, so a good one earns a far smaller
+  // share of its risk than a spread does.
+  const full = family === 'income' ? BALANCE.scoring.incomeFullRoR : BALANCE.scoring.bonusFullRoR;
+  return Math.max(0, Math.min(1, returnOnRisk / full));
+}
+
 export function pnlChips(realizedCents: Cents, roundStartEquityCents: Cents): number {
   if (roundStartEquityCents <= 0) return 0;
   return (realizedCents / roundStartEquityCents) * BALANCE.scoring.chipsPerUnit;
@@ -64,21 +77,29 @@ export function runScore(
   realizedCents: Cents,
   roundStartEquityCents: Cents,
   steps: ScoreStep[],
+  /** The win's quality (winQuality): scales its bonus chips. */
+  quality = 1,
 ): ScoreResult {
   const winner = realizedCents > 0;
-  const base = pnlChips(realizedCents, roundStartEquityCents) * (winner ? 1 : BALANCE.scoring.lossChipsScale);
+  const pnl = pnlChips(realizedCents, roundStartEquityCents);
+  const base = pnl * (winner ? 1 : BALANCE.scoring.lossChipsScale);
   const trace: TraceRow[] = [{ label: 'P/L', op: 'chips', value: base, chips: base, mult: 1 }];
+  // Bonus chips grow with the win's quality: a scrape that earned little of what it risked can't
+  // farm the same bonuses as a real win.
+  const size = winner ? Math.max(0, Math.min(1, quality)) : 1;
   let chips = base;
   let mult = 1;
   let meter = 1;
   for (const s of steps) {
     if (!winner && s.op !== 'meter') continue; // losers: chips are never multiplied or padded
-    if (s.op === 'chips') chips += s.value;
-    else if (s.op === 'chipsMul') chips *= s.value;
-    else if (s.op === 'add') mult += s.value;
-    else if (s.op === 'mul') mult *= s.value;
-    else meter *= s.value;
-    trace.push({ label: s.label, op: s.op, value: s.value, chips, mult });
+    const value = s.op === 'chips' ? s.value * size : s.value;
+    if (s.op === 'chips') chips += value;
+    else if (s.op === 'chipsMul') chips *= value;
+    else if (s.op === 'add') mult += value;
+    else if (s.op === 'mul') mult *= value;
+    else meter *= value;
+    const label = s.op === 'chips' && size < 1 ? `${s.label} (thin win ×${size.toFixed(2)})` : s.label;
+    trace.push({ label, op: s.op, value, chips, mult });
   }
   const points = winner ? chips * mult * meter : chips * meter;
   return { winner, chips, mult: winner ? mult : 1, points: Math.round(points), trace };

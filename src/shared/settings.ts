@@ -235,6 +235,8 @@ export interface Settings {
     pause: Record<DecisionKind, boolean>;
     pureMarket: boolean;
     tutorialDone: boolean;
+    /** Structures whose first-use coach card has been seen. */
+    seenStructures: string[];
     /** Where the tutorial's lessons are (null: from the top). */
     tutorialProgress: { idx: number; seen: string[]; skipped: boolean } | null;
     /** Show a confirm box before each order (off: orders go out on Sell/Buy). */
@@ -269,7 +271,7 @@ export interface Settings {
   data: { gameDbPath: string | null };
 }
 
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
@@ -285,10 +287,11 @@ export const DEFAULT_SETTINGS: Settings = {
     callPicksStructure: true,
     planTargetPct: 0.5,
     planStopMult: 2,
-    // Only the moments that need a real decision stop the clock. Targets close at plan by
-    // themselves; a touched short strike and 21 DTE show up as notices.
+    // Only the moments that need a real decision stop the clock. A hit target waits for you to
+    // take the profit (1.6: closing is the player's call); a touched short strike and 21 DTE
+    // show up as notices.
     pause: {
-      target_hit: false,
+      target_hit: true,
       stop_hit: true,
       short_touched: false,
       dte21: false,
@@ -299,6 +302,7 @@ export const DEFAULT_SETTINGS: Settings = {
     },
     pureMarket: false,
     tutorialDone: false,
+    seenStructures: [],
     tutorialProgress: null,
     confirmOrders: false,
     devMode: false,
@@ -338,6 +342,8 @@ export function mergeSettings(saved: unknown): Settings {
   // Version 3: days play out as forming candles, so the old fast default (0.35 s) became 1.4 s.
   // Version 4 (playtest 3): day by day is the default, and 1x runs at a quarter of the v3 speed.
   const ver = s.version ?? 1;
+  // Version 5 (playtest 5): a hit profit target pauses so taking the profit is the player's move.
+  const v5 = ver < 5 ? { target_hit: true } : {};
   const oldSpeed = s.game?.ffSecondsPerDay;
   const v3 =
     ver < 4
@@ -354,7 +360,9 @@ export function mergeSettings(saved: unknown): Settings {
       ...DEFAULT_SETTINGS.game,
       ...s.game,
       ...v3,
-      pause: old ? { ...DEFAULT_SETTINGS.game.pause } : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
+      pause: old
+        ? { ...DEFAULT_SETTINGS.game.pause }
+        : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause, ...v5 },
     },
     realism: { ...DEFAULT_SETTINGS.realism, ...s.realism },
     blind: { ...DEFAULT_SETTINGS.blind, ...s.blind },

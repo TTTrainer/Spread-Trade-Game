@@ -4,11 +4,12 @@ import { useApp, type Screen } from '../store/app';
 import { Backdrop } from '../../fx/Backdrop';
 import './title.css';
 
-const MENU: { label: string; screen: Screen }[] = [
+const MENU: { label: string; screen: Screen; wip?: boolean }[] = [
   { label: 'Career', screen: 'career' },
   { label: 'Daily', screen: 'daily' },
   { label: 'Drills', screen: 'drills' },
-  { label: 'Live', screen: 'live' },
+  // On hold until it's rebuilt around trading today's price for a leaderboard.
+  { label: 'Live', screen: 'live', wip: true },
   { label: 'Contracts', screen: 'contracts' },
   { label: 'Sandbox', screen: 'sandboxSetup' },
   { label: 'Stats', screen: 'stats' },
@@ -76,6 +77,11 @@ export function TitleScreen() {
           >
             <span className="caret">{i === sel ? '▶' : ' '}</span>
             {m.label}
+            {m.wip && (
+              <span className="title-wip num" data-testid={`wip-${m.screen}`}>
+                WORK IN PROGRESS
+              </span>
+            )}
           </button>
         ))}
       </nav>
