@@ -270,3 +270,64 @@ export const BOSS_IDS = Object.keys(BOSSES) as BossId[];
 export function quarterBossPool(): BossId[] {
   return BOSS_IDS.filter((id) => id !== 'rebalancer' && BOSSES[id].ready);
 }
+
+/**
+ * Showdown tiers: in Endless, each year after the first makes a boss's twist one notch harsher
+ * (tier 1 in year 2, and so on). Tier 0 is the boss as written.
+ */
+export function showdownTwist(t: BossTwist, tier: number): BossTwist {
+  const k = Math.max(0, Math.floor(tier));
+  if (!k) return t;
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  switch (t.kind) {
+    case 'riskCap':
+      return { ...t, mult: r2(Math.max(0.25, t.mult - 0.1 * k)) };
+    case 'lossMult':
+      return { ...t, mult: r2(t.mult + 0.5 * k) };
+    case 'shortWinTax':
+      return { ...t, days: t.days + k, mult: r2(Math.max(0.4, t.mult - 0.1 * k)) };
+    case 'lossStreak':
+      return { ...t, step: r2(t.step + 0.1 * k) };
+    case 'multCut':
+      return { ...t, keep: r2(Math.max(0.35, t.keep - 0.1 * k)) };
+    case 'variety':
+      return { ...t, count: t.count + k };
+    default:
+      return t;
+  }
+}
+
+/** The tier of a quarter's boss: 0 in the first year, +1 each Endless year after. */
+export function showdownTier(quarter: number): number {
+  return Math.max(0, Math.floor((quarter - 1) / 4));
+}
+
+/** The twist in one line at a tier: as written at tier 0, with the harsher numbers after. */
+export function twistLine(id: BossId, tier: number): string {
+  const def = BOSSES[id];
+  if (!tier) return def.twistText;
+  const t = showdownTwist(def.twist, tier);
+  switch (t.kind) {
+    case 'riskCap':
+      return `Only ${Math.round(t.mult * 100)}% of your usual risk per trade. The rest is held in reserve.`;
+    case 'lossMult':
+      return `Losing trades count x${t.mult} against your score.`;
+    case 'shortWinTax':
+      return `Wins closed in their first ${t.days} trading days score ${Math.round((1 - t.mult) * 100)}% less.`;
+    case 'lossStreak':
+      return `Losses in a row compound: each one costs ${Math.round((t.step - 1) * 100)}% more than the last.`;
+    case 'multCut':
+      return `Your total mult is cut by ${Math.round((1 - t.keep) * 100)}%: the house takes its share.`;
+    case 'variety':
+      return `Second goal: trade ${t.count} different structure types.`;
+    default:
+      return def.twistText;
+  }
+}
+
+/** "SHOWDOWN II" for a tier above 0. */
+export function showdownLabel(tier: number): string | null {
+  if (tier <= 0) return null;
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+  return `SHOWDOWN ${roman[Math.min(roman.length - 1, tier - 1)]}`;
+}

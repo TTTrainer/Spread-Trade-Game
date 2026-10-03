@@ -27,6 +27,8 @@ export interface PipelineInput {
   bossId?: BossId | null;
   /** Losing trades in a row closed just before this one, this round. */
   lossStreak?: number;
+  /** The boss's showdown tier (harsher twists each Endless year). */
+  showdown?: number;
   families: Record<Family, number>;
   cartridges: string[];
   cartState: Record<string, CartState>;
@@ -38,7 +40,7 @@ export interface PipelineInput {
 export function scoreSteps(i: PipelineInput): ScoreStep[] {
   const f = i.facts;
   const s = BALANCE.scoring;
-  const rule = roundRule(i.reviewId, i.bossId);
+  const rule = roundRule(i.reviewId, i.bossId, i.showdown ?? 0);
   const boss = i.bossId ? BOSSES[i.bossId].name : '';
   const steps: ScoreStep[] = [];
 

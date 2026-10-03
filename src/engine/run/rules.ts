@@ -5,7 +5,7 @@
  * (an older save) keeps its old rule.
  */
 
-import { BOSSES, type BossId, type SealedInfo } from '../../content/bosses';
+import { BOSSES, showdownTwist, type BossId, type SealedInfo } from '../../content/bosses';
 import { REVIEWS } from '../../content/reviews';
 import type { ReviewDef, ReviewId } from '../../content/types';
 
@@ -30,7 +30,8 @@ export type RoundRule = ReviewDef['rule'] & {
   beatSpy?: boolean;
 };
 
-export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null): RoundRule {
+/** `tier` is the boss's showdown tier (0 in the first year; harsher each Endless year). */
+export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null, tier = 0): RoundRule {
   if (!reviewId) return {};
   const market = REVIEWS[reviewId].rule;
   if (!bossId) return market;
@@ -38,7 +39,7 @@ export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null): Ro
     forceContextCard: market.forceContextCard,
     macroPanel: market.macroPanel,
   };
-  const t = BOSSES[bossId].twist;
+  const t = showdownTwist(BOSSES[bossId].twist, tier);
   switch (t.kind) {
     case 'riskCap':
       return { ...traits, riskCapMult: t.mult };

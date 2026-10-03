@@ -3,7 +3,7 @@ import { burstAt, fx } from '../../fx/overlay';
 import { ArtIcon, artUrl } from '../art';
 import { useEffect, useMemo, useState } from 'react';
 import { REVIEWS } from '../../content/reviews';
-import { BOSSES } from '../../content/bosses';
+import { BOSSES, showdownLabel, showdownTier, twistLine } from '../../content/bosses';
 import { STYLE_TEXT } from '../../engine/run/style';
 import { BALANCE } from '../../content/balance';
 import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
@@ -326,7 +326,15 @@ function BossCaseFile({ e }: { e: RunEngine }) {
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       >
         <div className="bf-top num">
-          <span>CASE FILE · {quarterLabel(st.quarter)} REVIEW</span>
+          <span>
+            CASE FILE · {quarterLabel(st.quarter)} REVIEW
+            {showdownLabel(showdownTier(st.quarter)) && (
+              <b className="bf-showdown" data-testid="boss-showdown">
+                {' '}
+                · {showdownLabel(showdownTier(st.quarter))}
+              </b>
+            )}
+          </span>
           <span className="bf-pillar">
             PILLAR {boss.pillar} · {boss.pillarName.toUpperCase()}
           </span>
@@ -351,7 +359,7 @@ function BossCaseFile({ e }: { e: RunEngine }) {
           <div className="bf-row twist">
             <span className="bf-k num">THE TWIST</span>
             <span className="bf-v" data-testid="boss-twist">
-              {boss.twistText}
+              {twistLine(boss.id, showdownTier(st.quarter))}
             </span>
           </div>
           <div className="bf-row blocked">

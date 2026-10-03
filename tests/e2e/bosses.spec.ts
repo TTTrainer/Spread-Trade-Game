@@ -185,3 +185,48 @@ test('the Allocator shows its second goal; the Rebalancer races SPY on the chart
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });
+
+test('beating a boss: bounty, trophy on the desk, and three free spoils to pick from', async () => {
+  test.setTimeout(180_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await faceBoss(page, 'underwriter', 'e2e-spoils');
+  // Clear the Review without trading: fill the meter and end the round.
+  await page.evaluate(async () => {
+    const run = (window as any).__stg.run.getState();
+    await run.act({ t: 'dev', op: { k: 'meter', delta: run.engine.state.round.target * 2 } });
+    await run.act({ t: 'endRound' });
+  });
+  await expect(page.getByTestId('tally-screen')).toBeVisible({ timeout: 30_000 });
+  // With no trades to count, the tally may already be finished.
+  const skip = page.getByTestId('tally-skip');
+  if (await skip.isVisible().catch(() => false)) await skip.click().catch(() => undefined);
+  await expect(page.getByTestId('tally-continue')).toBeVisible();
+  await page.waitForTimeout(400);
+  await shot(page, '17-boss-tally-1920');
+  await page.getByTestId('tally-continue').click();
+  await expect(page.getByTestId('spoils')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('spoils-trophy')).toContainText('Reinsurance Treaty');
+  await page.waitForTimeout(900);
+  await shot(page, '17-boss-spoils-1920');
+  await shot(page, '17-boss-spoils-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const before = await page.evaluate(
+    () => (window as any).__stg.run.getState().engine.state.cartridges.length,
+  );
+  await page.getByTestId('spoil-take-1').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__stg.run.getState().engine.state.cartridges.length))
+    .toBe(before + 1);
+  await expect(page.getByTestId('spoil-take-0')).toBeDisabled();
+  await page.getByTestId('spoils-close').click();
+  await expect(page.getByTestId('spoils')).toHaveCount(0);
+  await expect(page.getByTestId('trophy-underwriter')).toBeVisible();
+  await page.waitForTimeout(600);
+  await shot(page, '17-boss-trophy-desk-1920');
+  expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});

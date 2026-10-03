@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'motion/react';
-import { Fragment, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { DESKS } from '../../content/desks';
@@ -24,7 +24,8 @@ import {
   type EffectKind,
 } from '../../content/summaries';
 import { BALANCE } from '../../content/balance';
-import { BOSSES } from '../../content/bosses';
+import { BOSSES, showdownLabel, showdownTier, twistLine } from '../../content/bosses';
+import { BOSS_TROPHIES } from '../../content/trophies';
 import { ROUND_NAMES, quarterLabel, sellPrice, type RunEngine } from '../../engine/run/engine';
 import type { ShopItem } from '../../engine/run/types';
 import { STRUCTURES } from '../../engine/strategies/structures';
@@ -411,7 +412,13 @@ export function ShopView({ e }: { e: RunEngine }) {
   const st = e.state;
   const shop = st.shop;
   const r = st.round;
-  useHotkeys({ reroll: () => void act({ t: 'rerollShop' }), confirm: () => void act({ t: 'leaveShop' }) });
+  // A boss's spoils come up first, over the shop; they can wait until you leave.
+  const spoils = shop?.spoils ?? null;
+  const [spoilsOpen, setSpoilsOpen] = useState(!!spoils && !spoils.taken);
+  useHotkeys({
+    reroll: () => !spoilsOpen && void act({ t: 'rerollShop' }),
+    confirm: () => (spoilsOpen ? setSpoilsOpen(false) : void act({ t: 'leaveShop' })),
+  });
   // The desk boots: a click per window as they pop open.
   useEffect(() => {
     const ids = [0, 1, 2, 3, 4, 5, 6].map((i) =>
@@ -616,10 +623,23 @@ export function ShopView({ e }: { e: RunEngine }) {
             <div className="ld-group">
               <div className="ld-k num">VOUCHERS</div>
               <div className="ld-row">
-                {st.vouchers.length === 0 && <span className="ld-slot vacant">·</span>}
+                {st.vouchers.length === 0 && !(st.trophies ?? []).length && (
+                  <span className="ld-slot vacant">·</span>
+                )}
                 {st.vouchers.map((v) => (
                   <span key={v} className="ld-slot" data-tip={`voucher:${v}`}>
                     <ArtIcon category="voucher" id={v} name={VOUCHERS[v].name} scale={0.75} />
+                  </span>
+                ))}
+                {(st.trophies ?? []).map((b) => (
+                  <span
+                    key={b}
+                    className="ld-slot trophy"
+                    data-testid={`trophy-${b}`}
+                    data-tip-title={`Trophy: ${BOSS_TROPHIES[b].name}`}
+                    data-tip-body={`From ${BOSSES[b].name}. ${BOSS_TROPHIES[b].text}`}
+                  >
+                    🏆
                   </span>
                 ))}
               </div>
@@ -627,6 +647,7 @@ export function ShopView({ e }: { e: RunEngine }) {
           </div>
         </Win>
       </div>
+      {spoilsOpen && spoils && <Spoils e={e} onClose={() => setSpoilsOpen(false)} />}
       <div className="os-taskbar num">
         <span className="os-start">◈ DESK/OS</span>
         <span className="os-cash" data-testid="shop-cash-wrap">
@@ -642,6 +663,11 @@ export function ShopView({ e }: { e: RunEngine }) {
           <span className="dim">STRESS</span> {st.stress}
         </span>
         <span className="os-spacer" />
+        {spoils && !spoils.taken && !spoilsOpen && (
+          <button className="os-btn osb-reroll" onClick={() => setSpoilsOpen(true)} data-testid="spoils-open">
+            ☠ SPOILS · take 1 free
+          </button>
+        )}
         <NextBoss e={e} />
         <button
           className="os-btn reroll"
@@ -671,6 +697,78 @@ export function ShopView({ e }: { e: RunEngine }) {
   );
 }
 
+/** A boss's spoils: three free cartridges, take one; plus the trophy it just handed over. */
+function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
+  const act = useRun((s) => s.act);
+  const st = e.state;
+  const sp = st.shop?.spoils;
+  if (!sp) return null;
+  const id = st.round.bossId;
+  const boss = id ? BOSSES[id] : null;
+  const trophy = id && (st.trophies ?? []).includes(id) ? BOSS_TROPHIES[id] : null;
+  const full = st.cartridges.length >= e.cartridgeSlots();
+  return (
+    <motion.div
+      className="spoils-back"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={
+        boss
+          ? ({ '--boss-accent': boss.palette.accent, '--boss-tint': boss.palette.tint } as CSSProperties)
+          : undefined
+      }
+    >
+      <motion.div
+        className="spoils panel"
+        data-testid="spoils"
+        initial={{ scale: 0.92, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      >
+        <div className="sp-head">
+          <span className="sp-skull">☠</span> {boss ? `${boss.name.toUpperCase()} BEATEN` : 'BOSS BEATEN'} ·
+          SPOILS
+        </div>
+        {trophy && (
+          <div className="sp-trophy" data-testid="spoils-trophy">
+            <b>🏆 TROPHY · {trophy.name}</b> <span>{trophy.text}</span>
+          </div>
+        )}
+        <div className="sp-sub">
+          Take <b>one</b> cartridge, free. The other two go when you leave the shop.
+        </div>
+        <div className="sp-cards">
+          {sp.ids.map((c, i) => (
+            <div key={c} className={`sp-card ${sp.taken === c ? 'taken' : sp.taken ? 'gone' : ''}`}>
+              <CartridgeMini id={c} />
+              <button
+                className="pixel-btn primary"
+                disabled={!!sp.taken || full}
+                onClick={() => {
+                  sfx('buy');
+                  void act({ t: 'takeSpoil', id: c });
+                }}
+                data-testid={`spoil-take-${i}`}
+              >
+                {sp.taken === c ? '✔ TAKEN' : 'TAKE · FREE'}
+              </button>
+            </div>
+          ))}
+        </div>
+        {full && !sp.taken && (
+          <div className="sp-full warn-text">
+            No free slot: sell a cartridge in YOUR DESK first, then take one.
+          </div>
+        )}
+        <button className="pixel-btn sp-close" onClick={onClose} data-testid="spoils-close">
+          {sp.taken ? 'TO THE SHOP' : full ? 'TO THE SHOP (come back from the taskbar)' : 'DECIDE LATER'}{' '}
+          <Kbd>Enter</Kbd>
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /** The next quarter's boss, a quarter ahead, with its one reroll. */
 function NextBoss({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
@@ -685,7 +783,7 @@ function NextBoss({ e }: { e: RunEngine }) {
       data-testid="shop-next-boss"
       style={{ '--boss-accent': b.palette.accent, '--boss-tint': b.palette.tint } as CSSProperties}
       data-tip-title={`${quarterLabel(q)} boss: ${b.name}`}
-      data-tip-body={b.twistText}
+      data-tip-body={`${showdownLabel(showdownTier(q)) ? `${showdownLabel(showdownTier(q))}: ` : ''}${twistLine(id, showdownTier(q))}`}
     >
       <span className="osb-k">☠ {quarterLabel(q)} BOSS</span> <b>{b.name}</b>
       <button

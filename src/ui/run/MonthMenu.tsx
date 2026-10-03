@@ -9,7 +9,7 @@ import { motion } from 'motion/react';
 import { useEffect, type CSSProperties } from 'react';
 import { BALANCE } from '../../content/balance';
 import { STYLE_TEXT } from '../../engine/run/style';
-import { BOSSES } from '../../content/bosses';
+import { BOSSES, showdownLabel, showdownTier, twistLine } from '../../content/bosses';
 import { DESKS } from '../../content/desks';
 import { REVIEWS } from '../../content/reviews';
 import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
@@ -85,7 +85,12 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
               <div className="mm-boss-name" data-testid="mm-boss-name">
                 {boss.name}
               </div>
-              <div className="mm-boss-twist">{boss.twistText}</div>
+              <div className="mm-boss-twist">
+                {showdownLabel(showdownTier(q)) && (
+                  <b className="mm-showdown">{showdownLabel(showdownTier(q))} </b>
+                )}
+                {twistLine(boss.id, showdownTier(q))}
+              </div>
               <div className="mm-boss-style dim">
                 ★ style +${BALANCE.run.styleCash}: {STYLE_TEXT[boss.style]}
               </div>

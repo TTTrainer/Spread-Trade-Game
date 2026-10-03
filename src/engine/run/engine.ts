@@ -17,7 +17,8 @@ import { DESKS } from '../../content/desks';
 import { emptyFamilies, familyPassives } from '../../content/families';
 import { MEMOS, TAG_IDS, VOUCHERS } from '../../content/items';
 import { ANNUAL_MIX, REVIEWS } from '../../content/reviews';
-import { BOSSES, quarterBossPool, type BossId } from '../../content/bosses';
+import { BOSSES, quarterBossPool, showdownTier, type BossId } from '../../content/bosses';
+import { BOSS_TROPHIES } from '../../content/trophies';
 import { roundRule, type RoundRule } from './rules';
 import { raceNow, type RacePoint } from './race';
 import {
@@ -381,7 +382,7 @@ export class RunEngine {
   /** The rules in force this round: the boss's one twist, or a Month's none. */
   rule(): RoundRule {
     const r = this.state.round;
-    return roundRule(r.reviewId, r.bossId);
+    return roundRule(r.reviewId, r.bossId, r.showdown ?? 0);
   }
 
   /** Where new trades take profit and stop: the run's plan, else the desk's defaults. */
@@ -500,7 +501,8 @@ export class RunEngine {
     const carts = this.activeCartridges().map((id) => CARTRIDGE_BY_ID[id]?.passive ?? {});
     const fam = familyPassives(this.families());
     const vouchers = this.state.vouchers.map((v) => VOUCHERS[v].passive);
-    const all: VoucherDef['passive'][] = [...carts, fam, ...vouchers];
+    const trophies = (this.state.trophies ?? []).map((b) => BOSS_TROPHIES[b].passive);
+    const all: VoucherDef['passive'][] = [...carts, fam, ...vouchers, ...trophies];
     const execParts = all.map((p) => p.execution ?? {});
     const rollSlip = execParts.map((e) => e.rollSlippage).filter((x): x is number => x !== undefined);
     const sum = (f: (p: VoucherDef['passive']) => number | undefined) =>
@@ -760,6 +762,9 @@ export class RunEngine {
           break;
         case 'setPlan':
           this.setPlan(a.plan);
+          break;
+        case 'takeSpoil':
+          this.takeSpoil(a.id);
           break;
         case 'forfeit':
           this.finishRun('forfeit', 'You walked away from the desk.');
@@ -1098,6 +1103,7 @@ export class RunEngine {
       edgeTier: p.entry.edgeTier,
       reviewId: r.reviewId,
       bossId: r.bossId,
+      showdown: r.showdown ?? 0,
       lossStreak: this.lossStreak(),
       families: this.families(),
       cartridges: carts,
@@ -1343,6 +1349,7 @@ export class RunEngine {
     if (passed && r.bossId) {
       st.stats.bossesBeaten ??= [];
       if (!st.stats.bossesBeaten.includes(r.bossId)) st.stats.bossesBeaten.push(r.bossId);
+      this.bossRewards(r.bossId);
     }
     st.cash = Math.max(0, st.cash + r.payouts.reduce((a, p) => a + p.cash, 0));
     st.history.push({
@@ -1564,7 +1571,8 @@ export class RunEngine {
     // The quarter's boss is known from its first day (so it can be shown ahead); it runs the Review.
     const quarterBoss = this.bossFor(q);
     const bossId = reviewId && BOSSES[quarterBoss].market === reviewId ? quarterBoss : null;
-    const rule = roundRule(reviewId, bossId);
+    const showdown = bossId ? showdownTier(q) : 0;
+    const rule = roundRule(reviewId, bossId, showdown);
     const p = this.passives();
     const target = computeTarget(q, idx, reviewId, cfg, this.writtenUp(q), bossId);
     const comp = complianceMods(cfg.compliance);
@@ -1588,6 +1596,7 @@ export class RunEngine {
       index: idx,
       reviewId,
       bossId,
+      showdown,
       // The month menu comes before each Month (a Review has its case file instead).
       boardSeen: !!reviewId || cfg.mode === 'tutorial' || cfg.mode === 'sim',
       target,
@@ -1597,7 +1606,9 @@ export class RunEngine {
         1,
         BALANCE.run.ticketsPerRound +
           (DESKS[cfg.deskId].ticketsAdd ?? 0) +
-          tier.ticketDelta -
+          tier.ticketDelta +
+          // The Allocator's second goal comes with a ticket to reach it.
+          (rule.variety ? 1 : 0) -
           (burnout ? 1 : 0),
       ),
       rerolls: Math.max(
@@ -1964,6 +1975,21 @@ export class RunEngine {
       fx.freeUncommon--;
     }
     st.shop = { items, rerolls: 0, freeRerolls: fx.freeRerolls };
+    if (st.spoilsDue) {
+      // The boss's spoils: three free cartridges you don't own and the shop isn't showing, the
+      // first at least Uncommon.
+      st.spoilsDue = false;
+      const srng = this.rng(`spoils:q${st.quarter}`);
+      const ids: string[] = [];
+      for (let i = 0; i < BALANCE.run.spoilsCount; i++) {
+        const pool = cartridgePool(st).filter(
+          (c) => !ids.includes(c.id) && !items.some((x) => x.kind === 'cartridge' && x.id === c.id),
+        );
+        const c = pickCartridge(pool, srng, st.config.deskId, i === 0 ? 'U' : undefined);
+        if (c) ids.push(c.id);
+      }
+      if (ids.length) st.shop.spoils = { ids, taken: null };
+    }
     fx.freeRerolls = 0;
     st.phase = 'shop';
     // After a Review the next quarter's boss is drawn now, so the shop can show (and reroll) it a
@@ -1995,6 +2021,48 @@ export class RunEngine {
       this.shopMods(),
     ).filter((x) => x.kind !== 'voucher');
     shop.items = [...fresh, ...shop.items.filter((x) => x.kind === 'voucher')];
+  }
+
+  /**
+   * Beating a boss pays a bounty, hands over its trophy (a permanent buff; cash instead if you
+   * already hold it) and puts three free cartridges in the next shop.
+   */
+  private bossRewards(id: BossId): void {
+    const st = this.state;
+    const r = st.round;
+    const def = BOSSES[id];
+    r.payouts.push({ label: `Boss beaten: ${def.name}`, cash: BALANCE.run.bossBounty });
+    st.trophies ??= [];
+    if (st.trophies.includes(id)) {
+      r.payouts.push({ label: `${BOSS_TROPHIES[id].name} (already yours)`, cash: BALANCE.run.bossBounty });
+    } else {
+      st.trophies.push(id);
+      this.events.push({
+        kind: 'good',
+        text: `TROPHY: ${BOSS_TROPHIES[id].name}. ${BOSS_TROPHIES[id].text}`,
+      });
+    }
+    st.spoilsDue = true;
+  }
+
+  /** Take one of a boss's spoils (free); the others go. */
+  private takeSpoil(id: string): void {
+    const st = this.state;
+    const sp = st.shop?.spoils;
+    if (st.phase !== 'shop' || !sp || !sp.ids.includes(id)) return this.warn('Nothing to take there.');
+    if (sp.taken) return this.warn('You already took one.');
+    if (st.cartridges.length >= this.cartridgeSlots())
+      return this.warn('No free cartridge slot. Sell one first.');
+    st.cartridges.push(id);
+    st.cartState[id] = {};
+    if (!st.stats.owned.includes(id)) {
+      st.stats.owned.push(id);
+      st.stats.ownedAt[id] = st.history.length;
+    }
+    sp.taken = id;
+    st.stats.maxCartridges = Math.max(st.stats.maxCartridges, st.cartridges.length);
+    if (st.cartridges.some((c) => CARTRIDGE_BY_ID[c]?.duoOf)) st.stats.duoOwned = true;
+    this.events.push({ kind: 'good', text: `Spoils: ${CARTRIDGE_BY_ID[id]?.name ?? id}.` });
   }
 
   private buy(index: number): void {
@@ -2044,7 +2112,6 @@ export class RunEngine {
     this.events.push({ kind: 'good', text: 'Bought.' });
   }
 
-  /** Developer mode's levers: game-layer only, logged like any action. */
   /** Developer mode: skip the rest of this quarter's Months and face this boss now. */
   private async devBoss(id: BossId): Promise<void> {
     const st = this.state;
@@ -2059,6 +2126,7 @@ export class RunEngine {
     await this.advanceRound();
   }
 
+  /** Developer mode's levers: game-layer only, logged like any action. */
   private devOp(op: DevOp): void {
     const st = this.state;
     const r = st.round;

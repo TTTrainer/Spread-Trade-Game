@@ -10,6 +10,7 @@ import { pct, pnlText } from '../format';
 import type { RacePoint } from '../../engine/run/race';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
+import { showdownLabel, twistLine } from '../../content/bosses';
 
 export function BossBanner() {
   const boss = useActiveBoss();
@@ -40,7 +41,10 @@ export function BossBanner() {
       <div className="boss-banner num" data-testid="boss-banner" data-tip={`review:${def.market}`}>
         <span className="bb-skull">☠</span>
         <b className="bb-name">{def.name.toUpperCase()}</b>
-        <span className="bb-twist">{def.twistText}</span>
+        {showdownLabel(e.state.round.showdown ?? 0) && (
+          <span className="bb-showdown">{showdownLabel(e.state.round.showdown ?? 0)}</span>
+        )}
+        <span className="bb-twist">{twistLine(def.id, e.state.round.showdown ?? 0)}</span>
         {live && (
           <span className="bb-live" data-testid="boss-live">
             {live}

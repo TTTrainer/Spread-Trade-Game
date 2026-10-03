@@ -3009,3 +3009,108 @@
 .gs-pips i.on {
   background: var(--boss-accent, var(--up));
 }
+
+/* A boss's spoils over the shop: three free cartridges, take one. */
+.spoils-back {
+  position: fixed;
+  inset: 0 0 50px 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--boss-tint, var(--bg-0)) 70%, transparent);
+  backdrop-filter: blur(2px);
+}
+.spoils {
+  width: min(980px, 96vw);
+  max-height: calc(100vh - 90px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 18px;
+  border: 3px solid var(--boss-accent, var(--amber));
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 40px color-mix(in srgb, var(--boss-accent, var(--amber)) 40%, transparent);
+}
+.sp-head {
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1.05;
+  color: var(--boss-accent, var(--amber));
+  text-shadow: 3px 3px 0 #000;
+}
+.sp-trophy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border: 2px solid var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  font-size: 18px;
+}
+.sp-trophy b {
+  font-weight: 400;
+  color: var(--amber);
+}
+.sp-sub {
+  font-size: 18px;
+  color: var(--text-dim);
+}
+.sp-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.sp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-card .cart-mini {
+  flex: 1;
+}
+.sp-card.taken .cart-mini {
+  outline: 3px solid var(--up);
+}
+.sp-card.gone {
+  opacity: 0.4;
+}
+.sp-full {
+  font-size: 16px;
+}
+.sp-close {
+  align-self: center;
+  min-width: 260px;
+}
+.ld-slot.trophy {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  border-color: var(--amber);
+}
+@media (max-width: 1500px) {
+  .sp-head {
+    font-size: 26px;
+  }
+  .sp-trophy,
+  .sp-sub {
+    font-size: 16px;
+  }
+}
+
+/* A showdown tier (Endless years): the boss's harsher version. */
+.bb-showdown,
+.mm-showdown,
+.bf-showdown {
+  color: var(--down);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+.bb-showdown {
+  padding: 0 4px;
+  border: 1px solid var(--down);
+}

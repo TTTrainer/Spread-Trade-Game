@@ -34,6 +34,10 @@ export const BALANCE = {
     bossRerollCosts: [10, 25, 40, 60],
     /** Cash for a boss round played in the boss's style (on top of the round win). */
     styleCash: 3,
+    /** Cash for beating a boss (on top of the round win), and for a trophy you already hold. */
+    bossBounty: 5,
+    /** Free cartridges offered after a boss (take one). */
+    spoilsCount: 3,
   },
 
   /**

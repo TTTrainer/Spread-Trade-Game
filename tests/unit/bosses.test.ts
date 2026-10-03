@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BOSSES, BOSS_IDS, quarterBossPool } from '../../src/content/bosses';
+import {
+  BOSSES,
+  BOSS_IDS,
+  quarterBossPool,
+  showdownLabel,
+  showdownTier,
+  showdownTwist,
+  twistLine,
+} from '../../src/content/bosses';
+import { BOSS_TROPHIES } from '../../src/content/trophies';
 import { REVIEWS } from '../../src/content/reviews';
 import { roundRule } from '../../src/engine/run/rules';
 import { scoreSteps } from '../../src/engine/run/score';
@@ -77,5 +86,36 @@ describe('boss twists in the score', () => {
     const r = runScore(10_000, 500_000, steps);
     const plain = runScore(10_000, 500_000, scoreSteps(pipe({ cartridges: ['edge_hunter'] })));
     expect(r.mult).toBeCloseTo(plain.mult * 0.65);
+  });
+});
+
+describe('showdown tiers and trophies', () => {
+  it('year 1 is the boss as written; each Endless year turns the twist one notch harsher', () => {
+    expect(showdownTier(1)).toBe(0);
+    expect(showdownTier(4)).toBe(0);
+    expect(showdownTier(5)).toBe(1);
+    expect(showdownTier(9)).toBe(2);
+    expect(showdownTwist(BOSSES.underwriter.twist, 0)).toEqual(BOSSES.underwriter.twist);
+    expect(showdownTwist(BOSSES.underwriter.twist, 1)).toEqual({ kind: 'lossMult', mult: 2.5 });
+    expect(showdownTwist(BOSSES.margin_clerk.twist, 1)).toEqual({ kind: 'riskCap', mult: 0.4 });
+    expect(showdownTwist(BOSSES.landlord.twist, 9)).toEqual({ kind: 'multCut', keep: 0.35 });
+    expect(roundRule('gap_risk', 'underwriter', 1).lossMult).toBe(2.5);
+    // The text follows the numbers.
+    expect(twistLine('underwriter', 0)).toBe(BOSSES.underwriter.twistText);
+    expect(twistLine('underwriter', 1)).toContain('x2.5');
+    expect(twistLine('tax_man', 1)).toContain('first 3 trading days');
+    expect(showdownLabel(0)).toBeNull();
+    expect(showdownLabel(2)).toBe('SHOWDOWN II');
+    for (const id of BOSS_IDS) expect(twistLine(id, 3).length, id).toBeLessThanOrEqual(90);
+  });
+
+  it('every boss has a trophy that only touches the game layer', () => {
+    for (const id of BOSS_IDS) {
+      const t = BOSS_TROPHIES[id];
+      expect(t.name, id).toBeTruthy();
+      expect(t.text.length, id).toBeLessThanOrEqual(90);
+      expect(Object.keys(t.passive).length, id).toBeGreaterThan(0);
+      expect(t.passive.execution, id).toBeUndefined();
+    }
   });
 });

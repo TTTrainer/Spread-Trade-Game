@@ -93,6 +93,8 @@ export interface RoundState {
   bossId?: BossId | null;
   /** The month menu (target, build, plan, the quarter's boss) has been seen for this round. */
   boardSeen?: boolean;
+  /** A boss round's showdown tier: 0 in the first year, harsher each Endless year after. */
+  showdown?: number;
   /** The Rebalancer's race at each day's close: the round's trades vs SPY on the same capital. */
   race?: { you: number; spy: number }[];
   /** The boss's style bonus was earned (set when the round settles). */
@@ -159,6 +161,8 @@ export interface ShopState {
   items: ShopItem[];
   rerolls: number;
   freeRerolls: number;
+  /** After a boss: three free cartridges, take one (the others go when you leave). */
+  spoils?: { ids: string[]; taken: string | null };
 }
 
 export interface RoundSummary {
@@ -221,6 +225,10 @@ export interface RunState {
   bosses?: { quarter: number; id: BossId }[];
   /** Quarters whose boss has been rerolled (once per boss). */
   bossRerolled?: number[];
+  /** Bosses beaten this run whose trophy (a permanent buff) you hold. */
+  trophies?: BossId[];
+  /** A boss was just beaten: the next shop opens with its spoils. */
+  spoilsDue?: boolean;
   /** The run's exit plan for new trades, set from the month menu (else the desk's defaults). */
   plan?: ExitPlan;
   round: RoundState;
@@ -303,6 +311,7 @@ export type RunAction =
   | { t: 'boardDone' }
   | { t: 'rerollBoss' }
   | { t: 'setPlan'; plan: Partial<ExitPlan> }
+  | { t: 'takeSpoil'; id: string }
   | { t: 'endless' }
   | { t: 'forfeit' }
   | { t: 'dev'; op: DevOp };

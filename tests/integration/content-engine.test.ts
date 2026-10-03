@@ -327,6 +327,60 @@ describe('boss goals', () => {
   }, 30_000);
 });
 
+describe('boss rewards', () => {
+  it('beating a boss pays a bounty, hands over its trophy once, and the next shop has 3 free spoils', async () => {
+    const e = await RunEngine.create(src, config('reward-1'));
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'underwriter' } });
+    await e.dispatch({ t: 'startReview' });
+    // A cleared Review with no trades: pin the meter and play the days out.
+    await e.dispatch({ t: 'dev', op: { k: 'meter', delta: e.state.round.target * 2 } });
+    for (let i = 0; i < 40 && e.state.phase === 'round'; i++) await day(e);
+    if (e.state.phase === 'round') await e.dispatch({ t: 'endRound' });
+    expect(e.state.phase).toBe('tally');
+    expect(e.state.round.status).toBe('passed');
+    const cash0 = e.state.cash;
+    await e.dispatch({ t: 'finishTally' });
+    const labels = e.state.history.length ? e.state.round.payouts.map((p) => p.label) : [];
+    expect(labels).toContain('Boss beaten: The Underwriter');
+    expect(e.state.trophies).toEqual(['underwriter']);
+    expect(e.passives().maxLossLineDelta).toBeCloseTo(0.01);
+    expect(e.state.cash).toBeGreaterThan(cash0);
+    expect(e.state.phase).toBe('shop');
+    const sp = e.state.shop?.spoils;
+    expect(sp?.ids.length).toBe(BALANCE.run.spoilsCount);
+    expect(new Set(sp?.ids).size).toBe(sp?.ids.length);
+    for (const id of sp!.ids) expect(e.state.cartridges).not.toContain(id);
+    // Take one; the others are gone.
+    await e.dispatch({ t: 'takeSpoil', id: sp!.ids[1] });
+    expect(e.state.cartridges).toContain(sp!.ids[1]);
+    await e.dispatch({ t: 'takeSpoil', id: sp!.ids[2] });
+    expect(e.state.cartridges).not.toContain(sp!.ids[2]);
+    // Rerolling the shop keeps the spoils (taken).
+    e.state.cash += 50;
+    await e.dispatch({ t: 'rerollShop' });
+    expect(e.state.shop?.spoils?.taken).toBe(sp!.ids[1]);
+  }, 60_000);
+
+  it('the Allocator round has a 4th ticket for its second goal', async () => {
+    const e = await RunEngine.create(src, config('reward-alloc'));
+    const month = e.state.round.tickets;
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'allocator' } });
+    await e.dispatch({ t: 'startReview' });
+    expect(e.state.round.tickets).toBe(month + 1);
+  }, 30_000);
+
+  it('Endless bosses are showdown tiers: harsher twists from year 2', async () => {
+    const e = await RunEngine.create(src, config('showdown-1'));
+    e.state.quarter = 5;
+    e.state.endless = true;
+    e.state.bosses = [{ quarter: 5, id: 'underwriter' }];
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'underwriter' } });
+    await e.dispatch({ t: 'startReview' });
+    expect(e.state.round.showdown).toBe(1);
+    expect(e.rule().lossMult).toBe(2.5);
+  }, 30_000);
+});
+
 describe('the month menu', () => {
   it('comes up over each Month (not a Review, the tutorial or the simulator) and closes once', async () => {
     const e = await RunEngine.create(src, config('menu-1'));

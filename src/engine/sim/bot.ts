@@ -410,6 +410,16 @@ export async function shopTurn(
   const shop = engine.state.shop;
   if (!shop) return;
   const mode = o.shop ?? (o.kind === 'random' ? 'random' : 'families');
+  // A boss's spoils are free: take the one that fits the build best, if there's a slot.
+  const sp = shop.spoils;
+  if (mode !== 'none' && sp && !sp.taken && engine.state.cartridges.length < engine.cartridgeSlots()) {
+    const prefer = new Set<Family>(o.families ?? ['DISC', 'THETA', 'EXEC']);
+    const pick =
+      mode === 'random'
+        ? rng.pick(sp.ids)
+        : (sp.ids.find((id) => CARTRIDGE_BY_ID[id]?.families.some((f) => prefer.has(f))) ?? sp.ids[0]);
+    await send(engine, o, { t: 'takeSpoil', id: pick });
+  }
   if (mode !== 'none') {
     const prefer = new Set<Family>(o.families ?? ['DISC', 'THETA', 'EXEC']);
     const deskStructures = new Set<StructureId>(DESKS[engine.state.config.deskId].structures);
