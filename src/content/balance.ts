@@ -64,17 +64,17 @@ export const BALANCE = {
    * Executor, the Shell Company) are set by hand a little under 1.
    */
   bossTargets: {
-    controller: 0.9,
-    margin_clerk: 0.8,
-    underwriter: 0.85,
-    landlord: 0.6,
-    early_retiree: 0.9,
-    tax_man: 1,
-    bursar: 0.85,
-    allocator: 1,
-    shell_company: 0.75,
-    executor: 0.9,
-    collector: 0.95,
+    controller: 0.85,
+    margin_clerk: 0.76,
+    underwriter: 0.81,
+    landlord: 0.57,
+    early_retiree: 0.85,
+    tax_man: 0.95,
+    bursar: 0.81,
+    allocator: 0.95,
+    shell_company: 0.71,
+    executor: 0.85,
+    collector: 0.9,
     rebalancer: 2.7,
   } as Record<string, number>,
 

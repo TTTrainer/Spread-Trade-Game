@@ -1,0 +1,60 @@
+# Builds the Windows and Mac games on GitHub's own machines when a version tag (v1.6.1, ...) is
+# pushed, and publishes them as that version's release, with RELEASE_NOTES.md as its text.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+            files: |
+              release/SpreadTradingGame-Setup-*.exe
+              release/SpreadTradingGame-Portable-*.exe
+          - os: macos-latest
+            script: build:mac
+            files: |
+              release/SpreadTradingGame-mac-*.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npm run ${{ matrix.script }}
+        env:
+          # No paid certificates: the Mac apps are signed ad hoc by tools/build-mac.mjs instead.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Spread Trading Game ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*

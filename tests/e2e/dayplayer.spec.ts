@@ -85,8 +85,12 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
     .poll(async () => ['paused', 'done', 'decision'].includes((await state(page)).ff), { timeout: 10_000 })
     .toBe(true);
 
-  // Closing from the trade card ends the session (the only trade).
+  // Closing from the trade card ends the session (the only trade). A pause mid-candle lets the
+  // candle finish and then shows the day's recap over the card: wait for it, and set it aside.
   if ((await state(page)).ff === 'paused') {
+    await expect.poll(async () => (await state(page)).anim, { timeout: 10_000 }).toBe(false);
+    const x = page.locator('.dr-x');
+    if (await x.isVisible().catch(() => false)) await x.click();
     await page.getByTestId('hud-close').click();
     await expect(page.getByTestId('toasts')).toContainText(/Closed|closed/);
   }
