@@ -9,6 +9,7 @@ A single-player roguelite about trading options spreads on real historical marke
 - **Covered calls on pricey stocks.** Covered calls now carry an automatic stop (1×, 1.5×, 2× or 3× the premium, picked on the ticket) that sizes their risk, so they fit on high-priced stocks. The stop fires without asking and can only be tightened.
 - **Shop layout.** One layout at every screen size: nothing runs off the screen at 1536 wide (1920 at 125% scaling) or hides under the bottom bar at 1366.
 - **Harder runs.** Regular Months ask more and grow faster, and less of a big round carries into the next, so a strong build can't coast; boss rounds stay about 9 in 10 (the year-end boss about 7 in 10) for a careful player. Every Risk Tier now also adds +10% to targets, so a strong player can climb into more pressure (Career → CHALLENGE & OPTIONS).
+- **Bag Holder** gives +1 mult on winners (was +3): with tighter targets it had become the strongest cartridge by far.
 - The month menu's pause switches now apply to the run you're playing.
 
 ## Downloads

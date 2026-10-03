@@ -1,16 +1,41 @@
-# Builds the Windows and Mac games on GitHub's own machines when a version tag (v1.6.1, ...) is
-# pushed, and publishes them as that version's release, with RELEASE_NOTES.md as its text.
+# Builds the Windows and Mac games on GitHub's own machines and publishes them as a release,
+# with RELEASE_NOTES.md as its text. It runs when a push changes RELEASE_NOTES.md (or pushes a
+# version tag): the version comes from package.json (tag v1.6.1, ...), and a version that already
+# has a release is skipped, so editing the notes later never publishes twice.
 name: Release
 
 on:
   push:
+    branches: ['**']
+    paths: ['RELEASE_NOTES.md']
     tags: ['v*']
 
 permissions:
   contents: write
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      exists: ${{ steps.v.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: version
+    if: needs.version.outputs.exists != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -45,7 +70,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +80,8 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          name: Spread Trading Game ${{ github.ref_name }}
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Spread Trading Game ${{ needs.version.outputs.tag }}
           body_path: RELEASE_NOTES.md
           files: dist/*
