@@ -2,10 +2,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { BriefAccess } from '../../engine/news/brief';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { burstAt } from '../../fx/overlay';
-import { ArtIcon } from '../art';
+import { ArtIcon, artUrl } from '../art';
+import { BALANCE } from '../../content/balance';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { ALL_FAMILIES, FAMILY_NAMES } from '../../content/families';
+import { FAMILY_GLYPH } from '../../content/summaries';
 import { MEMOS, TAGS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
 import type { AnalystId, CartridgeDef, Family } from '../../content/types';
@@ -25,13 +27,17 @@ import { previewScore } from '../../engine/run/preview';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { Kbd, Meter, Modal, CountUp } from '../components/ui';
-import { money, pct, signed } from '../format';
+import { money, pct, pnlText, signed } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useRun } from '../store/run';
-import { useTrading } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 import { FastForwardBar, type CardBadges } from '../trading/Panels';
 import { Sparkline } from '../components/Sparkline';
+import { CashReadout } from '../trading/CashDeposit';
 import './run.css';
+import { BOSSES, type SealedInfo } from '../../content/bosses';
+import { LockStamp } from '../trading/BossBanner';
+import { usePendingPoints } from '../store/payout';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
@@ -42,14 +48,21 @@ export function CartridgeChip({
   index,
   onMove,
   extra,
+  held,
 }: {
   def: CartridgeDef;
   index?: number;
   onMove?: (dir: -1 | 1) => void;
   extra?: ReactNode;
+  /** Switched off by a boss for the round. */
+  held?: boolean;
 }) {
   return (
-    <div className={`cart-chip rar-${def.rarity}`} data-tip={`cart:${def.id}`} data-testid={`cart-${def.id}`}>
+    <div
+      className={`cart-chip rar-${def.rarity} ${held ? 'held' : ''}`}
+      data-tip={`cart:${def.id}`}
+      data-testid={`cart-${def.id}`}
+    >
       {onMove && (
         <button className="cart-move" onClick={() => onMove(-1)} aria-label="Move left">
           ◀
@@ -81,6 +94,12 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
   const slots = e.cartridgeSlots();
   const fam = e.families();
   const owned = e.state.cartridges;
+  // The Bursar holds the leftmost cartridge for the round: it shows, stamped, but does nothing.
+  const r = e.state.round;
+  const held =
+    r.bossId && (e.state.phase === 'round' || e.state.phase === 'review_intro') && e.rule().leftCartOff
+      ? owned[0]
+      : null;
   return (
     <div className="cart-rail" data-testid="cartridge-rail" data-tip="g:cartridge_rail">
       <div className="cart-slots">
@@ -98,14 +117,20 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
               key={id}
               def={def}
               index={i}
+              held={id === held}
               onMove={editable ? (d) => void act({ t: 'move', from: i, to: i + d }) : undefined}
+              extra={id === held ? <LockStamp text="TUITION" by={BOSSES[r.bossId!].name} /> : undefined}
             />
           );
         })}
       </div>
       <div className="fam-counters num">
         {ALL_FAMILIES.filter((f) => fam[f] > 0).map((f) => (
-          <span key={f} className={`fam ${fam[f] >= 2 ? 'on' : ''}`} data-tip={`family:${f}`}>
+          <span
+            key={f}
+            className={`fam ${fam[f] >= (f === 'CHAOS' ? 1 : 2) ? 'on' : ''}`}
+            data-tip={`family:${f}`}
+          >
             <ArtIcon
               category="family"
               id={f}
@@ -114,7 +139,13 @@ export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolea
               className="fam-art"
               style={{ width: 16, height: 16 }}
             />
-            {FAMILY_NAMES[f].toUpperCase()} {fam[f]}
+            {!artUrl('family', f) && <span className="fam-glyph">{FAMILY_GLYPH[f]}</span>}
+            {FAMILY_NAMES[f].toUpperCase()}
+            <span className="fam-pips" aria-label={`${fam[f]} of 4`}>
+              {[1, 2, 3, 4].map((i) => (
+                <i key={i} className={i <= fam[f] ? 'full' : ''} />
+              ))}
+            </span>
           </span>
         ))}
       </div>
@@ -157,11 +188,16 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
   const [stressOpen, setStressOpen] = useState(false);
   const st = e.state;
   const r = st.round;
+  // Points still playing out in a payout land on the score when it does.
+  const meter = r.meter - usePendingPoints();
   const eq = session ? session.markedEquityCents() : st.equityCents;
   const floor = e.maxLossFloorCents();
   const room = eq - floor;
   const span = Math.max(1, r.startEquityCents - floor);
   const review = r.reviewId ? REVIEWS[r.reviewId] : null;
+  // The Controller seals equity and the room above the line (both move with running P/L); the
+  // line itself still fires.
+  const plSealed = sealedBy(e).pnl;
   return (
     <div className="topbar panel run-topbar" data-testid="run-topbar">
       <div className="rtb-row">
@@ -171,30 +207,29 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           data-testid="run-menu"
           title="Save and return to the title screen"
         >
-          ◀ SAVE & EXIT
+          ◀ EXIT
         </button>
-        <div className="tb-item rtb-round">
-          <span className="amber-text">{quarterLabel(st.quarter)}</span> {ROUND_NAMES[r.index].toUpperCase()}
-          {review && (
-            <span className="chip magenta" data-tip={`review:${review.id}`}>
-              {review.name.toUpperCase()}
-            </span>
-          )}
-          <ModeChips e={e} />
-          <MeterJuice meter={r.meter} target={r.target} />
-          {r.memo.waiver && <span className="chip warn">WAIVER</span>}
-        </div>
-        <div className="rtb-meter" data-tip="g:meter">
-          <Meter
-            value={Math.max(0, r.meter)}
-            max={r.target}
-            tone={r.meter >= r.target ? 'cyan' : 'magenta'}
-            label={
-              <span data-testid="round-meter">
-                {r.meter.toLocaleString()} / {r.target.toLocaleString()}
+        <div className={`rtb-round rtb-blind ${review ? 'boss' : ''}`}>
+          <span className="rtb-q amber-text">{quarterLabel(st.quarter)}</span>
+          <span className="rtb-name">{ROUND_NAMES[r.index].toUpperCase()}</span>
+          <span className="rtb-chips">
+            {review && (
+              <span className="chip magenta" data-tip={`review:${review.id}`} data-testid="boss-chip">
+                {(r.bossId ? BOSSES[r.bossId].name : review.name).toUpperCase()}
               </span>
-            }
-          />
+            )}
+            <ModeChips e={e} />
+            {r.memo.waiver && <span className="chip warn">WAIVER</span>}
+          </span>
+          <MeterJuice meter={meter} target={r.target} />
+        </div>
+        {/* The score is the number the round is about, so it's the biggest thing up here. */}
+        <div className={`rtb-meter rtb-score ${meter >= r.target ? 'met' : ''}`} data-tip="g:meter">
+          <span className="rtb-k">SCORE</span>
+          <span className="rtb-score-v num" data-testid="round-meter">
+            <b>{meter.toLocaleString()}</b> / {r.target.toLocaleString()}
+          </span>
+          <Meter value={Math.max(0, meter)} max={r.target} tone={meter >= r.target ? 'cyan' : 'magenta'} />
           <AnimatePresence>
             {lastPoints && (
               <motion.span
@@ -210,47 +245,66 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             )}
           </AnimatePresence>
         </div>
-        <div
-          className="rtb-line"
-          data-tip-title="Max-Loss Line"
-          data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
-        >
-          <span className="dim">MAX-LOSS</span>
-          <Meter
-            value={room}
-            max={span}
-            tone={room / span < 0.35 ? 'down' : 'amber'}
-            label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
-            testId="maxloss-gauge"
-          />
+        <div className="rtb-tile rtb-cash num" data-testid="cash" data-tip="g:cash">
+          <span className="rtb-k">CASH</span>
+          <span className="rtb-v amber-text">${st.cash}</span>
         </div>
-        <button
-          className="tb-item rtb-stress"
-          onClick={() => setStressOpen(true)}
-          data-testid="stress"
-          data-tip="g:stress"
-        >
-          <span className="dim">STRESS</span>
-          <Meter
-            value={st.stress}
-            max={100}
-            tone={st.stress >= 75 ? 'down' : 'amber'}
-            label={`${st.stress}`}
-          />
-        </button>
-        <div className="tb-item num" data-testid="cash" data-tip="g:cash">
-          <span className="dim">CASH</span> <span className="amber-text">${st.cash}</span>
+        <div className="rtb-tile num" data-testid="tickets" data-tip="g:tickets">
+          <span className="rtb-k">TICKETS</span>
+          <span className="rtb-v">
+            {Array.from({ length: r.tickets }, (_, i) => (
+              <span key={i} className={i < r.ticketsUsed ? 'tk-pip used' : 'tk-pip'}>
+                ■
+              </span>
+            ))}
+          </span>
         </div>
-        <div className="tb-item num" data-testid="tickets" data-tip="g:tickets">
-          <span className="dim">TICKETS</span>{' '}
-          {Array.from({ length: r.tickets }, (_, i) => (
-            <span key={i} className={i < r.ticketsUsed ? 'tk-pip used' : 'tk-pip'}>
-              ■
-            </span>
-          ))}
+        <div className="rtb-gauges">
+          <div
+            className="rtb-line"
+            data-tip-title="Max-Loss Line"
+            data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
+          >
+            <span className="rtb-k">MAX-LOSS</span>
+            {plSealed ? (
+              <LockStamp text="ROOM SEALED" by={plSealed} />
+            ) : (
+              <Meter
+                value={room}
+                max={span}
+                tone={room / span < 0.35 ? 'down' : 'amber'}
+                label={r.memo.waiver ? 'waived' : `room ${money(Math.max(0, room))}`}
+                testId="maxloss-gauge"
+              />
+            )}
+          </div>
+          <button
+            className="rtb-stress"
+            onClick={() => setStressOpen(true)}
+            data-testid="stress"
+            data-tip="g:stress"
+          >
+            <span className="rtb-k">STRESS</span>
+            <Meter
+              value={st.stress}
+              max={100}
+              tone={st.stress >= 75 ? 'down' : 'amber'}
+              label={`${st.stress}`}
+            />
+          </button>
         </div>
-        <div className="tb-item num" data-tip="g:equity">
-          <span className="dim">EQUITY</span> {money(eq)}
+        <div className="rtb-tile rtb-account num">
+          <span className="rtb-k" data-tip="g:equity">
+            EQUITY{' '}
+            {plSealed ? (
+              <b className="rtb-eq sealed-num" data-testid="equity-sealed">
+                🔒 SEALED
+              </b>
+            ) : (
+              <b className="rtb-eq">{money(eq)}</b>
+            )}
+          </span>
+          <CashReadout />
         </div>
         <div className="tb-spacer" />
         <FastForwardBar />
@@ -274,10 +328,22 @@ function hasEarningsDetail(e: RunEngine): boolean {
 
 /** The news brief is free for everyone; its finer detail comes from the same analysts as the badges. */
 export function careerBriefAccess(e: RunEngine): BriefAccess {
+  const sealed = sealedBy(e);
   return {
     earningsDetail: hasEarningsDetail(e),
-    ivDetail: e.hasAnalyst('quant') || e.hasAnalyst('vol_surfer'),
+    ivDetail: !sealed.ivr && (e.hasAnalyst('quant') || e.hasAnalyst('vol_surfer')),
+    ivSealedBy: sealed.ivr ?? undefined,
+    studiesSealedBy: sealed.studies ?? undefined,
   };
+}
+
+/** Which information this round's boss has sealed, by the boss's name. */
+function sealedBy(e: RunEngine): Record<SealedInfo, string | null> {
+  const r = e.state.round;
+  const hide = e.state.phase === 'round' && r.bossId ? (e.rule().hide ?? []) : [];
+  const name = r.bossId ? BOSSES[r.bossId].name : '';
+  const of = (w: SealedInfo) => (hide.includes(w) ? name : null);
+  return { ivr: of('ivr'), studies: of('studies'), pnl: of('pnl'), dte: of('dte') };
 }
 
 export function careerBadges(
@@ -285,7 +351,8 @@ export function careerBadges(
   symbolSector: (sym: string) => string | null,
 ): (cardId: string) => CardBadges {
   const fam = e.families();
-  const quant = e.hasAnalyst('quant');
+  // IV rank badges go dark while a boss has IV rank sealed.
+  const quant = e.hasAnalyst('quant') && !sealedBy(e).ivr;
   const whisper = hasEarningsDetail(e);
   const scout = e.hasAnalyst('scout') || e.state.round.memo.lens;
   const trend = fam.DELTA >= 2;
@@ -417,6 +484,117 @@ function ClientCard({ e }: { e: RunEngine }) {
   );
 }
 
+/**
+ * The round goal in one glance: points still needed, a bar that shows where the meter is and where
+ * it would be if the open trades closed now, and a plain line on what that means.
+ */
+/** The Allocator's second goal as a progress chip: one pip per structure type needed. */
+function SecondGoal({ e }: { e: RunEngine }) {
+  const g = e.secondGoal();
+  if (!g) return null;
+  return (
+    <div className={`goal-second num ${g.met ? 'met' : ''}`} data-testid="second-goal">
+      <span className="dim">SECOND GOAL</span> {g.need} structure types{' '}
+      <span className="gs-pips">
+        {Array.from({ length: g.need }, (_, i) => (
+          <i key={i} className={i < g.have ? 'on' : ''} />
+        ))}
+      </span>{' '}
+      <b>
+        {Math.min(g.have, g.need)}/{g.need}
+        {g.met ? ' ✔' : ''}
+      </b>
+    </div>
+  );
+}
+
+export function GoalCard({ e }: { e: RunEngine }) {
+  useTrading((s) => s.version);
+  useRun((s) => s.version);
+  const pending = usePendingPoints();
+  if (e.state.round.sitOut) return null;
+  const g0 = e.goalOutlook();
+  // A payout still on screen hasn't landed its points yet.
+  const g = { ...g0, meter: g0.meter - pending, toGo: Math.max(0, g0.target - (g0.meter - pending)) };
+  const met = g.meter >= g.target;
+  const hole = g.meter < 0;
+  const frac = (v: number) => Math.max(0, Math.min(1, v / Math.max(1, g.target)));
+  const now = frac(g.meter);
+  // With the running P/L sealed, so is what the open trades would score.
+  const plSealed = sealedBy(e).pnl;
+  const withOpen = plSealed ? now : frac(g.meter + g.openPoints);
+  const ifClosedToGo = g.target - (g.meter + g.openPoints);
+  const note = met
+    ? 'Target met. Anything more is bonus; protect it.'
+    : hole
+      ? 'Losses score against you. Small, planned exits climb back out.'
+      : plSealed && g.openCount > 0
+        ? `${plSealed} has sealed how your open trades stand. Read the chart.`
+        : g.openCount > 0 && ifClosedToGo <= 0
+          ? 'Closing your open trades now would clear the target.'
+          : g.openCount > 0
+            ? `If your open trades closed now: ${Math.max(0, ifClosedToGo).toLocaleString()} still to go.`
+            : 'Winning trades fill the bar; confident, exact calls multiply it.';
+  return (
+    <div
+      className={`goal-card ${met ? 'met' : hole ? 'hole' : ''}`}
+      data-testid="goal-card"
+      data-tip="g:meter"
+    >
+      <div className="goal-head">
+        <span className="section-title">Round goal</span>
+        <span className="num dim">
+          {g.meter.toLocaleString()} / {g.target.toLocaleString()}
+        </span>
+      </div>
+      <motion.div
+        key={g.meter}
+        className="goal-big num"
+        data-testid="goal-to-go"
+        initial={{ scale: 1.25 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 14 }}
+      >
+        {met
+          ? '✔ TARGET MET'
+          : hole
+            ? `▼ ${Math.abs(g.meter).toLocaleString()} IN THE HOLE`
+            : `${g.toGo.toLocaleString()} TO GO`}
+      </motion.div>
+      <div className="goal-bar" aria-label={`${Math.round(now * 100)}% of the target`}>
+        <i className="gb-now" style={{ width: `${now * 100}%` }} />
+        {g.openCount > 0 && withOpen !== now && (
+          <i
+            className={`gb-open ${withOpen > now ? 'up' : 'down'}`}
+            style={{ left: `${Math.min(now, withOpen) * 100}%`, width: `${Math.abs(withOpen - now) * 100}%` }}
+          />
+        )}
+        <b className="gb-pct num">{Math.round(now * 100)}%</b>
+      </div>
+      {g.openCount > 0 && (
+        <div className="goal-open num" data-testid="goal-open">
+          <span className="dim">OPEN ×{g.openCount}</span>{' '}
+          {plSealed ? (
+            <span className="sealed-num">🔒 SEALED</span>
+          ) : (
+            <>
+              <span className={g.openPlCents >= 0 ? 'up-text' : 'down-text'}>{pnlText(g.openPlCents)}</span>{' '}
+              <span className="dim">≈</span>{' '}
+              <span className={g.openPoints >= 0 ? 'up-text' : 'down-text'}>
+                {g.openPoints >= 0 ? '+' : ''}
+                {g.openPoints.toLocaleString()}
+                {g.openPoints > 0 ? '+' : ''} pts
+              </span>
+            </>
+          )}
+        </div>
+      )}
+      <SecondGoal e={e} />
+      <div className="goal-note">{note}</div>
+    </div>
+  );
+}
+
 export function RunLeftExtra({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   useRun((s) => s.version);
@@ -426,6 +604,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
   const st = e.state;
   const r = st.round;
   const canSkip = e.canSkip();
+  const daysLeft = e.tradeDaysLeft();
   const session = e.session;
   const noPositions =
     !!session && session.openPositions().length === 0 && session.orders.length === 0 && !session.inDay;
@@ -457,16 +636,16 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
         >
           REROLL {r.rerolls - r.rerollsUsed} <Kbd>R</Kbd>
         </button>
-        {r.index < 2 && (
+        {r.index < 2 && !r.sitOut && (
           <button
             className="pixel-btn"
             disabled={!canSkip}
             onClick={() => void act({ t: 'skip' })}
             data-testid="skip"
-            data-tip-title="Skip the round (K)"
-            data-tip-body={`Skip before trading: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a skip; Reviews can't be skipped.`}
+            data-tip-title="Sit this round out (K)"
+            data-tip-body={`No trades for ${BALANCE.run.sitOutDays} trading days while the market moves without you. At the end: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a sit-out; Reviews can't be skipped.`}
           >
-            SKIP →{' '}
+            ☕ SIT OUT →{' '}
             {r.skipTag && (
               <ArtIcon
                 category="tag"
@@ -480,9 +659,40 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
             {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
           </button>
         )}
-        {noPositions && (session?.positions.length ?? 0) > 0 && (
-          <button className="pixel-btn" onClick={() => void act({ t: 'endRound' })} data-testid="end-round">
-            END ROUND
+        {r.sitOut && session && (
+          <div className="sitout-banner num" data-testid="sitout">
+            <div>
+              ☕ SITTING OUT · day {Math.min(session.dayIndex, r.sitOut.days)}/{r.sitOut.days}
+            </div>
+            <div className="sitout-bar">
+              <i style={{ width: `${(Math.min(session.dayIndex, r.sitOut.days) / r.sitOut.days) * 100}%` }} />
+            </div>
+            <div className="dim small">
+              {r.skipTag ? `${TAGS[r.skipTag].name} and −10 stress at the end.` : '−10 stress at the end.'}{' '}
+              Space lets a day pass.
+            </div>
+          </div>
+        )}
+        {!r.sitOut && daysLeft !== null && r.index >= 0 && (
+          <div
+            className={`window-chip num ${daysLeft <= 2 ? 'low' : ''}`}
+            data-testid="trade-window"
+            data-tip-title="Trading window"
+            data-tip-body={`New trades can start on any of the round's first ${BALANCE.run.tradeWindowDays} trading days, while you have tickets. Waiting a day to see more bars is allowed: press Space (or N) without trading.`}
+          >
+            ⏱ {daysLeft > 0 ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} to open trades` : 'window closed'}{' '}
+            · 🎫 {Math.max(0, r.tickets - r.ticketsUsed)}
+          </div>
+        )}
+        {noPositions && r.clockStarted && !r.sitOut && (
+          <button
+            className="pixel-btn"
+            onClick={() => void act({ t: 'endRound' })}
+            data-testid="end-round"
+            data-tip-title="End the round now"
+            data-tip-body="Nothing is open. Settle the round with what you have instead of waiting out the trading window."
+          >
+            END ROUND ■
           </button>
         )}
         {r.filterRelaxed && (
@@ -567,35 +777,116 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
   );
 }
 
+/**
+ * What this trade is worth if it wins, and which of your cartridges power it: each bonus is a
+ * chip that pops in (with the cartridge's picture), and the ones this trade doesn't trigger sit
+ * greyed out, so it's clear what you're building toward.
+ */
 export function ScorePreviewBox({ e }: { e: RunEngine }) {
   const plan = useTrading((s) => s.plan)();
   const builder = useTrading((s) => s.builder);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const session = useTrading((s) => s.session);
+  const open = useTrading(tradeOpen);
+  const implied = useTrading((s) => s.impliedCall)();
   useTrading((s) => s.version);
-  if (!plan || !cardId || !session || session.clockStarted) return null;
-  const card = session.cards.find((c) => c.id === cardId);
-  const p = previewScore(e, plan, builder.structureId, cardId, card?.call ?? null);
+  if (!plan || !cardId || !session || !open) return null;
+  const call = implied
+    ? {
+        ...implied,
+        emPct: plan.entry?.expectedMovePct ?? 0.05,
+        horizonDays: plan.dte ?? 30,
+        mode: session.config.callMode,
+      }
+    : null;
+  const p = previewScore(e, plan, builder.structureId, cardId, call);
   if (!p) return null;
-  const steps = p.steps
-    .filter((st) => st.op !== 'meter')
-    .map(
-      (st) =>
-        `${st.op === 'chips' ? `+${Math.round(st.value)} chips` : st.op === 'add' ? `+${st.value} mult` : `×${st.value}`} ${st.label}`,
-    )
-    .join(' · ');
+  const steps = p.steps.filter((st) => st.op !== 'meter');
+  const firing = new Set(steps.map((st) => st.source).filter((x): x is string => !!x));
+  const idle = e.activeCartridges().filter((id) => !firing.has(id) && CARTRIDGE_BY_ID[id]);
+  const share = p.targetLeft > 0 ? p.points / p.targetLeft : 1;
   return (
     <div
-      className="score-preview"
+      className="combo"
       data-testid="score-preview"
-      data-tip-title="Score preview (at max profit)"
-      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round needs ${p.targetLeft.toLocaleString()} more. ${steps}`}
+      data-tip-title="If it wins (at max profit)"
+      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round still needs ${p.targetLeft.toLocaleString()}.`}
     >
-      <span className="dim">SCORE IF IT WINS</span>{' '}
-      <b className="num sp-points">{p.points.toLocaleString()}</b>{' '}
-      <span className="dim num">
-        ({p.chips}c × {p.mult.toFixed(1)}) · needs {p.targetLeft.toLocaleString()}
-      </span>
+      <div className="combo-head">
+        <span className="dim">IF IT WINS</span>
+        <b className="num combo-pts">
+          <CountUp value={p.points} />
+        </b>
+        <span className="num dim">
+          {p.chips} chips × {p.mult.toFixed(1)}
+        </span>
+      </div>
+      <div
+        className="combo-fill"
+        data-tip-title="Round target"
+        data-tip-body={`This trade alone would fill ${Math.round(share * 100)}% of what the round still needs (${p.targetLeft.toLocaleString()}).`}
+      >
+        <span
+          className={`cf-bar ${share >= 1 ? 'full' : ''}`}
+          style={{ width: `${Math.min(1, share) * 100}%` }}
+        />
+        <span className="cf-label num">
+          {share >= 1 ? '✔ CLEARS THE ROUND' : `${Math.round(share * 100)}% OF THE ROUND`}
+        </span>
+      </div>
+      <div className="combo-steps">
+        <AnimatePresence initial={false}>
+          {steps.map((st, i) => {
+            const cart = st.source ? CARTRIDGE_BY_ID[st.source] : undefined;
+            return (
+              <motion.span
+                key={`${st.label}-${st.op}-${st.value}-${i}`}
+                className={`cstep ${st.op}`}
+                data-tip={cart ? `cart:${cart.id}` : undefined}
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 20, delay: i * 0.03 }}
+              >
+                {cart && (
+                  <ArtIcon
+                    category="cartridge"
+                    id={cart.id}
+                    name={cart.name}
+                    tone={cart.rarity}
+                    style={{ width: 16, height: 16, fontSize: 8 }}
+                  />
+                )}
+                <b className="num">
+                  {st.op === 'chips'
+                    ? `+${Math.round(st.value)}`
+                    : st.op === 'add'
+                      ? `+${st.value}×`
+                      : st.op === 'chipsMul'
+                        ? `×${st.value}c`
+                        : `×${st.value}`}
+                </b>{' '}
+                {st.label}
+              </motion.span>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+      {idle.length > 0 && (
+        <div className="combo-idle">
+          <span className="dim">NOT TRIGGERED:</span>
+          {idle.map((id) => (
+            <span key={id} className="ci" data-tip={`cart:${id}`}>
+              <ArtIcon
+                category="cartridge"
+                id={id}
+                name={CARTRIDGE_BY_ID[id].name}
+                tone={CARTRIDGE_BY_ID[id].rarity}
+                style={{ width: 20, height: 20, fontSize: 9 }}
+              />
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -612,7 +903,7 @@ function Readout({ title, children }: { title: string; children: ReactNode }) {
 /** What each hired analyst says about the selected card. */
 export function AnalystDesk({ e }: { e: RunEngine }) {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const builder = useTrading((s) => s.builder);
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
@@ -625,8 +916,16 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
   const out: ReactNode[] = [];
   const fam = e.families();
   const deskCal = e.state.config.deskId === 'calendar';
-  const review = e.state.round.reviewId ? REVIEWS[e.state.round.reviewId].rule : {};
-  if (has('quant')) {
+  const review = e.rule();
+  const sealed = sealedBy(e);
+  const ivSealed = sealed.ivr;
+  if (ivSealed && (has('quant') || has('vol_surfer')))
+    out.push(
+      <Readout key="sealed" title="IV desk">
+        <LockStamp text="IV RANK SEALED" by={ivSealed} />
+      </Readout>,
+    );
+  else if (has('quant')) {
     const hist = view
       .vol()
       .slice(-120)
@@ -656,9 +955,9 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
         {vrp !== null ? (vrp >= 5 ? '(premium rich)' : vrp < 0 ? '(premium cheap)' : '') : ''}
         {(has('vol_surfer') || deskCal) && ts.length > 1 && (
           <div className="term num">
-            {ts.slice(0, 6).map((t) => (
+            {ts.slice(0, 6).map((t, i) => (
               <span key={t.expiration}>
-                {t.dte}d {pct(t.iv, 0)}
+                {sealed.dte ? `T${i + 1}` : `${t.dte}d`} {pct(t.iv, 0)}
               </span>
             ))}
             <div className="dim">
@@ -762,7 +1061,13 @@ export function AnalystDesk({ e }: { e: RunEngine }) {
       </Readout>,
     );
   }
-  if (has('ghost') && plan?.ok && plan.entry && plan.dte) {
+  if (has('ghost') && sealed.dte)
+    out.push(
+      <Readout key="ghost" title="The Ghost">
+        A base rate needs the trade's length, and {sealed.dte} has sealed it.
+      </Readout>,
+    );
+  else if (has('ghost') && plan?.ok && plan.entry && plan.dte) {
     const shorts = plan.entry.shortStrikes;
     const spot = plan.entry.spot;
     const def = STRUCTURES[builder.structureId];

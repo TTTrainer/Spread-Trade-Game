@@ -6,18 +6,14 @@ import { money } from '../format';
 import { Kbd, Modal, Pnl } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
-import { useTrading, type Panel, type StudyId } from '../store/trading';
+import { tradeOpen, useTrading, type Panel, type StudyId } from '../store/trading';
 import { BUCKET_NAMES, CONFIDENCES } from '../../engine/scoring/calls';
 import { ChartPanel } from './ChartPanel';
 import { NewsTicker } from './NewsTicker';
-import {
-  CallCards,
-  ExpiryChips,
-  OrderTicket,
-  SetupPresets,
-  SizeControls,
-  StructureCards,
-} from './BuilderTray';
+import { OrderTicket, StructureCards } from './BuilderTray';
+import { SetupSliders } from './SetupPanel';
+import { ChainScreen } from './ChainScreen';
+import { CashDeposit, CashReadout } from './CashDeposit';
 import {
   AnalyzePanel,
   DecisionModal,
@@ -31,6 +27,8 @@ import { NewsBriefPanel } from './NewsBrief';
 import type { BriefAccess } from '../../engine/news/brief';
 import { DebriefStrip } from './Debrief';
 import './trading.css';
+import { LockStamp } from './BossBanner';
+import { useSealed } from '../boss';
 
 const STUDY_LABELS: Record<StudyId, string> = {
   bb: 'Bollinger Bands',
@@ -170,23 +168,14 @@ export function HelpModal() {
                 'analyze',
                 'lineup',
                 'studies',
+                'chain',
                 'timeframe',
                 'home',
                 'back',
                 'help',
                 'settings',
               ],
-              [
-                'sell',
-                'buy',
-                'flatten',
-                'reverse',
-                'autoSend',
-                'playPause',
-                'confirm',
-                'ladderIn',
-                'ladderOut',
-              ],
+              ['sell', 'buy', 'flatten', 'reverse', 'autoSend', 'playPause', 'confirm'],
             ] as const
           ).map((group, gi) => (
             <div key={gi} className="hotkey-list">
@@ -198,8 +187,8 @@ export function HelpModal() {
             </div>
           ))}
           <p>
-            <Kbd>1-5</Kbd> call bucket ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd> confidence{' '}
-            {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
+            <Kbd>1-5</Kbd> pick a structure by view ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd>{' '}
+            conviction {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
           </p>
         </div>
       </div>
@@ -218,6 +207,7 @@ export function TradingTopBar({ left, right }: { left?: ReactNode; right?: React
       <div className="tb-item num">
         <span className="dim">EQUITY</span> <span data-testid="equity">{money(marked)}</span>
       </div>
+      <CashReadout />
       <div className="tb-item num">
         <span className="dim">REALIZED</span> <Pnl cents={session.realizedCents} testId="realized" />
       </div>
@@ -236,6 +226,7 @@ export function TradingLayout({
   allowedStructures,
   onDone,
   leftExtra,
+  leftPinned,
   rightExtra,
   badges,
   levels,
@@ -248,6 +239,8 @@ export function TradingLayout({
   allowedStructures?: StructureId[];
   onDone?: ReactNode;
   leftExtra?: ReactNode;
+  /** Stays in view at the bottom of the lineup column however far it scrolls. */
+  leftPinned?: ReactNode;
   rightExtra?: ReactNode;
   badges?: (cardId: string) => CardBadges;
 }) {
@@ -265,11 +258,17 @@ export function TradingLayout({
   const setRightTab = useTrading((s) => s.setRightTab);
   // Only this yes/no is watched, so the layout doesn't re-render on every tick.
   const engaged = useTrading((s) => {
-    const card = s.session && s.selectedCardId ? s.session.card(s.selectedCardId) : null;
-    return !!card && (!!card.call || s.session!.openPositions().some((p) => p.cardId === card.id));
+    // A reroll or a new round can leave the selection on a card that is gone: never throw here
+    // (a selector that throws takes the whole screen down with it).
+    const card = s.session?.cards.find((c) => c.id === s.selectedCardId) ?? null;
+    return !!card && (s.touched || s.session!.openPositions().some((p) => p.cardId === card.id));
   });
   const controls = useAnimationControls();
   const [studiesOpen, setStudiesOpen] = useStudyPicker();
+  const studiesSealed = useSealed('studies');
+  const chainOpen = useTrading((s) => s.chainOpen);
+  const setChainOpen = useTrading((s) => s.setChainOpen);
+  const chainKey = useApp((s) => s.settings.hotkeys.chain);
 
   useEffect(() => {
     if (shake > 0)
@@ -288,7 +287,8 @@ export function TradingLayout({
     nextPanel: () => setPanel(tabs[(tabs.indexOf(panel) + 1) % tabs.length]),
     prevPanel: () => setPanel(tabs[(tabs.indexOf(panel) + tabs.length - 1) % tabs.length]),
     reverse: () => reverse(),
-    studies: () => setStudiesOpen(true),
+    studies: () => !studiesSealed && setStudiesOpen(true),
+    chain: () => setChainOpen(!chainOpen),
     timeframe: () => useTrading.getState().setTimeframe(useTrading.getState().timeframe === 'D' ? 'W' : 'D'),
     help: () => setHelp(true),
     bucket1: () => void setCall(0),
@@ -306,12 +306,14 @@ export function TradingLayout({
     expNext: () => useTrading.getState().nudgeExpiration(1),
     expPrev: () => useTrading.getState().nudgeExpiration(-1),
     qtyUp: () => {
-      const b = useTrading.getState().builder;
-      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.min(50, b.qty + 1) });
+      const c = useTrading.getState().confidence;
+      if (tradeOpen(useTrading.getState()))
+        void setConfidence(Math.min(0.9, Math.round((c + 0.1) * 10) / 10));
     },
     qtyDown: () => {
-      const b = useTrading.getState().builder;
-      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.max(1, b.qty - 1) });
+      const c = useTrading.getState().confidence;
+      if (tradeOpen(useTrading.getState()))
+        void setConfidence(Math.max(0.5, Math.round((c - 0.1) * 10) / 10));
     },
     presetWeekly: () => useTrading.getState().applyPreset('weekly'),
     presetSwing: () => useTrading.getState().applyPreset('swing'),
@@ -339,9 +341,33 @@ export function TradingLayout({
       <div className="t-top">{top}</div>
       <div className="t-left">
         <LineupColumn extra={leftExtra} badges={badges} briefAccess={briefAccess} />
+        {leftPinned && <div className="t-left-pin">{leftPinned}</div>}
       </div>
       <div className="t-center">
         <ChartPanel />
+        <div className="center-tabs num" role="tablist">
+          <button
+            className={chainOpen ? '' : 'sel'}
+            onClick={() => setChainOpen(false)}
+            role="tab"
+            aria-selected={!chainOpen}
+            data-testid="ctab-chart"
+          >
+            ◲ CHART
+          </button>
+          <button
+            className={chainOpen ? 'sel' : ''}
+            onClick={() => setChainOpen(true)}
+            role="tab"
+            aria-selected={chainOpen}
+            data-testid="ctab-chain"
+            data-tip-title="Option chain"
+            data-tip-body="Every strike and expiration with bid, ask, IV and the Greeks. Click a bid to sell there."
+          >
+            ⊞ CHAIN <span className="kbd">{chainKey}</span>
+          </button>
+        </div>
+        {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
         <NewsTicker />
       </div>
       <div className="t-right panel">
@@ -390,9 +416,13 @@ export function TradingLayout({
               <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
             </button>
           ))}
-          <button onClick={() => setStudiesOpen(true)}>
-            STUDIES <span className="kbd">Ctrl+E</span>
-          </button>
+          {studiesSealed ? (
+            <LockStamp text="STUDIES SEALED" by={studiesSealed} />
+          ) : (
+            <button onClick={() => setStudiesOpen(true)}>
+              STUDIES <span className="kbd">Ctrl+E</span>
+            </button>
+          )}
           <button onClick={() => setHelp(true)}>
             HELP <span className="kbd">Ctrl+8</span>
           </button>
@@ -400,13 +430,8 @@ export function TradingLayout({
         <div className="tray-body">
           {panel === 'builder' && (
             <div className="builder-row">
-              <CallCards />
               <StructureCards allowed={allowedStructures} levels={levels} />
-              <div className="tray-col">
-                <SetupPresets />
-                <ExpiryChips />
-                <SizeControls />
-              </div>
+              <SetupSliders />
               <OrderTicket />
             </div>
           )}
@@ -415,7 +440,8 @@ export function TradingLayout({
         </div>
       </div>
       <DecisionModal />
-      {studiesOpen && <StudyPicker onClose={() => setStudiesOpen(false)} />}
+      <CashDeposit />
+      {studiesOpen && !studiesSealed && <StudyPicker onClose={() => setStudiesOpen(false)} />}
     </motion.div>
   );
 }

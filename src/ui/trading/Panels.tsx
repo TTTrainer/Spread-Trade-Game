@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { motion } from 'motion/react';
 import { diffDays } from '../../engine/calendar';
 import { lastMark, optionLegsOf, stockRatio } from '../../engine/lifecycle/position';
 import { BUCKET_GLYPHS } from '../../engine/scoring/calls';
@@ -6,18 +7,24 @@ import { quotesFor, STRUCTURES } from '../../engine/strategies/structures';
 import { payoffNow, type PricingEnv } from '../../engine/strategies/metrics';
 import type { DecisionAction, DecisionPoint, Position } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
-import { money, pct, price } from '../format';
+import { burstAt } from '../../fx/overlay';
+import { money, pnlText, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { useTrading } from '../store/trading';
+import { liveCardId, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
+import { usePayout } from '../store/payout';
 import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
 import { briefFor, StreetChip } from './NewsBrief';
-import { LivePnl, PaceControls, useDayProgress } from './DayPlayer';
+import { LiveVsMax, LivePnl, PaceControls, useDayProgress } from './DayPlayer';
+import { useSealed } from '../boss';
+import { LockStamp, SealedText } from './BossBanner';
 import { priceAt } from './dayPath';
 import type { BriefAccess } from '../../engine/news/brief';
 import { RollDialog } from './RollDialog';
+import { MiniCandles } from './DayRecap';
+import { boundsOf, PlRange, shareText } from './PlRange';
 
 export { RollDialog };
 
@@ -92,7 +99,7 @@ export function LineupColumn({
             key={c.id}
             selected={selected === c.id}
             onClick={() => select(c.id)}
-            className="lineup-card"
+            className={`lineup-card ${pos ? 'has-open' : closed.length ? 'has-closed' : ''}`}
             testId={`card-${i}`}
           >
             <div
@@ -101,6 +108,19 @@ export function LineupColumn({
               style={{ animationDelay: `${i * 90}ms`, ...cardBackImage(cardBack) }}
               aria-hidden="true"
             />
+            {pos ? (
+              <div className="lc-trade open num" data-testid={`card-trade-${i}`}>
+                <span>● IN TRADE</span>
+                <LivePnl pos={pos} />
+              </div>
+            ) : (
+              closed.length > 0 && (
+                <div className="lc-trade closed num" data-testid={`card-trade-${i}`}>
+                  <span>✓ CLOSED</span>
+                  <Pnl cents={pl} />
+                </div>
+              )
+            )}
             <div className="lc-top" data-tip="g:lineup_card">
               <span className="lc-sym">{c.displaySymbol}</span>
               <LivePx cardId={c.id} settled={view.spot()} />
@@ -151,7 +171,6 @@ export function LineupColumn({
               ) : (
                 <span className="dim">no call</span>
               )}
-              {pos ? <LivePnl pos={pos} /> : closed.length > 0 && <Pnl cents={pl} />}
             </div>
           </TiltCard>
         );
@@ -179,6 +198,8 @@ export function PositionsDock() {
   const selectedPos = useTrading((s) => s.selectedPositionId);
   const selectPosition = useTrading((s) => s.selectPosition);
   const [rolling, setRolling] = useState<Position | null>(null);
+  // The Controller seals the running P/L, and the mark with it (open minus mark is the P/L).
+  const plSealed = useSealed('pnl');
   useHotkeys({
     flatten: () => {
       const id = selectedPos ?? session?.openPositions()[0]?.id;
@@ -204,7 +225,7 @@ export function PositionsDock() {
             <th data-tip="g:open_price">Open</th>
             <th data-tip="g:mark">Mark</th>
             <th data-tip="g:pl_open">P/L</th>
-            <th data-tip="g:pct_risk">% risk</th>
+            <th data-tip="g:pl_range">vs max</th>
             <th data-tip="g:dte">DTE</th>
             <th data-tip="g:pos_delta">Δ</th>
             <th data-tip="g:pos_theta">Θ/day</th>
@@ -238,9 +259,19 @@ export function PositionsDock() {
                 </td>
                 <td>{p.qty}</td>
                 <td>{price(Math.abs(p.openNet))}</td>
-                <td>{p.status === 'open' ? price(Math.abs(m?.value ?? 0)) : p.exitReason}</td>
+                <td>
+                  {p.status !== 'open' ? (
+                    p.exitReason
+                  ) : plSealed ? (
+                    <SealedText by={plSealed} text="?" />
+                  ) : (
+                    price(Math.abs(m?.value ?? 0))
+                  )}
+                </td>
                 <td>{p.status === 'open' ? <LivePnl pos={p} /> : <Pnl cents={pl} />}</td>
-                <td>{pct(pl / Math.max(1, p.entry.maxLossCents), 0)}</td>
+                <td>
+                  <LiveVsMax pos={p} />
+                </td>
                 <td>{p.status === 'open' ? (dte ?? '—') : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.delta ?? 0).toFixed(0) : '—'}</td>
                 <td>{p.status === 'open' ? (m?.greeks.theta ?? 0).toFixed(1) : '—'}</td>
@@ -327,18 +358,48 @@ export function DecisionModal() {
   useTrading((s) => s.version);
   const ff = useTrading((s) => s.ff);
   const decide = useTrading((s) => s.decide);
+  const selected = useTrading((s) => s.selectedCardId);
+  const select = useTrading((s) => s.select);
   const [rolling, setRolling] = useState<DecisionPoint | null>(null);
-  const dp = ff === 'decision' ? session?.decisions[0] : undefined;
+  const plSealed = useSealed('pnl');
+  // Reviewing the chart: the dialog tucks into a bar so the full chart can be scrolled and zoomed.
+  const peek = useTrading((s) => s.reviewChart);
+  const setPeek = useTrading((s) => s.setReviewChart);
+  // The next decision waits for a profit celebration (or a closed trade's payout) to finish, so
+  // the two never stack.
+  const paying = usePayout((s) => s.queue.length > 0);
+  const celebrating = useTrading((s) => !!s.deposit?.profit) || paying;
+  const dp = ff === 'decision' && !celebrating ? session?.decisions[0] : undefined;
   const pos = dp ? session?.position(dp.positionId) : undefined;
   const act = (a: DecisionAction) => {
     if (!dp) return;
     if (a === 'roll') {
+      setPeek(false);
       setRolling(dp);
       return;
     }
     sfx(a === 'close' ? 'stamp' : 'click');
+    setPeek(false);
     void decide(dp.id, a);
   };
+  // The chart behind the dialog shows the stock the decision is about.
+  const cardId = pos?.cardId;
+  useEffect(() => {
+    if (cardId && selected !== cardId) select(cardId);
+  }, [dp?.id, cardId]);
+  useEffect(() => {
+    if (!dp) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.code === 'KeyV' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        setPeek(!peek);
+      } else if (e.key === 'Escape' && peek) setPeek(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dp, peek]);
   useHotkeys(
     dp
       ? {
@@ -346,9 +407,81 @@ export function DecisionModal() {
         }
       : {},
   );
+  useEffect(() => {
+    // A new decision (or none) always starts as the full dialog.
+    if (!dp && peek) setPeek(false);
+  }, [dp?.id]);
   if (!dp || !pos || !session) return null;
   const m = lastMark(pos);
   const view = session.view(pos.cardId);
+  const closeNow = dp.closeNowCents ?? m?.plCents ?? 0;
+  const label = (o: DecisionAction): string =>
+    dp.kind === 'target_hit' && o === 'close'
+      ? `CASH OUT ${pnlText(closeNow)}`
+      : dp.kind === 'target_hit' && o === 'hold'
+        ? 'LET IT RIDE'
+        : dp.kind === 'stop_hit' && o === 'close'
+          ? `TAKE THE STOP ${pnlText(closeNow)}`
+          : ACTION_LABEL[o];
+  const buttons = dp.options.map((o) => (
+    <button
+      key={o}
+      className={`pixel-btn ${dp.planned === o ? 'primary' : ''}`}
+      onClick={() => act(o)}
+      data-testid={`dp-${o}`}
+      title={ACTION_KEY[o] ? `Hotkey ${ACTION_KEY[o]}` : undefined}
+    >
+      {label(o)} {dp.planned === o && dp.kind !== 'target_hit' && <span className="chip good">PLAN</span>}
+    </button>
+  ));
+  const roll = rolling && (
+    <RollDialog
+      pos={pos}
+      onClose={() => setRolling(null)}
+      onRoll={(legs) => {
+        void decide(rolling.id, 'roll', legs);
+      }}
+    />
+  );
+  if (peek)
+    return (
+      <div className="dp-dock panel" data-testid="decision-dock" role="region" aria-label="Decision">
+        <div className={`dp-kind kind-${dp.kind}`}>
+          {dp.title}: {pos.symbol}
+        </div>
+        <span className="num">
+          P/L {plSealed ? <SealedText by={plSealed} /> : <Pnl cents={m?.plCents ?? 0} />}
+        </span>
+        <div className="dp-actions">{buttons}</div>
+        <button className="pixel-btn" onClick={() => setPeek(false)} data-testid="dp-back">
+          ▣ BACK <Kbd>V</Kbd>
+        </button>
+        {roll}
+      </div>
+    );
+  const legs = optionLegsOf(pos.legs);
+  if (dp.kind === 'target_hit')
+    return (
+      <TakeProfit
+        dp={dp}
+        pos={pos}
+        closeNow={closeNow}
+        dayLabel={view.dayLabel()}
+        daysLeft={legs.length ? Math.min(...legs.map((l) => diffDays(view.now, l.expiration))) : null}
+        onAct={act}
+        onPeek={() => setPeek(true)}
+      >
+        <MiniCandles
+          bars={view.bars().slice(-30)}
+          shorts={legs.filter((l) => l.ratio < 0).map((l) => l.strike)}
+          longs={legs.filter((l) => l.ratio > 0).map((l) => l.strike)}
+          width={440}
+          height={110}
+          tags
+        />
+        {roll}
+      </TakeProfit>
+    );
   return (
     <Modal testId="decision-modal">
       <div className={`dp-kind kind-${dp.kind}`}>DECISION POINT · {view.dayLabel()}</div>
@@ -356,25 +489,31 @@ export function DecisionModal() {
         {dp.title}: {pos.symbol}
       </h2>
       <p className="dp-msg">{dp.message}</p>
+      <div className="dp-chart" data-testid="dp-mini-chart">
+        <MiniCandles
+          bars={view.bars().slice(-30)}
+          shorts={legs.filter((l) => l.ratio < 0).map((l) => l.strike)}
+          longs={legs.filter((l) => l.ratio > 0).map((l) => l.strike)}
+          width={440}
+          height={150}
+          tags
+        />
+      </div>
       <div className="num dp-facts">
-        <span>
-          P/L <Pnl cents={m?.plCents ?? 0} />
-        </span>
+        <span>P/L {plSealed ? <SealedText by={plSealed} /> : <Pnl cents={m?.plCents ?? 0} />}</span>
         <span>spot {view.spot().toFixed(2)}</span>
         <span>short {pos.entry.shortStrikes.join('/') || '—'}</span>
       </div>
       <div className="modal-actions dp-actions">
-        {dp.options.map((o) => (
-          <button
-            key={o}
-            className={`pixel-btn ${dp.planned === o ? 'primary' : ''}`}
-            onClick={() => act(o)}
-            data-testid={`dp-${o}`}
-            title={ACTION_KEY[o] ? `Hotkey ${ACTION_KEY[o]}` : undefined}
-          >
-            {ACTION_LABEL[o]} {dp.planned === o && <span className="chip good">PLAN</span>}
-          </button>
-        ))}
+        {buttons}
+        <button
+          className="pixel-btn"
+          onClick={() => setPeek(true)}
+          data-testid="dp-peek"
+          title="Hide this dialog to scroll and zoom the full chart; your choices stay in a bar"
+        >
+          ◐ REVIEW CHART <Kbd>V</Kbd>
+        </button>
       </div>
       {dp.kind === 'stop_hit' && (
         <p className="dp-warn">
@@ -384,15 +523,99 @@ export function DecisionModal() {
       <p className="dim num">
         <Kbd>Enter</Kbd> follows the plan
       </p>
-      {rolling && (
-        <RollDialog
-          pos={pos}
-          onClose={() => setRolling(null)}
-          onRoll={(legs) => {
-            void decide(rolling.id, 'roll', legs);
-          }}
-        />
-      )}
+      {roll}
+    </Modal>
+  );
+}
+
+/**
+ * A hit profit target is the payoff moment, so it gets its own dialog: the money you can bank in
+ * big type, how much of the trade's best case that is, and two plain choices. Taking it is the
+ * default; letting it ride removes the target and keeps the trade open.
+ */
+function TakeProfit({
+  dp,
+  pos,
+  closeNow,
+  dayLabel,
+  daysLeft,
+  onAct,
+  onPeek,
+  children,
+}: {
+  dp: DecisionPoint;
+  pos: Position;
+  closeNow: number;
+  dayLabel: string;
+  daysLeft: number | null;
+  onAct: (a: DecisionAction) => void;
+  onPeek: () => void;
+  children: ReactNode;
+}) {
+  const b = boundsOf(pos);
+  const more = b.maxProfit !== null ? Math.max(0, b.maxProfit - closeNow) : null;
+  const giveBack = closeNow + b.maxLoss;
+  useEffect(() => {
+    sfx('win', 1.1, 0.8);
+    const t = setTimeout(
+      () => burstAt(document.querySelector('[data-testid="tp-amount"]'), 'coins', 22),
+      180,
+    );
+    return () => clearTimeout(t);
+  }, [dp.id]);
+  return (
+    <Modal testId="decision-modal">
+      <div className="tp">
+        <div className="dp-kind kind-target_hit">◆ PROFIT TARGET HIT · {dayLabel}</div>
+        <h2>
+          {pos.symbol} · {STRUCTURES[pos.structureId].short} {pos.entry.shortStrikes.join('/')}
+          {pos.qty > 1 ? ` ×${pos.qty}` : ''}
+        </h2>
+        <motion.div
+          className="tp-amount num"
+          data-testid="tp-amount"
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 13 }}
+        >
+          {pnlText(closeNow)}
+        </motion.div>
+        <div className="tp-sub num">
+          ready to bank · <b>{shareText(closeNow, b)}</b>
+          {b.maxProfit !== null && <> ({money(b.maxProfit)})</>}
+        </div>
+        <PlRange cents={closeNow} bounds={b} size="big" />
+        <div className="tp-choices">
+          <button className="pixel-btn primary tp-take" onClick={() => onAct('close')} data-testid="dp-close">
+            <span className="tp-btn-title">CASH OUT</span>
+            <span className="tp-btn-sub num">bank {pnlText(closeNow)} and score it · Enter</span>
+          </button>
+          <button className="pixel-btn tp-ride" onClick={() => onAct('hold')} data-testid="dp-hold">
+            <span className="tp-btn-title">LET IT RIDE</span>
+            <span className="tp-btn-sub num">
+              {more !== null ? `+${money(more)} more at best` : 'no cap on the upside'}
+              {daysLeft !== null ? ` · ${daysLeft}d left` : ''}
+            </span>
+          </button>
+        </div>
+        <p className="tp-risk dim">
+          Riding removes the target: you close it whenever you like, but from here it can still give back up
+          to {money(giveBack)}.
+        </p>
+        <div className="dp-chart" data-testid="dp-mini-chart">
+          {children}
+        </div>
+        <div className="tp-more">
+          {dp.options.includes('roll') && (
+            <button className="pixel-btn small" onClick={() => onAct('roll')} data-testid="dp-roll">
+              ROLL
+            </button>
+          )}
+          <button className="pixel-btn small" onClick={onPeek} data-testid="dp-peek">
+            ◐ REVIEW CHART <Kbd>V</Kbd>
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -434,13 +657,15 @@ export function FastForwardBar() {
 
 export function AnalyzePanel() {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const whatIf = useTrading((s) => s.whatIf);
   const setWhatIf = useTrading((s) => s.setWhatIf);
   const builder = useTrading((s) => s.builder);
   const plan = useTrading((s) => s.plan)();
   useTrading((s) => s.version);
   const [heat, setHeat] = useState(true);
+  // The Executor seals how long the planned trade has: no day axis to read it off.
+  const dteSealed = useSealed('dte');
   if (!session || !cardId) return null;
   const chain = session.chain(cardId);
   const exp = builder.expiration;
@@ -481,17 +706,23 @@ export function AnalyzePanel() {
             onChange={(e) => setWhatIf({ pricePct: Number(e.target.value) })}
           />
         </label>
-        <label>
-          Days +{whatIf.days}
-          <input
-            type="range"
-            min={0}
-            max={Math.max(1, dte)}
-            step={1}
-            value={whatIf.days}
-            onChange={(e) => setWhatIf({ days: Number(e.target.value) })}
-          />
-        </label>
+        {dteSealed ? (
+          <label>
+            Days <LockStamp text="SEALED" by={dteSealed} />
+          </label>
+        ) : (
+          <label>
+            Days +{whatIf.days}
+            <input
+              type="range"
+              min={0}
+              max={Math.max(1, dte)}
+              step={1}
+              value={whatIf.days}
+              onChange={(e) => setWhatIf({ days: Number(e.target.value) })}
+            />
+          </label>
+        )}
         <label>
           IV {whatIf.ivPts > 0 ? '+' : ''}
           {whatIf.ivPts} pts
@@ -514,7 +745,7 @@ export function AnalyzePanel() {
                   plan.mid,
                   spot * (1 + whatIf.pricePct / 100),
                   env,
-                  whatIf.days,
+                  dteSealed ? 0 : whatIf.days,
                   whatIf.ivPts / 100,
                 ) *
                   100 *
@@ -534,7 +765,7 @@ export function AnalyzePanel() {
             const d = Math.round((dte * r) / 5);
             return (
               <div key={r} className="heat-row">
-                <span className="heat-lbl">+{d}d</span>
+                <span className="heat-lbl">{dteSealed ? (r === 5 ? 'EXP' : `T${r}`) : `+${d}d`}</span>
                 {Array.from({ length: 13 }, (_, c) => {
                   const px = spot * (1 + (c - 6) * 0.02);
                   const v = payoffNow(plan.legs, plan.mid as number, px, env, d, 0) * 100 * builder.qty;

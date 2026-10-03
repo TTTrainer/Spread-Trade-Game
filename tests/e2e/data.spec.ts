@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { launchGame } from './helpers';
+import { homedir, tmpdir } from 'node:os';
+import { SyntheticSource } from '../../src/engine/market/synthetic/source';
+import { schwabPull } from '../../data-pipeline/schwab/pull';
+import { afterClose, fakeSchwab } from '../helpers/fakeSchwab';
+import { launchGame, shot } from './helpers';
 
 test('market data flows over IPC and the main process refuses the future', async () => {
   const { app, page } = await launchGame();
@@ -54,5 +57,45 @@ test('reads a built game.db through the main process', async () => {
     return chain.quotes.length;
   });
   expect(chainLen).toBeGreaterThan(100);
+  await app.close();
+});
+
+test('Schwab: a pulled schwab.db builds a playable real market (no DoltHub download)', async () => {
+  // Stand in for PULL FROM SCHWAB (it needs a live login): the same pull code, against a fake.
+  const userData = mkdtempSync(join(tmpdir(), 'stg-e2e-schwab-'));
+  const src = new SyntheticSource({ lastDate: '2021-06-30', symbols: ['MKTX', 'HLXR'] });
+  const last = '2021-06-29';
+  const fake = fakeSchwab(src, () => last);
+  await schwabPull({
+    storePath: join(userData, 'data', 'schwab.db'),
+    api: fake.api,
+    symbols: ['SPY', 'AAPL'],
+    now: afterClose(last),
+  });
+  const { app, page } = await launchGame({ userData });
+  await page.getByTestId('menu-settings').click();
+  await page.getByTestId('set-data').click();
+  await expect(page.getByTestId('schwab-store')).toContainText('2 tickers');
+  await expect(page.getByTestId('schwab-store')).toContainText('real option chains on 1 close');
+  await expect(page.getByTestId('schwab-pull')).toBeDisabled(); // not logged in
+  await page.getByTestId('schwab-build').click();
+  await expect(page.getByTestId('toasts')).toContainText('Game data built from schwab.db', {
+    timeout: 60_000,
+  });
+  await expect(page.locator('.data-status')).toContainText('REAL');
+  await expect(page.locator('.data-status')).toContainText(`2 tickers through ${last}`);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.getByTestId('schwab-build').scrollIntoViewIfNeeded();
+  await shot(page, '05-settings-schwab-built-1366');
+  const chain = await page.evaluate(async (d) => {
+    const stg = (window as unknown as { stg: { invoke: (...a: unknown[]) => Promise<unknown> } }).stg;
+    const c = (await stg.invoke('market.call', 'chain', ['AAPL', d], d)) as {
+      source: string;
+      quotes: unknown[];
+    };
+    return { source: c.source, n: c.quotes.length };
+  }, '2020-06-15');
+  expect(chain.source).toBe('modeled');
+  expect(chain.n).toBeGreaterThan(40);
   await app.close();
 });

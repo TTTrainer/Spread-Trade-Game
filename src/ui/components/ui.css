@@ -124,33 +124,69 @@
   text-shadow: var(--glow-amber);
 }
 
+/* Messages sit low in the middle of the screen, where the eye already is, big enough to notice.
+   Clicks pass through them, so a message never covers a button. */
 .toasts {
+  /* Top right, under the top bar's clock: noticeable without sitting on the chart or the buttons. */
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 14px;
+  top: 92px;
   z-index: 900;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
   pointer-events: none;
+  width: min(440px, 46vw);
 }
 .toast {
-  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(20, 14, 52, 0.96);
   border: 2px solid var(--line-bright);
-  padding: 6px 12px;
+  border-left-width: 8px;
+  padding: 8px 14px;
   font-family: var(--font-mono);
   font-size: 19px;
-  box-shadow: 3px 3px 0 #000;
-  max-width: 420px;
+  line-height: 1.2;
+  box-shadow:
+    3px 3px 0 #000,
+    0 0 18px rgba(157, 107, 255, 0.3);
+}
+.toast-ico {
+  font-size: 21px;
+  flex: none;
 }
 .toast.tone-good {
   border-color: var(--up);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 26px rgba(77, 255, 154, 0.35);
+}
+.toast.tone-good .toast-ico {
+  color: var(--up);
 }
 .toast.tone-bad {
   border-color: var(--down);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 26px rgba(255, 79, 109, 0.4);
+}
+.toast.tone-bad .toast-ico {
+  color: var(--down);
 }
 .toast.tone-warn {
   border-color: var(--amber);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 26px rgba(255, 191, 62, 0.35);
+}
+.toast.tone-warn .toast-ico {
+  color: var(--amber);
+}
+.toast.tone-info .toast-ico {
+  color: var(--cyan);
 }
 
 .stamp {
@@ -391,4 +427,299 @@ select:focus-visible,
   margin-top: 5px;
   font-size: 13px;
   color: var(--cyan);
+}
+
+/* ---------- Snap sliders ---------- */
+.snap {
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+}
+.snap.off {
+  opacity: 0.45;
+}
+.snap-label {
+  font-size: 15px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+/* The label's marker wears the color of what the control moves on the chart. */
+.snap-label::before {
+  content: '■';
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--snap-accent, var(--cyan));
+}
+.snap-hint {
+  grid-column: 1 / -1;
+  margin: 4px 0 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--snap-accent, var(--cyan));
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--text);
+}
+.snap-readout {
+  font-size: 16px;
+  color: var(--text);
+  white-space: nowrap;
+  min-width: 96px;
+}
+.snap-track {
+  position: relative;
+  height: 26px;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+.snap-track:focus-visible {
+  outline: 1px dashed var(--amber);
+  outline-offset: 2px;
+}
+.snap-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 11px;
+  height: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+}
+.snap-fill {
+  position: absolute;
+  left: 0;
+  top: 11px;
+  height: 4px;
+  background: var(--snap-accent, var(--cyan));
+  box-shadow: 0 0 6px var(--snap-accent, var(--cyan));
+}
+.snap-tick {
+  position: absolute;
+  top: 8px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  background: var(--line-bright);
+}
+.snap-tick.major {
+  top: 5px;
+  height: 16px;
+}
+.snap-tick.on {
+  background: var(--text);
+}
+.snap-mark {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.snap-thumb {
+  position: absolute;
+  top: 5px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: var(--snap-accent, var(--cyan));
+  border: 2px solid #000;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--snap-accent, var(--cyan));
+  transition: left 0.08s steps(2);
+  pointer-events: none;
+}
+.snap.accent-magenta {
+  --snap-accent: var(--magenta);
+}
+.snap.accent-amber {
+  --snap-accent: var(--amber);
+}
+.snap.accent-violet {
+  --snap-accent: var(--violet);
+}
+.snap.accent-up {
+  --snap-accent: var(--up);
+}
+.plan-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+.plan-setup.compact .snap {
+  grid-template-columns: 80px 1fr 130px;
+}
+
+/* developer mode */
+.dev-fab {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 900;
+  font-size: 15px;
+  padding: 2px 8px;
+  background: #1a0d00;
+  color: var(--amber);
+  border: 2px dashed var(--amber);
+  cursor: pointer;
+  opacity: 0.8;
+}
+.dev-fab:hover {
+  opacity: 1;
+}
+.dev-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.dev-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.dev-grid[hidden] {
+  display: none;
+}
+.dc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(62vh, 640px);
+  overflow: auto;
+  padding-right: 4px;
+}
+.dc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dc-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.dc-row.ok {
+  border-color: var(--up);
+}
+.dc-row.issue {
+  border-color: var(--down);
+}
+.dc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.dc-note {
+  font: inherit;
+  font-size: 15px;
+  padding: 2px 6px;
+  background: var(--bg-1);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.dc-btns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 260px;
+}
+.dev-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+}
+.dev-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dev-ctx {
+  font-size: 14px;
+  color: var(--text-faint);
+  border: 1px dashed var(--line);
+  padding: 3px 6px;
+}
+.dev-note {
+  min-height: 80px;
+  resize: vertical;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  padding: 6px;
+}
+.dev-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dev-notes {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+}
+.dev-n {
+  position: relative;
+  padding: 4px 22px 4px 6px;
+  border: 1px solid var(--line);
+  background: rgba(23, 16, 66, 0.6);
+}
+.dev-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: none;
+  border: none;
+  color: var(--down);
+  cursor: pointer;
+  font-size: 16px;
+}
+.dev-levers {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dev-levers button {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 2px 8px;
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.dev-levers button:hover:not(:disabled) {
+  border-color: var(--amber);
+}
+.dev-levers select {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  max-width: 260px;
+}
+.dev-k {
+  min-width: 180px;
+  color: var(--amber);
+  font-size: 15px;
 }

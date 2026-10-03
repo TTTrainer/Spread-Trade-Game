@@ -48,6 +48,7 @@ interface AppState {
   refreshData: () => Promise<void>;
   toast: (text: string, tone?: Toast['tone']) => void;
   dismissToast: (id: number) => void;
+  clearToasts: () => void;
   setHelp: (open: boolean) => void;
 }
 
@@ -74,7 +75,15 @@ export const useApp = create<AppState>((set, get) => ({
   data: null,
   toasts: [],
   helpOpen: false,
-  go: (s) => set((st) => (st.screen === s ? st : { screen: s, stack: [...st.stack, st.screen].slice(-20) })),
+  go: (s) =>
+    set((st) => {
+      if (st.screen === s) return st;
+      // Going to a screen already on the way here (a desk's ◀ back to its hub) returns to it, so
+      // BACK from the hub then leads home instead of looping between the two.
+      const i = st.stack.lastIndexOf(s);
+      if (i >= 0) return { screen: s, stack: st.stack.slice(0, i) };
+      return { screen: s, stack: [...st.stack, st.screen].slice(-20) };
+    }),
   back: () =>
     set((st) => {
       const stack = st.stack.slice();
@@ -104,10 +113,14 @@ export const useApp = create<AppState>((set, get) => ({
     set({ data: await bridge().invoke('data.status') });
   },
   toast: (text, tone = 'info') => {
+    // The same message twice in a row just stays up.
+    if (get().toasts.some((t) => t.text === text)) return;
     const id = ++toastId;
-    set((st) => ({ toasts: [...st.toasts.slice(-4), { id, text, tone }] }));
-    setTimeout(() => get().dismissToast(id), 3800);
+    // Three at a time in the corner, each up long enough to read (longer messages stay longer).
+    set((st) => ({ toasts: [...st.toasts.slice(-2), { id, text, tone }] }));
+    setTimeout(() => get().dismissToast(id), Math.min(7000, Math.max(3500, text.length * 55)));
   },
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
+  clearToasts: () => set({ toasts: [] }),
   setHelp: (open) => set({ helpOpen: open }),
 }));

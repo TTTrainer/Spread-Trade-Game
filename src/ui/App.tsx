@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Toasts } from './components/ui';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { DevLayer } from './components/DevPanel';
 import { TooltipLayer } from './components/Tooltip';
 import { useHotkeys } from './hotkeys';
 import { useMusicDirector } from './musicDirector';
@@ -66,12 +68,41 @@ export function App() {
   const Comp = SCREENS[screen] ?? (() => <PlaceholderScreen screen={screen} />);
   return (
     <>
-      {settingsLoaded && <Comp />}
+      {settingsLoaded && (
+        <ErrorBoundary name={`screen ${screen}`} key={screen}>
+          <Comp />
+        </ErrorBoundary>
+      )}
       <HelpModal />
-      {(screen === 'run' || screen === 'career') && <DialogueBox />}
+      {(screen === 'run' || screen === 'career') && (
+        <ErrorBoundary name="dialogue" quiet>
+          <DialogueBox />
+        </ErrorBoundary>
+      )}
+      <DevLayer />
       <Toasts />
       <TooltipLayer />
-      <div className="crt-overlay" aria-hidden="true" />
+      <CrtOverlay />
     </>
   );
+}
+
+/**
+ * The CRT scanlines and vignette, with a brief flicker every few seconds. The flicker is switched
+ * on by a timer rather than a CSS animation that never stops: a running animation on a
+ * full-screen layer makes the browser recomposite the whole window every frame, which halved the
+ * frame rate on PCs without a graphics card.
+ */
+function CrtOverlay() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const el = ref.current;
+      if (!el || document.documentElement.dataset.reducedMotion === 'true') return;
+      el.classList.add('flick');
+      setTimeout(() => el.classList.remove('flick'), 260);
+    }, 6000);
+    return () => clearInterval(id);
+  }, []);
+  return <div ref={ref} className="crt-overlay" aria-hidden="true" data-testid="crt-overlay" />;
 }

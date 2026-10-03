@@ -55,14 +55,16 @@ export function formingBar(path: number[], t: number): OHLC {
 }
 
 /**
- * How close the day came to a short strike: 1 when it traded through one, rising from 0 as the
- * nearest extreme comes within 2% of it.
+ * How close the day came to a short strike: 1 when price touched it or sits past it (below a
+ * short put, above a short call), rising from 0 as the nearest extreme comes within 2% of it.
+ * The side matters: a stock that gapped far below a short put is not "safe" for being far away.
  */
-export function strikeTension(shortStrikes: number[], bar: OHLC): number {
+export function strikeTension(shorts: { strike: number; right: 'C' | 'P' }[], bar: OHLC): number {
   let best = 0;
-  for (const k of shortStrikes) {
-    if (bar.low <= k && k <= bar.high) return 1;
-    const d = Math.min(Math.abs(bar.low - k), Math.abs(bar.high - k)) / Math.max(1e-9, k);
+  for (const { strike: k, right } of shorts) {
+    const reached = right === 'P' ? bar.low <= k : bar.high >= k;
+    if (reached) return 1;
+    const d = (right === 'P' ? bar.low - k : k - bar.high) / Math.max(1e-9, k);
     best = Math.max(best, 1 - d / 0.02);
   }
   return Math.max(0, best);

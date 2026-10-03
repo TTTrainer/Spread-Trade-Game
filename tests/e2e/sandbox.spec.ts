@@ -21,10 +21,26 @@ async function ffUntilDone(page: Page, maxDecisions = 40): Promise<string[]> {
       () => (window as unknown as { __stg: Stg }).__stg.trading.getState().ff,
     );
     if (state === 'done') return seen;
+    // Days with news (and recaps) hold the clock; keep it going.
+    if (state === 'paused') await page.keyboard.press('Space');
     if (state === 'decision') {
       const title = (await page.getByTestId('decision-modal').locator('h2').textContent()) ?? '';
       seen.push(title);
-      if (seen.length === 1) await shot(page, '03-decision-1920');
+      if (seen.length === 1) {
+        // The decision shows the last weeks of candles, and can step aside to review the full
+        // chart (with the solid expiration line) without losing the choice.
+        await expect(page.getByTestId('dp-mini-chart')).toBeVisible();
+        await shot(page, '03-decision-1920');
+        await page.keyboard.press('v');
+        await expect(page.getByTestId('decision-dock')).toBeVisible();
+        await expect(page.getByTestId('decision-modal')).toBeHidden();
+        await expect(page.getByTestId('exp-line')).toHaveCount(1);
+        await shot(page, '03-decision-review-1920');
+        await shot(page, '03-decision-review-1366', { width: 1366, height: 768 });
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.getByTestId('dp-back').click();
+        await expect(page.getByTestId('decision-modal')).toBeVisible();
+      }
       // Hold through everything so the trade reaches expiration.
       const hold = page.getByTestId('dp-hold');
       if (await hold.count()) await hold.click();
@@ -38,6 +54,8 @@ async function ffUntilDone(page: Page, maxDecisions = 40): Promise<string[]> {
 
 test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine', async () => {
   const { app, page } = await launchGame();
+  // Saved settings load just after launch; changing one before that would be overwritten.
+  await expect(page.getByTestId('title-screen')).toBeVisible();
   await page.evaluate(() => {
     const stg = (window as unknown as { __stg: Stg }).__stg;
     stg.app.getState().updateSettings((s) => ({
@@ -48,6 +66,7 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
         ffSecondsPerDay: 0.06,
         confirmOrders: true,
         pauseOnTest: false,
+        dayPace: '4',
       },
     }));
   });
@@ -67,15 +86,24 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   await shot(page, '03-brief-1920');
   await shot(page, '03-brief-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });
+  for (const w of ['bw-street', 'bw-price', 'bw-momentum', 'bw-vol', 'bw-market', 'bw-timeline', 'bw-news'])
+    await expect(page.getByTestId(w).first()).toBeVisible();
+  await page.getByTestId('brief-expand').click();
+  await expect(page.getByTestId('brief-big')).toBeVisible();
+  await shot(page, '03-brief-big');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('brief-big')).toBeHidden();
 
-  // Call the shot (up, 70%) with hotkeys; the panel flips to the trade view. Then sell the
+  // "Up" picks a bull put and the panel flips to the trade view; 70% conviction; then sell the
   // default ~30-delta bull put at market.
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+3');
-  await expect(page.getByTestId('call-3')).toHaveClass(/selected/);
+  await expect(page.getByTestId('view-chip')).toContainText('UP');
   await expect(page.getByTestId('payoff-chart')).toBeVisible();
   await expect(page.getByTestId('stat-pop')).toBeVisible();
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
+  // The planned trade's expiration is a dotted line on the chart (or an arrow at its edge).
+  await expect(page.getByTestId('exp-line')).toHaveCount(1);
   await shot(page, '03-builder-1920');
   await shot(page, '03-builder-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -84,6 +112,22 @@ test('sandbox: place a bull put, fast-forward to expiry, P/L matches the engine'
   await page.getByTestId('confirm-send').click();
   await expect(page.getByTestId('toasts')).toContainText('Filled');
   await expect(page.getByTestId('lineup')).toContainText('%');
+
+  // The roll dialog shows where the strikes go and stay-versus-roll payoffs (cancelled here).
+  await page.keyboard.press('Control+1');
+  await page.getByRole('button', { name: 'ROLL', exact: true }).first().click();
+  const roll = page.getByTestId('roll-dialog');
+  await expect(roll.getByTestId('roll-payoff')).toBeVisible();
+  await expect(roll.getByTestId('roll-compare')).toContainText('Chance of profit');
+  await roll.getByTestId('roll-shift').getByRole('slider').focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(roll.getByTestId('roll-shift')).toContainText('down 1');
+  await shot(page, '03-roll-1920');
+  await shot(page, '03-roll-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await roll.getByRole('button', { name: 'CANCEL' }).click();
+  await expect(roll).toBeHidden();
+  await page.keyboard.press('Control+2');
 
   // Start the clock and hold through every decision point to expiration.
   await page.keyboard.press('Space');

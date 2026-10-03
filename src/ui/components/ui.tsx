@@ -12,8 +12,15 @@ export function Pnl({ cents, big = false, testId }: { cents: number; big?: boole
   );
 }
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
+
+/** On a Mac, Alt is the Option key (⌥); Ctrl works as Control or Command. */
+export function keyLabel(binding: string): string {
+  return IS_MAC ? binding.replace(/\bAlt\+/g, '⌥').replace(/\bAlt\b/g, '⌥') : binding;
+}
+
 export function Kbd({ children }: { children: ReactNode }) {
-  return <span className="kbd">{children}</span>;
+  return <span className="kbd">{typeof children === 'string' ? keyLabel(children) : children}</span>;
 }
 
 export function Meter({
@@ -108,6 +115,15 @@ export function Modal({
   wide?: boolean;
   testId?: string;
 }) {
+  // Escape closes any closable dialog.
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <motion.div
@@ -165,6 +181,8 @@ export function CountUp({
   );
 }
 
+const TOAST_ICONS: Record<string, string> = { good: '✔', bad: '✖', warn: '⚠', info: '◆' };
+
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   return (
@@ -175,8 +193,12 @@ export function Toasts() {
           className={`toast tone-${t.tone}`}
           initial={{ x: 60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 26 }}
         >
-          {t.text}
+          <span className="toast-ico" aria-hidden="true">
+            {TOAST_ICONS[t.tone] ?? '◆'}
+          </span>
+          <span>{t.text}</span>
         </motion.div>
       ))}
     </div>

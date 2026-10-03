@@ -1,125 +1,440 @@
-import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { TUTORIAL_PARTS, TUTORIAL_STEPS, type TutEnter } from '../../content/tutorial';
 import type { RunEngine } from '../../engine/run/engine';
+import { STRUCTURES } from '../../engine/strategies/structures';
+import { sfx } from '../../audio/sfx';
 import { Portrait } from '../components/Portrait';
+import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
-import '../screens/modes.css';
+import {
+  TUT_START,
+  acknowledge,
+  activeLesson,
+  freshRegions,
+  hiddenRegions,
+  lessonText,
+  partOf,
+  selectorFor,
+  settle,
+  tutorialCss,
+  type ActiveLesson,
+  type TutCtx,
+  type TutProgress,
+} from '../tutorial/flow';
+import './tutorial.css';
 
-interface Tip {
-  key: string;
-  title: string;
-  text: string;
-}
+const FULL_STUDIES = ['bb', 'rsi', 'vol', 'em'] as const;
+const LINE_STEP = TUTORIAL_STEPS.findIndex((s) => s.id === 'line');
 
-/** Ines's next hint, worked out from what is on screen (the tutorial never blocks a click). */
-function tipFor(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tip {
+/** A snapshot of the run for the lesson rules (cheap: read on each render of the coach). */
+function contextOf(e: RunEngine, t: ReturnType<typeof useTrading.getState>): TutCtx {
   const st = e.state;
   const r = st.round;
   const s = t.session;
-  switch (st.phase) {
-    case 'tally':
-      return {
-        key: 'tally',
-        title: 'The tally',
-        text: 'Each closed trade prints a receipt: chips × mult, in slot order. Winners fill the meter; losers drain it (less than they cost you, unless you had no stop). Beat the target to pass the round.',
-      };
-    case 'shop':
-      return {
-        key: 'shop',
-        title: 'The shop',
-        text: 'Cartridges change how trades score, left to right, so order matters. Analysts give you information, not luck. Buy something you can afford, then LEAVE THE SHOP.',
-      };
-    case 'review_intro':
-      return {
-        key: 'review',
-        title: 'A Review',
-        text: "A boss round. COMPLY-3000 reads the rule; the lineup is dealt only from matching markets. The Annual Review ends the year. Press START THE REVIEW when you're ready.",
-      };
-    case 'victory':
-    case 'defeat':
-      return {
-        key: 'end',
-        title: 'That is the loop',
-        text: "Lineup, call, build, clock, tally, shop, Review. Practice never counts against you. The mug is yours. Career is where it's real: every trade lands in your Stats.",
-      };
-    default:
-      break;
-  }
-  if (!s) return { key: 'wait', title: 'One second', text: 'Dealing the lineup…' };
-  const card = t.selectedCardId ? s.cards.find((c) => c.id === t.selectedCardId) : null;
-  const anyPosition = s.positions.length > 0;
-  if (r.index === 1 && !anyPosition && !r.clockStarted)
-    return {
-      key: 'm2',
-      title: 'Month 2',
-      text: 'You have more than one ticket: try two trades on different cards. If nothing looks right, reroll (R), or skip the round (K) before trading for −10 stress and a Tag.',
-    };
-  if (!card?.call && !anyPosition)
-    return {
-      key: 'call',
-      title: 'Call your shot',
-      text: 'Each card is one real stock at one real moment, disguised. Read the chart, then press 1–5 (down big … up big). Shift+1–5 sets how sure you are. Calls are graded on calibration, not bravado.',
-    };
-  if (!anyPosition)
-    return {
-      key: 'build',
-      title: 'Build a bull put',
-      text: 'A bull put collects a credit and wins if the stock stays above the short strike. Pick an expiration near 30 days, check POP and max loss on the right, then SELL (Alt+S). Brackets (take profit at 50%, stop at 2× credit) come on by default.',
-    };
-  if (!r.clockStarted)
-    return {
-      key: 'clock',
-      title: 'Start the clock',
-      text: 'Placed. Add another trade on a different card if you like, then press Space (START CLOCK). Once the clock runs, no new trades this round.',
-    };
-  if (t.ff === 'decision')
-    return {
-      key: 'decision',
-      title: 'A decision point',
-      text: 'The clock paused. Closing at your plan scores +1 mult and calms you down. Declining your own stop costs stress, and the loss counts more on the meter.',
-    };
+  const phase =
+    st.phase === 'victory' || st.phase === 'defeat'
+      ? 'end'
+      : st.phase === 'tally' || st.phase === 'shop' || st.phase === 'review_intro'
+        ? st.phase
+        : 'round';
+  const open = s ? s.openPositions().length + s.orders.length : 0;
+  const bias = STRUCTURES[t.builder.structureId]?.bias;
   return {
-    key: 'ff',
-    title: 'Fast-forward',
-    text: 'Days fly by, one candle at a time. Headlines slide in on event days. Positions close at your brackets, at a decision, or at expiration.',
+    phase,
+    round: r.index,
+    placed: s ? s.positions.length + s.orders.length : 0,
+    closed: s ? s.positions.filter((p) => p.status !== 'open').length : 0,
+    day: s ? s.dayIndex : 0,
+    touched: t.touched,
+    recap: !!t.recap && (t.ff === 'paused' || t.ff === 'decision'),
+    decision: t.ff === 'decision',
+    stress: st.stress,
+    canEndRound: !!s && open === 0 && !s.inDay && r.clockStarted && !r.sitOut,
+    strikeKey: JSON.stringify([t.builder.delta, t.builder.anchor, t.builder.structureId]),
+    side: bias === 'bear' ? 'below' : 'above',
   };
 }
 
+function runEnter(what: TutEnter | undefined): void {
+  const t = useTrading.getState();
+  if (what === 'simpleChart') useTrading.setState({ studies: ['vol'], chainOpen: false });
+  else if (what === 'emChart') useTrading.setState({ studies: ['vol', 'em'], chainOpen: false });
+  else if (what === 'fullChart') useTrading.setState({ studies: [...FULL_STUDIES] });
+  else if (what === 'briefTab') t.setRightTab('brief');
+  else if (what === 'tradeTab') t.setRightTab('trade');
+}
+
+/** The target's box on screen, re-read a few times a second (things move as the desk lights up). */
+function useTargetRect(selector: string | null): DOMRect | null {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    if (!selector) {
+      setRect(null);
+      return;
+    }
+    const read = () => {
+      let el: Element | null = null;
+      try {
+        el = document.querySelector(selector);
+      } catch {
+        el = null;
+      }
+      const r = el?.getBoundingClientRect() ?? null;
+      const next = r && r.width > 2 && r.height > 2 ? r : null;
+      setRect((prev) =>
+        prev &&
+        next &&
+        prev.x === next.x &&
+        prev.y === next.y &&
+        prev.width === next.width &&
+        prev.height === next.height
+          ? prev
+          : next,
+      );
+    };
+    read();
+    const id = window.setInterval(read, 250);
+    window.addEventListener('resize', read);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('resize', read);
+    };
+  }, [selector]);
+  return rect;
+}
+
+const PAD = 6;
+const BUBBLE_W = 380;
+
+/**
+ * What a bubble should never sit on if it can help it: the buttons and numbers a lesson is about
+ * to ask for, and the readouts the player is watching.
+ */
+const KEEP_CLEAR = [
+  '[data-testid="sell-button"]',
+  '[data-testid="setup-sliders"]',
+  '[data-testid="goal-card"]',
+  '.rtb-score',
+  '[data-testid="ff-bar"]',
+  '[data-testid="leave-shop"]',
+  '[data-testid="tally-continue"]',
+  '[data-testid="tally-meter"]',
+  '[data-testid="day-recap"]',
+  '[data-testid="decision-modal"]',
+  '[data-testid="pos-hud"]',
+  '.shop-card',
+  '.os-taskbar',
+];
+
+type Box = { x: number; y: number; w: number; h: number };
+const overlap = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+  Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
+/**
+ * Put the bubble next to what it talks about, where it covers the least: never the spotlight if
+ * there's any other room, then as little of the key buttons and readouts as possible, then as
+ * close to the spotlight as it can get (so the eye doesn't travel far to act on it).
+ */
+export function bubblePlace(
+  rect: DOMRect | null,
+  centered: boolean,
+  size: { w: number; h: number },
+  avoid: Box[] = [],
+): React.CSSProperties {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const { w, h } = size;
+  if (!rect) return centered ? { left: vw / 2 - w / 2, top: vh * 0.3 } : { right: 24, bottom: 24 };
+  const gap = PAD + 16;
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const raw: { x: number; y: number }[] = [
+    { x: rect.right + gap, y: rect.top },
+    { x: rect.right + gap, y: cy - h / 2 },
+    { x: rect.right + gap, y: rect.bottom - h },
+    { x: rect.left - gap - w, y: rect.top },
+    { x: rect.left - gap - w, y: cy - h / 2 },
+    { x: rect.left - gap - w, y: rect.bottom - h },
+    { x: rect.left, y: rect.bottom + gap },
+    { x: cx - w / 2, y: rect.bottom + gap },
+    { x: rect.right - w, y: rect.bottom + gap },
+    { x: rect.left, y: rect.top - gap - h },
+    { x: cx - w / 2, y: rect.top - gap - h },
+    { x: rect.right - w, y: rect.top - gap - h },
+    // Inside a big spotlight (the chart): its older, left side matters least.
+    { x: rect.left + 16, y: rect.top + 16 },
+    { x: rect.left + 16, y: rect.bottom - h - 16 },
+  ];
+  const target: Box = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+  let best: { x: number; y: number; score: number } | null = null;
+  for (const c of raw) {
+    const x = Math.max(12, Math.min(vw - w - 12, c.x));
+    const y = Math.max(12, Math.min(vh - h - 12, c.y));
+    const me: Box = { x, y, w, h };
+    const onTarget = overlap(me, target);
+    const onKeep = avoid.reduce((a, b) => a + overlap(me, b), 0);
+    const dist = Math.hypot(x + w / 2 - cx, y + h / 2 - cy);
+    const score = onTarget * 4 + onKeep * 2 + dist * 60;
+    if (!best || score < best.score) best = { x, y, score };
+  }
+  return { left: best!.x, top: best!.y };
+}
+
+/** The boxes a bubble should keep clear of (minus the spotlight itself, which is scored apart). */
+function keepClearBoxes(selector: string | null): Box[] {
+  const out: Box[] = [];
+  for (const sel of KEEP_CLEAR) {
+    let els: NodeListOf<Element>;
+    try {
+      els = document.querySelectorAll(sel);
+    } catch {
+      continue;
+    }
+    els.forEach((el) => {
+      if (selector && el.matches(selector)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width > 2 && r.height > 2) out.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+    });
+  }
+  return out;
+}
+
+/**
+ * Ines's lessons. The desk starts almost empty; each lesson puts a spotlight on one thing, says
+ * what it's for and lights it up for good. Lessons that only explain wait for GOT IT (Enter);
+ * the rest wait for the player to do the thing.
+ */
 export function TutorialCoach({ e }: { e: RunEngine }) {
   useRun((s) => s.version);
-  const t = useTrading();
-  const [hidden, setHidden] = useState(false);
-  const tip = tipFor(e, t);
-  if (hidden)
-    return (
-      <button
-        className="pixel-btn coach-show"
-        onClick={() => setHidden(false)}
-        style={{ position: 'fixed', left: 262, bottom: 262, zIndex: 800 }}
-      >
-        INES ▲
-      </button>
-    );
+  // Re-read only when something a lesson watches changes (not on every animation frame).
+  useTrading((s) =>
+    [
+      s.version,
+      s.ff,
+      !!s.recap,
+      s.touched,
+      s.builder.delta,
+      s.builder.anchor,
+      s.builder.structureId,
+      s.selectedCardId,
+      s.session?.dayIndex,
+    ].join('|'),
+  );
+  const t = useTrading.getState();
+  const saved = useApp((s) => s.settings.game.tutorialProgress);
+  const updateSettings = useApp((s) => s.updateSettings);
+  const [prog, setProg] = useState<TutProgress>(saved ?? TUT_START);
+  const ctx = contextOf(e, t);
+  const lessonKey = useRef<string | null>(null);
+  const strikeBase = useRef<string | null>(null);
+
+  // Lessons the player has already done (or that this part of the run has passed) move on.
+  const settled = settle(prog, ctx, strikeBase.current);
+  useEffect(() => {
+    if (settled !== prog) setProg(settled);
+  });
+  const active: ActiveLesson = activeLesson(settled, ctx);
+  const lesson = active?.lesson ?? null;
+
+  // Save where the lessons are, so a resumed tutorial picks up at the same one.
+  useEffect(() => {
+    updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: prog } }));
+  }, [prog]);
+
+  // A new lesson: its sound, its setup, and a fresh baseline for "move the strike".
+  useEffect(() => {
+    const key = lesson?.id ?? null;
+    if (key === lessonKey.current) return;
+    lessonKey.current = key;
+    strikeBase.current = ctx.strikeKey;
+    if (!lesson) return;
+    sfx(active?.kind === 'moment' ? 'select' : 'deal');
+    if (active?.kind === 'step') runEnter(active.lesson.enter);
+  });
+
+  // The chart starts plain (candles and volume) and gets its studies back with the whole desk.
+  useEffect(() => {
+    if (!prog.skipped && prog.idx < TUTORIAL_STEPS.findIndex((s) => s.id === 'everything'))
+      runEnter('simpleChart');
+    return () => useTrading.setState({ clockHold: null });
+  }, []);
+
+  // The planned trade stays off the chart until Ines has explained the chart and asked up or down.
+  const planHidden = !settled.skipped && settled.idx < LINE_STEP && ctx.placed === 0 && ctx.round === 0;
+  useEffect(() => {
+    useTrading.setState({ planHidden });
+  }, [planHidden]);
+  useEffect(() => () => useTrading.setState({ planHidden: false }), []);
+
+  // The clock stays locked while a lesson before the first trade is up.
+  const hold = active?.kind === 'step' && !!active.lesson.holdClock;
+  useEffect(() => {
+    useTrading.setState({
+      clockHold: hold ? 'One thing at a time: Ines will start the clock with you in a moment.' : null,
+    });
+  }, [hold]);
+
+  const hidden = hiddenRegions(settled, active);
+  const fresh = freshRegions(active);
+  const css = useMemo(() => tutorialCss(hidden, fresh), [hidden.join(' '), fresh.join(' ')]);
+
+  const selector = lesson?.target ? selectorFor(lesson.target) : null;
+  const rect = useTargetRect(selector);
+  const wait = active?.kind === 'step' ? active.lesson.wait : 'next';
+  const dim = !!lesson && (lesson.dim ?? (wait !== 'phase' && (!!selector || wait === 'next')));
+  // Reading lessons hold the rest of the screen still; doing lessons leave it all clickable.
+  const block = dim && (wait === 'next' || wait === 'view');
+
+  const ok = () => {
+    sfx('click');
+    setProg((p) => acknowledge(settle(p, ctx, strikeBase.current), active));
+  };
+  const skipAll = () => {
+    sfx('whoosh');
+    runEnter('fullChart');
+    setProg((p) => ({ ...p, skipped: true }));
+  };
+  const pick = (up: boolean) => {
+    void useTrading.getState().setCall(up ? 3 : 1);
+    ok();
+  };
+
+  useEffect(() => {
+    if (!lesson || (wait !== 'next' && wait !== 'strike')) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === 'Enter' && !ev.repeat && !document.querySelector('.modal-backdrop')) ok();
+    };
+    // Capture, like the game's hotkeys, which stop Enter from reaching later listeners.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
+
+  // The bubble's real size, so placement knows what it has to fit.
+  const bubbleRef = useRef<HTMLDivElement | null>(null);
+  const [bubbleH, setBubbleH] = useState(230);
+  useEffect(() => {
+    const hNow = bubbleRef.current?.offsetHeight;
+    if (hNow && Math.abs(hNow - bubbleH) > 4) setBubbleH(hNow);
+  });
+  const part = partOf(settled);
+  const hole = rect
+    ? {
+        left: rect.left - PAD,
+        top: rect.top - PAD,
+        width: rect.width + PAD * 2,
+        height: rect.height + PAD * 2,
+      }
+    : null;
+
   return (
-    <div
-      className="panel coach"
-      data-testid="tutorial-coach"
-      data-step={tip.key}
-      role="note"
-      aria-live="polite"
-    >
-      <Portrait id="ines" mood="happy" scale={1} />
-      <div>
-        <div className="coach-step">INES · TUTORIAL · {tip.title.toUpperCase()}</div>
-        <p>{tip.text}</p>
-      </div>
-      <button
-        className="pixel-btn"
-        onClick={() => setHidden(true)}
-        title="Hide (the tips keep up in the background)"
-      >
-        ▼
-      </button>
-    </div>
+    <>
+      <style data-testid="tutorial-style">{css}</style>
+      {dim && (
+        <div className={`tut-dim ${hole ? '' : 'full'}`} aria-hidden="true">
+          {hole && <div className="tut-hole" style={hole} />}
+        </div>
+      )}
+      {block && hole && <Blockers hole={hole} />}
+      {block && !hole && <div className="tut-block" style={{ inset: 0 }} />}
+      {!dim && hole && <div className="tut-ring" style={hole} aria-hidden="true" />}
+      {lesson?.id === 'strike' && rect && (
+        // A hand showing the move: press on the tag and drag it up or down.
+        <div
+          className="tut-drag"
+          style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }}
+          aria-hidden="true"
+        >
+          <span className="td-hand">☝</span>
+          <span className="td-arrows">⇕</span>
+        </div>
+      )}
+      <AnimatePresence mode="wait">
+        {lesson && (
+          <motion.div
+            key={lesson.id}
+            className={`tut-bubble panel ${active?.kind === 'moment' ? 'moment' : ''}`}
+            ref={bubbleRef}
+            style={bubblePlace(rect, !selector && dim, { w: BUBBLE_W, h: bubbleH }, keepClearBoxes(selector))}
+            initial={{ opacity: 0, y: 14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+            data-testid="tutorial-coach"
+            data-step={lesson.id}
+            role="dialog"
+            aria-live="polite"
+          >
+            <div className="tut-head">
+              <Portrait id="ines" mood="happy" scale={1} />
+              <div>
+                <div className="tut-kicker num">
+                  {active?.kind === 'moment'
+                    ? 'INES · SOMETHING NEW'
+                    : `INES · PART ${part} OF ${TUTORIAL_PARTS.length} · ${TUTORIAL_PARTS[part - 1].toUpperCase()}`}
+                </div>
+                <div className="tut-title">{lesson.title}</div>
+              </div>
+            </div>
+            <p className="tut-text">{lessonText(lesson.text, ctx)}</p>
+            <div className="tut-actions">
+              {wait === 'view' ? (
+                <>
+                  <button className="pixel-btn tut-up" onClick={() => pick(true)} data-testid="tut-up">
+                    ▲ UP <span className="dim">or flat</span>
+                  </button>
+                  <button className="pixel-btn tut-down" onClick={() => pick(false)} data-testid="tut-down">
+                    ▼ DOWN
+                  </button>
+                </>
+              ) : wait === 'next' ? (
+                <button className="pixel-btn primary" onClick={ok} data-testid="tut-next">
+                  GOT IT <span className="kbd">Enter</span>
+                </button>
+              ) : wait === 'strike' ? (
+                <button className="pixel-btn" onClick={ok} data-testid="tut-next">
+                  KEEP IT <span className="kbd">Enter</span>
+                </button>
+              ) : (
+                <span className="tut-doing num">
+                  {wait === 'placed'
+                    ? '▶ waiting for SELL'
+                    : wait === 'day'
+                      ? '▶ waiting for a day to play'
+                      : '▶ your move'}
+                </span>
+              )}
+              <button className="tut-skip" onClick={skipAll} data-testid="tut-skip">
+                skip lessons
+              </button>
+            </div>
+            <div className="tut-dots" aria-hidden="true">
+              {TUTORIAL_PARTS.map((name, i) => (
+                <i key={name} className={i + 1 < part ? 'done' : i + 1 === part ? 'now' : ''} />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/** Four clear panes around the spotlight that catch clicks, so only the lit area answers. */
+function Blockers({ hole }: { hole: { left: number; top: number; width: number; height: number } }) {
+  const r = hole.left + hole.width;
+  const b = hole.top + hole.height;
+  return (
+    <>
+      <div className="tut-block" style={{ left: 0, top: 0, right: 0, height: Math.max(0, hole.top) }} />
+      <div className="tut-block" style={{ left: 0, top: b, right: 0, bottom: 0 }} />
+      <div
+        className="tut-block"
+        style={{ left: 0, top: hole.top, width: Math.max(0, hole.left), height: hole.height }}
+      />
+      <div className="tut-block" style={{ left: r, top: hole.top, right: 0, height: hole.height }} />
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { STRUCTURES } from '../../src/engine/strategies/structures';
 import {
   adx,
   atr,
@@ -171,7 +172,44 @@ describe('trade planner', () => {
       params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
       qty: 1,
     });
-    expect(cc.collateralCents).toBeGreaterThan(900_000);
+    // A covered call is the call alone against 500 shares you already own: a credit, no cash
+    // set aside, bearish-leaning, at most 5 contracts, and risk measured at its automatic stop
+    // (2x the premium by default) plus a 25% gap allowance.
+    expect(cc.ok).toBe(true);
+    expect(cc.legs).toHaveLength(1);
+    expect(cc.legs[0]).toMatchObject({ kind: 'option', right: 'C', ratio: -1 });
+    expect(cc.mid).toBeLessThan(0);
+    expect(cc.collateralCents).toBe(0);
+    const premium = -cc.metrics!.entryNet;
+    expect(cc.riskCents).toBe(Math.round(premium * 2 * 1.25 * 100 * 100));
+    expect(cc.maxLossCents).toBe(cc.riskCents);
+    // A tighter stop is less risk; a stop can't be set below half the premium.
+    const ccStop = (stopMult: number) =>
+      planTrade({
+        ...input,
+        equityCents: 5_000_000,
+        structureId: 'covered_call',
+        params: { expiration: '2025-01-31', delta: 0.3, width: 0 },
+        qty: 1,
+        stopMult,
+      });
+    expect(ccStop(1).riskCents).toBeLessThan(cc.riskCents);
+    const floor = ccStop(0.1);
+    expect(floor.riskCents).toBe(Math.round(premium * 0.5 * 1.25 * 100 * 100));
+    expect(STRUCTURES.covered_call.bias).toBe('bear');
+    const ccAt = (delta: number, qty = 1) =>
+      planTrade({
+        ...input,
+        equityCents: 5_000_000,
+        structureId: 'covered_call',
+        params: { expiration: '2025-01-31', delta, width: 0 },
+        qty,
+      });
+    // Further from the price, less premium but a better chance of keeping it.
+    expect(ccAt(0.15).metrics!.pop).toBeGreaterThan(ccAt(0.3).metrics!.pop);
+    expect(ccAt(0.3, 5).reason ?? '').not.toContain('500 shares');
+    expect(ccAt(0.3, 6).ok).toBe(false);
+    expect(ccAt(0.3, 6).reason).toContain('500 shares');
     expect(
       planTrade({
         ...input,

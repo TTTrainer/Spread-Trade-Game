@@ -6,18 +6,19 @@ import type {
   OrderSpec,
   PlaceResult,
 } from '../../engine/trading/session';
-import type { TradePlan } from '../../engine/trading/plan';
+import { maxQtyFor, premiumOf, type TradePlan } from '../../engine/trading/plan';
 import { buildDebrief, type TradeDebrief } from '../../engine/trading/debrief';
 import { computeFacts } from '../../engine/run/facts';
 import { STRUCTURES, expirationsOf, reverseOf, stepStrike } from '../../engine/strategies/structures';
 import type { Leg, OptionLeg, StructureId } from '../../engine/strategies/types';
 import type { Bucket } from '../../engine/scoring/calls';
-import type { DecisionAction } from '../../engine/lifecycle/types';
+import type { DecisionAction, Position } from '../../engine/lifecycle/types';
 import { brier } from '../../engine/scoring/calls';
 import { diffDays } from '../../engine/calendar';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
 import { fitStructure } from '../../engine/strategies/fit';
+import { convictionQty, CONVICTION, impliedBucket } from '../../engine/trading/conviction';
 import { bridge, hasBridge } from '../bridge';
 import { useApp } from './app';
 import { checkAchievements } from '../achievements';
@@ -25,6 +26,8 @@ import type { TradeRow } from '../../shared/userData';
 import type { DayPace } from '../../shared/settings';
 import { lastMark, optionLegsOf } from '../../engine/lifecycle/position';
 import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
+import { crumb } from '../trail';
+import { payoutBusy, usePayout } from './payout';
 
 export interface BuilderState {
   structureId: StructureId;
@@ -33,6 +36,8 @@ export interface BuilderState {
   delta: number;
   width: number;
   anchor: number | null;
+  /** A condor's short call strike (dragged on the chart). */
+  callAnchor: number | null;
   qty: number;
   legs: Leg[] | null;
   orderType: 'limit' | 'market';
@@ -43,6 +48,8 @@ export interface BuilderState {
   targetPct: number;
   stopMult: number;
   earningsAck: boolean;
+  /** Long straddles and strangles: call the big move down instead of up. */
+  flipVol: boolean;
 }
 
 export type FFState = 'idle' | 'running' | 'paused' | 'decision' | 'done';
@@ -67,6 +74,25 @@ export interface DayAnim {
       prevClose: number;
     }
   >;
+}
+
+/** The end-of-day report: what each trade did, what happened, and the news. */
+export interface DayRecap {
+  /** Cards with no trade yet: how each moved today (they move with the clock in a Career round). */
+  watch: { cardId: string; movePct: number }[];
+  id: number;
+  day: number;
+  spyPct: number | null;
+  trades: {
+    positionId: string;
+    cardId: string;
+    prevCents: number;
+    finalCents: number;
+    closed: boolean;
+    tension: number;
+    movePct: number;
+  }[];
+  news: { text: string; tone: 'good' | 'bad' | 'warn' | 'info'; cardId: string }[];
 }
 
 /** "+$18" rising off a position when its day settles. */
@@ -123,8 +149,12 @@ interface TradingState {
   builder: BuilderState;
   ff: FFState;
   panel: Panel;
-  /** The right panel: the news brief or the trade view (null follows the card: brief until a call). */
+  /** The right panel: the news brief or the trade view (null follows the card: brief until you build). */
   rightTab: 'brief' | 'trade' | null;
+  /** The player has started shaping a trade on this card (the right panel flips to TRADE). */
+  touched: boolean;
+  /** The call this build makes (read from the structure and strikes). */
+  impliedCall: () => { bucket: Bucket; confidence: number } | null;
   feed: FeedItem[];
   whatIf: { pricePct: number; days: number; ivPts: number };
   studies: StudyId[];
@@ -149,9 +179,31 @@ interface TradingState {
   floats: DayFloat[];
   /** Why the clock paused itself (a short strike being tested), shown on the chart. */
   testNote: string | null;
+  recap: DayRecap | null;
+  /** The last day had news worth reading: the clock waits (auto paces only). */
+  recapHold: boolean;
+  dismissRecap: () => void;
+  /** A strike handle is being dragged: the chart hides everything but the trade being shaped. */
+  dragging: boolean;
+  setDragging: (v: boolean) => void;
+  /** The tutorial keeps the clock locked during a lesson; this is what it says if you try. */
+  clockHold: string | null;
+  /** The tutorial keeps the planned trade off the chart until it has explained the chart itself. */
+  planHidden: boolean;
+  /** A decision is tucked into a bar so the full chart can be reviewed. */
+  reviewChart: boolean;
+  setReviewChart: (v: boolean) => void;
+  /** The option chain tab replaces the chart. */
+  chainOpen: boolean;
+  setChainOpen: (v: boolean) => void;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
-  stamp: { id: number; title: string; text: string; credit: boolean } | null;
+  stamp: { id: number; title: string; text: string; credit: boolean; plan?: boolean } | null;
+  /**
+   * Money landing: a credit flies into the BALANCE readout; a profit taken flies into the round
+   * meter (or EQUITY outside a run).
+   */
+  deposit: { id: number; cents: number; label?: string; to?: string; profit?: boolean } | null;
   /** The structures this screen allows (a desk's playbook); null = all. */
   allowed: StructureId[] | null;
   setAllowed: (ids: StructureId[] | null) => void;
@@ -176,8 +228,11 @@ interface TradingState {
       external?: ExternalDispatch | null;
       maxPositions?: number | null;
       onChange?: (() => void) | null;
+      blockReason?: ((cardId: string, structureId: StructureId) => string | null) | null;
     },
   ) => void;
+  /** Rules outside the market that stop a trade (a Career round's tickets, window, sit-out). */
+  blockReason: ((cardId: string, structureId: StructureId) => string | null) | null;
   reset: () => void;
   bump: () => void;
   select: (cardId: string) => void;
@@ -214,15 +269,19 @@ const defaultBuilder = (): BuilderState => ({
   delta: useApp.getState().settings.game.shortDelta,
   width: 2,
   anchor: null,
+  callAnchor: null,
   qty: 1,
   legs: null,
-  orderType: 'limit',
+  // Market by default: it fills now at the price you see. Limits are an option you choose.
+  orderType: 'market',
   limitFrac: 0.5,
   autoSend: !useApp.getState().settings.game.confirmOrders,
   bracketsOn: true,
-  targetPct: 0.5,
-  stopMult: 2,
+  // The plan is set once (Settings, or when starting a run), not per ticket.
+  targetPct: useApp.getState().settings.game.planTargetPct,
+  stopMult: useApp.getState().settings.game.planStopMult,
   earningsAck: false,
+  flipVol: false,
 });
 
 /** One ledger row for a closed trade. Used by every mode that records to Stats. */
@@ -291,10 +350,36 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Whether a trade can be shaped and sent right now: before the clock, or between days while it is
+ * paused (a Career round lets new trades start on a later day). Never while a day is playing.
+ */
+/**
+ * The selected card, but only while it is still on the table. A reroll swaps cards before the
+ * store hears about it, and components that redraw on a timer must not ask for a removed card.
+ */
+export function liveCardId(t: Pick<TradingState, 'session' | 'selectedCardId'>): string | null {
+  const id = t.selectedCardId;
+  return id && t.session?.cards.some((c) => c.id === id) ? id : null;
+}
+
+export function tradeOpen(t: Pick<TradingState, 'ff' | 'dayAnim' | 'session'>): boolean {
+  return (t.ff === 'idle' || t.ff === 'paused') && !t.dayAnim && !t.session?.inDay;
+}
+
 export const useTrading = create<TradingState>((set, get) => {
+  /** A tutorial lesson is up that the clock must wait for: say so and stay put. */
+  const holdClock = (): boolean => {
+    const why = get().clockHold;
+    if (!why) return false;
+    useApp.getState().toast(why, 'info');
+    sfx('error');
+    return true;
+  };
   const dispatch = async (a: SessionAction, quiet = false) => {
     const s = get().session;
     if (!s) return null;
+    crumb(`trade ${a.t}`);
     const ext = get().external;
     const bump = () => {
       if (!quiet || s.decisions.length > 0) set({ version: get().version + 1 });
@@ -316,6 +401,7 @@ export const useTrading = create<TradingState>((set, get) => {
   const dispatchHeld = async (a: SessionAction): Promise<SessionEvent[]> => {
     const s = get().session;
     if (!s) return [];
+    crumb(`trade ${a.t}`);
     const ext = get().external;
     if (ext) return (await ext(a)).events;
     await s.dispatch(a);
@@ -351,7 +437,7 @@ export const useTrading = create<TradingState>((set, get) => {
         .flatMap((p) =>
           optionLegsOf(p.legs)
             .filter((l) => l.ratio < 0)
-            .map((l) => l.strike),
+            .map((l) => ({ strike: l.strike, right: l.right })),
         );
       const t = strikeTension(shorts, bar);
       tension = Math.max(tension, t);
@@ -380,7 +466,9 @@ export const useTrading = create<TradingState>((set, get) => {
     const pace = get().pace;
     // Near a short strike the day plays in slow motion (except at 4x).
     const slow = tension >= 0.7 && pace !== '4' ? 1.7 : 1;
-    const ms = reduced || get().timeframe === 'W' ? 0 : Math.round(dayMs() * 0.8 * slow);
+    // Day by day plays each candle over a few seconds; the auto paces use most of the day's time.
+    const base = pace === 'step' ? Math.min(3200, dayMs() * 0.8) : dayMs() * 0.8;
+    const ms = reduced || get().timeframe === 'W' ? 0 : Math.round(base * slow);
     return { id: ++feedId, startedAt: performance.now(), ms, tension, cards, positions };
   };
 
@@ -388,6 +476,8 @@ export const useTrading = create<TradingState>((set, get) => {
     const s = get().session;
     const day = s?.dayIndex ?? 0;
     const items: FeedItem[] = [];
+    const banked = { cents: 0, n: 0, expired: 0, positionId: undefined as string | undefined };
+    let keptPlan: Position | undefined;
     for (const e of events) {
       const tone: FeedItem['tone'] =
         e.kind === 'reject' || e.kind === 'alert'
@@ -430,6 +520,13 @@ export const useTrading = create<TradingState>((set, get) => {
           const pos = e.positionId ? s?.position(e.positionId) : undefined;
           if (pos?.exitReason === 'stop') sfx('stop');
           else sfx(win ? 'win' : 'loss');
+          if (win && (e.cents ?? 0) > 0) {
+            banked.cents += e.cents ?? 0;
+            banked.n++;
+            if (e.kind === 'expired') banked.expired++;
+            banked.positionId = e.positionId;
+          } else if (!win && pos) keptPlan = pos;
+          // The celebration says it louder; the corner note stays for the record.
           useApp.getState().toast(e.text, win ? 'good' : 'bad');
           break;
         }
@@ -438,6 +535,56 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     }
     if (items.length) set({ feed: [...get().feed, ...items].slice(-60) });
+    // In a run the payout plays the win out (chips, mult, the cartridges); elsewhere, the deposit.
+    if ((banked.n || keptPlan) && payoutBusy()) return;
+    if (banked.n) celebrateProfit(banked);
+    else if (keptPlan) celebratePlan(keptPlan);
+  };
+
+  /** Winners closed: a big "+$ PROFIT TAKEN" with coins that flies into the score (or equity). */
+  const celebrateProfit = (b: { cents: number; n: number; expired: number; positionId?: string }) => {
+    const id = ++feedId;
+    const toMeter = !!document.querySelector('[data-testid="round-meter"]');
+    const label = b.n > 1 ? `${b.n} WINS BANKED` : b.expired ? 'EXPIRED WORTHLESS · KEPT IT' : 'PROFIT TAKEN';
+    set({
+      deposit: {
+        id,
+        cents: b.cents,
+        label,
+        profit: true,
+        to: toMeter ? '[data-testid="round-meter"]' : '[data-testid="equity"]',
+      },
+    });
+    setTimeout(() => get().deposit?.id === id && set({ deposit: null }), 1900);
+    const from =
+      (b.positionId && document.querySelector(`[data-testid="hud-${b.positionId}"]`)) ||
+      document.querySelector('[data-testid="pos-hud"]') ||
+      document.querySelector('[data-testid="chart-panel"]');
+    burstAt(from, 'coins', Math.min(60, 18 + Math.round(b.cents / 1500)));
+  };
+
+  /**
+   * A loser closed by the plan: taking the stop (or cutting before it) gets its own stamp, so the
+   * disciplined exit feels like a move, not a defeat.
+   */
+  const celebratePlan = (p: Position) => {
+    const realized = p.realizedCents ?? 0;
+    const stopCents = p.brackets.stopPl !== null ? p.brackets.stopPl * 100 * 100 * p.qty : null;
+    const atStop = p.flags.closedAtPlan === 'stop';
+    const early = !atStop && !p.flags.stopDeclined && stopCents !== null && -realized < stopCents * 0.98;
+    if (!atStop && !early) return;
+    const id = ++feedId;
+    set({
+      stamp: {
+        id,
+        title: atStop ? 'PLAN KEPT' : 'LOSS CUT',
+        text: `${atStop ? 'Stop taken' : 'Out before the stop'} −$${(Math.abs(realized) / 100).toFixed(0)}`,
+        credit: false,
+        plan: true,
+      },
+    });
+    setTimeout(() => get().stamp?.id === id && set({ stamp: null }), 1500);
+    setTimeout(() => sfx('stamp'), 120);
   };
 
   const finishIfDone = async () => {
@@ -479,10 +626,16 @@ export const useTrading = create<TradingState>((set, get) => {
       // Live mode: nothing after the latest close until the next sync.
       loopToken++;
       set({ ff: 'idle' });
-      useApp.getState().toast('Caught up to the latest close. Sync data for new days.', 'info');
+      useApp
+        .getState()
+        .toast(
+          'Caught up to the latest close. Open trades wait here for the next day of data (◀ LIVE › CHECK FOR NEW DAYS).',
+          'info',
+        );
       return;
     }
     if (!s.inDay) {
+      set({ recap: null, recapHold: false });
       // Remember where every open trade stood, settle the day, then play it back as a candle.
       const before = new Map<string, { cents: number; delta: number; theta: number; cardId: string }>();
       for (const p of s.openPositions()) {
@@ -494,7 +647,7 @@ export const useTrading = create<TradingState>((set, get) => {
           cardId: p.cardId,
         });
       }
-      const prevClose = new Map(s.runningCardIds().map((id) => [id, s.view(id).spot()] as const));
+      const prevClose = new Map(s.advancingCardIds().map((id) => [id, s.view(id).spot()] as const));
       const events = await dispatchHeld({ t: 'begin' });
       const anim = buildDay(s, before, prevClose);
       set({ dayAnim: anim, version: get().version + 1 });
@@ -526,14 +679,71 @@ export const useTrading = create<TradingState>((set, get) => {
             note = `${s.card(x.cardId).displaySymbol} ${c.tension >= 1 ? 'traded through' : 'is testing'} your short strike.`;
           } else if (c.tension < 0.5) tested[id] = false;
         }
+      // The day's report. Days with news (headlines, alerts, gaps, closes) hold the clock so
+      // there is time to read them.
+      const news: DayRecap['news'] = events
+        .filter((e) => ['headline', 'alert', 'gap', 'close', 'expired', 'assigned'].includes(e.kind))
+        .map((e) => ({
+          text: e.text,
+          cardId: e.cardId,
+          tone:
+            e.kind === 'close' || e.kind === 'expired'
+              ? (e.cents ?? 0) >= 0
+                ? 'good'
+                : 'bad'
+              : e.kind === 'headline'
+                ? 'info'
+                : 'warn',
+        }));
+      const firstCard = Object.keys(anim.cards)[0];
+      const bench = firstCard ? s.view(firstCard).benchmarkBars() : [];
+      const watch = Object.entries(anim.cards)
+        .filter(([cardId]) => !Object.values(anim.positions).some((x) => x.cardId === cardId))
+        .map(([cardId, c]) => ({ cardId, movePct: c.bar.close / c.prevClose - 1 }));
+      const recap: DayRecap | null =
+        Object.keys(anim.positions).length || watch.length
+          ? {
+              id: ++feedId,
+              day: s.dayIndex,
+              spyPct:
+                bench.length > 1 ? bench[bench.length - 1].close / bench[bench.length - 2].close - 1 : null,
+              news,
+              watch,
+              trades: Object.entries(anim.positions).map(([positionId, x]) => ({
+                positionId,
+                cardId: x.cardId,
+                prevCents: x.prevCents,
+                finalCents: x.finalCents,
+                closed: s.position(positionId)?.status === 'closed',
+                tension: anim.cards[x.cardId]?.tension ?? 0,
+                movePct: anim.cards[x.cardId]
+                  ? anim.cards[x.cardId].bar.close / anim.cards[x.cardId].prevClose - 1
+                  : 0,
+              })),
+            }
+          : null;
       set({
         dayAnim: null,
         floats: floats.filter((f) => f.cents !== 0),
         testNote: note,
+        recap,
+        recapHold: get().pace !== 'step' && news.length > 0,
         version: get().version + 1,
       });
       handleEvents(events);
-      if (anim.ms > 0 && floats.length) sfx(total >= 0 ? 'coin' : 'tick', total >= 0 ? 1.4 : 0.6, 0.35);
+      // An untraded card moved to a new day: keep the builder on an expiration it still lists.
+      const sel = get().selectedCardId;
+      const exp = get().builder.expiration;
+      if (sel && s.idleCardIds().includes(sel)) {
+        const ch = s.chain(sel);
+        if (ch && (!exp || !expirationsOf(ch).includes(exp) || diffDays(s.view(sel).now, exp) < 1)) {
+          const touched = get().touched;
+          get().select(sel);
+          set({ touched });
+        }
+      }
+      // Money is only won when a trade closes; a day's paper gain or loss gets a quiet tick.
+      if (anim.ms > 0 && floats.length) sfx('tick', total >= 0 ? 1.2 : 0.7, 0.4);
       if (note) sfx('decision', 0.9, 0.6);
     }
     if (s.decisions.length > 0) {
@@ -551,8 +761,11 @@ export const useTrading = create<TradingState>((set, get) => {
       const t0 = performance.now();
       await get().step();
       if (token !== loopToken || get().ff !== 'running') return;
-      // Day by day: wait for the player after each day. A tested strike also waits (once).
-      if (get().pace === 'step' || get().testNote) {
+      // A closed trade's payout plays out before the next day starts.
+      while (payoutBusy() && token === loopToken && get().ff === 'running') await sleep(60);
+      if (token !== loopToken || get().ff !== 'running') return;
+      // Day by day: wait for the player after each day. A tested strike or a day with news waits too.
+      if (get().pace === 'step' || get().testNote || get().recapHold) {
         loopToken++;
         set({ ff: 'paused' });
         return;
@@ -571,6 +784,7 @@ export const useTrading = create<TradingState>((set, get) => {
     ff: 'idle',
     panel: 'builder',
     rightTab: null,
+    touched: false,
     feed: [],
     whatIf: { pricePct: 0, days: 0, ivPts: 0 },
     // MACD is one click away in Studies; by default the chart keeps to what a spread seller reads.
@@ -595,6 +809,24 @@ export const useTrading = create<TradingState>((set, get) => {
     testNote: null,
     allowed: null,
     stamp: null,
+    deposit: null,
+    blockReason: null,
+    recap: null,
+    recapHold: false,
+    dismissRecap: () => set({ recap: null }),
+    clockHold: null,
+    planHidden: false,
+    dragging: false,
+    setDragging: (v) => {
+      if (get().dragging !== v) set({ dragging: v });
+    },
+    reviewChart: false,
+    setReviewChart: (v) => set({ reviewChart: v }),
+    chainOpen: false,
+    setChainOpen: (v) => {
+      if (v !== get().chainOpen) sfx(v ? 'select' : 'click');
+      set({ chainOpen: v });
+    },
 
     init: (s, opts = {}) => {
       loopToken++;
@@ -620,10 +852,13 @@ export const useTrading = create<TradingState>((set, get) => {
         external: opts.external ?? null,
         maxPositions: opts.maxPositions ?? null,
         onChange: opts.onChange ?? null,
+        blockReason: opts.blockReason ?? null,
         pace: useApp.getState().settings.game.dayPace,
         dayAnim: null,
         floats: [],
         testNote: null,
+        recap: null,
+        recapHold: false,
       });
       tested = {};
       if (first) get().select(first);
@@ -660,18 +895,20 @@ export const useTrading = create<TradingState>((set, get) => {
       set({
         selectedCardId: cardId,
         rightTab: null,
+        touched: false,
         builder: {
           ...get().builder,
           expiration: pick,
           backExpiration: back,
           legs: null,
           anchor: null,
+          callAnchor: null,
           earningsAck: false,
         },
       });
     },
     selectPosition: (id) => set({ selectedPositionId: id }),
-    setBuilder: (patch) => set({ builder: { ...get().builder, ...patch } }),
+    setBuilder: (patch) => set({ builder: { ...get().builder, ...patch }, touched: true }),
     setStructure: (id) => {
       const def = STRUCTURES[id];
       sfx('deal');
@@ -686,6 +923,7 @@ export const useTrading = create<TradingState>((set, get) => {
           width: def.defaults.width || get().builder.width,
           legs: null,
           anchor: null,
+          callAnchor: null,
         },
       });
     },
@@ -694,28 +932,56 @@ export const useTrading = create<TradingState>((set, get) => {
       const next = reverseOf(b.structureId);
       if (next !== b.structureId) {
         sfx('whoosh');
-        set({ builder: { ...b, structureId: next, legs: null, anchor: null } });
+        set({ builder: { ...b, structureId: next, legs: null, anchor: null, callAnchor: null } });
       }
     },
     plan: () => {
-      const { session, selectedCardId, builder, version } = get();
+      const { session, builder, version, confidence } = get();
+      const selectedCardId = liveCardId(get());
       if (!session || !selectedCardId || !builder.expiration) return null;
-      const key = JSON.stringify([session.config.seed, version, selectedCardId, builder]);
+      const key = JSON.stringify([session.config.seed, version, selectedCardId, builder, confidence]);
       if (planCache.key === key) return planCache.value;
       try {
-        const value = session.planFor(
+        const params = {
+          expiration: builder.expiration,
+          backExpiration: builder.backExpiration ?? undefined,
+          delta: builder.delta,
+          width: builder.width,
+          anchor: builder.anchor ?? undefined,
+          callAnchor: builder.callAnchor ?? undefined,
+        };
+        // Size by conviction: price one contract, then fill that share of the risk cap.
+        // A covered call's risk is its automatic stop, so the plan's stop sizes it.
+        const one = session.planFor(
           selectedCardId,
           builder.structureId,
-          {
-            expiration: builder.expiration,
-            backExpiration: builder.backExpiration ?? undefined,
-            delta: builder.delta,
-            width: builder.width,
-            anchor: builder.anchor ?? undefined,
-          },
-          builder.qty,
+          params,
+          1,
           builder.legs ?? undefined,
+          builder.stopMult,
         );
+        const qty = one.ok
+          ? Math.min(
+              maxQtyFor(builder.structureId),
+              convictionQty(
+                one.maxLossCents,
+                session.markedEquityCents(),
+                session.config.riskCapPct,
+                confidence,
+              ),
+            )
+          : 1;
+        const value =
+          qty === 1
+            ? one
+            : session.planFor(
+                selectedCardId,
+                builder.structureId,
+                params,
+                qty,
+                builder.legs ?? undefined,
+                builder.stopMult,
+              );
         planCache = { key, value };
         return value;
       } catch {
@@ -723,22 +989,34 @@ export const useTrading = create<TradingState>((set, get) => {
         return null;
       }
     },
+    impliedCall: () => {
+      const { session, builder, confidence } = get();
+      const selectedCardId = liveCardId(get());
+      const plan = get().plan();
+      if (!session || !selectedCardId || !plan?.ok) return null;
+      const spot = session.view(selectedCardId).spot();
+      const em =
+        plan.entry?.expectedMovePct ?? (plan.metrics?.expectedMove ? plan.metrics.expectedMove / spot : 0.05);
+      return { bucket: impliedBucket(builder.structureId, plan.legs, spot, em, builder.flipVol), confidence };
+    },
     setCall: async (bucket) => {
-      const { selectedCardId, confidence } = get();
-      if (!selectedCardId) return;
+      // The number keys pick a structure by view (4 = up: a bull put); the call itself is read
+      // from the trade when it is placed.
+      if (!get().selectedCardId || !tradeOpen(get())) return;
       sfx('select', 0.8 + bucket * 0.1);
-      await dispatch({ t: 'call', cardId: selectedCardId, bucket, confidence });
-      if (useApp.getState().settings.game.callPicksStructure) {
-        const fit = fitStructure(get().builder.structureId, bucket, get().allowed);
-        if (fit !== get().builder.structureId) get().setStructure(fit);
-      }
+      if (get().panel !== 'builder') set({ panel: 'builder' });
+      const fit = fitStructure(get().builder.structureId, bucket, get().allowed);
+      if (fit !== get().builder.structureId) get().setStructure(fit);
+      if (STRUCTURES[fit].bias === 'long_vol') get().setBuilder({ flipVol: bucket < 2 });
+      set({ touched: true });
     },
     setAllowed: (ids) => set({ allowed: ids }),
     nudgeStrike: (dir) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const plan = get().plan();
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || !builder.expiration || get().ff !== 'idle') return;
+      if (!chain || !builder.expiration || !tradeOpen(get())) return;
       // Condors build both sides from delta; everything else moves its anchor strike.
       if (['iron_condor', 'bwb_condor'].includes(builder.structureId)) {
         get().setBuilder({ delta: Math.max(0.05, Math.min(0.5, builder.delta - dir * 0.02)), legs: null });
@@ -754,9 +1032,10 @@ export const useTrading = create<TradingState>((set, get) => {
       get().setBuilder({ anchor: next, legs: null });
     },
     nudgeExpiration: (dir) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || get().ff !== 'idle') return;
+      if (!chain || !tradeOpen(get())) return;
       const now = session!.view(selectedCardId!).now;
       const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
       const i = builder.expiration ? exps.indexOf(builder.expiration) : -1;
@@ -770,20 +1049,20 @@ export const useTrading = create<TradingState>((set, get) => {
       });
     },
     sizeToRisk: (target) => {
-      const { session, builder } = get();
-      const plan = get().plan();
-      if (!session || !plan?.ok || plan.maxLossCents <= 0) return;
-      const perContract = plan.maxLossCents / builder.qty;
-      const cap = session.config.riskCapPct;
-      const pct = target === 'max' ? cap : Math.min(cap, target);
-      const qty = Math.max(1, Math.min(50, Math.floor((session.markedEquityCents() * pct) / perContract)));
-      sfx('multPop', 0.9 + Math.min(0.6, qty * 0.05));
-      get().setBuilder({ qty });
+      // Older saved setups stored a risk share; map it onto the nearest conviction step.
+      const session = get().session;
+      if (!session) return;
+      const share = target === 'max' ? 1 : target / session.config.riskCapPct;
+      const step = CONVICTION.reduce((b, c) =>
+        Math.abs(c.capShare - share) < Math.abs(b.capShare - share) ? c : b,
+      );
+      void get().setConfidence(step.confidence);
     },
     applyPreset: (p) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const chain = session && selectedCardId ? session.chain(selectedCardId) : null;
-      if (!chain || !session || get().ff !== 'idle') return;
+      if (!chain || !session || !tradeOpen(get())) return;
       const now = session.view(selectedCardId!).now;
       const exps = expirationsOf(chain).filter((e) => diffDays(now, e) >= 1);
       const near = (lo: number, hi: number, aim: number) =>
@@ -819,15 +1098,22 @@ export const useTrading = create<TradingState>((set, get) => {
         backExpiration: exps.find((x) => diffDays(e, x) >= 21) ?? null,
         delta: setup.delta,
         anchor: null,
+        callAnchor: null,
         legs: null,
         ...(p === 'mine' && mine
           ? { width: mine.width, targetPct: mine.targetPct, stopMult: mine.stopMult }
           : {}),
       });
-      if (p === 'mine' && mine) setTimeout(() => get().sizeToRisk(mine.riskPct), 0);
+      if (p === 'mine' && mine)
+        setTimeout(
+          () =>
+            mine.conviction ? void get().setConfidence(mine.conviction) : get().sizeToRisk(mine.riskPct),
+          0,
+        );
     },
     saveMySetup: () => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       const plan = get().plan();
       if (!session || !selectedCardId || !builder.expiration) return;
       const setup = {
@@ -836,6 +1122,7 @@ export const useTrading = create<TradingState>((set, get) => {
         delta: builder.delta,
         width: builder.width,
         riskPct: plan?.riskPct ?? 0.02,
+        conviction: get().confidence,
         targetPct: builder.targetPct,
         stopMult: builder.stopMult,
       };
@@ -844,19 +1131,18 @@ export const useTrading = create<TradingState>((set, get) => {
       useApp
         .getState()
         .toast(
-          `Saved MY SETUP: ${STRUCTURES[builder.structureId].short}, ~${setup.dte} days, ${Math.round(setup.delta * 100)}Δ, risk ${(setup.riskPct * 100).toFixed(1)}%. Press Y to use it.`,
+          `Saved MY SETUP: ${STRUCTURES[builder.structureId].short}, ~${setup.dte} days, ${Math.round(setup.delta * 100)}Δ, conviction ${Math.round(setup.conviction * 100)}%. Press Y to use it.`,
           'good',
         );
     },
     setConfidence: async (c) => {
-      set({ confidence: c });
-      const { selectedCardId, session } = get();
-      const card = selectedCardId && session ? session.card(selectedCardId) : null;
-      sfx('tick', 0.7 + c);
-      if (card?.call) await dispatch({ t: 'call', cardId: card.id, bucket: card.call.bucket, confidence: c });
+      // Conviction: the confidence behind the call and how much of the risk cap the trade uses.
+      set({ confidence: c, touched: true });
+      sfx('multPop', 0.6 + c * 0.6);
     },
     place: async (side) => {
-      const { session, selectedCardId, builder } = get();
+      const { session, builder } = get();
+      const selectedCardId = liveCardId(get());
       if (!session || !selectedCardId || !builder.expiration) return false;
       const plan = get().plan();
       if (!plan || !plan.ok || plan.mid === null || plan.natural === null) {
@@ -864,7 +1150,10 @@ export const useTrading = create<TradingState>((set, get) => {
         useApp.getState().toast(plan?.reason ?? 'Pick an expiration first.', 'warn');
         return false;
       }
-      const isCredit = plan.mid < 0;
+      // A covered call is a premium sale even though buying the shares makes its net a debit.
+      const spot = plan.entry?.spot ?? null;
+      const premium = premiumOf(plan.mid, plan.legs, spot);
+      const isCredit = premium !== null;
       if (side === 'sell' && !isCredit) {
         useApp.getState().toast('This build is a debit: use Buy (Alt+B).', 'warn');
         sfx('error');
@@ -883,19 +1172,20 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx('error');
         return false;
       }
-      const card = session.card(selectedCardId);
-      if (!card.call) {
-        useApp.getState().toast('Call your shot first: press 1-5 (and Shift+1-5 for confidence).', 'warn');
-        sfx('error');
-        return false;
-      }
+      // The call is the trade's own view, at the conviction you sized it with.
+      const call = get().impliedCall();
+      if (call)
+        await dispatch(
+          { t: 'call', cardId: selectedCardId, bucket: call.bucket, confidence: call.confidence },
+          true,
+        );
       const limit = plan.mid + (plan.natural - plan.mid) * builder.limitFrac;
       const d = session.config.bracketDefaults;
       const brackets = builder.bracketsOn
-        ? isCredit
+        ? premium !== null
           ? {
-              targetPl: -plan.mid * builder.targetPct,
-              stopPl: -plan.mid * builder.stopMult,
+              targetPl: premium * builder.targetPct,
+              stopPl: premium * builder.stopMult,
               targetPct: builder.targetPct,
               stopMult: builder.stopMult,
             }
@@ -916,9 +1206,10 @@ export const useTrading = create<TradingState>((set, get) => {
           delta: builder.delta,
           width: builder.width,
           anchor: builder.anchor ?? undefined,
+          callAnchor: builder.callAnchor ?? undefined,
         },
         legs: builder.legs ?? undefined,
-        qty: builder.qty,
+        qty: plan.qty,
         order: { type: builder.orderType, limit: builder.orderType === 'limit' ? limit : undefined },
         brackets,
         earningsAck: builder.earningsAck,
@@ -927,12 +1218,13 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx(isCredit ? 'fill' : 'buy');
         // The ticket slams onto the chart and coins fly off the button.
         const st = STRUCTURES[builder.structureId];
-        const net = Math.abs(plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit);
+        const fillNet = plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit;
+        const net = isCredit ? (premiumOf(fillNet, plan.legs, spot) ?? premium ?? 0) : Math.abs(fillNet);
         set({
           stamp: {
             id: ++feedId,
             title: isCredit ? 'SOLD' : 'BOUGHT',
-            text: `${builder.qty > 1 ? `${builder.qty}× ` : ''}${st.short} ${isCredit ? '+' : '−'}${net.toFixed(2)}`,
+            text: `${plan.qty > 1 ? `${plan.qty}× ` : ''}${st.short} ${isCredit ? '+' : '−'}${net.toFixed(2)}`,
             credit: isCredit,
           },
         });
@@ -942,6 +1234,12 @@ export const useTrading = create<TradingState>((set, get) => {
           isCredit ? 26 : 14,
         );
         setTimeout(() => set({ stamp: null }), 1300);
+        if (isCredit) {
+          const cents = Math.round(net * 100 * 100 * plan.qty);
+          const id = ++feedId;
+          set({ deposit: { id, cents } });
+          setTimeout(() => get().deposit?.id === id && set({ deposit: null }), 1900);
+        }
       }
       return !!r?.ok;
     },
@@ -952,7 +1250,12 @@ export const useTrading = create<TradingState>((set, get) => {
     start: () => {
       const s = get().session;
       if (!s) return;
-      if (s.openPositions().length === 0 && s.orders.length === 0) {
+      // Space during a payout fast-forwards it rather than starting the clock.
+      if (payoutBusy()) return usePayout.getState().skip();
+      if (holdClock()) return;
+      // A desk whose cards all move with the clock (Career, a Live month) may watch days pass untraded.
+      const watchable = get().external || s.config.advanceIdle;
+      if (!watchable && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;
@@ -960,7 +1263,8 @@ export const useTrading = create<TradingState>((set, get) => {
       if (get().ff === 'decision' || get().ff === 'done') return;
       if (get().ff === 'running') return;
       sfx('whoosh');
-      set({ ff: 'running', panel: 'positions', testNote: null });
+      // The tray shows your positions while the clock runs (the builder stays up if nothing is open).
+      set({ ff: 'running', panel: s.openPositions().length ? 'positions' : get().panel, testNote: null });
       const token = ++loopToken;
       void loop(token);
     },
@@ -970,18 +1274,23 @@ export const useTrading = create<TradingState>((set, get) => {
         set({ ff: 'paused' });
       }
     },
-    toggle: () => (get().ff === 'running' ? get().pause() : get().start()),
+    toggle: () =>
+      payoutBusy() ? usePayout.getState().skip() : get().ff === 'running' ? get().pause() : get().start(),
     nextDay: () => {
+      if (payoutBusy()) return usePayout.getState().skip();
       const ff = get().ff;
       if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;
       if (!s) return;
-      if (!s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
+      if (holdClock()) return;
+      const watchable = get().external || s.config.advanceIdle;
+      if (!watchable && !s.clockStarted && s.openPositions().length === 0 && s.orders.length === 0) {
         useApp.getState().toast('Place at least one trade before starting the clock.', 'warn');
         sfx('error');
         return;
       }
-      set({ ff: 'running', panel: 'positions', testNote: null });
+      // The tray shows your positions while the clock runs (the builder stays up if nothing is open).
+      set({ ff: 'running', panel: s.openPositions().length ? 'positions' : get().panel, testNote: null });
       const token = ++loopToken;
       void (async () => {
         await get().step();

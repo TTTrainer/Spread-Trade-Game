@@ -14,6 +14,7 @@ import { MEMOS, TAGS, VOUCHERS } from './items';
 import { COSMETICS } from './meta';
 import { REVIEWS } from './reviews';
 import { ACHIEVEMENTS } from './achievements';
+import { PAD_ART } from './padArt';
 import { STRUCTURES } from '../engine/strategies/structures';
 
 export type ArtCategory =
@@ -28,7 +29,8 @@ export type ArtCategory =
   | 'client'
   | 'family'
   | 'cardback'
-  | 'achievement';
+  | 'achievement'
+  | 'pad';
 
 export interface ArtSize {
   w: number;
@@ -49,6 +51,8 @@ export const ART_SIZES: Record<ArtCategory, ArtSize> = {
   // A tall card strip; it repeats across the (wider) lineup card as it deals in.
   cardback: { w: 48, h: 128 },
   achievement: { w: 32, h: 32 },
+  // A whole room; the Pad's furniture and collectibles each have their own size (see padArt.ts).
+  pad: { w: 640, h: 360 },
 };
 
 export const ART_CATEGORY_TEXT: Record<ArtCategory, { title: string; where: string; priority: 1 | 2 | 3 }> = {
@@ -100,6 +104,11 @@ export const ART_CATEGORY_TEXT: Record<ArtCategory, { title: string; where: stri
     priority: 3,
   },
   achievement: { title: 'Achievement badges', where: 'The Achievements screen', priority: 3 },
+  pad: {
+    title: 'The Pad (your apartment)',
+    where: 'The Pad screen. See PAD_ART_BRIEF.md for how to make these look good',
+    priority: 3,
+  },
 };
 
 /** Drawing ideas. Short on purpose: the item's name and rules are in the checklist too. */
@@ -242,6 +251,8 @@ export interface ArtSlot {
   name: string;
   what: string;
   idea: string;
+  /** For slots whose size differs from the category's (the Pad's pieces). */
+  size?: ArtSize;
 }
 
 const slot = (category: ArtCategory, id: string, name: string, what: string, ideaKey = id): ArtSlot => ({
@@ -294,6 +305,12 @@ export const ART_SLOTS: ArtSlot[] = [
     ...slot('achievement', a.id, a.name, a.text),
     idea: `a small medal for: ${a.text}`,
   })),
+  ...PAD_ART.map((p) => ({ ...slot('pad', p.id, p.name, p.what), idea: p.idea, size: { w: p.w, h: p.h } })),
 ];
+
+/** The PNG size a slot expects. */
+export function slotSize(s: ArtSlot): ArtSize {
+  return s.size ?? ART_SIZES[s.category];
+}
 
 export const ART_BY_KEY: Record<string, ArtSlot> = Object.fromEntries(ART_SLOTS.map((s) => [s.key, s]));

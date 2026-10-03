@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { day, skip } from './sitout';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
 import { computeTarget, RunEngine } from '../../src/engine/run/engine';
 import { BALANCE } from '../../src/content/balance';
@@ -145,25 +146,157 @@ describe('career run loop', () => {
     expect(r?.ok).toBe(true);
     expect(e.state.round.ticketsUsed).toBe(1);
     r = await place('bull_put');
-    expect(r?.reason).toMatch(/One position per card/);
-    // Once the clock runs, no new trades and no skipping.
+    expect(r?.reason).toMatch(/One trade per card/);
+    // Once the clock runs: no skipping, and a new trade waits for the close, then may start on a
+    // later day (the untraded card moved with the clock and has today's chain).
     await e.dispatch({ t: 's', a: { t: 'begin' } });
     expect(e.canSkip()).toBe(false);
     const c2 = s.cards[1];
     await e.dispatch({ t: 's', a: { t: 'call', cardId: c2.id, bucket: 1, confidence: 0.6 } });
-    r = await e.dispatch({
+    const placeOn = (cardId: string) => {
+      const ch = s.chain(cardId)!;
+      const ex = [...new Set(ch.quotes.map((q) => q.expiration))]
+        .sort()
+        .find((x) => Date.parse(x) - Date.parse(ch.date) > 25 * 86400000)!;
+      return e.dispatch({
+        t: 's',
+        a: {
+          t: 'place',
+          cardId,
+          structureId: 'bear_call',
+          params: { expiration: ex, delta: 0.3, width: 1 },
+          qty: 1,
+          order: { type: 'market' },
+          earningsAck: true,
+        },
+      });
+    };
+    r = await placeOn(c2.id);
+    expect(r?.reason).toMatch(/Wait for the close/);
+    for (const d of s.decisions.slice())
+      await e.dispatch({ t: 's', a: { t: 'decide', dpId: d.id, action: 'hold' } });
+    if (s.inDay) await e.dispatch({ t: 's', a: { t: 'end' } });
+    const day1 = s.view(c2.id).now;
+    expect(s.chain(c2.id)!.date).toBe(day1);
+    r = await placeOn(c2.id);
+    expect(r?.ok).toBe(true);
+    expect(e.state.round.ticketsUsed).toBe(2);
+    // After the trading window, new trades wait for the next round.
+    while (e.session === s && s.dayIndex < BALANCE.run.tradeWindowDays) await day(e);
+    if (e.session === s) {
+      const c3 = s.cards[2];
+      await e.dispatch({ t: 's', a: { t: 'call', cardId: c3.id, bucket: 3, confidence: 0.6 } });
+      r = await placeOn(c3.id);
+      expect(r?.reason).toMatch(/trading window closed/);
+    }
+  }, 60_000);
+
+  it('names why a trade is blocked and tracks the goal with open trades', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'goal-1' }));
+    const s = e.session!;
+    const c = s.cards[0];
+    expect(e.tradeBlock(c.id, 'bull_put')).toBeNull();
+    expect(e.tradeBlock(c.id, 'iron_condor')).toMatch(/playbook/);
+    const g0 = e.goalOutlook();
+    expect(g0).toMatchObject({ meter: 0, toGo: e.state.round.target, openCount: 0, openPoints: 0 });
+    const chain = s.chain(c.id)!;
+    const exp = [...new Set(chain.quotes.map((q) => q.expiration))]
+      .sort()
+      .find((x) => Date.parse(x) - Date.parse(chain.date) > 25 * 86400000)!;
+    await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+    const r = await e.dispatch({
       t: 's',
       a: {
         t: 'place',
-        cardId: c2.id,
-        structureId: 'bear_call',
+        cardId: c.id,
+        structureId: 'bull_put',
         params: { expiration: exp, delta: 0.3, width: 1 },
         qty: 1,
         order: { type: 'market' },
         earningsAck: true,
       },
     });
-    expect(r?.reason).toMatch(/clock is running/);
+    expect(r?.ok).toBe(true);
+    expect(e.tradeBlock(c.id, 'bull_put')).toMatch(/One trade per card/);
+    await day(e);
+    const g = e.goalOutlook();
+    expect(g.openCount).toBe(1);
+    // Open trades count their P/L chips only: 1% of round-start equity is 100 points before mults.
+    const expected = (g.openPlCents / e.state.round.startEquityCents) * BALANCE.scoring.chipsPerUnit;
+    const scaled = g.openPlCents > 0 ? expected : expected * BALANCE.scoring.lossChipsScale;
+    expect(g.openPoints).toBe(Math.round(scaled));
+  }, 60_000);
+
+  it('a card whose trade closed keeps moving with the clock (its chart never freezes)', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'settled-1' }));
+    const s = e.session!;
+    const c = s.cards[0];
+    const chain = s.chain(c.id)!;
+    const exp = [...new Set(chain.quotes.map((q) => q.expiration))]
+      .sort()
+      .find((x) => Date.parse(x) - Date.parse(chain.date) > 25 * 86400000)!;
+    await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+    const r = await e.dispatch({
+      t: 's',
+      a: {
+        t: 'place',
+        cardId: c.id,
+        structureId: 'bull_put',
+        params: { expiration: exp, delta: 0.3, width: 1 },
+        qty: 1,
+        order: { type: 'market' },
+        earningsAck: true,
+      },
+    });
+    expect(r?.ok).toBe(true);
+    await day(e);
+    const pos = s.openPositions()[0];
+    await e.dispatch({ t: 's', a: { t: 'close', positionId: pos.id, order: { type: 'market' } } });
+    expect(s.settledCardIds()).toContain(c.id);
+    const closedOn = s.view(c.id).now;
+    const bars = s.view(c.id).bars().length;
+    await day(e);
+    expect(e.session).toBe(s); // the trading window keeps the round open
+    expect(s.view(c.id).now > closedOn).toBe(true);
+    expect(s.view(c.id).bars().length).toBe(bars + 1);
+    expect(s.chain(c.id)?.date).toBe(s.view(c.id).now);
+  }, 60_000);
+
+  it('a missed Month target is a write-up; a second miss in the quarter ends the run', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'writeup-1' }));
+    const t1 = e.state.round.target;
+    expect(t1).toBe(computeTarget(1, 0, null, e.state.config));
+    // Month 1: no trades, end the round: missed, but the run goes on to the shop.
+    await e.dispatch({ t: 'endRound' });
+    expect(e.state.phase).toBe('tally');
+    const stress0 = e.state.stress;
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('shop');
+    expect(e.state.writeUps).toEqual([1]);
+    expect(e.state.stress).toBe(stress0 + BALANCE.stress.writeUp);
+    expect(e.state.round.payouts.some((p) => /Round win/.test(p.label))).toBe(false);
+    // The quarter's Review now asks for more.
+    const review = computeTarget(1, 2, null, e.state.config, true);
+    expect(review).toBe(
+      Math.round((computeTarget(1, 2, null, e.state.config) * BALANCE.targets.writeUpReviewMult) / 10) * 10,
+    );
+    // Month 2 missed too: the run ends.
+    await e.dispatch({ t: 'leaveShop' });
+    expect(e.state.round.index).toBe(1);
+    await e.dispatch({ t: 'endRound' });
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('defeat');
+  }, 60_000);
+
+  it('practice (the tutorial) never writes anyone up for a missed round', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'writeup-practice', practice: true, quarters: 1 }));
+    const stress0 = e.state.stress;
+    await e.dispatch({ t: 'endRound' });
+    await e.dispatch({ t: 'finishTally' });
+    expect(e.state.phase).toBe('shop');
+    expect(e.state.writeUps ?? []).toEqual([]);
+    expect(e.state.stress).toBe(stress0);
+    expect(e.state.nextReview ?? null).toBeNull();
   }, 60_000);
 
   it('skips Month 1 for a tag, then deals Month 2 with no shop', async () => {
@@ -171,13 +304,56 @@ describe('career run loop', () => {
     const tag = e.state.round.skipTag;
     expect(tag).not.toBeNull();
     const stress0 = e.state.stress;
+    // A skip is a sit-out: the round runs its days with trading locked, then the Tag pays.
     await e.dispatch({ t: 'skip' });
+    expect(e.state.round.sitOut?.days).toBe(BALANCE.run.sitOutDays);
+    expect(e.state.pendingTags).not.toContain(tag);
+    const s = e.session!;
+    const c = s.cards[0];
+    await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+    const blocked = await e.dispatch({
+      t: 's',
+      a: {
+        t: 'place',
+        cardId: c.id,
+        structureId: 'bull_put',
+        params: { expiration: s.chain(c.id)!.quotes[0].expiration, delta: 0.3, width: 1 },
+        qty: 1,
+        order: { type: 'market' },
+        earningsAck: true,
+      },
+    });
+    expect(blocked?.reason).toMatch(/sitting this round out/);
+    for (let d = 1; d < BALANCE.run.sitOutDays; d++) {
+      await e.dispatch({ t: 's', a: { t: 'begin' } });
+      await e.dispatch({ t: 's', a: { t: 'end' } });
+      expect(e.state.roundIndex).toBe(0);
+    }
+    await e.dispatch({ t: 's', a: { t: 'begin' } });
+    await e.dispatch({ t: 's', a: { t: 'end' } });
     expect(e.state.phase).toBe('round');
     expect(e.state.roundIndex).toBe(1);
     expect(e.state.pendingTags).toContain(tag);
     expect(e.state.stress).toBeLessThanOrEqual(stress0);
     expect(e.state.history[0].status).toBe('skipped');
     expect(e.state.round.target).toBe(computeTarget(1, 1, null, e.state.config));
+  }, 60_000);
+
+  it('developer levers change the game layer, are logged, and survive a resume', async () => {
+    const e = await RunEngine.create(src, config({ seed: 'dev-1' }));
+    const cash0 = e.state.cash;
+    await e.dispatch({ t: 'dev', op: { k: 'cash', delta: 50 } });
+    await e.dispatch({ t: 'dev', op: { k: 'cartridge', id: 'theta_engine' } });
+    await e.dispatch({ t: 'dev', op: { k: 'tickets', delta: 2 } });
+    await e.dispatch({ t: 'dev', op: { k: 'meter', delta: 25 } });
+    expect(e.state.dev).toBe(true);
+    expect(e.state.cash).toBe(cash0 + 50);
+    expect(e.state.cartridges).toContain('theta_engine');
+    expect(e.state.round.tickets).toBe(BALANCE.run.ticketsPerRound + 2);
+    const again = await RunEngine.resume(src, e.save());
+    expect(again.state.cash).toBe(e.state.cash);
+    expect(again.state.cartridges).toEqual(e.state.cartridges);
+    expect(again.state.round.meter).toBe(25);
   }, 60_000);
 
   it('rerolls untraded cards and never repeats a window', async () => {
@@ -212,7 +388,7 @@ describe('career run loop', () => {
     expect(e.state.stress).toBe(50);
     expect(e.state.burnoutNext).toBe(true);
     expect(e.state.stressLog.some((x) => /BURNOUT/.test(x.reason))).toBe(true);
-    await e.dispatch({ t: 'skip' });
+    await skip(e);
     expect(e.state.round.tickets).toBe(2);
     expect(e.state.round.silentAnalyst).toBe('quant');
     expect(e.hasAnalyst('quant')).toBe(false);
@@ -220,8 +396,8 @@ describe('career run loop', () => {
 
   it('skipping into a Review: COMPLY-3000 intro, +10 stress, filtered lineup', async () => {
     const e = await RunEngine.create(src, config({ seed: 'review-1' }));
-    await e.dispatch({ t: 'skip' });
-    await e.dispatch({ t: 'skip' });
+    await skip(e);
+    await skip(e);
     expect(e.state.phase).toBe('review_intro');
     const id = e.state.nextReview!;
     expect(id).not.toBe('annual_review');
@@ -230,8 +406,10 @@ describe('career run loop', () => {
     await e.dispatch({ t: 'startReview' });
     expect(e.state.phase).toBe('round');
     expect(e.state.round.reviewId).toBe(id);
-    expect(e.state.round.target).toBe(computeTarget(1, 2, id, e.state.config));
-    await e.dispatch({ t: 'skip' });
+    // The boss running it sets its share of the target.
+    expect(e.state.round.bossId).toBeTruthy();
+    expect(e.state.round.target).toBe(computeTarget(1, 2, id, e.state.config, false, e.state.round.bossId));
+    await skip(e);
     expect(e.events.some((x) => /cannot be skipped/.test(x.text))).toBe(true);
   }, 60_000);
 

@@ -10,6 +10,7 @@ import {
   type IPriceLine,
   type ISeriesApi,
   type LineData,
+  type Logical,
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -27,12 +28,20 @@ import {
 } from '../../engine/market/indicators';
 import type { Bar } from '../../engine/market/types';
 import { optionLegsOf } from '../../engine/lifecycle/position';
+import { diffDays } from '../../engine/calendar';
+import { barsAhead } from './expiry';
 import type { Leg } from '../../engine/strategies/types';
-import { useTrading, type StudyId } from '../store/trading';
+import { liveCardId, tradeOpen, useTrading, type StudyId } from '../store/trading';
+import type { Position } from '../../engine/lifecycle/types';
+import type { TradePlan } from '../../engine/trading/plan';
+import { STRUCTURES } from '../../engine/strategies/structures';
 import { chartBridge } from './chartBridge';
-import { PriceLadder } from './PriceLadder';
-import { PositionHud } from './DayPlayer';
+import { LivePnl, PositionHud } from './DayPlayer';
+import { BossBanner } from './BossBanner';
+import { useSealed } from '../boss';
 import { StrikeHandle } from './StrikeHandle';
+import { DayRecapPanel } from './DayRecap';
+import { ChartZones } from './ChartZones';
 import { formingBar } from './dayPath';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -74,6 +83,8 @@ const COLORS = {
   magenta: '#ff3ea5',
   amber: '#ffbf3e',
   violet: '#9d6bff',
+  planShort: 'rgba(255, 62, 165, 0.6)',
+  planLong: 'rgba(62, 242, 255, 0.55)',
 };
 
 function line(data: (number | null)[], bars: Bar[]): LineData<Time>[] {
@@ -86,15 +97,23 @@ function line(data: (number | null)[], bars: Bar[]): LineData<Time>[] {
 
 export function ChartPanel() {
   const session = useTrading((s) => s.session);
-  const cardId = useTrading((s) => s.selectedCardId);
+  const cardId = useTrading(liveCardId);
   const version = useTrading((s) => s.version);
-  const studies = useTrading((s) => s.studies);
+  const allStudies = useTrading((s) => s.studies);
+  // The Shell Company seals the studies: only volume stays.
+  const studiesSealed = useSealed('studies');
+  const studies = useMemo(
+    () => (studiesSealed ? allStudies.filter((x) => x === 'vol') : allStudies),
+    [allStudies, studiesSealed],
+  );
   const timeframe = useTrading((s) => s.timeframe);
-  const builder = useTrading((s) => s.builder);
   const drawings = useTrading((s) => (cardId ? s.drawings[cardId] : undefined));
   const drawTool = useTrading((s) => s.drawTool);
   const ff = useTrading((s) => s.ff);
   const addDrawing = useTrading((s) => s.addDrawing);
+  // The builder's sliders move the strike and expiration lines: redraw on every change.
+  useTrading((s) => s.builder);
+  const dragging = useTrading((s) => s.dragging);
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -104,6 +123,8 @@ export function ChartPanel() {
   const drawRef = useRef<ISeriesApi<'Line'>[]>([]);
   const pendingRef = useRef<{ time: number; price: number } | null>(null);
   const [legend, setLegend] = useState<string>('');
+  // Bumped whenever the chart is rebuilt (new card, studies or timeframe) so data and overlays reload.
+  const [chartGen, setChartGen] = useState(0);
   const blind = session?.config.blind ?? false;
   const studiesKey = studies.slice().sort().join(',');
 
@@ -230,6 +251,21 @@ export function ChartPanel() {
     chartBridge.priceToY = (p) => candles.priceToCoordinate(p);
     chartBridge.yToPrice = (y) => candles.coordinateToPrice(y);
     chartBridge.paneHeight = () => panes[0]?.getHeight() ?? host.clientHeight;
+    chartBridge.barCount = () => candles.data().length;
+    chartBridge.plotWidth = () => chart.timeScale().width();
+    chartBridge.lastBar = () => {
+      const d = candles.data();
+      if (!d.length) return { date: null, inView: false };
+      const i = d.length - 1;
+      const r = chart.timeScale().getVisibleLogicalRange();
+      return { date: toDate(d[i].time), inView: !!r && i >= r.from - 0.5 && i <= r.to + 0.5 };
+    };
+    chartBridge.xForDate = (d) => chart.timeScale().timeToCoordinate(toTs(d));
+    chartBridge.xAhead = (n) => {
+      const len = candles.data().length;
+      return len ? chart.timeScale().logicalToCoordinate((len - 1 + n) as Logical) : null;
+    };
+    setChartGen((g) => g + 1);
     chart.subscribeCrosshairMove((param) => {
       const d = param.seriesData.get(candles) as
         { open: number; high: number; low: number; close: number } | undefined;
@@ -246,6 +282,8 @@ export function ChartPanel() {
       linesRef.current = [];
       drawRef.current = [];
       chartBridge.priceToY = () => null;
+      chartBridge.xAhead = () => null;
+      chartBridge.xForDate = () => null;
     };
   }, [session, cardId, studiesKey, timeframe]);
 
@@ -387,7 +425,7 @@ export function ChartPanel() {
       cancelAnimationFrame(raf);
       for (const l of shortLinesRef.current) l.applyOptions({ color: COLORS.magenta, lineWidth: 2 });
     };
-  }, [bars, animKey]);
+  }, [bars, animKey, chartGen]);
 
   // Zoom in on the recent candles while the clock runs; zoom back out to build the next trade.
   const clockOn = ff !== 'idle';
@@ -399,12 +437,40 @@ export function ChartPanel() {
   }, [clockOn]);
 
   // Overlays: strikes, breakevens, expected move, support/resistance, drawings.
-  const plan = useTrading((s) => s.plan)();
+  const planHidden = useTrading((s) => s.planHidden);
   const position = session && cardId ? session.openPositions().find((p) => p.cardId === cardId) : undefined;
+  const fullPlan = useTrading((s) => s.plan)();
+  const plan = planHidden && !position ? null : fullPlan;
   const legs: Leg[] = position ? position.legs : (plan?.legs ?? []);
   const breakevens = position ? [] : (plan?.metrics?.breakevens ?? []);
   const em = plan?.metrics?.expectedMove ?? null;
-  const legKey = JSON.stringify([legs, breakevens, em, studiesKey, version]);
+  const legKey = JSON.stringify([legs, breakevens, em, studiesKey, version, dragging]);
+
+  // Expiration: solid for the open trade, dotted for the one being planned. Future days have no
+  // bars, so it sits that many trading days (or weeks) past the newest candle.
+  const exps = optionLegsOf(legs).map((l) => l.expiration);
+  // The Executor seals a planned trade's expiration: no line to read it off until it's open.
+  const dteSealed = useSealed('dte');
+  const expHidden = !!dteSealed && !position && exps.length > 0;
+  const exp = exps.length && !expHidden ? exps.reduce((a, b) => (a < b ? a : b)) : null;
+  const expAhead = exp && now && exp > now ? barsAhead(now, exp, timeframe) : null;
+  const expDte = exp && now ? diffDays(now, exp) : null;
+  // Leave room on the right to see the expiration, up to 40% of the chart; beyond that an arrow
+  // at the edge points to it.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const ts = chart.timeScale();
+    const visible = ts.width() / ts.options().barSpacing;
+    const room = visible > 20 ? Math.floor(visible * 0.4) : 30;
+    // A sealed expiration gets the same fixed room whatever it is, so the room can't give it away.
+    const offset = expHidden
+      ? Math.min(14, room)
+      : expAhead === null
+        ? 6
+        : Math.min(Math.max(6, expAhead + 3), room);
+    ts.applyOptions({ rightOffset: offset });
+  }, [expAhead, expHidden, clockOn, chartGen]);
 
   useEffect(() => {
     const candles = candleRef.current;
@@ -412,12 +478,13 @@ export function ChartPanel() {
     for (const l of linesRef.current) candles.removePriceLine(l);
     linesRef.current = [];
     shortLinesRef.current = [];
+    // While a strike is dragged, the axis labels step aside: the handle is the one to watch.
     const add = (
       price: number,
       color: string,
       title: string,
       style: LineStyle = LineStyle.Solid,
-      width: 1 | 2 = 1,
+      width: 1 | 2 | 3 = 1,
     ) =>
       linesRef.current.push(
         candles.createPriceLine({
@@ -425,27 +492,49 @@ export function ChartPanel() {
           color,
           lineWidth: width,
           lineStyle: style,
-          axisLabelVisible: true,
-          title,
+          axisLabelVisible: !dragging,
+          title: dragging ? '' : title,
         }),
       );
+    // Keep the trade's strikes in view (but not mid-drag, or the scale would chase the cursor).
+    const strikes = optionLegsOf(legs)
+      .map((l) => l.strike)
+      .filter((k) => Number.isFinite(k) && k > 0);
+    candles.applyOptions({
+      autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
+        const r = base();
+        if (!r || dragging || !strikes.length) return r;
+        const { minValue, maxValue } = r.priceRange;
+        if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) return r;
+        // Never zoom out past three times the candles' own range for a far-away strike.
+        const span = Math.max(maxValue - minValue, maxValue * 0.01);
+        const lo = Math.max(minValue - span, Math.min(minValue, ...strikes));
+        const hi = Math.min(maxValue + span, Math.max(maxValue, ...strikes));
+        if (!(hi > lo)) return r;
+        return { ...r, priceRange: { minValue: lo - (hi - lo) * 0.03, maxValue: hi + (hi - lo) * 0.03 } };
+      },
+    });
+    // Your open trade: bold solid lines marked YOUR. A trade still being planned: thin dashed
+    // PLAN lines in paler colors, so the two can never be mistaken for each other.
+    const live = !!position;
     for (const l of optionLegsOf(legs)) {
+      const short = l.ratio < 0;
       add(
         l.strike,
-        l.ratio < 0 ? COLORS.magenta : COLORS.cyan,
-        `${l.ratio < 0 ? 'S' : 'L'} ${l.right}`,
-        l.ratio < 0 ? LineStyle.Solid : LineStyle.Dashed,
-        2,
+        short ? (live ? COLORS.magenta : COLORS.planShort) : live ? COLORS.cyan : COLORS.planLong,
+        `${live ? '● YOUR' : 'PLAN'} ${short ? 'S' : 'L'} ${l.right}`,
+        live ? LineStyle.Solid : LineStyle.Dashed,
+        live ? (short ? 3 : 2) : 1,
       );
-      if (l.ratio < 0) shortLinesRef.current.push(linesRef.current[linesRef.current.length - 1]);
+      if (short) shortLinesRef.current.push(linesRef.current[linesRef.current.length - 1]);
     }
     for (const b of breakevens) add(b, COLORS.amber, 'BE', LineStyle.Dotted);
     const spot = session.view(cardId).spot();
-    if (studies.includes('em') && em) {
+    if (studies.includes('em') && em && !dragging) {
       add(spot + em, COLORS.violet, '+EM', LineStyle.LargeDashed);
       add(spot - em, COLORS.violet, '-EM', LineStyle.LargeDashed);
     }
-    if (studies.includes('sr'))
+    if (studies.includes('sr') && !dragging)
       for (const lvl of supportResistance(session.view(cardId).bars()))
         add(
           lvl.price,
@@ -453,7 +542,7 @@ export function ChartPanel() {
           lvl.kind === 'support' ? 'SUP' : 'RES',
           LineStyle.SparseDotted,
         );
-  }, [legKey]);
+  }, [legKey, chartGen]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -486,7 +575,7 @@ export function ChartPanel() {
         drawRef.current.push(s);
       }
     }
-  }, [drawings, legKey]);
+  }, [drawings, legKey, chartGen]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -510,21 +599,26 @@ export function ChartPanel() {
 
   return (
     <div className="chart-panel panel" data-testid="chart-panel">
-      <div className="chart-host" ref={hostRef} style={ff === 'idle' ? undefined : { right: 0 }} />
+      <div className="chart-host" ref={hostRef} />
       <div className="chart-legend num">{legend}</div>
       {drawTool !== 'none' && (
         <div className="chart-drawhint num">
           {drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}
         </div>
       )}
-      <PriceLadder expiration={builder.expiration} legs={legs} />
-      <StrikeHandle />
+      {(!planHidden || position) && <ChartZones />}
+      <TradeBadge position={position} plan={plan} />
+      {expAhead !== null && expDte !== null && <ExpiryLine ahead={expAhead} dte={expDte} open={!!position} />}
+      {expHidden && dteSealed && <SealedExpiry by={dteSealed} />}
+      {!planHidden && <StrikeHandle />}
       <PositionHud />
+      <BossBanner />
+      <DayRecapPanel />
       <AnimatePresence>
         {stamp && (
           <motion.div
             key={stamp.id}
-            className={`fill-stamp ${stamp.credit ? 'credit' : 'debit'}`}
+            className={`fill-stamp ${stamp.plan ? 'plan' : stamp.credit ? 'credit' : 'debit'}`}
             data-testid="fill-stamp"
             initial={{ scale: 2.4, opacity: 0, rotate: -16 }}
             animate={{ scale: 1, opacity: 1, rotate: -8 }}
@@ -550,6 +644,106 @@ export function ChartPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** The expiration as a vertical line: solid once the trade is on, dotted while it's a plan. */
+/** Top left of the chart: are these lines a trade you placed, or one you're still shaping? */
+function TradeBadge({ position, plan }: { position: Position | undefined; plan: TradePlan | null }) {
+  const canTrade = useTrading(tradeOpen);
+  if (position) {
+    const strikes = optionLegsOf(position.legs)
+      .map((l) => l.strike)
+      .join('/');
+    return (
+      <div
+        className="trade-badge open num"
+        data-testid="trade-badge"
+        data-kind="open"
+        data-tip-title="Your open trade"
+        data-tip-body="The solid lines marked YOUR are the trade you placed on this card. The shaded box runs from the day you opened it to its expiration."
+      >
+        <b>● OPEN TRADE</b> {STRUCTURES[position.structureId].short} {strikes} ×{position.qty}{' '}
+        <LivePnl pos={position} />
+      </div>
+    );
+  }
+  if (plan && plan.legs.length && canTrade) {
+    const strikes = optionLegsOf(plan.legs)
+      .map((l) => l.strike)
+      .join('/');
+    return (
+      <div
+        className="trade-badge plan num"
+        data-testid="trade-badge"
+        data-kind="plan"
+        data-tip-title="A plan, not a trade"
+        data-tip-body="The dashed PLAN lines show the trade you're shaping. Nothing is placed until you press SELL or BUY."
+      >
+        <b>◌ PLANNING</b> {STRUCTURES[plan.structureId].short} {strikes} · not placed yet
+      </div>
+    );
+  }
+  return null;
+}
+
+/** The Executor's seal where the expiration line would be: at the chart's right edge. */
+function SealedExpiry({ by }: { by: string }) {
+  const w = chartBridge.plotWidth();
+  if (w <= 0) return null;
+  return (
+    <div
+      className="exp-edge num plan sealed"
+      style={{ left: w - 2 }}
+      data-testid="exp-sealed"
+      data-tip-title="Expiration sealed"
+      data-tip-body={`${by} has sealed when this trade would expire. It shows once the trade is open; max profit and max loss still show.`}
+    >
+      🔒 EXP ?
+    </div>
+  );
+}
+
+function ExpiryLine({ ahead, dte, open }: { ahead: number; dte: number; open: boolean }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    // Follow scrolling and zooming, like the payoff zones do.
+    const id = setInterval(() => setTick((t) => t + 1), 150);
+    return () => clearInterval(id);
+  }, []);
+  const w = chartBridge.plotWidth();
+  const h = chartBridge.paneHeight();
+  const x = chartBridge.xAhead(ahead);
+  if (w <= 0 || h <= 0) return null;
+  const label = `${open ? 'EXPIRES' : 'EXP'} ${dte}d`;
+  const tip = open
+    ? `Your trade expires in ${dte} calendar days (${ahead} trading days). Past this line it settles at intrinsic value.`
+    : `The planned trade would expire in ${dte} calendar days (${ahead} trading days).`;
+  if (x === null || x > w - 2)
+    return (
+      <div
+        className={`exp-edge num ${open ? 'open' : 'plan'}`}
+        style={{ left: w - 2 }}
+        data-testid="exp-line"
+        data-exp-offscreen="1"
+        data-tip-title="Expiration"
+        data-tip-body={`${tip} It's off the right edge of the chart.`}
+      >
+        {label} ▶
+      </div>
+    );
+  if (x < 0) return null;
+  return (
+    <div
+      className={`exp-line ${open ? 'open' : 'plan'}`}
+      style={{ left: x, height: h }}
+      data-testid="exp-line"
+      data-exp-style={open ? 'solid' : 'dotted'}
+    >
+      <span className="exp-tag num" data-tip-title="Expiration" data-tip-body={tip}>
+        {label}
+      </span>
     </div>
   );
 }

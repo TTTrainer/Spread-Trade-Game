@@ -102,6 +102,15 @@
   color: var(--text-dim);
   cursor: pointer;
 }
+.title-wip {
+  margin-left: 10px;
+  padding: 1px 6px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  border: 1px dashed var(--amber);
+  vertical-align: middle;
+}
 .title-item .caret {
   display: inline-block;
   width: 1.4em;

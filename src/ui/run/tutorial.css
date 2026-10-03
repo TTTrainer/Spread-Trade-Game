@@ -1,0 +1,223 @@
+/* The tutorial's spotlight: the desk dims around the one thing Ines is talking about. */
+.tut-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  pointer-events: none;
+}
+.tut-dim.full {
+  background: rgba(4, 2, 18, 0.72);
+}
+.tut-hole {
+  position: fixed;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 200vmax rgba(4, 2, 18, 0.72),
+    0 0 0 2px var(--cyan),
+    0 0 22px 4px rgba(62, 242, 255, 0.45);
+  transition:
+    left 0.35s ease,
+    top 0.35s ease,
+    width 0.35s ease,
+    height 0.35s ease;
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+.tut-ring {
+  position: fixed;
+  z-index: 700;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px var(--cyan),
+    0 0 18px 3px rgba(62, 242, 255, 0.4);
+  animation: tut-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tut-pulse {
+  0%,
+  100% {
+    outline: 2px solid rgba(62, 242, 255, 0);
+    outline-offset: 2px;
+  }
+  50% {
+    outline: 2px solid rgba(62, 242, 255, 0.55);
+    outline-offset: 7px;
+  }
+}
+/* Clear panes around the spotlight that catch clicks during reading lessons. */
+.tut-block {
+  position: fixed;
+  z-index: 710;
+  background: transparent;
+}
+.tut-bubble {
+  position: fixed;
+  /* Above dialogs (a decision point is one), below toasts and tooltips. */
+  z-index: 850;
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  padding: 14px 16px 10px;
+  border: 2px solid var(--amber);
+  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
+  box-shadow:
+    0 0 0 3px rgba(7, 5, 26, 0.9),
+    0 10px 40px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(255, 191, 62, 0.25);
+}
+.tut-bubble.moment {
+  border-color: var(--cyan);
+}
+.tut-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.tut-kicker {
+  font-size: 13px;
+  color: var(--amber);
+  letter-spacing: 0.06em;
+}
+.tut-bubble.moment .tut-kicker {
+  color: var(--cyan);
+}
+.tut-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--text);
+}
+.tut-text {
+  margin: 10px 0 12px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.tut-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tut-actions .pixel-btn {
+  font-size: 16px;
+}
+.tut-up {
+  border-color: var(--up);
+  color: var(--up);
+}
+.tut-down {
+  border-color: var(--down);
+  color: var(--down);
+}
+.tut-doing {
+  color: var(--cyan);
+  font-size: 15px;
+  animation: tut-blink 1.2s steps(2) infinite;
+}
+@keyframes tut-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+.tut-skip {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tut-skip:hover {
+  color: var(--text);
+}
+.tut-dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+.tut-dots i {
+  flex: 1;
+  height: 4px;
+  background: rgba(164, 157, 224, 0.2);
+}
+.tut-dots i.done {
+  background: var(--amber);
+}
+.tut-dots i.now {
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+}
+/* A part of the desk switching on for the first time. */
+@keyframes tut-reveal {
+  0% {
+    opacity: 0;
+    filter: brightness(2.4) drop-shadow(0 0 10px rgba(62, 242, 255, 0.9));
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tut-hole,
+  .tut-ring,
+  .tut-doing {
+    animation: none;
+  }
+}
+
+/* The drag lesson: a hand presses on the S tag and slides it up and down. */
+.tut-drag {
+  position: fixed;
+  z-index: 840;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.td-hand {
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  font-size: 34px;
+  color: #fff;
+  text-shadow:
+    2px 2px 0 #000,
+    0 0 10px var(--amber);
+  animation: td-drag 1.6s ease-in-out infinite;
+}
+.td-arrows {
+  position: absolute;
+  left: 30px;
+  top: -14px;
+  font-size: 28px;
+  color: var(--amber);
+  text-shadow: 2px 2px 0 #000;
+  animation: td-pulse 1.6s ease-in-out infinite;
+}
+@keyframes td-drag {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    transform: translateY(0) scale(0.9);
+  }
+  45% {
+    transform: translateY(-42px) scale(0.9);
+  }
+  75% {
+    transform: translateY(42px) scale(0.9);
+  }
+}
+@keyframes td-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+:root[data-reduced-motion='true'] .td-hand,
+:root[data-reduced-motion='true'] .td-arrows {
+  animation: none;
+}

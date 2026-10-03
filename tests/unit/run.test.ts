@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../src/content/balance';
 import { CARTRIDGES, CARTRIDGE_BY_ID } from '../../src/content/cartridges';
 import { DESKS } from '../../src/content/desks';
+import { STRUCTURES } from '../../src/engine/strategies/structures';
 import { emptyFamilies, familyPassives } from '../../src/content/families';
 import { ANALYSTS } from '../../src/content/analysts';
 import { REVIEWS, QUARTER_REVIEWS } from '../../src/content/reviews';
@@ -17,7 +18,7 @@ import {
   rerollCost,
   sellPrice,
 } from '../../src/engine/run/shop';
-import { dealWindows } from '../../src/engine/run/deal';
+import { dealWindows, isFlat } from '../../src/engine/run/deal';
 import { baseRate, skew25, termStructure } from '../../src/engine/run/analystTools';
 import { runScore } from '../../src/engine/scoring/mult';
 import { Rng } from '../../src/engine/rng';
@@ -32,7 +33,24 @@ describe('round targets', () => {
       t.q1.map((x) => r10(x * t.quarterGrowth)),
     );
     expect(computeTarget(4, 2, 'annual_review', cfg)).toBe(r10(t.q1[2] * t.quarterGrowth ** 3 * 1.25));
-    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25));
+    // Every tier adds 10% to targets; Tier 5 adds its own 25% on top.
+    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25 * 1.5));
+    expect(computeTarget(1, 0, null, { tier: 2 })).toBe(r10(t.q1[0] * 1.2));
+  });
+
+  it('scale by desk, so a desk that scores more per trade asks for more', () => {
+    const t = BALANCE.targets;
+    const r10 = (x: number) => Math.round(x / 10) * 10;
+    expect(computeTarget(1, 0, null, { tier: 0, deskId: 'verticals' })).toBe(r10(t.q1[0]));
+    for (const id of ['income', 'condor', 'volatility', 'calendar'] as const) {
+      const m = DESKS[id].targetMult ?? 1;
+      expect(computeTarget(1, 0, null, { tier: 0, deskId: id })).toBe(r10(t.q1[0] * m));
+    }
+    // Builds compound, so targets keep pace: at least 25% more every quarter.
+    for (let q = 1; q < 4; q++)
+      expect(computeTarget(q + 1, 0, null, { tier: 0, deskId: 'verticals' })).toBeGreaterThanOrEqual(
+        computeTarget(q, 0, null, { tier: 0, deskId: 'verticals' }) * 1.2,
+      );
   });
 });
 
@@ -190,7 +208,8 @@ describe('shop', () => {
     expect(a).toEqual(b);
     expect(a.filter((x) => x.kind === 'cartridge').length).toBe(2);
     expect(a.filter((x) => x.kind === 'analyst').length).toBe(1);
-    expect(a.filter((x) => x.kind === 'memo' || x.kind === 'page').length).toBe(2);
+    expect(a.filter((x) => x.kind === 'memo').length).toBe(1);
+    expect(a.filter((x) => x.kind === 'page').length).toBe(1);
     expect(a.filter((x) => x.kind === 'voucher').length).toBe(1);
     const analyst = a.find((x) => x.kind === 'analyst');
     if (analyst?.kind === 'analyst' && analyst.id === 'quant') expect(analyst.level).toBe(2);
@@ -255,6 +274,41 @@ describe('dealing', () => {
     });
     expect(relaxed.relaxed).toBe(true);
     expect(relaxed.windows.length).toBe(2);
+  });
+
+  it('always deals a range-selling desk one flat chart, even against a trend filter', () => {
+    const tilted = windows.map((w) => ({ ...w, tags: { ...w.tags, trendSlope: w.id % 7 === 0 ? 0 : 0.4 } }));
+    for (let k = 0; k < 50; k++) {
+      const { windows: w } = dealWindows(tilted, new Rng(`flat${k}`), {
+        count: 4,
+        filter: { minAdx: 30 },
+        excludeWindows: new Set(),
+        excludeSymbols: new Set(),
+        indexSymbols: new Set(),
+        needFlat: true,
+      });
+      expect(w.length).toBe(4);
+      expect(w.filter(isFlat).length, `deal ${k}`).toBeGreaterThanOrEqual(1);
+      // The rest still follow the Review's market.
+      expect(w.filter((x) => !isFlat(x)).every((x) => x.tags.adx >= 30)).toBe(true);
+    }
+    // Without the flag nothing changes.
+    const plain = dealWindows(tilted, new Rng('plain'), {
+      count: 4,
+      filter: { minAdx: 30 },
+      excludeWindows: new Set(),
+      excludeSymbols: new Set(),
+      indexSymbols: new Set(),
+    });
+    expect(plain.windows.every((x) => x.tags.adx >= 30)).toBe(true);
+  });
+
+  it('knows which desks sell a range', () => {
+    const sells = (d: keyof typeof DESKS) =>
+      DESKS[d].structures.some((id) => STRUCTURES[id].bias === 'neutral');
+    expect(sells('condor')).toBe(true);
+    expect(sells('calendar')).toBe(true);
+    expect(sells('verticals')).toBe(false);
   });
 });
 

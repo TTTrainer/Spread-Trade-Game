@@ -15,11 +15,80 @@ export const BALANCE = {
     lineupSize: 4,
     lineupMax: 5,
     recentShare: 0.75,
+    /** New trades may start on any of a round's first N trading days. */
+    tradeWindowDays: 10,
+    /** A skip sits the round out for this many trading days before its Tag pays. */
+    sitOutDays: 5,
+    /**
+     * A "flat" chart, judged only from history up to the entry date: weak trend strength (ADX)
+     * and a nearly level 50-day average (% per day). Desks that sell a range always get one.
+     */
+    flatMaxAdx: 20,
+    flatMaxSlope: 0.1,
+    /**
+     * A failed Review (boss) ends the run. Set false and a failed boss becomes a write-up instead
+     * (more stress, and the run ends only at a second miss in the same quarter).
+     */
+    bossFailEndsRun: true,
+    /** Rerolling a boss (once per boss) costs more for each boss of the run: 1st, 2nd, 3rd, later. */
+    bossRerollCosts: [10, 25, 40, 60],
+    /** Cash for a boss round played in the boss's style (on top of the round win). */
+    styleCash: 3,
+    /** Cash for beating a boss (on top of the round win), and for a trophy you already hold. */
+    bossBounty: 5,
+    /** Free cartridges offered after a boss (take one). */
+    spoilsCount: 3,
   },
 
+  /**
+   * The Early Retiree's duel: Chad buys out-of-the-money bull call spreads (long leg at `delta`,
+   * about `dte` days out) on his first `trades` cards, sized at this share of the risk cap but
+   * never more than `maxQty` contracts.
+   */
+  duel: {
+    trades: 2,
+    delta: 0.25,
+    dte: 21,
+    riskShare: 0.3,
+    maxQty: 1,
+    /** Your round score is multiplied by this when you finish ahead of Chad, or behind him. */
+    winMult: 1.5,
+    loseMult: 0.75,
+  },
+
+  /**
+   * Each boss's Review target, as a share of the normal Review target, tuned in the simulator so a
+   * good player beats a typical boss about 9 times in 10 and the year-end Rebalancer about 7 in 10
+   * (on top of the Annual Review's own x1.25). A harsher twist gets a lower bar. The simulator's
+   * bots don't read the screen, so the bosses that only seal information (the Controller, the
+   * Executor, the Shell Company) are set by hand a little under 1.
+   */
+  bossTargets: {
+    controller: 0.85,
+    margin_clerk: 0.76,
+    underwriter: 0.81,
+    landlord: 0.57,
+    early_retiree: 0.85,
+    tax_man: 0.95,
+    bursar: 0.81,
+    allocator: 0.95,
+    shell_company: 0.71,
+    executor: 0.85,
+    collector: 0.9,
+    rebalancer: 2.7,
+  } as Record<string, number>,
+
   targets: {
-    q1: [30, 50, 80] as [number, number, number],
-    quarterGrowth: 1.3,
+    // Round 1 needs more than one typical trade (a median Verticals win scores about 220 on the
+    // SIM market). Reviews ask a little less: their rules (beat SPY, stay calm) are the hard part.
+    q1: [200, 220, 150] as [number, number, number],
+    // Builds compound, so targets grow 34% a quarter (12% before 1.6, when a decent build scored
+    // 5 to 14 times the target by the fourth quarter; 30% in 1.6.0, when a strong player still
+    // finished Months at 3 to 5 times the target). Months ask more than Reviews: the boss is the
+    // Review's hard part, and a Month is where a strong build snowballs.
+    quarterGrowth: 1.34,
+    /** A missed Month target is a write-up, not the end: that quarter's Review target grows this much. */
+    writeUpReviewMult: 1.1,
     endlessGrowth: 1.8,
     annualReviewMult: 1.25,
   },
@@ -28,6 +97,22 @@ export const BALANCE = {
     maxLossLinePct: 0.15,
     riskCapPct: 0.1,
     plannedRiskPct: 0.05, // sizing beyond this is flagged "oversized"
+  },
+
+  /** Size: the share of the per-trade risk cap each conviction step uses (FEELER to ALL IN). */
+  conviction: {
+    capShares: [0.2, 0.4, 0.6, 0.8, 1] as [number, number, number, number, number],
+  },
+
+  /**
+   * Covered calls carry an automatic stop: it buys the call back once the loss reaches this many
+   * times the premium, and the risk cap measures the trade at that stop plus an allowance for a
+   * gap skipping past it. (Sized on a stock jump instead, a call on a $700 stock never fit.)
+   */
+  coveredCall: {
+    stopMult: 2,
+    minStopMult: 0.5,
+    gapAllowance: 0.25,
   },
 
   brackets: {
@@ -41,7 +126,19 @@ export const BALANCE = {
   scoring: {
     chipsPerUnit: 10_000, // chips = P/L / round-start equity * this (1% = 100 chips)
     /** A loser's chips on the meter, as a share of its P/L chips (the ledger is never touched). */
-    lossChipsScale: 0.4,
+    lossChipsScale: 1,
+    /** Bonus chips are full for a win that earned this share of its risk, and scale down below it. */
+    bonusFullRoR: 0.08,
+    /** The same for cash-secured puts (their risk is a stress drop in the stock). */
+    incomeFullRoR: 0.01,
+    /** A round that finished with a profit adds this share of its score... */
+    greenRoundBonus: 0.2,
+    /** ...and one that finished with a loss gives up this share. */
+    redRoundPenalty: 0.2,
+    /** This share of a passed round's surplus carries into the next round's meter... */
+    carryShare: 0.35,
+    /** ...up to this share of the next target (half until 1.6.1, a head start that snowballed). */
+    carryCap: 0.25,
     levelChips: 10,
     levelMult: 0.5,
     rrMult: 1,
@@ -88,6 +185,7 @@ export const BALANCE = {
     skipRound: -10,
     closeAtPlan: -5,
     assignment: 5, // not in the plan's table; the Assignment Artist cartridge implies assignments cost stress
+    writeUp: 15,
     vacationDay: -30,
     burnoutAt: 100,
     burnoutResetTo: 50,

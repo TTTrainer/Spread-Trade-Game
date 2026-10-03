@@ -2,7 +2,7 @@
   display: grid;
   height: 100vh;
   width: 100vw;
-  grid-template-columns: 236px minmax(0, 1fr) 330px;
+  grid-template-columns: 236px minmax(0, 1fr) 430px;
   grid-template-rows: auto minmax(0, 1fr) 238px;
   grid-template-areas:
     'top top top'
@@ -89,7 +89,7 @@
 }
 .chart-host {
   position: absolute;
-  inset: 0 190px 0 0;
+  inset: 0;
 }
 .chart-legend {
   position: absolute;
@@ -490,6 +490,39 @@
   border-color: var(--cyan);
   color: var(--cyan);
 }
+.order-simple {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: rgba(62, 242, 255, 0.05);
+}
+.os-market {
+  color: var(--cyan);
+}
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-dim);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9em;
+}
+.linkish:hover {
+  color: var(--text);
+}
+.order-limit-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 1.3;
+}
 .limit-box input {
   width: 100%;
 }
@@ -577,6 +610,17 @@
   border-bottom: 1px dotted rgba(91, 75, 196, 0.3);
   white-space: nowrap;
 }
+.pos-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pos-range .up {
+  color: var(--up);
+}
+.pos-range .down {
+  color: var(--down);
+}
 .pos-table tr.closed {
   opacity: 0.6;
 }
@@ -617,6 +661,93 @@
 .roll-legs {
   font-size: 18px;
   margin: 8px 0;
+}
+
+/* The take-profit moment: the money first, then two plain choices. */
+.tp {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: min(560px, 90vw);
+}
+.tp h2 {
+  margin: 0;
+}
+.tp .dp-kind {
+  color: var(--up);
+}
+.tp-amount {
+  font-family: var(--font-display);
+  font-size: 76px;
+  line-height: 1;
+  text-align: center;
+  color: var(--up);
+  text-shadow:
+    4px 4px 0 #000,
+    0 0 26px rgba(77, 255, 154, 0.7);
+}
+.tp-sub {
+  text-align: center;
+  font-size: 20px;
+  color: var(--text-dim);
+}
+.tp-sub b {
+  color: var(--up);
+  font-weight: 400;
+}
+.tp-choices {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+.tp-choices .pixel-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 12px;
+}
+.tp-btn-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+.tp-btn-sub {
+  font-size: 16px;
+  opacity: 0.85;
+}
+/* Banking money is green everywhere, so the button matches the number it banks. */
+.tp .pixel-btn.tp-take {
+  border-color: var(--up);
+  background: linear-gradient(180deg, rgba(77, 255, 154, 0.28), rgba(77, 255, 154, 0.1));
+  color: var(--text);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 18px rgba(77, 255, 154, 0.45);
+}
+.tp .pixel-btn.tp-take:hover {
+  background: linear-gradient(180deg, rgba(77, 255, 154, 0.4), rgba(77, 255, 154, 0.16));
+}
+.tp .pixel-btn.tp-ride {
+  border-color: var(--amber);
+}
+.tp-ride .tp-btn-title {
+  color: var(--amber);
+}
+.tp-risk {
+  font-size: 16px;
+  margin: 0;
+}
+.tp .dp-chart {
+  align-self: center;
+  margin: 2px 0;
+}
+.tp-more {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
 
 /* analyze */
@@ -845,11 +976,8 @@
 /* Compact layout for laptop screens (1366x768). */
 @media (max-width: 1500px) {
   .trading {
-    grid-template-columns: 200px minmax(0, 1fr) 290px;
+    grid-template-columns: 200px minmax(0, 1fr) 350px;
     grid-template-rows: auto minmax(0, 1fr) 226px;
-  }
-  .chart-host {
-    right: 150px;
   }
   .ladder {
     width: 150px;
@@ -883,8 +1011,8 @@
 .news-ticker {
   position: absolute;
   left: 8px;
-  top: 28px;
-  right: 200px;
+  top: 62px;
+  right: 90px;
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -947,16 +1075,32 @@
 .stat-chips .chip {
   cursor: help;
 }
-.greeks-line {
-  font-size: 16px;
-  color: var(--text-dim);
-  cursor: help;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.moves {
+  border: 1px solid var(--line);
+  background: rgba(23, 16, 66, 0.55);
+  padding: 5px 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.greeks-line .ginfo {
+.moves-k {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+}
+.moves-row {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--text);
+  cursor: help;
+}
+.moves-g {
   color: var(--cyan);
+  text-align: center;
+  font-size: 16px;
 }
 .ticket-buttons .pixel-btn {
   display: flex;
@@ -1258,6 +1402,58 @@
   animation: hud-tense 0.6s steps(2) 3;
 }
 
+/* The miniplayer: other cards' open trades as small live charts above the main trade card. */
+.mini-player {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.mini-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 116px;
+  padding: 3px 5px 4px;
+  background: rgba(7, 5, 26, 0.9);
+  border: 1px solid var(--line-bright);
+  box-shadow: 3px 3px 0 #000;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mini-tile:hover {
+  border-color: var(--cyan);
+  transform: translateY(-1px);
+}
+.mini-tile.closed {
+  opacity: 0.7;
+}
+.mini-tile .mini-candles {
+  display: block;
+}
+.mt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+}
+.mt-sym {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--cyan);
+}
+.mt-pl {
+  font-size: 15px;
+}
+.mt-closed {
+  font-size: 12px;
+}
+.mt-more {
+  align-self: center;
+  font-size: 15px;
+}
+
 /* Stop on the left, target on the right, today's P/L riding between them. */
 .tug {
   display: flex;
@@ -1317,6 +1513,84 @@
 .tug.near-target .tug-dot {
   background: var(--up);
   box-shadow: 0 0 10px var(--up);
+}
+
+/* The same track spanning the most it can lose to the most it can make, with stop/target ticks. */
+.rng {
+  padding-bottom: 12px;
+}
+.rng.mini {
+  padding-bottom: 0;
+  margin-top: 0;
+  min-width: 90px;
+}
+.rng.mini .tug-track {
+  height: 8px;
+}
+.rng.mini .tug-dot {
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-width: 1px;
+}
+.rng-fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+}
+.rng-fill.gain {
+  background: var(--up);
+  opacity: 0.75;
+}
+.rng-fill.loss {
+  background: var(--down);
+  opacity: 0.75;
+}
+.rng-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+}
+.rng-tick.stop {
+  background: var(--down);
+}
+.rng-tick.target {
+  background: var(--up);
+}
+.rng-lab {
+  position: absolute;
+  top: calc(100% + 1px);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Stop labels hang to the left of their tick, target labels to the right, so they never collide. */
+.rng-tick.stop .rng-lab {
+  right: 0;
+  color: var(--down);
+}
+.rng-tick.target .rng-lab {
+  left: 0;
+  color: var(--up);
+}
+.rng.big {
+  padding-bottom: 18px;
+}
+.rng.big .tug-track {
+  height: 16px;
+}
+.rng.big .tug-end {
+  font-size: 17px;
+}
+.rng.big .rng-lab {
+  font-size: 15px;
+}
+.rng.big .tug-dot {
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
 }
 
 /* "DAY 7" as each new day starts. */
@@ -1462,6 +1736,15 @@
     4px 4px 0 #000,
     0 0 24px rgba(255, 191, 62, 0.35);
 }
+/* Taking a planned stop: a calm cyan stamp, a move rather than a defeat. */
+.fill-stamp.plan {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(4, 22, 34, 0.88);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 24px rgba(62, 231, 255, 0.35);
+}
 .fs-title {
   font-family: var(--font-display);
   font-size: 40px;
@@ -1504,4 +1787,1635 @@
   .delta-chips .wide-only {
     display: none;
   }
+}
+
+/* ---------- The end-of-day recap ---------- */
+.day-recap {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  margin-left: max(-340px, -45%);
+  width: min(680px, 90%);
+  max-height: 84%;
+  overflow-y: auto;
+  z-index: 8;
+  background: rgba(10, 7, 30, 0.96);
+  border: 2px solid var(--cyan);
+  box-shadow:
+    5px 5px 0 #000,
+    0 0 26px rgba(62, 242, 255, 0.25);
+  padding: 8px 12px 10px;
+}
+.dr-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.dr-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--cyan);
+}
+.dr-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 22px;
+  cursor: pointer;
+}
+.dr-trades {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recap-trade {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--up);
+  padding: 6px 8px;
+}
+.recap-trade.warn {
+  border-left-color: var(--amber);
+}
+.recap-trade.bad {
+  border-left-color: var(--down);
+  animation: hud-tense 0.6s steps(2) 3;
+}
+.recap-trade.closed {
+  border-left-color: var(--text-faint);
+}
+.rt-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 16px;
+}
+.rt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rt-sym {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--cyan);
+}
+.rt-move.up,
+.rt-status.good {
+  color: var(--up);
+}
+.rt-move.down,
+.rt-status.bad {
+  color: var(--down);
+}
+.rt-status.warn {
+  color: var(--amber);
+}
+.rt-status.closed {
+  color: var(--text-dim);
+}
+.rt-info .pixel-btn {
+  align-self: flex-start;
+  font-size: 14px;
+  padding: 2px 10px;
+  border-color: var(--down);
+  color: var(--down);
+}
+.dr-news {
+  margin-top: 6px;
+  border-top: 1px dashed var(--line);
+  padding-top: 4px;
+  font-size: 16px;
+}
+.dr-item.good {
+  color: var(--up);
+}
+.dr-item.bad {
+  color: var(--down);
+}
+.dr-item.warn {
+  color: var(--amber);
+}
+.dr-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+.mini-candles {
+  background: #0b0826;
+  border: 1px solid var(--line);
+}
+.mini-candles .mc-up line,
+.mini-candles .mc-up rect {
+  stroke: var(--up);
+  fill: var(--up);
+}
+.mini-candles .mc-down line,
+.mini-candles .mc-down rect {
+  stroke: var(--down);
+  fill: var(--down);
+}
+.mini-candles .mc-today rect {
+  stroke: #fff;
+  stroke-width: 1;
+}
+.mini-candles .mc-short {
+  stroke: var(--magenta);
+  stroke-width: 1.5;
+}
+.mini-candles .mc-long {
+  stroke: var(--cyan);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+.hud-inhand {
+  font-size: 14px;
+}
+.hud-pl-k {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* Paper gains and losses float up muted: nothing is won until the trade closes. */
+.hud-float.unreal {
+  opacity: 0.75;
+  font-size: 16px;
+}
+
+/* ---------- Shaping a trade (sliders) ---------- */
+/* Its rows scroll instead of squashing into each other (hint lines need their height). */
+.tray-section.setup > * {
+  flex-shrink: 0;
+}
+.tray-section.setup {
+  flex: 1 1 420px;
+  min-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-top: 4px;
+}
+.view-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-bright);
+  background: var(--bg-2);
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.view-chip.flip {
+  cursor: pointer;
+}
+.vc-k {
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 1px;
+}
+.view-chip.b3 .vc-glyph,
+.view-chip.b4 .vc-glyph {
+  color: var(--up);
+}
+.view-chip.b0 .vc-glyph,
+.view-chip.b1 .vc-glyph {
+  color: var(--down);
+}
+.view-chip.b2 .vc-glyph {
+  color: var(--flat);
+}
+.vc-line {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vc-flip {
+  margin-left: auto;
+  color: var(--amber);
+}
+.plan-chip {
+  font-size: 14px;
+  color: var(--text-dim);
+  border: 1px dashed var(--line);
+  padding: 1px 6px;
+}
+/* A covered call's stop is required: a solid amber frame and its own picker. */
+.ticket .plan-chip.auto-stop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--amber);
+  overflow: visible;
+}
+.plan-chip.auto-stop > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.plan-chip.auto-stop b {
+  font-weight: 400;
+  color: var(--amber);
+}
+.auto-stop-picks {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.auto-stop-picks .seg-btn {
+  padding: 0 5px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.auto-stop-picks .seg-btn.on {
+  color: #000;
+  background: var(--amber);
+  border-color: var(--amber);
+}
+@media (max-width: 1500px) {
+  .tray-section.setup {
+    min-width: 300px;
+  }
+  .snap {
+    grid-template-columns: 62px 1fr auto;
+    gap: 6px;
+  }
+  .snap-readout {
+    font-size: 14px;
+    min-width: 80px;
+  }
+}
+
+/* ---------- Profit and loss zones on the chart ---------- */
+.chart-zones {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+.chart-zones > * {
+  pointer-events: auto;
+}
+.zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none !important;
+}
+.zone.win {
+  background: linear-gradient(90deg, rgba(77, 255, 154, 0.02), rgba(77, 255, 154, 0.09));
+  border-top: 1px dashed rgba(77, 255, 154, 0.25);
+  border-bottom: 1px dashed rgba(77, 255, 154, 0.25);
+}
+.zone.lose {
+  background: linear-gradient(90deg, rgba(255, 79, 109, 0.02), rgba(255, 79, 109, 0.09));
+  border-top: 1px dashed rgba(255, 79, 109, 0.25);
+  border-bottom: 1px dashed rgba(255, 79, 109, 0.25);
+}
+.zone-peak {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--amber);
+  pointer-events: none !important;
+}
+.zone-peak span {
+  position: absolute;
+  right: 60px;
+  top: -18px;
+  font-size: 13px;
+  color: var(--amber);
+}
+/* The cushion between today's price and the nearest short strike. */
+.cushion {
+  position: absolute;
+  right: 34px;
+  width: 10px;
+  border: 2px solid var(--up);
+  border-left: none;
+}
+.cushion.thin {
+  border-color: var(--down);
+}
+.cushion span {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--up);
+  background: rgba(7, 5, 26, 0.85);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.cushion.thin span {
+  color: var(--down);
+}
+.strike-handle.far {
+  border-color: var(--cyan);
+  background: rgba(6, 30, 40, 0.92);
+}
+.strike-handle.far .sh-grip {
+  color: var(--cyan);
+}
+.strike-handle.far .sh-read {
+  color: var(--amber);
+}
+
+/* ---------- Trade visuals (right panel) ---------- */
+.trade-visuals {
+  display: grid;
+  grid-template-columns: 122px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.pop-gauge {
+  position: relative;
+  text-align: center;
+}
+.pg-needle {
+  transform-origin: 60px 62px;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pg-arc {
+  transition: stroke-dasharray 0.35s ease-out;
+}
+.pg-v {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34px;
+  font-size: 20px;
+  color: var(--text);
+  text-shadow: 2px 2px 0 #000;
+}
+.pg-k {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  margin-top: -4px;
+}
+.rr {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rr-row {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+.rr-k {
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 1px;
+}
+.rr-bar {
+  height: 10px;
+  min-width: 2px;
+  transition: width 0.3s ease-out;
+}
+.rr-bar.loss {
+  background: linear-gradient(90deg, rgba(255, 79, 109, 0.4), var(--down));
+}
+.rr-bar.gain {
+  background: linear-gradient(90deg, rgba(77, 255, 154, 0.4), var(--up));
+}
+.rr-v {
+  font-size: 15px;
+}
+.rr-ratio {
+  font-size: 14px;
+}
+.rr-ratio b {
+  font-weight: 400;
+}
+.rr-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.rr-rule.up {
+  color: var(--up);
+}
+.premium-bar {
+  margin: 4px 0 6px;
+}
+.pb-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.pb-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  margin-top: 2px;
+}
+.pb-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+  transition: width 0.3s ease-out;
+}
+.pb-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--amber);
+}
+.key-stats.small .kstat-v {
+  font-size: 17px;
+}
+.pace .seg button,
+.ffbar .pixel-btn {
+  white-space: nowrap;
+}
+/* The far-strike handle sits to the right of the anchor so close strikes never overlap. */
+.strike-handle.far {
+  left: 230px;
+}
+@media (max-width: 1500px) {
+  .pace-wide {
+    display: none;
+  }
+  .strike-handle.far {
+    left: 200px;
+  }
+  .strike-handle .sh-read {
+    font-size: 13px;
+  }
+}
+
+/* full-screen option chain */
+.ladder-head .ladder-chain {
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--cyan);
+  cursor: pointer;
+  padding: 0;
+}
+.ladder-head .ladder-chain:hover {
+  text-shadow: var(--glow-cyan);
+}
+.modal.wide:has(.chain-full) {
+  max-width: 1500px;
+  width: 96vw;
+}
+.chain-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.chain-head h2 {
+  margin: 0;
+}
+.chain-head .pixel-btn {
+  margin-left: auto;
+}
+.chain-exps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 10px 0 8px;
+}
+.chain-exps .exp-chip {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  padding: 2px 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.chain-exps .exp-chip:hover {
+  border-color: var(--cyan);
+  color: var(--text);
+}
+.chain-exps .exp-chip.sel {
+  background: var(--cyan);
+  color: #000;
+  border-color: var(--cyan);
+}
+.chain-full-wrap {
+  position: relative;
+  max-height: 64vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+}
+.chain-full {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+.chain-full thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-1);
+  color: var(--text-faint);
+  font-weight: 400;
+  padding: 2px 6px;
+  z-index: 1;
+}
+.chain-full thead tr:nth-child(2) th {
+  top: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.chain-full .side-h {
+  color: var(--amber);
+  letter-spacing: 2px;
+}
+.chain-full td {
+  padding: 1px 6px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.chain-full td.strike {
+  text-align: center;
+  color: var(--text);
+  background: var(--bg-2);
+  min-width: 90px;
+}
+.chain-full td.strike i {
+  font-style: normal;
+  font-size: 13px;
+  color: #000;
+  padding: 0 3px;
+  margin: 0 4px;
+}
+.chain-full td.cg {
+  color: var(--text-faint);
+}
+.chain-full td.cd {
+  position: relative;
+  min-width: 56px;
+}
+.chain-full .dbar {
+  position: absolute;
+  right: 0;
+  top: 3px;
+  bottom: 3px;
+  background: rgba(157, 107, 255, 0.22);
+}
+.chain-full .dv {
+  position: relative;
+}
+.chain-full td.cb,
+.chain-full td.ca {
+  cursor: pointer;
+  color: var(--text);
+}
+.chain-full td.cb:hover {
+  background: var(--magenta);
+  color: #000;
+}
+.chain-full td.ca:hover {
+  background: var(--cyan);
+  color: #000;
+}
+.chain-full tr.itm-c > td:nth-child(-n + 7),
+.chain-full tr.itm-p > td:nth-last-child(-n + 7) {
+  background: rgba(157, 107, 255, 0.09);
+}
+.chain-full tr.atm td.strike {
+  background: var(--amber);
+  color: #000;
+}
+.chain-full tr.em-edge td.strike {
+  box-shadow: inset 0 0 0 1px var(--amber);
+  color: var(--amber);
+}
+.chain-full tr:hover td {
+  outline: 1px solid rgba(62, 242, 255, 0.15);
+}
+.chain-full tr.spot-row td {
+  text-align: center;
+  padding: 0;
+  height: 16px;
+  background: linear-gradient(90deg, transparent, rgba(62, 242, 255, 0.25), transparent);
+  color: var(--cyan);
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.chain-full td.cd.p .dbar {
+  right: auto;
+  left: 0;
+}
+
+/* brief widgets */
+.brief {
+  position: relative;
+}
+.brief-expand {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  background: var(--bg-3);
+  border: 1px solid var(--line-bright);
+  color: var(--cyan);
+  font-size: 16px;
+  line-height: 16px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.brief-expand:hover {
+  background: var(--cyan);
+  color: #000;
+}
+.bw {
+  border: 1px solid var(--line);
+  background: rgba(23, 16, 66, 0.65);
+  padding: 4px 7px 6px;
+  min-width: 0;
+}
+.bw-k {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.bw-num {
+  margin-left: auto;
+  font-size: 17px;
+  color: var(--text);
+  letter-spacing: 0;
+}
+.bw-num.up {
+  color: var(--up);
+}
+.bw-num.down {
+  color: var(--down);
+}
+.bw-sub {
+  font-size: 14px;
+  color: var(--text-faint);
+  margin-top: 3px;
+  white-space: nowrap;
+}
+.bw-sub b {
+  font-weight: 400;
+  color: var(--text);
+}
+.bw-street {
+  border-color: var(--line-bright);
+  padding-right: 30px;
+}
+.bw-street.up {
+  border-color: var(--up);
+  box-shadow: inset 0 0 18px rgba(77, 255, 154, 0.12);
+}
+.bw-street.down {
+  border-color: var(--down);
+  box-shadow: inset 0 0 18px rgba(255, 79, 109, 0.12);
+}
+.bw-street.up .brief-lean {
+  color: var(--up);
+}
+.bw-street.down .brief-lean {
+  color: var(--down);
+}
+.bw-street.flat .brief-lean {
+  color: var(--flat);
+}
+.street-gauge {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  margin: 4px 0 5px;
+  height: 8px;
+}
+.sg-seg {
+  flex: 1;
+  opacity: 0.28;
+}
+.sg-seg.down {
+  background: var(--down);
+}
+.sg-seg.flat {
+  background: var(--flat);
+}
+.sg-seg.up {
+  background: var(--up);
+}
+.sg-seg.on {
+  opacity: 1;
+}
+.sg-needle {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 16px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 6px var(--text);
+  transition: left 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.bw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.bspark {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+}
+.bspark-line {
+  fill: none;
+  stroke-width: 1.5;
+}
+.bspark.up .bspark-line {
+  stroke: var(--up);
+}
+.bspark.down .bspark-line {
+  stroke: var(--down);
+}
+.bspark-area {
+  stroke: none;
+  opacity: 0.14;
+}
+.bspark.up .bspark-area {
+  fill: var(--up);
+}
+.bspark.down .bspark-area {
+  fill: var(--down);
+}
+.bspark-dot {
+  fill: var(--text);
+}
+.bspark-mark {
+  stroke: var(--amber);
+  stroke-dasharray: 2 2;
+  stroke-width: 0.6;
+  opacity: 0.7;
+}
+.bm {
+  margin-top: 3px;
+}
+.bm-track {
+  position: relative;
+  height: 7px;
+  background: var(--bg-3);
+}
+.bm-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.bm-zone.z-low,
+.bm-zone.z-calm {
+  background: rgba(77, 255, 154, 0.22);
+}
+.bm-zone.z-high,
+.bm-zone.z-fear {
+  background: rgba(255, 79, 109, 0.22);
+}
+.bm-zone.z-rich {
+  background: rgba(255, 191, 62, 0.22);
+}
+.bm-fill {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  background: rgba(62, 242, 255, 0.45);
+}
+.bm.range .bm-fill {
+  background: linear-gradient(90deg, var(--down), var(--flat), var(--up));
+  opacity: 0.45;
+}
+.bm-mark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 13px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 5px var(--cyan);
+}
+.bm-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-faint);
+  line-height: 13px;
+  margin-top: 1px;
+}
+.trend-chips {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+}
+.trend-chip {
+  font-size: 14px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+}
+.trend-chip.up {
+  color: var(--up);
+}
+.trend-chip.down {
+  color: var(--down);
+}
+.ivhv {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.ivhv div {
+  display: grid;
+  grid-template-columns: 50px 1fr 22px;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-faint);
+}
+.ivhv i {
+  display: block;
+  height: 6px;
+}
+.ivhv i.iv {
+  background: var(--amber);
+}
+.ivhv i.hv {
+  background: var(--violet);
+}
+.ivhv b {
+  font-weight: 400;
+  color: var(--text);
+  text-align: right;
+}
+.bw-lock {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--text-faint);
+  border: 1px dashed var(--line-bright);
+  padding: 2px 4px;
+  text-align: center;
+}
+.vix-calm {
+  color: var(--up);
+}
+.vix-jumpy {
+  color: var(--amber);
+}
+.vix-panic {
+  color: var(--down);
+}
+.bw-k .warn-text {
+  font-size: 14px;
+}
+.tl {
+  position: relative;
+  height: 50px;
+  margin: 2px 6px 0;
+}
+.tl-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22px;
+  height: 2px;
+  background: var(--line-bright);
+}
+.tl-trade {
+  position: absolute;
+  left: 0;
+  top: 17px;
+  height: 12px;
+  background: rgba(62, 242, 255, 0.16);
+  border-right: 2px solid var(--cyan);
+}
+.tl-exp {
+  position: absolute;
+  right: -2px;
+  top: 17px;
+  transform: translateX(50%);
+  font-size: 13px;
+  line-height: 13px;
+  color: var(--cyan);
+  white-space: nowrap;
+  background: var(--bg-2);
+  padding: 0 2px;
+  z-index: 1;
+}
+.tl-pos {
+  position: absolute;
+  top: 16px;
+  width: 2px;
+  height: 14px;
+  background: var(--magenta);
+}
+.tl-ev {
+  position: absolute;
+  top: 14px;
+  transform: translateX(-50%);
+  width: 17px;
+  height: 17px;
+  line-height: 17px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  background: var(--bg-3);
+  border: 1px solid var(--line-bright);
+  color: var(--text);
+  cursor: help;
+  z-index: 2;
+}
+.tl-ev.lane1 {
+  top: -4px;
+}
+.tl-ev.ev-earnings {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.tl-ev.inside {
+  border-color: var(--cyan);
+}
+.tl-ev.ev-earnings.inside {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #000;
+  box-shadow: var(--glow-amber);
+}
+.tl-tick {
+  position: absolute;
+  bottom: 0;
+  font-size: 12px;
+  line-height: 12px;
+  color: var(--text-faint);
+}
+.tl-tick.end {
+  right: 0;
+}
+.bw-wide .brief-news {
+  grid-template-columns: 70px 1fr;
+}
+.bw-big-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.brief.big .bw-grid .bspark {
+  height: 60px !important;
+}
+.brief.big h2 {
+  margin-bottom: 8px;
+}
+.bw-notes {
+  grid-column: 1 / -1;
+}
+.bw .small,
+.chain-note {
+  font-size: 14px;
+}
+.bw-big-grid {
+  align-items: start;
+}
+.bw-year {
+  margin-top: 6px;
+}
+.tl-ev-inline {
+  display: inline-block;
+  width: 17px;
+  text-align: center;
+  border: 1px solid currentColor;
+  font-size: 14px;
+  line-height: 15px;
+  margin-right: 4px;
+}
+
+/* roll dialog */
+.roll-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.roll-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.roll-col .mini-candles {
+  width: 100%;
+  height: auto;
+}
+.mini-candles .mc-ghost-short {
+  stroke: var(--magenta);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.55;
+}
+.mini-candles .mc-ghost-long {
+  stroke: var(--cyan);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+  opacity: 0.45;
+}
+.mini-candles .mc-tag {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.mc-tag-s {
+  fill: var(--magenta);
+}
+.mc-tag-l {
+  fill: var(--cyan);
+}
+.mc-tag-g {
+  fill: var(--text-faint);
+}
+.roll-key {
+  display: flex;
+  gap: 16px;
+  font-size: 15px;
+}
+.rk-old {
+  color: var(--text-faint);
+}
+.rk-new {
+  color: var(--amber);
+}
+.roll-payoff {
+  background: #0b0826;
+  border: 1px solid var(--line);
+}
+.roll-payoff .rp-win {
+  fill: rgba(77, 255, 154, 0.06);
+}
+.roll-payoff .rp-lose {
+  fill: rgba(255, 79, 109, 0.06);
+}
+.roll-payoff .rp-zero {
+  stroke: var(--line-bright);
+}
+.roll-payoff .rp-spot {
+  stroke: var(--text);
+  stroke-dasharray: 2 3;
+  opacity: 0.6;
+}
+.roll-payoff .rp-t {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  fill: var(--text-faint);
+}
+.roll-payoff .rp-line {
+  fill: none;
+  stroke-width: 2;
+}
+.roll-payoff .rp-line.stay {
+  stroke: var(--text-faint);
+  stroke-dasharray: 5 4;
+}
+.roll-payoff .rp-line.roll {
+  stroke: var(--amber);
+  filter: drop-shadow(0 0 3px rgba(255, 191, 62, 0.6));
+}
+.roll-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+.roll-compare th {
+  font-weight: 400;
+  text-align: right;
+  padding: 1px 6px;
+}
+.roll-compare td {
+  padding: 1px 6px;
+  text-align: right;
+  border-top: 1px solid rgba(59, 47, 134, 0.45);
+}
+.roll-compare td:first-child {
+  text-align: left;
+  color: var(--text-dim);
+}
+.roll-compare .up {
+  color: var(--up);
+}
+.roll-compare .down {
+  color: var(--down);
+}
+.roll-net {
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.roll-net b {
+  font-weight: 400;
+}
+.dr-watch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 15px;
+}
+.dr-k {
+  color: var(--text-faint);
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+.dr-w {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 1px 7px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.dr-w.up {
+  color: var(--up);
+}
+.dr-w.down {
+  color: var(--down);
+}
+.dr-w:hover {
+  border-color: var(--cyan);
+}
+
+/* conviction is size */
+.conv-qty {
+  font-weight: 400;
+  color: var(--up);
+  font-size: 17px;
+}
+.conv-cap {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin: -2px 0 2px;
+}
+.cc-k {
+  color: var(--text-faint);
+  letter-spacing: 1px;
+}
+.cc-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+}
+.cc-track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--up), var(--amber));
+  transition: width 0.25s;
+}
+.cc-track i.hot {
+  background: linear-gradient(90deg, var(--amber), var(--down));
+}
+.cc-v b {
+  font-weight: 400;
+  color: var(--down);
+}
+
+/* CHART | CHAIN tabs over the center */
+.center-tabs {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  gap: 2px;
+}
+.center-tabs button {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 1px 10px;
+  background: rgba(14, 10, 43, 0.92);
+  color: var(--text-dim);
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.center-tabs button.sel {
+  background: var(--cyan);
+  color: #000;
+  border-color: var(--cyan);
+}
+.center-tabs button .kbd {
+  margin-left: 4px;
+}
+.chain-embed {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 12px 8px;
+  background: rgba(11, 8, 38, 0.98);
+  border: 2px solid var(--line-bright);
+}
+.chain-embed .chain-full-wrap {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+.chain-embed h2 {
+  font-size: 22px;
+}
+@media (max-width: 1500px) {
+  .chain-embed {
+    padding: 28px 8px 6px;
+  }
+  .chain-embed .chain-full {
+    font-size: 15px;
+  }
+  .chain-embed .chain-full td,
+  .chain-embed .chain-full th {
+    padding: 1px 3px;
+  }
+  .chain-embed .chain-full td.strike {
+    min-width: 64px;
+  }
+  .chain-embed .chain-note {
+    display: none;
+  }
+}
+
+/* cash lands in the account */
+.cash-readout [data-testid='balance'] {
+  color: var(--amber);
+}
+.cash-readout.bump [data-testid='balance'] {
+  animation: cash-bump 0.9s ease-out;
+}
+@keyframes cash-bump {
+  0% {
+    text-shadow: 0 0 0 transparent;
+    color: #fff;
+  }
+  30% {
+    text-shadow: var(--glow-amber);
+    color: var(--amber);
+    font-size: 1.25em;
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+}
+.cash-deposit {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  margin-left: -220px;
+  margin-top: -70px;
+  width: 440px;
+  z-index: 950;
+  pointer-events: none;
+  text-align: center;
+}
+.cd-amount {
+  font-family: var(--font-display);
+  font-size: 84px;
+  line-height: 1;
+  color: var(--up);
+  text-shadow:
+    4px 4px 0 #000,
+    0 0 24px rgba(77, 255, 154, 0.8);
+}
+.cd-label {
+  font-size: 22px;
+  letter-spacing: 4px;
+  color: var(--amber);
+  text-shadow: 2px 2px 0 #000;
+}
+.cash-deposit.profit {
+  margin-left: -280px;
+  width: 560px;
+}
+.cash-deposit.profit .cd-amount {
+  font-size: 104px;
+  animation: cd-shine 0.5s steps(2) 3;
+}
+.cash-deposit.profit .cd-label {
+  font-size: 28px;
+  color: var(--up);
+}
+@keyframes cd-shine {
+  50% {
+    color: #fff;
+    text-shadow:
+      4px 4px 0 #000,
+      0 0 40px rgba(77, 255, 154, 1);
+  }
+}
+/* Sits over the greyed-out buttons, so the reason is where the eye goes when a click does nothing. */
+.ticket-buttons {
+  position: relative;
+}
+.ticket-block {
+  position: absolute;
+  /* Anchored at the bottom: a long reason grows upward over the plan line instead of clipping. */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 100%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.15;
+  color: var(--amber);
+  border: 1px dashed var(--amber);
+  background: rgba(20, 12, 50, 0.9);
+  padding: 2px 8px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.t-left-pin {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--bg-1);
+  padding-top: 6px;
+  box-shadow: 0 -8px 12px var(--bg-1);
+}
+@media (max-height: 820px) {
+  .t-left-pin .goal-note {
+    display: none;
+  }
+}
+
+/* The Sell/Buy buttons always stay in view: the rows above give up space (one line each) first. */
+.ticket .ticket-grid {
+  flex: 1;
+  min-height: 0;
+}
+.ticket .ticket-buttons {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+.ticket .plan-chip,
+.ticket .toggle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+/* expiration line on the chart: dotted while planned, solid once the trade is on */
+.exp-line {
+  position: absolute;
+  top: 0;
+  width: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-left: 2px dotted var(--amber);
+  opacity: 0.85;
+}
+.exp-line.open {
+  border-left: 2px solid var(--amber);
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(255, 191, 62, 0.45);
+}
+.exp-tag {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 5px;
+  color: var(--bg-0);
+  background: var(--amber);
+  pointer-events: auto;
+}
+.exp-line.plan .exp-tag {
+  color: var(--amber);
+  background: rgba(20, 12, 50, 0.92);
+  border: 1px dashed var(--amber);
+}
+.exp-edge {
+  position: absolute;
+  top: 26px;
+  z-index: 2;
+  transform: translateX(-100%);
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 5px;
+  color: var(--amber);
+  background: rgba(20, 12, 50, 0.92);
+  border: 1px dashed var(--amber);
+}
+.exp-edge.open {
+  border-style: solid;
+}
+
+/* decision: a small chart of the last weeks, and a docked bar while reviewing the full chart */
+.dp-chart {
+  margin: 6px 0 8px;
+  border: 1px solid var(--line);
+  line-height: 0;
+  width: max-content;
+}
+/* Bottom-left, over the tray: the chart stays clear and the notices (bottom-right) stay readable. */
+.dp-dock {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 2px solid var(--magenta);
+  box-shadow:
+    4px 4px 0 #000,
+    0 0 24px rgba(255, 62, 165, 0.35);
+  font-size: 18px;
+  white-space: nowrap;
+}
+.dp-dock .dp-actions {
+  display: flex;
+  gap: 6px;
+}
+.dp-dock .dp-kind {
+  letter-spacing: 0.08em;
+}
+@media (max-width: 1500px) {
+  .dp-dock {
+    font-size: 16px;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+  .dp-dock .pixel-btn {
+    font-size: 15px;
+    padding: 3px 8px;
+  }
+}
+@media (max-width: 1500px) {
+  .ticket-block {
+    font-size: 13px;
+  }
+}
+
+/* The trade's box on the chart: from the day it opened (or today, for a plan) to expiration.
+   An open trade is a solid, framed box; a plan is a faint hatched ghost of one. */
+.chart-zones.boxed {
+  border-left: 1px dashed rgba(164, 157, 224, 0.4);
+}
+.chart-zones.boxed.open {
+  border: 2px solid rgba(255, 62, 165, 0.7);
+  border-right: none;
+}
+.chart-zones.boxed.plan .zone {
+  opacity: 0.55;
+  background-image: repeating-linear-gradient(135deg, rgba(164, 157, 224, 0.1) 0 2px, transparent 2px 9px);
+}
+.chart-zones.boxed.open .zone.win {
+  background: linear-gradient(90deg, rgba(77, 255, 154, 0.08), rgba(77, 255, 154, 0.16));
+}
+.chart-zones.boxed.open .zone.lose {
+  background: linear-gradient(90deg, rgba(255, 79, 109, 0.08), rgba(255, 79, 109, 0.16));
+}
+.zone-entry {
+  position: absolute;
+  top: 62px;
+  left: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: #16051a;
+  background: var(--magenta);
+  padding: 2px 4px;
+  pointer-events: none !important;
+  white-space: nowrap;
+}
+/* At today's candle the cushion bracket opens to the right, its label beside it. */
+.chart-zones.boxed .cushion {
+  border-left: 2px solid var(--up);
+  border-right: none;
+}
+.chart-zones.boxed .cushion.thin {
+  border-left-color: var(--down);
+}
+.chart-zones.boxed .cushion span {
+  right: auto;
+  left: 14px;
+}
+/* Mid-drag the edge-pinned handle shows an arrow toward its strike. */
+.strike-handle.edge {
+  opacity: 0.9;
+  border-style: dashed;
+}
+
+/* Which lines are a placed trade and which are a plan (top left of the chart, under the legend). */
+.trade-badge {
+  position: absolute;
+  left: 8px;
+  top: 28px;
+  z-index: 4;
+  padding: 3px 10px;
+  font-size: 17px;
+  background: rgba(11, 8, 32, 0.88);
+  border: 2px solid var(--magenta);
+  box-shadow: 0 0 12px rgba(255, 62, 165, 0.35);
+}
+.trade-badge b {
+  color: var(--magenta);
+  font-weight: 400;
+  margin-right: 4px;
+}
+.trade-badge.plan {
+  border: 2px dashed rgba(164, 157, 224, 0.7);
+  box-shadow: none;
+  color: var(--text-dim);
+}
+.trade-badge.plan b {
+  color: var(--text);
+}
+
+/* Lineup cards: a trade on the card is impossible to miss. */
+.lineup-card.has-open {
+  outline: 3px solid var(--magenta);
+  outline-offset: -3px;
+  box-shadow: 0 0 14px rgba(255, 62, 165, 0.45);
+}
+.lc-trade {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin: -2px -2px 4px;
+  padding: 2px 8px;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+}
+.lc-trade.open {
+  background: var(--magenta);
+  color: #16051a;
+}
+.lc-trade.closed {
+  background: rgba(164, 157, 224, 0.18);
+  color: var(--text-dim);
+}
+.lc-trade .pnl {
+  color: inherit;
+}
+
+/* First use of a structure: one line on what it bets, and each slider says what it moves. */
+.coach-pitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px dashed var(--amber);
+  background: rgba(255, 191, 62, 0.08);
+  font-size: 14px;
+  line-height: 1.2;
+}
+.cp-new {
+  padding: 0 4px;
+  background: var(--amber);
+  color: #000;
+  font-size: 12px;
+}
+.cp-text {
+  flex: 1;
+}
+.cp-text b {
+  font-weight: 400;
+  color: var(--amber);
 }

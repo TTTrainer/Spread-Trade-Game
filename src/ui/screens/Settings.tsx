@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { PlanSetup } from '../components/PlanSetup';
 import { DEFAULT_HOTKEYS, HOTKEY_LABELS, type HotkeyAction, type Settings } from '../../shared/settings';
 import type { DecisionKind } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
+import type { DataBuildRequest, SchwabStatus, SchwabStoreStatus } from '../../shared/rpc';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
@@ -145,9 +147,9 @@ export function SettingsScreen() {
               <Slider
                 label="Seconds per day at 1× (the candle plays for most of it)"
                 value={settings.game.ffSecondsPerDay}
-                min={0.4}
-                max={3}
-                step={0.1}
+                min={1}
+                max={10}
+                step={0.2}
                 onChange={(v) => set((s) => ({ ...s, game: { ...s.game, ffSecondsPerDay: v } }))}
                 fmt={(v) => v.toFixed(1)}
               />
@@ -169,6 +171,26 @@ export function SettingsScreen() {
                         set((s) => ({ ...s, game: { ...s.game, dayPace: v } }));
                         useTrading.setState({ pace: v });
                       }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="set-row">
+                <span>Payout when a trade closes</span>
+                <div className="seg num" data-testid="set-payout">
+                  {(
+                    [
+                      ['normal', 'FULL'],
+                      ['fast', 'FAST'],
+                      ['instant', 'OFF'],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      className={(settings.game.payoutSpeed ?? 'normal') === v ? 'sel' : ''}
+                      onClick={() => set((s) => ({ ...s, game: { ...s.game, payoutSpeed: v } }))}
                     >
                       {label}
                     </button>
@@ -216,12 +238,21 @@ export function SettingsScreen() {
                 testId="set-confirm"
               />
               <Toggle
+                label="Developer mode"
+                value={settings.game.devMode}
+                onChange={(v) => set((s) => ({ ...s, game: { ...s.game, devMode: v } }))}
+                hint="A DEV button (Ctrl+Shift+D): playtest notes with screenshots, unlock everything, cash/stress/ticket levers"
+                testId="set-dev"
+              />
+              <Toggle
                 label="Calling a direction picks a matching structure"
                 value={settings.game.callPicksStructure}
                 onChange={(v) => set((s) => ({ ...s, game: { ...s.game, callPicksStructure: v } }))}
                 hint="Up: bull put. Down: bear call. Flat: iron condor (when your playbook has one)."
                 testId="set-call-picks"
               />
+              <div className="section-title">Your plan (applies to every trade)</div>
+              <PlanSetup />
               <div className="section-title">Decision points that pause the fast-forward</div>
               <p className="dim small">
                 Off: targets close at your plan by themselves, and the rest show up as short notices.
@@ -493,6 +524,7 @@ function DataPanel() {
   });
   const [report, setReport] = useState<string | null>(null);
   const [diskAsk, setDiskAsk] = useState<string | null>(null);
+  const [runs, setRuns] = useState(0);
   useEffect(() => {
     if (!hasBridge()) return;
     return bridge().on('data.progress', (p) =>
@@ -503,10 +535,11 @@ function DataPanel() {
       ),
     );
   }, []);
-  const run = async (mode: 'synthetic' | 'real' | 'sync', confirmLowDisk = false) => {
+  const run = async (mode: DataBuildRequest['mode'], confirmLowDisk = false) => {
     setBusy(true);
     const r = await bridge().invoke('data.build', { mode, allowDownload: true, confirmLowDisk });
     setBusy(false);
+    setRuns((n) => n + 1);
     if (r.needsDiskConfirm) setDiskAsk(r.message);
     else toast(r.message, r.ok ? 'good' : 'warn');
     await refresh();
@@ -533,7 +566,8 @@ function DataPanel() {
       <p>
         <b>Build real market data</b> downloads about 16 GB from DoltHub (free, public options data) the first
         time, takes a few hours, and needs about 40 GB free. The game can fetch the Dolt tool by itself. You
-        can keep playing the SIM market meanwhile.
+        can keep playing the SIM market meanwhile. <b>Or build it from Schwab</b> in a few minutes (steps 4
+        and 5 below).
       </p>
       <div className="modal-actions">
         <button
@@ -558,6 +592,12 @@ function DataPanel() {
           VIEW DATA REPORT
         </button>
       </div>
+      <SchwabPanel
+        busy={busy}
+        runs={runs}
+        onRun={(m) => void run(m)}
+        dolthub={!!data && data.kind === 'real' && !data.fromSchwab}
+      />
       <p className="dim">
         Found a bug? Open the log folder and send <b>game.log</b> to Claude Code with what you were doing.
         Your saves and stats live in the save folder (<b>user.db</b>).
@@ -624,6 +664,254 @@ function DataPanel() {
         </Modal>
       )}
     </>
+  );
+}
+
+/**
+ * The read-only Schwab connection: the player's own developer app pulls prices and closing
+ * option chains into schwab.db (a separate file), and the game data is built from it: the whole
+ * market, or just the days DoltHub hasn't published yet. Keys stay on this computer.
+ */
+function SchwabPanel({
+  busy,
+  runs,
+  onRun,
+  dolthub,
+}: {
+  busy: boolean;
+  runs: number;
+  onRun: (mode: 'schwabPull' | 'schwabBuild') => void;
+  /** The game data is DoltHub's: a build from schwab.db adds the newest days instead of replacing it. */
+  dolthub: boolean;
+}) {
+  const toast = useApp((s) => s.toast);
+  const [st, setSt] = useState<SchwabStatus | null>(null);
+  const [store, setStore] = useState<SchwabStoreStatus | null>(null);
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge().invoke('schwab.store').then(setStore);
+  }, [runs]);
+  const [appKey, setAppKey] = useState('');
+  const [secret, setSecret] = useState('');
+  const [callback, setCallback] = useState('');
+  const [pasted, setPasted] = useState('');
+  const [working, setWorking] = useState(false);
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge()
+      .invoke('schwab.status')
+      .then((x) => {
+        setSt(x);
+        setCallback(x.callbackUrl);
+      });
+  }, []);
+  const act = async (f: () => Promise<SchwabStatus | string>, ok?: string) => {
+    setWorking(true);
+    try {
+      const r = await f();
+      if (typeof r !== 'string') setSt(r);
+      if (ok) toast(ok, 'good');
+    } catch (e) {
+      toast(
+        e instanceof Error
+          ? e.message.replace(/^Error invoking remote method 'rpc': (Error: )?/, '')
+          : String(e),
+        'warn',
+      );
+    } finally {
+      setWorking(false);
+    }
+  };
+  const until = st?.loginExpiresAt ? new Date(st.loginExpiresAt).toLocaleDateString() : null;
+  return (
+    <div className="schwab-panel panel" data-testid="schwab-panel">
+      <div className="schwab-head">
+        <h3>Schwab · read-only market data</h3>
+        <span
+          className={`chip ${st?.connected ? 'good' : st?.configured ? 'warn' : ''}`}
+          data-testid="schwab-status"
+        >
+          {st?.connected
+            ? `CONNECTED · login good until ${until}`
+            : st?.configured
+              ? 'KEYS SAVED · NOT LOGGED IN'
+              : 'NOT SET UP'}
+        </span>
+      </div>
+      <p className="dim small">
+        Your own Schwab developer app pulls daily prices and option chains into a separate file (schwab.db),
+        and the game builds its market from it: the whole market with no big download, or just the newest days
+        the free DoltHub data hasn't published yet, so Live's month reaches today. The game only asks for
+        market data: it never reads your account and never places a trade. Your keys and login stay on this
+        computer
+        {st && !st.encrypted
+          ? ' (this system has no key store, so they are saved unencrypted)'
+          : ', encrypted'}
+        .
+      </p>
+      <div className="schwab-step">
+        <b className="num">1</b>
+        <label>
+          App Key
+          <input
+            value={appKey}
+            onChange={(e) => setAppKey(e.target.value)}
+            placeholder={st?.appKeyHint ? `saved ${st.appKeyHint}` : 'from developer.schwab.com › Apps'}
+            data-testid="schwab-key"
+          />
+        </label>
+        <label>
+          App Secret
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            placeholder={st?.configured ? 'saved (leave empty to keep)' : 'Secret'}
+            data-testid="schwab-secret"
+          />
+        </label>
+        <label>
+          Callback URL
+          <input
+            value={callback}
+            onChange={(e) => setCallback(e.target.value)}
+            data-testid="schwab-callback"
+          />
+        </label>
+        <button
+          className="pixel-btn"
+          disabled={working}
+          onClick={() =>
+            void act(async () => {
+              const r = await bridge().invoke('schwab.save', {
+                appKey,
+                appSecret: secret,
+                callbackUrl: callback,
+              });
+              setSecret('');
+              return r;
+            }, 'Schwab keys saved on this computer.')
+          }
+          data-testid="schwab-save"
+        >
+          SAVE KEYS
+        </button>
+      </div>
+      <p className="dim small schwab-note">
+        The Callback URL must match your app on developer.schwab.com exactly (for example https://127.0.0.1).
+      </p>
+      <div className="schwab-step">
+        <b className="num">2</b>
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.configured}
+          onClick={() => void act(() => bridge().invoke('schwab.login'))}
+          data-testid="schwab-login"
+        >
+          LOG IN AT SCHWAB ↗
+        </button>
+        <span className="dim small">
+          Approve in your browser. It then lands on a page that may not load: copy that page's whole address.
+        </span>
+      </div>
+      <div className="schwab-step">
+        <b className="num">3</b>
+        <input
+          className="schwab-paste"
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder="Paste the address here (it contains ?code=…)"
+          data-testid="schwab-paste"
+        />
+        <button
+          className="pixel-btn primary"
+          disabled={working || !pasted.trim()}
+          onClick={() =>
+            void act(async () => {
+              const r = await bridge().invoke('schwab.finish', pasted);
+              setPasted('');
+              return r;
+            }, 'Connected to Schwab (read-only market data).')
+          }
+          data-testid="schwab-finish"
+        >
+          CONNECT
+        </button>
+      </div>
+      <div className="schwab-step">
+        <b className="num">4</b>
+        <button
+          className="pixel-btn primary"
+          disabled={busy || working || !st?.connected}
+          onClick={() => onRun('schwabPull')}
+          data-testid="schwab-pull"
+        >
+          ⤓ PULL FROM SCHWAB
+        </button>
+        <span className="dim small">
+          Saves daily prices (since 2018 the first time, then just the new days) and, after the 4 pm close,
+          that day's option chains into <b>schwab.db</b>, a separate file on this computer. Pull once a day
+          after the close to collect real chains. The first pull takes a few minutes.
+        </span>
+      </div>
+      <div className="schwab-store num" data-testid="schwab-store">
+        {store?.exists && store.symbols > 0 ? (
+          <>
+            schwab.db · {store.symbols} tickers · prices {store.firstDate} → {store.lastDate} · real option
+            chains on {store.chainDays} close{store.chainDays === 1 ? '' : 's'}
+            {store.lastPullAt ? ` · last pull ${new Date(store.lastPullAt).toLocaleString()}` : ''}
+          </>
+        ) : (
+          <>schwab.db · nothing pulled yet</>
+        )}
+      </div>
+      <div className="schwab-step">
+        <b className="num">5</b>
+        <button
+          className="pixel-btn primary"
+          disabled={busy || working || !store?.exists || !store.symbols}
+          onClick={() => onRun('schwabBuild')}
+          data-testid="schwab-build"
+        >
+          ▶ BUILD GAME DATA FROM SCHWAB
+        </button>
+        <span className="dim small">
+          {dolthub
+            ? "Adds the days after DoltHub's last day to your game data, with the real chains you pulled."
+            : "Makes the game's market from schwab.db: real prices, real chains on the closes you pulled, other days' chains modeled (labeled MODEL). Schwab has no earnings history, so no earnings events."}
+        </span>
+      </div>
+      <p className="dim small">
+        After that, <b>SYNC LATEST DAYS</b> (or Live's <b>CHECK FOR NEW DAYS</b>) does steps 4 and 5 for you.
+      </p>
+      <div className="modal-actions">
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.connected}
+          onClick={() => void act(() => bridge().invoke('schwab.disconnect', false), 'Logged out of Schwab.')}
+        >
+          LOG OUT
+        </button>
+        <button
+          className="pixel-btn"
+          disabled={working || !st?.configured}
+          onClick={() =>
+            void act(
+              () => bridge().invoke('schwab.disconnect', true),
+              'Schwab keys removed from this computer.',
+            )
+          }
+          data-testid="schwab-forget"
+        >
+          REMOVE KEYS
+        </button>
+      </div>
+      <p className="dim small">
+        Schwab asks you to log in again every 7 days. Pulls made while the market is open add only finished
+        days; the latest option chain is taken after the 4 pm close. <b>REMOVE KEYS</b> leaves schwab.db;
+        delete that file from the save folder's data folder to remove the pulled prices too.
+      </p>
+    </div>
   );
 }
 

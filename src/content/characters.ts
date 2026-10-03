@@ -63,7 +63,15 @@ export type Trigger =
   | 'shop'
   | 'endless'
   | 'rival'
-  | 'parachute';
+  | 'parachute'
+  // Coworker tips: when you're struggling, or meeting something for the first time.
+  | 'tip_struggling'
+  | 'tip_earnings'
+  | 'tip_stop'
+  | 'tip_roll'
+  | 'tip_first_win'
+  | 'tip_window'
+  | 'tip_wait';
 
 export interface Line {
   who: CharacterId;
@@ -514,6 +522,98 @@ export const LINES: Record<Trigger, Line[]> = {
       'PARACHUTE CLAUSE EXERCISED. SURVIVAL GRANTED ONCE. THE CLAUSE HAS BEEN SHREDDED.',
     ),
     L('ines', 'worried', "That was your one free life. Trade like you know it's gone, because it is."),
+  ],
+  tip_struggling: [
+    L(
+      'ines',
+      'worried',
+      'Rough patch. Slide conviction down to FEELER for a trade or two: a fifth of the risk cap. Stay in the game.',
+    ),
+    L(
+      'ines',
+      'worried',
+      'Two losers in a row. Before the next one: is the street read with you, and is your short strike outside the expected move?',
+    ),
+    L(
+      'ines',
+      'neutral',
+      'Behind the target is fine. Behind your stop is not. Take the planned loss and let the next trade catch up.',
+    ),
+    L(
+      'ines',
+      'neutral',
+      'When nothing looks clean, waiting is a trade. Let a day pass and read the tape again.',
+    ),
+  ],
+  tip_earnings: [
+    L('bradley', 'happy', 'Earnings are free money. For whoever sold me the calls, apparently.'),
+    L(
+      'ines',
+      'worried',
+      'Earnings land inside this trade. A stock can gap straight past a strike overnight. Sell outside the implied move, or be out before the report.',
+    ),
+    L(
+      'ines',
+      'neutral',
+      'Report tomorrow. The move is priced in the options; the surprise is not. Decide now whether you are holding on purpose.',
+    ),
+  ],
+  tip_stop: [
+    L(
+      'kessler',
+      'neutral',
+      'Risk would like a word. The word is "stop." It is not a suggestion, legally speaking.',
+    ),
+    L(
+      'ines',
+      'neutral',
+      "That's your stop. The plan was written by the calm version of you. Listen to them.",
+    ),
+    L('ines', 'neutral', 'A stop hit is not a failure. Holding past it is how small losses grow teeth.'),
+  ],
+  tip_roll: [
+    L(
+      'bradley',
+      'neutral',
+      "I roll everything. It's called conviction. My accountant calls it something else.",
+    ),
+    L('ines', 'neutral', 'Rolling buys time, not forgiveness. Roll for a credit or close it.'),
+    L(
+      'ines',
+      'neutral',
+      "Before you roll, look at the chart in the dialog: if the new strikes aren't safer, you're just paying to stay wrong.",
+    ),
+  ],
+  tip_first_win: [
+    L('kessler', 'happy', 'A realized gain. Frame it. Then do it again, preferably at scale.'),
+    L(
+      'ines',
+      'happy',
+      'First one in the books. Closing a winner early at your target: remember that feeling.',
+    ),
+    L('ines', 'happy', 'Locked in. Paper profit is a rumor; that one is real money.'),
+  ],
+  tip_window: [
+    L('kessler', 'neutral', 'Tickets expire with the window. Unused ones pay a little. Targets pay more.'),
+    L(
+      'bradley',
+      'happy',
+      "Clock's ticking, rookie. I already placed three trades today. Two of them on purpose.",
+    ),
+    L(
+      'ines',
+      'neutral',
+      'Two days left to open trades this round, and you still have tickets. Use them on a clean setup, or not at all.',
+    ),
+  ],
+  tip_wait: [
+    L('kessler', 'neutral', 'Observing the market is permitted. Billing for it is under review.'),
+    L('bradley', 'neutral', "You're just... watching? Bold. I'd have traded twice by now. Badly, but twice."),
+    L(
+      'ines',
+      'neutral',
+      "Watching before you trade? Good. Untraded cards move with the clock: a day of bars can tell you which way it's leaning.",
+    ),
   ],
 };
 

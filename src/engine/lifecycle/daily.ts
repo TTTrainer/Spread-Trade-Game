@@ -23,6 +23,9 @@ import {
   settleLegAtIntrinsic,
   stockRatio,
   applyDividend,
+  isIncomeTrade,
+  noteCoveredDividend,
+  settleIncomeAssignment,
 } from './position';
 import type { DayBook, DecisionKind, DecisionPoint, Position } from './types';
 
@@ -90,7 +93,11 @@ const dpId = (pos: Position, kind: DecisionKind, date: string) => `${pos.id}:${k
 export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseStepResult {
   let pos = input;
   if (pos.status !== 'open') return { pos, decisions: [], autoClosed: false };
-  if (book.exDivToday) pos = applyDividend(pos, book.exDivToday.amount, book.date);
+  if (book.exDivToday)
+    pos =
+      pos.structureId === 'covered_call' && stockRatio(pos.legs) === 0
+        ? noteCoveredDividend(pos, book.exDivToday.amount, book.date)
+        : applyDividend(pos, book.exDivToday.amount, book.date);
   pos = markPosition(pos, book);
   const mark = lastMark(pos);
   const decisions: DecisionPoint[] = [];
@@ -144,15 +151,17 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
       };
       return { pos, decisions: [], autoClosed: true };
     }
+    const closeNowCents = contractCents(plIfClosedAt(pos, q.natural), pos.qty);
     decisions.push({
       id: dpId(pos, 'target_hit', book.date),
       positionId: pos.id,
       kind: 'target_hit',
       date: book.date,
       title: 'Profit target hit',
-      message: `Your target is in reach: closing now locks in about ${(b.targetPl * 100 * pos.qty).toFixed(0)} dollars.`,
+      message: `Your target is in reach: closing now locks in about ${(closeNowCents / 100).toFixed(0)} dollars.`,
       options: ['close', 'hold', 'roll'],
       planned: 'close',
+      closeNowCents,
     });
   } else if (
     b.stopPl !== null &&
@@ -160,7 +169,8 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
     optionLegsOf(pos.legs).length > 0 &&
     plIfClosedAt(pos, q.mid) <= -b.stopPl + 1e-9
   ) {
-    if (ctx.autoBrackets || !ctx.pause.stop_hit) {
+    // A covered call's stop is automatic: it sized the trade's risk, so it never waits to be asked.
+    if (ctx.autoBrackets || !ctx.pause.stop_hit || pos.structureId === 'covered_call') {
       const ex = contractCents(q.mid - q.natural, pos.qty);
       pos = closePosition(
         pos,
@@ -187,6 +197,7 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
         'The trade reached the stop you planned. Taking it now keeps a bad trade from becoming a disaster.',
       options: ['close', 'hold', 'roll'],
       planned: 'close',
+      closeNowCents: contractCents(plIfClosedAt(pos, q.natural), pos.qty),
     });
   }
 
@@ -272,7 +283,7 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
           date: book.date,
           title: 'Pin risk at expiration',
           message:
-            'The stock closed between your strikes on expiration day. Hold and you may be assigned shares over the weekend.',
+            'The stock closed right at your short strike on expiration day. In the money by even a cent means assignment; out of the money expires worthless. Close now to take the uncertainty off.',
           options: ['close', 'hold'],
           planned: 'close',
         });
@@ -308,7 +319,11 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
       if (leg.right === 'P' && leg.strike > book.spot * 1.02 && extrinsic < 0.05 && ctx.rng.chance(0.2))
         assign = true;
       if (assign) {
-        pos = convertLegToStock(pos, leg, book.date, 'assigned');
+        // Trades saved before 1.5 still hold their shares and take the old path.
+        pos =
+          isIncomeTrade(pos.structureId) && stockRatio(pos.legs) === 0
+            ? settleIncomeAssignment(pos, leg, book.date, book.spot)
+            : convertLegToStock(pos, leg, book.date, 'assigned');
         assignedToday = true;
       }
     }
@@ -319,12 +334,15 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
     if (!ctx.realism.expirationMechanics) {
       for (const leg of expiring) pos = settleLegAtIntrinsic(pos, leg, book.spot);
     } else {
-      // Both legs of a vertical in the money: settles at max value (the share legs cancel).
+      // Exercise by exception, as at a real broker: in the money by a cent or more is exercised
+      // (or assigned); out of the money expires worthless. Both legs of a vertical in the money
+      // settle at max value (the share legs cancel).
       for (const leg of expiring) {
-        const itm = intrinsic(leg, book.spot) >= 0.01;
-        const pin = leg.ratio < 0 && Math.abs(book.spot / leg.strike - 1) <= 0.005;
-        const exercised = leg.ratio > 0 ? itm : pin ? ctx.rng.chance(0.5) : itm;
-        if (exercised) {
+        const exercised = intrinsic(leg, book.spot) >= 0.01;
+        if (exercised && leg.ratio < 0 && isIncomeTrade(pos.structureId) && stockRatio(pos.legs) === 0) {
+          pos = settleIncomeAssignment(pos, leg, book.date, book.spot);
+          assignedToday = true;
+        } else if (exercised) {
           pos = convertLegToStock(pos, leg, book.date, leg.ratio < 0 ? 'assigned' : 'exercise');
           if (leg.ratio < 0) assignedToday = true;
         } else {
@@ -333,6 +351,28 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
       }
     }
     pos = addEvent(pos, { date: book.date, kind: 'expired', detail: `${expiring.length} leg(s) expired` });
+  }
+
+  // A covered call saved before 1.5 still holds its shares: when its call expires worthless the
+  // premium is kept and the shares are sold at that close, so the trade ends at expiration.
+  if (
+    pos.structureId === 'covered_call' &&
+    expiring.length > 0 &&
+    optionLegsOf(pos.legs).length === 0 &&
+    stockRatio(pos.legs) !== 0 &&
+    !pos.flags.assigned
+  ) {
+    const shares = stockRatio(pos.legs);
+    const cashDelta = contractCents(shares * book.spot, pos.qty);
+    pos = addEvent(
+      { ...pos, legs: [], cashCents: pos.cashCents + cashDelta },
+      {
+        date: book.date,
+        kind: 'close',
+        detail: `Call expired worthless: premium kept; ${Math.abs(shares * 100 * pos.qty)} shares sold at the close (${book.spot.toFixed(2)})`,
+        cashCents: cashDelta,
+      },
+    );
   }
 
   if (pos.legs.length === 0) {
