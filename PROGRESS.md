@@ -8,7 +8,8 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## How to run (on your PC)
 
-- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.6.1.exe`, or run `SpreadTradingGame-Portable-1.6.1.exe` directly.
+- **Play:** download from the [1.6.1 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.6.1) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.6.1.exe`, or run `SpreadTradingGame-Portable-1.6.1.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
