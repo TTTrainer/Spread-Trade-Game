@@ -576,9 +576,10 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'U',
     tag: 'ARCADE',
-    text: '+3 mult on winners, but losers cannot be closed before expiration.',
+    text: '+2 mult on winners, but losers cannot be closed before expiration.',
     synergies: ['golden_parachute', 'iron_stomach'],
-    score: ({ facts }) => when(facts.win, add('Bag Holder', 3)),
+    // +3 in 1.6.0: with 1.6.1's tighter targets it added 23 points of run win rate (cap 15).
+    score: ({ facts }) => when(facts.win, add('Bag Holder', 2)),
     passive: { losersLocked: true },
   },
   {
