@@ -40,6 +40,12 @@ export const BALANCE = {
     spoilsCount: 3,
   },
 
+  /** The Early Retiree's duel: how many trades Chad opens, sized at this share of the risk cap. */
+  duel: {
+    trades: 2,
+    riskShare: 0.5,
+  },
+
   /**
    * Each boss's Review target, as a share of the normal Review target, tuned in the simulator so a
    * good player beats a typical boss about 9 times in 10 and the year-end Rebalancer about 7 in 10
@@ -59,7 +65,7 @@ export const BALANCE = {
     shell_company: 0.75,
     executor: 0.9,
     collector: 0.95,
-    rebalancer: 2,
+    rebalancer: 2.7,
   } as Record<string, number>,
 
   targets: {

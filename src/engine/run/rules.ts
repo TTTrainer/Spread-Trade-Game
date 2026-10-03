@@ -28,6 +28,8 @@ export type RoundRule = ReviewDef['rule'] & {
   variety?: number;
   /** The full victory needs this round's trades to beat SPY on the same capital. */
   beatSpy?: boolean;
+  /** A rival trades the same cards; the Review needs more P/L than his. */
+  duel?: boolean;
 };
 
 /** `tier` is the boss's showdown tier (0 in the first year; harsher each Endless year). */
@@ -57,6 +59,8 @@ export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null, tie
       return { ...traits, multKeep: t.keep };
     case 'variety':
       return { ...traits, variety: t.count };
+    case 'duel':
+      return { ...traits, duel: true };
     case 'annual':
       return { ...traits, targetMult: market.targetMult, beatSpy: true };
     case 'pending':

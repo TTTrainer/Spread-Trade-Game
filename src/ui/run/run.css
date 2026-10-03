@@ -3114,3 +3114,24 @@
   padding: 0 4px;
   border: 1px solid var(--down);
 }
+
+/* The Early Retiree's duel: Chad's book under the race. */
+.boss-race:has(.duel-book) {
+  flex-wrap: wrap;
+}
+.duel-book {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.duel-book b {
+  font-weight: 400;
+}
+.duel-wait {
+  max-width: 360px;
+  font-size: 14px;
+  white-space: normal;
+}

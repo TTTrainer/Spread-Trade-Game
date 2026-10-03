@@ -230,3 +230,40 @@ test('beating a boss: bounty, trophy on the desk, and three free spoils to pick 
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });
+
+test('the Early Retiree duel: Chad trades the same cards in his own book, live beside yours', async () => {
+  test.setTimeout(180_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await page.evaluate(() =>
+    (window as any).__stg.app.getState().updateSettings((x: any) => ({
+      ...x,
+      game: { ...x.game, ffSecondsPerDay: 0.3, dayPace: 'step', pauseOnTest: false },
+    })),
+  );
+  await faceBoss(page, 'early_retiree', 'e2e-duel');
+  await expect(page.getByTestId('duel')).toContainText('when the clock starts');
+  await sellBullPut(page);
+  await page.keyboard.press('Space');
+  await expect(page.getByTestId('duel')).toContainText('CHAD', { timeout: 20_000 });
+  await expect
+    .poll(
+      () => page.evaluate(() => (window as any).__stg.run.getState().engine.duelNow()?.trades.length ?? 0),
+      {
+        timeout: 20_000,
+      },
+    )
+    .toBeGreaterThan(0);
+  // Close the day's recap to see the duel on the chart.
+  await expect(page.getByTestId('day-recap')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.dr-x').click();
+  await expect(page.getByTestId('day-recap')).toHaveCount(0);
+  await page.waitForTimeout(800);
+  await shot(page, '17-boss-duel-1920');
+  await shot(page, '17-boss-duel-1366', { width: 1366, height: 768 });
+  expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});

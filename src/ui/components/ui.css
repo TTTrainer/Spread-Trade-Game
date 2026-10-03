@@ -576,6 +576,63 @@ select:focus-visible,
   align-items: baseline;
   gap: 14px;
 }
+.dev-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.dev-grid[hidden] {
+  display: none;
+}
+.dc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(62vh, 640px);
+  overflow: auto;
+  padding-right: 4px;
+}
+.dc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dc-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.dc-row.ok {
+  border-color: var(--up);
+}
+.dc-row.issue {
+  border-color: var(--down);
+}
+.dc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.dc-note {
+  font: inherit;
+  font-size: 15px;
+  padding: 2px 6px;
+  background: var(--bg-1);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.dc-btns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 260px;
+}
 .dev-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;

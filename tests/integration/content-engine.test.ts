@@ -381,6 +381,34 @@ describe('boss rewards', () => {
   }, 30_000);
 });
 
+describe('the Early Retiree duel', () => {
+  it('Chad opens his own book when the clock starts, plays in lockstep, and the Review needs more P/L than his', async () => {
+    const e = await RunEngine.create(src, config('duel-1'));
+    await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'early_retiree' } });
+    await e.dispatch({ t: 'startReview' });
+    expect(e.rule().duel).toBe(true);
+    expect(e.duelNow()).toMatchObject({ started: false });
+    await placeOn(e, 0);
+    await day(e);
+    const d1 = e.duelNow()!;
+    expect(d1.started).toBe(true);
+    expect(d1.trades.length).toBe(BALANCE.duel.trades);
+    // His book is separate: your positions are only yours.
+    expect(e.session!.positions.length).toBe(1);
+    await day(e);
+    expect(e.state.round.duelRace?.length).toBe(2);
+    // A save mid-round resumes to the same duel.
+    const resumed = await RunEngine.resume(src, e.save());
+    expect(resumed.duelNow()?.rival).toBe(e.duelNow()?.rival);
+    for (let i = 0; i < 60 && e.state.phase === 'round'; i++) await day(e);
+    expect(e.state.phase).toBe('tally');
+    const r = e.state.round;
+    expect(r.duel).toBeDefined();
+    expect(r.duel!.won).toBe(r.duel!.you > r.duel!.rival);
+    if (!r.duel!.won) expect(r.status).toBe('failed');
+  }, 120_000);
+});
+
 describe('the month menu', () => {
   it('comes up over each Month (not a Review, the tutorial or the simulator) and closes once', async () => {
     const e = await RunEngine.create(src, config('menu-1'));

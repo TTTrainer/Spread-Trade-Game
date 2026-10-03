@@ -21,6 +21,7 @@ import { BOSSES, quarterBossPool, showdownTier, type BossId } from '../../conten
 import { BOSS_TROPHIES } from '../../content/trophies';
 import { roundRule, type RoundRule } from './rules';
 import { raceNow, type RacePoint } from './race';
+import { Rival, type RivalTrade } from './rival';
 import {
   STYLE_TEXT,
   styleState,
@@ -46,7 +47,7 @@ import { lastMark } from '../lifecycle/position';
 import type { Position } from '../lifecycle/types';
 import type { MarketDataSource } from '../market/source';
 import type { WindowDef } from '../market/types';
-import { formatCents } from '../money';
+import { formatCents, type Cents } from '../money';
 import { BASE_EXECUTION, combineImprove, type ExecutionMods } from '../orders/fill';
 import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
@@ -305,6 +306,8 @@ export class RunEngine {
   session: TradingSession | null = null;
   /** The session of the round that just settled (the UI records its trades and debriefs). */
   finishedSession: TradingSession | null = null;
+  /** The Early Retiree's book in a duel round (rebuilt from the round's actions on resume). */
+  private rival: Rival | null = null;
   readonly log: RunAction[] = [];
   /** Engine messages from the last action (toasts, meter pops, stress changes). */
   events: RunEvent[] = [];
@@ -697,6 +700,19 @@ export class RunEngine {
     return { id: style, text: STYLE_TEXT[style], cash: BALANCE.run.styleCash, state };
   }
 
+  /** The duel right now: your P/L (realized plus open marks), Chad's, and his trades. */
+  duelNow(): { you: Cents; rival: Cents; trades: RivalTrade[]; started: boolean } | null {
+    const r = this.state.round;
+    if (!this.session || !r.bossId || !this.rule().duel) return null;
+    if (!this.rival) return { you: 0, rival: 0, trades: [], started: false };
+    return {
+      you: raceNow(this.session).you,
+      rival: this.rival.pl(),
+      trades: this.rival.trades(),
+      started: true,
+    };
+  }
+
   /** The Rebalancer's race right now (null outside its round). */
   race(): RacePoint | null {
     if (!this.session || !this.state.round.bossId || !this.rule().beatSpy) return null;
@@ -948,7 +964,12 @@ export class RunEngine {
     }
     const before = new Set(s.positions.map((p) => p.id));
     const hadOrder = sa.t === 'cancel' && s.orders.some((o) => o.id === sa.orderId);
+    // The duel: Chad opens his book on the cards as they stand when the clock first starts.
+    const duel = !!r.bossId && !!this.rule().duel;
+    if (duel && sa.t === 'begin' && !this.rival)
+      this.rival = await Rival.start(this.source, this.sessionConfig(), r.cards);
     const res = await this.sdispatch(action);
+    if (duel && sa.t === 'begin' && this.rival) await this.rival.day();
     for (const p of s.positions) if (!before.has(p.id)) this.onOpened(p);
     if (sa.t === 'place' && res?.ok) r.ticketsUsed++;
     if (sa.t === 'begin') {
@@ -968,6 +989,8 @@ export class RunEngine {
     if (hadOrder) r.ticketsUsed = Math.max(0, r.ticketsUsed - 1);
     if (sa.t === 'end') this.afterDayClose();
     if (sa.t === 'end' && r.bossId && this.rule().beatSpy) r.race = [...(r.race ?? []), raceNow(s)];
+    if (sa.t === 'end' && duel && this.rival)
+      r.duelRace = [...(r.duelRace ?? []), { you: raceNow(s).you, rival: this.rival.pl() }];
     this.scoreClosed();
     if (sa.t === 'end' || sa.t === 'close' || sa.t === 'decide') await this.checkLine();
     if (this.session !== s) return res;
@@ -1257,13 +1280,26 @@ export class RunEngine {
         points: r.greenBonus,
       });
     }
+    const duel = this.duelNow();
+    if (duel) {
+      r.duel = { you: s.realizedCents, rival: duel.rival, won: s.realizedCents > duel.rival };
+      this.events.push({
+        kind: r.duel.won ? 'good' : 'warn',
+        text: r.duel.won
+          ? `You beat Chad: ${formatCents(r.duel.you)} to his ${formatCents(r.duel.rival)}.`
+          : `Chad wins the duel: his ${formatCents(r.duel.rival)} to your ${formatCents(r.duel.you)}. The Review needs both.`,
+      });
+    }
     const goal = this.secondGoal();
     if (goal && !goal.met)
       this.events.push({
         kind: 'warn',
         text: `Second goal missed: ${goal.have} of ${goal.need} structure types. The Review needs both.`,
       });
-    r.status = !r.breached && r.meter >= r.target && (!goal || goal.met) ? 'passed' : 'failed';
+    r.status =
+      !r.breached && r.meter >= r.target && (!goal || goal.met) && (!r.duel || r.duel.won)
+        ? 'passed'
+        : 'failed';
     if (r.bossId) r.styleMet = styleState(BOSSES[r.bossId].style, this.styleTrades(), true) === 'met';
     // Part of a surplus carries into the next round, so a strong round leaves a cushion.
     st.carry = r.status === 'passed' ? Math.round((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;
@@ -1547,6 +1583,7 @@ export class RunEngine {
   }
 
   private async openSession(): Promise<void> {
+    this.rival = null;
     await this.loadWindows();
     const s = new TradingSession(this.source, this.sessionConfig());
     for (const c of this.state.round.cards)

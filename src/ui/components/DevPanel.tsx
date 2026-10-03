@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { ANALYSTS, ANALYST_IDS } from '../../content/analysts';
 import { BOSSES, BOSS_IDS, type BossId } from '../../content/bosses';
 import { CARTRIDGES } from '../../content/cartridges';
+import { DEV_CHECKS, type DevSetup } from '../../content/devChecklist';
 import { MEMOS, MEMO_IDS, VOUCHERS, VOUCHER_IDS } from '../../content/items';
 import type { AnalystId, MemoId, VoucherId } from '../../content/types';
 import { unlockEverything } from '../../engine/meta/profile';
@@ -78,6 +79,164 @@ function notesMarkdown(notes: DevNote[]): string {
   ].join('\n');
 }
 
+interface CheckResult {
+  status: 'ok' | 'issue' | null;
+  note: string;
+  at?: string;
+}
+
+const CHECKS_KEY = 'devChecklist';
+
+function checklistMarkdown(res: Record<string, CheckResult>): string {
+  const mark = (r?: CheckResult) => (r?.status === 'ok' ? '[x]' : r?.status === 'issue' ? '[!]' : '[ ]');
+  return [
+    '# Test checklist',
+    '',
+    ...DEV_CHECKS.map((c) => {
+      const r = res[c.id];
+      return `- ${mark(r)} **${c.title}** (${c.group})${r?.note ? `: ${r.note}` : ''}${r?.at ? ` _(${r.at})_` : ''}`;
+    }),
+  ].join('\n');
+}
+
+/** Run a check's setup through the same store actions the screens use. */
+async function runSetup(s: DevSetup): Promise<void> {
+  const run = useRun.getState();
+  if (s.run) {
+    await run.newRun({ deskId: 'verticals', seed: `devcheck-${Date.now().toString(36)}` });
+    useApp.getState().go('run');
+  }
+  const act = useRun.getState().act;
+  if (s.cash) await act({ t: 'dev', op: { k: 'cash', delta: s.cash } });
+  if (s.closeMenu || s.boss) await act({ t: 'boardDone' });
+  if (s.boss) await act({ t: 'dev', op: { k: 'boss', id: s.boss } });
+  if (s.clearReview) {
+    await act({ t: 'startReview' });
+    const target = useRun.getState().engine?.state.round.target ?? 0;
+    await act({ t: 'dev', op: { k: 'meter', delta: target * 2 } });
+    await act({ t: 'endRound' });
+  }
+}
+
+/** The test checklist: try each thing, tick it (worked or a problem) and leave a note. */
+function Checklist({ onClose }: { onClose: () => void }) {
+  const toast = useApp((s) => s.toast);
+  const [res, setRes] = useState<Record<string, CheckResult>>({});
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge()
+      .invoke('user.get', CHECKS_KEY)
+      .then((r) => setRes(((r as Record<string, CheckResult> | null) ?? {}) as Record<string, CheckResult>));
+  }, []);
+  const save = (next: Record<string, CheckResult>) => {
+    setRes(next);
+    if (hasBridge()) void bridge().invoke('user.set', CHECKS_KEY, next);
+  };
+  const update = (id: string, patch: Partial<CheckResult>) =>
+    save({
+      ...res,
+      [id]: {
+        status: patch.status !== undefined ? patch.status : (res[id]?.status ?? null),
+        note: patch.note ?? res[id]?.note ?? '',
+        at: new Date().toLocaleString(),
+      },
+    });
+  const done = DEV_CHECKS.filter((c) => res[c.id]?.status).length;
+  const groups = [...new Set(DEV_CHECKS.map((c) => c.group))];
+  return (
+    <section className="dev-sec dev-checks" data-testid="dev-checklist">
+      <div className="dev-row">
+        <span className="num">
+          <b>{done}</b> of {DEV_CHECKS.length} checked
+        </span>
+        <span className="dim small">SET UP starts what the check needs (it replaces the current run).</span>
+      </div>
+      <div className="dc-list">
+        {groups.map((g) => (
+          <div key={g} className="dc-group">
+            <div className="section-title">{g}</div>
+            {DEV_CHECKS.filter((c) => c.group === g).map((c) => {
+              const r = res[c.id];
+              return (
+                <div key={c.id} className={`dc-row ${r?.status ?? ''}`} data-testid={`check-${c.id}`}>
+                  <div className="dc-main">
+                    <b>{c.title}</b>
+                    <div className="dim small">{c.look}</div>
+                    <input
+                      className="dc-note"
+                      value={r?.note ?? ''}
+                      placeholder="Note (what happened)…"
+                      onChange={(e) => update(c.id, { note: e.target.value })}
+                      data-testid={`check-note-${c.id}`}
+                    />
+                  </div>
+                  <div className="dc-btns">
+                    {c.setup && (
+                      <button
+                        className="pixel-btn small"
+                        onClick={async () => {
+                          sfx('click');
+                          onClose();
+                          await runSetup(c.setup!);
+                          toast(`Set up: ${c.title}`, 'info');
+                        }}
+                        data-testid={`check-setup-${c.id}`}
+                      >
+                        ▶ SET UP
+                      </button>
+                    )}
+                    <button
+                      className={`pixel-btn small ${r?.status === 'ok' ? 'primary' : ''}`}
+                      onClick={() => update(c.id, { status: r?.status === 'ok' ? null : 'ok' })}
+                      data-testid={`check-ok-${c.id}`}
+                    >
+                      ✔ WORKS
+                    </button>
+                    <button
+                      className={`pixel-btn small ${r?.status === 'issue' ? 'danger' : ''}`}
+                      onClick={() => update(c.id, { status: r?.status === 'issue' ? null : 'issue' })}
+                      data-testid={`check-issue-${c.id}`}
+                    >
+                      ✘ PROBLEM
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="dev-row">
+        <button
+          className="pixel-btn"
+          onClick={() => {
+            void navigator.clipboard?.writeText(checklistMarkdown(res));
+            toast('Checklist copied.', 'good');
+          }}
+          data-testid="check-copy"
+        >
+          ⧉ COPY ALL
+        </button>
+        <button
+          className="pixel-btn"
+          onClick={async () => {
+            if (!hasBridge()) return;
+            const path = await bridge().invoke(
+              'system.saveTextFile',
+              'test-checklist.md',
+              checklistMarkdown(res),
+            );
+            if (path) toast(`Checklist saved to ${path}`, 'good');
+          }}
+          data-testid="check-export"
+        >
+          ⤓ SAVE AS FILE
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function DevPanel({ onClose }: { onClose: () => void }) {
   const toast = useApp((s) => s.toast);
   const engine = useRun((s) => s.engine);
@@ -91,6 +250,7 @@ function DevPanel({ onClose }: { onClose: () => void }) {
   const [boss, setBoss] = useState<BossId>('controller');
   const [voucher, setVoucher] = useState<VoucherId>(VOUCHER_IDS[0]);
   const [ctx] = useState(contextLine);
+  const [tab, setTab] = useState<'levers' | 'checklist'>('levers');
   useEffect(() => {
     void loadNotes().then(setNotes);
   }, []);
@@ -131,8 +291,25 @@ function DevPanel({ onClose }: { onClose: () => void }) {
         <span className="dim num small">
           For playtesting. Levers touch the game layer only, never market data.
         </span>
+        <div className="dev-tabs">
+          <button
+            className={`pixel-btn small ${tab === 'levers' ? 'primary' : ''}`}
+            onClick={() => setTab('levers')}
+            data-testid="dev-tab-levers"
+          >
+            NOTES &amp; LEVERS
+          </button>
+          <button
+            className={`pixel-btn small ${tab === 'checklist' ? 'primary' : ''}`}
+            onClick={() => setTab('checklist')}
+            data-testid="dev-tab-checklist"
+          >
+            ☑ TEST CHECKLIST
+          </button>
+        </div>
       </div>
-      <div className="dev-grid">
+      {tab === 'checklist' && <Checklist onClose={onClose} />}
+      <div className="dev-grid" hidden={tab !== 'levers'}>
         <section className="dev-sec">
           <div className="section-title">Playtest notes</div>
           <div className="dev-ctx num">{ctx}</div>

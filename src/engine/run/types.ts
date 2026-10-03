@@ -97,6 +97,10 @@ export interface RoundState {
   showdown?: number;
   /** The Rebalancer's race at each day's close: the round's trades vs SPY on the same capital. */
   race?: { you: number; spy: number }[];
+  /** The duel at each day's close: your P/L and Chad's. */
+  duelRace?: { you: number; rival: number }[];
+  /** The duel's result, when the round settles. */
+  duel?: { you: number; rival: number; won: boolean };
   /** The boss's style bonus was earned (set when the round settles). */
   styleMet?: boolean;
   target: number;

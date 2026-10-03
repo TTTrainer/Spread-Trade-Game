@@ -41,6 +41,8 @@ export type BossTwist =
   | { kind: 'variety'; count: number }
   /** The year end: a bigger target, and the full victory needs this round to beat SPY. */
   | { kind: 'annual' }
+  /** A rival trades the same cards in his own book: finish with more P/L than him. */
+  | { kind: 'duel' }
   /** Designed, not built yet (waiting on a design answer or a later phase). */
   | { kind: 'pending' };
 
@@ -142,13 +144,13 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'Chad Fenwick',
     role: 'Retired at 34',
     market: 'earnings_gauntlet',
-    twist: { kind: 'pending' },
-    twistText: 'Duel: beat his P/L on the same cards.',
+    twist: { kind: 'duel' },
+    twistText: 'Duel: Chad trades the same cards. Finish with more P/L than him.',
     blocks: 'The cards to yourself',
     intro: 'I quit at thirty-four. Beat my number on your own cards, or keep the day job.',
     palette: { accent: '#4dff9a', tint: '#08261a' },
     style: 'green',
-    ready: false,
+    ready: true,
   },
   tax_man: {
     id: 'tax_man',

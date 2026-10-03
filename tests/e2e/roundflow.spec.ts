@@ -124,3 +124,30 @@ test('developer mode: notes, unlock everything and run levers', async () => {
   expect(errors).toEqual([]);
   await app.close();
 });
+
+test('developer test checklist: tick, note, and a one-click setup into a boss', async () => {
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await settings(page, { devMode: true });
+  await page.keyboard.press('Control+Shift+D');
+  await page.getByTestId('dev-tab-checklist').click();
+  await expect(page.getByTestId('dev-checklist')).toBeVisible();
+  await page.getByTestId('check-ok-menu-basics').click();
+  await page.getByTestId('check-note-menu-reroll').fill('Reroll felt cheap.');
+  await expect(page.getByTestId('check-menu-basics')).toHaveClass(/ok/);
+  await page.waitForTimeout(300);
+  await shot(page, '12-dev-checklist-1920');
+  await shot(page, '12-dev-checklist-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  // One click sets up the Executor's case file.
+  await page.getByTestId('check-setup-boss-executor').click();
+  await expect(page.getByTestId('review-intro')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('boss-name')).toHaveText('THE EXECUTOR');
+  // The ticks and notes are kept.
+  await page.keyboard.press('Control+Shift+D');
+  await page.getByTestId('dev-tab-checklist').click();
+  await expect(page.getByTestId('check-note-menu-reroll')).toHaveValue('Reroll felt cheap.');
+  expect(errors).toEqual([]);
+  await app.close();
+});
