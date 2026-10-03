@@ -94,7 +94,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     ticketsAdd: 2,
     lineupAdd: 1,
     // Calendars make steady small money, and a flat chart is always dealt (1.6).
-    targetMult: 1.3,
+    targetMult: 1.36,
     priceRange: [10, 60],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },

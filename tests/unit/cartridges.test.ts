@@ -231,7 +231,7 @@ const CASES: Record<string, () => void> = {
     expect(CARTRIDGE_BY_ID.two_x_leverage.passive?.maxLossLineDelta).toBe(-0.02);
   },
   bag_holder: () => {
-    expect(one('bag_holder', {})).toEqual({ op: 'add', value: 2 });
+    expect(one('bag_holder', {})).toEqual({ op: 'add', value: 1 });
     expect(one('bag_holder', lose)).toBeNull();
     expect(CARTRIDGE_BY_ID.bag_holder.passive?.losersLocked).toBe(true);
   },

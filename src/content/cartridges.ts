@@ -576,10 +576,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'U',
     tag: 'ARCADE',
-    text: '+2 mult on winners, but losers cannot be closed before expiration.',
+    text: '+1 mult on winners, but losers cannot be closed before expiration.',
     synergies: ['golden_parachute', 'iron_stomach'],
-    // +3 in 1.6.0: with 1.6.1's tighter targets it added 23 points of run win rate (cap 15).
-    score: ({ facts }) => when(facts.win, add('Bag Holder', 2)),
+    // +3 in 1.6.0. With 1.6.1's tighter targets an unconditional mult on every winner was the
+    // strongest card in the simulator (+23 points of run win rate at +3, +20 at +2; the lock
+    // alone, at +0, about +5).
+    score: ({ facts }) => when(facts.win, add('Bag Holder', 1)),
     passive: { losersLocked: true },
   },
   {

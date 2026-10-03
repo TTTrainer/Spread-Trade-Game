@@ -135,7 +135,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   },
   bag_holder: {
     when: 'Every winner',
-    get: '+2 mult',
+    get: '+1 mult',
     kind: 'mult',
     catch: "Losers can't close before expiry",
   },
