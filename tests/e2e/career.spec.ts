@@ -180,7 +180,10 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   await page.setViewportSize({ width: 1920, height: 1080 });
   await playToTally(page, '06-decision-1920');
   await shot(page, '06-tally-anim-1920');
-  await page.getByTestId('tally-skip').click();
+  // Each trade's scoring already played as its payout, so the tally opens counted (a skip is
+  // there only when the payout is set to OFF).
+  const skip = page.getByTestId('tally-skip');
+  if (await skip.isVisible().catch(() => false)) await skip.click();
   await expect(page.getByTestId('tally-continue')).toBeVisible();
   await shot(page, '06-tally-1920');
   await page.getByTestId('tally-continue').click();

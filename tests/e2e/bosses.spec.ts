@@ -55,16 +55,16 @@ test('a full year of bosses draws without one error', async () => {
   await app.close();
 });
 
-async function faceBoss(page: Page, id: string, seed: string): Promise<void> {
+async function faceBoss(page: Page, id: string, seed: string, desk = 'verticals'): Promise<void> {
   await page.evaluate(
-    async ([bossId, s]) => {
+    async ([bossId, s, deskId]) => {
       const w = window as any;
-      await w.__stg.run.getState().newRun({ deskId: 'verticals', seed: s, practice: true });
+      await w.__stg.run.getState().newRun({ deskId, seed: s, practice: true });
       w.__stg.app.getState().go('run');
       await w.__stg.run.getState().act({ t: 'boardDone' });
       await w.__stg.run.getState().act({ t: 'dev', op: { k: 'boss', id: bossId } });
     },
-    [id, seed],
+    [id, seed, desk],
   );
   await expect(page.getByTestId('review-intro')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('review-accept').click();
@@ -186,17 +186,22 @@ test('the Allocator shows its second goal; the Rebalancer races SPY on the chart
   await app.close();
 });
 
-test('beating a boss: bounty, trophy on the desk, and three free spoils to pick from', async () => {
+test('beating a boss: the trophy on its own screen, then three free spoils, then the desk', async () => {
   test.setTimeout(180_000);
   const { app, page } = await launchGame();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
   await expect(page.getByTestId('title-screen')).toBeVisible();
   await page.waitForFunction(() => (window as any).__stg !== undefined);
-  await faceBoss(page, 'underwriter', 'e2e-spoils');
-  // Clear the Review without trading: fill the meter and end the round.
+  // Jacob's crowded desk: the Income desk, a full set of vouchers and cartridges.
+  await faceBoss(page, 'underwriter', 'e2e-spoils', 'income');
   await page.evaluate(async () => {
     const run = (window as any).__stg.run.getState();
+    for (const id of ['second_monitor', 'terminal_pro', 'margin_upgrade', 'seed_capital'])
+      await run.act({ t: 'dev', op: { k: 'voucher', id } });
+    for (const id of ['bag_holder', 'two_x_leverage', 'weekend_warrior'])
+      await run.act({ t: 'dev', op: { k: 'cartridge', id } });
+    // Clear the Review without trading: fill the meter and end the round.
     await run.act({ t: 'dev', op: { k: 'meter', delta: run.engine.state.round.target * 2 } });
     await run.act({ t: 'endRound' });
   });
@@ -208,8 +213,27 @@ test('beating a boss: bounty, trophy on the desk, and three free spoils to pick 
   await page.waitForTimeout(400);
   await shot(page, '17-boss-tally-1920');
   await page.getByTestId('tally-continue').click();
-  await expect(page.getByTestId('spoils')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('spoils-trophy')).toContainText('Reinsurance Treaty');
+  // Screen one: the trophy, with what it changed in numbers.
+  await expect(page.getByTestId('trophy-reveal')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('trophy-name')).toHaveText('Reinsurance Treaty');
+  await expect(page.getByTestId('spoils')).toHaveCount(0);
+  // The Max-Loss Line moves a point further away (where it starts depends on the tier).
+  await expect(page.getByTestId('trophy-deltas')).toContainText(/Max-Loss Line.*\d+%→\d+%/, {
+    timeout: 5_000,
+  });
+  const [lineBefore, lineAfter] = ((await page.getByTestId('trophy-deltas').textContent()) ?? '')
+    .match(/(\d+)%→(\d+)%/)!
+    .slice(1)
+    .map(Number);
+  expect(lineAfter - lineBefore).toBe(1);
+  await page.waitForTimeout(500);
+  await shot(page, '17-boss-trophy-1920');
+  await shot(page, '17-boss-trophy-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.keyboard.press('Enter');
+  // Screen two: the spoils, three free cartridges.
+  await expect(page.getByTestId('trophy-reveal')).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.getByTestId('spoils')).toBeVisible();
   await page.waitForTimeout(900);
   await shot(page, '17-boss-spoils-1920');
   await shot(page, '17-boss-spoils-1366', { width: 1366, height: 768 });
@@ -226,7 +250,43 @@ test('beating a boss: bounty, trophy on the desk, and three free spoils to pick 
   await expect(page.getByTestId('spoils')).toHaveCount(0);
   await expect(page.getByTestId('trophy-underwriter')).toBeVisible();
   await page.waitForTimeout(600);
-  await shot(page, '17-boss-trophy-desk-1920');
+  for (const [w, h] of [
+    [1920, 1080],
+    [1536, 864],
+    [1366, 768],
+  ]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(400);
+    await shot(page, `17-boss-shop-desk-${w}`);
+    // Nothing in the taskbar or on the desk sits on top of anything else.
+    const overlaps = await page.evaluate(() => {
+      const boxes = (sel: string) =>
+        [...document.querySelectorAll<HTMLElement>(sel)]
+          .filter((el) => el.offsetParent !== null)
+          .map((el) => ({ el, r: el.getBoundingClientRect() }));
+      const hit = (a: DOMRect, b: DOMRect) =>
+        a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      const out: string[] = [];
+      for (const sel of ['.os-taskbar > *', '.ld-row > *', '.os-boss > *']) {
+        const list = boxes(sel);
+        for (let i = 0; i < list.length; i++)
+          for (let j = i + 1; j < list.length; j++)
+            if (list[i].el.parentElement === list[j].el.parentElement && hit(list[i].r, list[j].r))
+              out.push(`${sel}: ${list[i].el.className} / ${list[j].el.className}`);
+      }
+      return out;
+    });
+    expect(overlaps, `${w}: ${overlaps.join('; ')}`).toEqual([]);
+    // Nothing runs off the right edge, and the desk (with the new trophy) sits above the taskbar.
+    const fit = await page.evaluate(() => {
+      const shop = document.querySelector('.run-shop') as HTMLElement;
+      const trophy = document.querySelector('[data-testid="trophy-underwriter"]')!.getBoundingClientRect();
+      const bar = document.querySelector('.os-taskbar')!.getBoundingClientRect();
+      return { over: shop.scrollWidth - shop.clientWidth, gap: bar.top - trophy.bottom };
+    });
+    expect(fit.over, `${w}: shop is ${fit.over}px too wide`).toBeLessThanOrEqual(0);
+    expect(fit.gap, `${w}: the trophy sits under the taskbar`).toBeGreaterThan(0);
+  }
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });

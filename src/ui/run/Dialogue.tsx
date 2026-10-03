@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { CHARACTERS } from '../../content/characters';
 import { useApp } from '../store/app';
+import { usePayout } from '../store/payout';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { Portrait } from '../components/Portrait';
@@ -60,7 +61,10 @@ export function DialogueBox() {
         }
       : undefined;
   // A line said while the month menu is up waits for it to close (its timer starts then).
-  const menuUp = useRun((s) => inRun && monthMenuUp(s.engine));
+  // So does one said while a closed trade's payout plays: the line follows the score.
+  const menuOpen = useRun((s) => inRun && monthMenuUp(s.engine));
+  const paying = usePayout((s) => s.queue.length > 0);
+  const menuUp = menuOpen || paying;
   const [n, setN] = useState(0);
   const text = speech?.line.text ?? '';
   useEffect(() => {

@@ -65,6 +65,11 @@ export interface TradeTally {
   steps: ScoreStep[];
   trace: TraceRow[];
   closedOn: string;
+  /** The round's score after this trade, and its target (the payout shows the climb). */
+  meterAfter?: number;
+  target?: number;
+  /** How it closed (target, stop, expired...). */
+  exitReason?: string | null;
 }
 
 export interface RoundCard {
@@ -165,8 +170,11 @@ export interface ShopState {
   items: ShopItem[];
   rerolls: number;
   freeRerolls: number;
-  /** After a boss: three free cartridges, take one (the others go when you leave). */
-  spoils?: { ids: string[]; taken: string | null };
+  /**
+   * After a boss: three free cartridges, take one (the others go when you leave), and the trophy
+   * it just handed over (null when you already held it and it paid cash instead).
+   */
+  spoils?: { ids: string[]; taken: string | null; trophy?: BossId | null };
 }
 
 export interface RoundSummary {
@@ -233,6 +241,8 @@ export interface RunState {
   trophies?: BossId[];
   /** A boss was just beaten: the next shop opens with its spoils. */
   spoilsDue?: boolean;
+  /** The trophy that boss handed over, shown when its spoils open (null: it paid cash). */
+  spoilsTrophy?: BossId | null;
   /** The run's exit plan for new trades, set from the month menu (else the desk's defaults). */
   plan?: ExitPlan;
   round: RoundState;
@@ -316,6 +326,8 @@ export type RunAction =
   | { t: 'rerollBoss' }
   | { t: 'setPlan'; plan: Partial<ExitPlan> }
   | { t: 'takeSpoil'; id: string }
+  /** Which decision points stop the clock, for the rest of this run (the month menu's switches). */
+  | { t: 'setPause'; kind: DecisionKind; on: boolean }
   | { t: 'endless' }
   | { t: 'forfeit' }
   | { t: 'dev'; op: DevOp };

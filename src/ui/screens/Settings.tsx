@@ -177,6 +177,26 @@ export function SettingsScreen() {
                   ))}
                 </div>
               </div>
+              <div className="set-row">
+                <span>Payout when a trade closes</span>
+                <div className="seg num" data-testid="set-payout">
+                  {(
+                    [
+                      ['normal', 'FULL'],
+                      ['fast', 'FAST'],
+                      ['instant', 'OFF'],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button
+                      key={v}
+                      className={(settings.game.payoutSpeed ?? 'normal') === v ? 'sel' : ''}
+                      onClick={() => set((s) => ({ ...s, game: { ...s.game, payoutSpeed: v } }))}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Toggle
                 label="Pause (no pop-up) when price first tests my short strike"
                 value={settings.game.pauseOnTest}

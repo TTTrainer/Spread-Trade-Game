@@ -40,7 +40,6 @@ export function monthMenuUp(e: RunEngine | null | undefined): boolean {
 export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
   const act = useRun((s) => s.act);
   useRun((s) => s.version);
-  const settings = useApp((s) => s.settings);
   const updateSettings = useApp((s) => s.updateSettings);
   const st = e.state;
   const q = st.quarter;
@@ -128,8 +127,11 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
       </div>
     );
   };
-  const setPause = (k: 'target_hit' | 'stop_hit', v: boolean) =>
+  // The switch changes this run and the default for the next ones.
+  const setPause = (k: 'target_hit' | 'stop_hit', v: boolean) => {
+    void act({ t: 'setPause', kind: k, on: v });
     updateSettings((s) => ({ ...s, game: { ...s.game, pause: { ...s.game.pause, [k]: v } } }));
+  };
   return (
     <motion.div
       className="month-menu"
@@ -200,7 +202,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
             <label className="mm-toggle num">
               <input
                 type="checkbox"
-                checked={settings.game.pause.target_hit}
+                checked={st.config.pause.target_hit}
                 onChange={(ev) => setPause('target_hit', ev.target.checked)}
               />
               Pause when a profit target is hit (you choose to take it)
@@ -208,7 +210,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
             <label className="mm-toggle num">
               <input
                 type="checkbox"
-                checked={settings.game.pause.stop_hit}
+                checked={st.config.pause.stop_hit}
                 onChange={(ev) => setPause('stop_hit', ev.target.checked)}
               />
               Pause when a stop is hit

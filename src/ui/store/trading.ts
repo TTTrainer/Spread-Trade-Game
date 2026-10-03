@@ -27,6 +27,7 @@ import type { DayPace } from '../../shared/settings';
 import { lastMark, optionLegsOf } from '../../engine/lifecycle/position';
 import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
 import { crumb } from '../trail';
+import { payoutBusy, usePayout } from './payout';
 
 export interface BuilderState {
   structureId: StructureId;
@@ -534,6 +535,8 @@ export const useTrading = create<TradingState>((set, get) => {
       }
     }
     if (items.length) set({ feed: [...get().feed, ...items].slice(-60) });
+    // In a run the payout plays the win out (chips, mult, the cartridges); elsewhere, the deposit.
+    if ((banked.n || keptPlan) && payoutBusy()) return;
     if (banked.n) celebrateProfit(banked);
     else if (keptPlan) celebratePlan(keptPlan);
   };
@@ -758,6 +761,9 @@ export const useTrading = create<TradingState>((set, get) => {
       const t0 = performance.now();
       await get().step();
       if (token !== loopToken || get().ff !== 'running') return;
+      // A closed trade's payout plays out before the next day starts.
+      while (payoutBusy() && token === loopToken && get().ff === 'running') await sleep(60);
+      if (token !== loopToken || get().ff !== 'running') return;
       // Day by day: wait for the player after each day. A tested strike or a day with news waits too.
       if (get().pace === 'step' || get().testNote || get().recapHold) {
         loopToken++;
@@ -945,12 +951,14 @@ export const useTrading = create<TradingState>((set, get) => {
           callAnchor: builder.callAnchor ?? undefined,
         };
         // Size by conviction: price one contract, then fill that share of the risk cap.
+        // A covered call's risk is its automatic stop, so the plan's stop sizes it.
         const one = session.planFor(
           selectedCardId,
           builder.structureId,
           params,
           1,
           builder.legs ?? undefined,
+          builder.stopMult,
         );
         const qty = one.ok
           ? Math.min(
@@ -966,7 +974,14 @@ export const useTrading = create<TradingState>((set, get) => {
         const value =
           qty === 1
             ? one
-            : session.planFor(selectedCardId, builder.structureId, params, qty, builder.legs ?? undefined);
+            : session.planFor(
+                selectedCardId,
+                builder.structureId,
+                params,
+                qty,
+                builder.legs ?? undefined,
+                builder.stopMult,
+              );
         planCache = { key, value };
         return value;
       } catch {
@@ -1235,6 +1250,8 @@ export const useTrading = create<TradingState>((set, get) => {
     start: () => {
       const s = get().session;
       if (!s) return;
+      // Space during a payout fast-forwards it rather than starting the clock.
+      if (payoutBusy()) return usePayout.getState().skip();
       if (holdClock()) return;
       // A desk whose cards all move with the clock (Career, a Live month) may watch days pass untraded.
       const watchable = get().external || s.config.advanceIdle;
@@ -1257,8 +1274,10 @@ export const useTrading = create<TradingState>((set, get) => {
         set({ ff: 'paused' });
       }
     },
-    toggle: () => (get().ff === 'running' ? get().pause() : get().start()),
+    toggle: () =>
+      payoutBusy() ? usePayout.getState().skip() : get().ff === 'running' ? get().pause() : get().start(),
     nextDay: () => {
+      if (payoutBusy()) return usePayout.getState().skip();
       const ff = get().ff;
       if (ff === 'running' || ff === 'decision' || ff === 'done' || get().dayAnim) return;
       const s = get().session;

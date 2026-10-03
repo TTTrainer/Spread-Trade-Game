@@ -347,6 +347,8 @@ describe('boss rewards', () => {
     expect(e.state.cash).toBeGreaterThan(cash0);
     expect(e.state.phase).toBe('shop');
     const sp = e.state.shop?.spoils;
+    expect(sp?.trophy).toBe('underwriter');
+    expect(e.state.spoilsTrophy).toBeNull();
     expect(sp?.ids.length).toBe(BALANCE.run.spoilsCount);
     expect(new Set(sp?.ids).size).toBe(sp?.ids.length);
     for (const id of sp!.ids) expect(e.state.cartridges).not.toContain(id);

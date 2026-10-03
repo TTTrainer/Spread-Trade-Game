@@ -242,7 +242,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   max_profit: { title: 'Max profit', body: 'The most this trade can make, at expiration.' },
   max_loss_trade: {
     title: 'Max loss',
-    body: 'The most this trade can lose; defined risk never loses more. A covered call shows its loss if the stock jumps 25% instead (the gain past the strike you give up). A cash-secured put can lose the strike minus the credit.',
+    body: 'The most this trade can lose; defined risk never loses more. A covered call shows its loss at its automatic stop plus 25% for a gap (a big gap can still cost more). A cash-secured put can lose the strike minus the credit.',
+  },
+  auto_stop: {
+    title: 'Automatic stop (covered calls)',
+    body: 'A covered call always has a stop: it buys the call back, without asking, once the loss hits that many times the premium. The risk cap measures it there (+25% for gaps), so a tighter stop fits a pricier stock. Pick 1×–3× on the ticket.',
+    real: 'A stop order to buy the call back; real stops can fill worse on a gap too.',
   },
   breakeven: {
     title: 'Breakeven',

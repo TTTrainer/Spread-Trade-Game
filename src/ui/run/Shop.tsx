@@ -38,6 +38,7 @@ import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { Primer } from './Primer';
+import { PixelTrophy, TrophyReveal } from './Rewards';
 
 export function itemTitle(it: ShopItem): string {
   switch (it.kind) {
@@ -412,9 +413,15 @@ export function ShopView({ e }: { e: RunEngine }) {
   const st = e.state;
   const shop = st.shop;
   const r = st.round;
-  // A boss's spoils come up first, over the shop; they can wait until you leave.
+  // A boss's rewards come up first, over the shop, one screen each: its trophy (a permanent buff),
+  // then its spoils (three free cartridges, take one; they can wait until you leave).
   const spoils = shop?.spoils ?? null;
-  const [spoilsOpen, setSpoilsOpen] = useState(!!spoils && !spoils.taken);
+  const fresh = !!spoils && !spoils.taken;
+  const [reward, setReward] = useState<'trophy' | 'spoils' | null>(
+    fresh && spoils?.trophy ? 'trophy' : fresh && spoils?.ids.length ? 'spoils' : null,
+  );
+  const spoilsOpen = reward !== null;
+  const setSpoilsOpen = (open: boolean) => setReward(open ? 'spoils' : null);
   useHotkeys({
     reroll: () => !spoilsOpen && void act({ t: 'rerollShop' }),
     confirm: () => (spoilsOpen ? setSpoilsOpen(false) : void act({ t: 'leaveShop' })),
@@ -639,7 +646,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                     data-tip-title={`Trophy: ${BOSS_TROPHIES[b].name}`}
                     data-tip-body={`From ${BOSSES[b].name}. ${BOSS_TROPHIES[b].text}`}
                   >
-                    🏆
+                    <PixelTrophy accent={BOSSES[b].palette.accent} px={3} />
                   </span>
                 ))}
               </div>
@@ -647,7 +654,14 @@ export function ShopView({ e }: { e: RunEngine }) {
           </div>
         </Win>
       </div>
-      {spoilsOpen && spoils && <Spoils e={e} onClose={() => setSpoilsOpen(false)} />}
+      {reward === 'trophy' && spoils?.trophy && (
+        <TrophyReveal
+          e={e}
+          id={spoils.trophy}
+          onDone={() => setReward(spoils.ids.length && !spoils.taken ? 'spoils' : null)}
+        />
+      )}
+      {reward === 'spoils' && spoils && <Spoils e={e} onClose={() => setSpoilsOpen(false)} />}
       <div className="os-taskbar num">
         <span className="os-start">◈ DESK/OS</span>
         <span className="os-cash" data-testid="shop-cash-wrap">
@@ -663,7 +677,7 @@ export function ShopView({ e }: { e: RunEngine }) {
           <span className="dim">STRESS</span> {st.stress}
         </span>
         <span className="os-spacer" />
-        {spoils && !spoils.taken && !spoilsOpen && (
+        {spoils && !spoils.taken && spoils.ids.length > 0 && !spoilsOpen && (
           <button className="os-btn osb-reroll" onClick={() => setSpoilsOpen(true)} data-testid="spoils-open">
             ☠ SPOILS · take 1 free
           </button>
@@ -697,15 +711,18 @@ export function ShopView({ e }: { e: RunEngine }) {
   );
 }
 
-/** A boss's spoils: three free cartridges, take one; plus the trophy it just handed over. */
+/** A boss's spoils, the second reward screen: three free cartridges, take one. */
 function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
   const act = useRun((s) => s.act);
   const st = e.state;
   const sp = st.shop?.spoils;
+  useEffect(() => {
+    const ids = [0, 1, 2].map((i) => setTimeout(() => sfx('deal', 1 + i * 0.1), 180 + i * 140));
+    return () => ids.forEach(clearTimeout);
+  }, []);
   if (!sp) return null;
   const id = st.round.bossId;
   const boss = id ? BOSSES[id] : null;
-  const trophy = id && (st.trophies ?? []).includes(id) ? BOSS_TROPHIES[id] : null;
   const full = st.cartridges.length >= e.cartridgeSlots();
   return (
     <motion.div
@@ -726,20 +743,21 @@ function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       >
         <div className="sp-head">
-          <span className="sp-skull">☠</span> {boss ? `${boss.name.toUpperCase()} BEATEN` : 'BOSS BEATEN'} ·
-          SPOILS
+          <span className="sp-skull">☠</span> SPOILS · CHOOSE ONE
         </div>
-        {trophy && (
-          <div className="sp-trophy" data-testid="spoils-trophy">
-            <b>🏆 TROPHY · {trophy.name}</b> <span>{trophy.text}</span>
-          </div>
-        )}
         <div className="sp-sub">
-          Take <b>one</b> cartridge, free. The other two go when you leave the shop.
+          {boss ? `${boss.name}'s desk is up for grabs. ` : ''}Take <b>one</b> cartridge, free. The other two
+          go when you leave the shop.
         </div>
         <div className="sp-cards">
           {sp.ids.map((c, i) => (
-            <div key={c} className={`sp-card ${sp.taken === c ? 'taken' : sp.taken ? 'gone' : ''}`}>
+            <motion.div
+              key={c}
+              className={`sp-card ${sp.taken === c ? 'taken' : sp.taken ? 'gone' : ''}`}
+              initial={{ y: -260, rotate: (i - 1) * 14, opacity: 0 }}
+              animate={{ y: 0, rotate: 0, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.15 + i * 0.14 }}
+            >
               <CartridgeMini id={c} />
               <button
                 className="pixel-btn primary"
@@ -752,7 +770,7 @@ function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
               >
                 {sp.taken === c ? '✔ TAKEN' : 'TAKE · FREE'}
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
         {full && !sp.taken && (

@@ -222,6 +222,8 @@ export interface Settings {
     ffSecondsPerDay: number;
     /** How the clock runs: one day per press, or continuously at 1x, 2x or 4x. */
     dayPace: DayPace;
+    /** How a closed trade's scoring plays out on screen (the payout). */
+    payoutSpeed: 'normal' | 'fast' | 'instant';
     /** Pause the clock (no pop-up) the first time a day trades near or through a short strike. */
     pauseOnTest: boolean;
     /** The player's own saved builder setup (the MY SETUP preset). */
@@ -282,6 +284,7 @@ export const DEFAULT_SETTINGS: Settings = {
     bucketMode: 'em',
     ffSecondsPerDay: 5.6,
     dayPace: 'step',
+    payoutSpeed: 'normal',
     pauseOnTest: true,
     mySetup: null,
     callPicksStructure: true,

@@ -13,6 +13,7 @@ import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { liveCardId, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
+import { usePayout } from '../store/payout';
 import { cardBackImage } from '../art';
 import { Sparkline } from '../components/Sparkline';
 import { briefFor, StreetChip } from './NewsBrief';
@@ -364,8 +365,10 @@ export function DecisionModal() {
   // Reviewing the chart: the dialog tucks into a bar so the full chart can be scrolled and zoomed.
   const peek = useTrading((s) => s.reviewChart);
   const setPeek = useTrading((s) => s.setReviewChart);
-  // The next decision waits for a profit celebration to finish, so the two never stack.
-  const celebrating = useTrading((s) => !!s.deposit?.profit);
+  // The next decision waits for a profit celebration (or a closed trade's payout) to finish, so
+  // the two never stack.
+  const paying = usePayout((s) => s.queue.length > 0);
+  const celebrating = useTrading((s) => !!s.deposit?.profit) || paying;
   const dp = ff === 'decision' && !celebrating ? session?.decisions[0] : undefined;
   const pos = dp ? session?.position(dp.positionId) : undefined;
   const act = (a: DecisionAction) => {
@@ -414,7 +417,7 @@ export function DecisionModal() {
   const closeNow = dp.closeNowCents ?? m?.plCents ?? 0;
   const label = (o: DecisionAction): string =>
     dp.kind === 'target_hit' && o === 'close'
-      ? `TAKE PROFIT ${pnlText(closeNow)}`
+      ? `CASH OUT ${pnlText(closeNow)}`
       : dp.kind === 'target_hit' && o === 'hold'
         ? 'LET IT RIDE'
         : dp.kind === 'stop_hit' && o === 'close'
@@ -584,8 +587,8 @@ function TakeProfit({
         <PlRange cents={closeNow} bounds={b} size="big" />
         <div className="tp-choices">
           <button className="pixel-btn primary tp-take" onClick={() => onAct('close')} data-testid="dp-close">
-            <span className="tp-btn-title">TAKE PROFIT</span>
-            <span className="tp-btn-sub num">bank {pnlText(closeNow)} now · Enter</span>
+            <span className="tp-btn-title">CASH OUT</span>
+            <span className="tp-btn-sub num">bank {pnlText(closeNow)} and score it · Enter</span>
           </button>
           <button className="pixel-btn tp-ride" onClick={() => onAct('hold')} data-testid="dp-hold">
             <span className="tp-btn-title">LET IT RIDE</span>

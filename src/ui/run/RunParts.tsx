@@ -37,6 +37,7 @@ import { CashReadout } from '../trading/CashDeposit';
 import './run.css';
 import { BOSSES, type SealedInfo } from '../../content/bosses';
 import { LockStamp } from '../trading/BossBanner';
+import { usePendingPoints } from '../store/payout';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
@@ -187,6 +188,8 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
   const [stressOpen, setStressOpen] = useState(false);
   const st = e.state;
   const r = st.round;
+  // Points still playing out in a payout land on the score when it does.
+  const meter = r.meter - usePendingPoints();
   const eq = session ? session.markedEquityCents() : st.equityCents;
   const floor = e.maxLossFloorCents();
   const room = eq - floor;
@@ -218,19 +221,15 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             <ModeChips e={e} />
             {r.memo.waiver && <span className="chip warn">WAIVER</span>}
           </span>
-          <MeterJuice meter={r.meter} target={r.target} />
+          <MeterJuice meter={meter} target={r.target} />
         </div>
         {/* The score is the number the round is about, so it's the biggest thing up here. */}
-        <div className={`rtb-meter rtb-score ${r.meter >= r.target ? 'met' : ''}`} data-tip="g:meter">
+        <div className={`rtb-meter rtb-score ${meter >= r.target ? 'met' : ''}`} data-tip="g:meter">
           <span className="rtb-k">SCORE</span>
           <span className="rtb-score-v num" data-testid="round-meter">
-            <b>{r.meter.toLocaleString()}</b> / {r.target.toLocaleString()}
+            <b>{meter.toLocaleString()}</b> / {r.target.toLocaleString()}
           </span>
-          <Meter
-            value={Math.max(0, r.meter)}
-            max={r.target}
-            tone={r.meter >= r.target ? 'cyan' : 'magenta'}
-          />
+          <Meter value={Math.max(0, meter)} max={r.target} tone={meter >= r.target ? 'cyan' : 'magenta'} />
           <AnimatePresence>
             {lastPoints && (
               <motion.span
@@ -512,8 +511,11 @@ function SecondGoal({ e }: { e: RunEngine }) {
 export function GoalCard({ e }: { e: RunEngine }) {
   useTrading((s) => s.version);
   useRun((s) => s.version);
+  const pending = usePendingPoints();
   if (e.state.round.sitOut) return null;
-  const g = e.goalOutlook();
+  const g0 = e.goalOutlook();
+  // A payout still on screen hasn't landed its points yet.
+  const g = { ...g0, meter: g0.meter - pending, toGo: Math.max(0, g0.target - (g0.meter - pending)) };
   const met = g.meter >= g.target;
   const hole = g.meter < 0;
   const frac = (v: number) => Math.max(0, Math.min(1, v / Math.max(1, g.target)));

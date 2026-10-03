@@ -102,6 +102,17 @@ export const BALANCE = {
     capShares: [0.2, 0.4, 0.6, 0.8, 1] as [number, number, number, number, number],
   },
 
+  /**
+   * Covered calls carry an automatic stop: it buys the call back once the loss reaches this many
+   * times the premium, and the risk cap measures the trade at that stop plus an allowance for a
+   * gap skipping past it. (Sized on a stock jump instead, a call on a $700 stock never fit.)
+   */
+  coveredCall: {
+    stopMult: 2,
+    minStopMult: 0.5,
+    gapAllowance: 0.25,
+  },
+
   brackets: {
     creditTargetPct: 0.5,
     creditStopMult: 2,
@@ -116,7 +127,7 @@ export const BALANCE = {
     lossChipsScale: 1,
     /** Bonus chips are full for a win that earned this share of its risk, and scale down below it. */
     bonusFullRoR: 0.08,
-    /** The same for covered calls and cash-secured puts (their risk is the stock). */
+    /** The same for cash-secured puts (their risk is a stress drop in the stock). */
     incomeFullRoR: 0.01,
     /** A round that finished with a profit adds this share of its score... */
     greenRoundBonus: 0.2,

@@ -73,6 +73,41 @@ describe('trading session', () => {
     expect(a.cards[0].displaySymbol).not.toBe('ORGR');
   });
 
+  it('a covered call always carries its automatic stop, sized into its risk, and it only tightens', async () => {
+    const s = new TradingSession(
+      src,
+      defaultSessionConfig({ seed: 'cc-stop', mode: 'sandbox', startEquityCents: 5_000_000 }),
+    );
+    const w = src.allWindows().filter((x) => x.symbol === 'HLXR')[80];
+    await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
+    const chain = s.chain('c1')!;
+    const exp = expirationsOf(chain).find((e) => Date.parse(e) - Date.parse(chain.date) >= 14 * 86400000)!;
+    const params = { expiration: exp, delta: 0.3, width: 0 };
+    const at2 = s.planFor('c1', 'covered_call', params, 1);
+    const at1 = s.planFor('c1', 'covered_call', params, 1, undefined, 1);
+    expect(at1.riskCents).toBeLessThan(at2.riskCents);
+    // Asked for no brackets at all: the stop is still there, at the desk's 2x.
+    const res = await s.dispatch({
+      t: 'place',
+      cardId: 'c1',
+      structureId: 'covered_call',
+      params,
+      qty: 1,
+      order: { type: 'market' },
+      brackets: null,
+      earningsAck: true,
+    });
+    expect(res?.filled).toBe(true);
+    const p = s.positions[0];
+    expect(p.brackets.targetPl).toBeNull();
+    expect(p.brackets.stopPl).toBeCloseTo(-p.openNet * 2, 9);
+    // Loosening or removing it is refused; tightening sticks.
+    await s.dispatch({ t: 'brackets', positionId: p.id, brackets: { ...p.brackets, stopPl: null } });
+    expect(s.positions[0].brackets.stopPl).toBeCloseTo(-p.openNet * 2, 9);
+    await s.dispatch({ t: 'brackets', positionId: p.id, brackets: { ...p.brackets, stopPl: -p.openNet } });
+    expect(s.positions[0].brackets.stopPl).toBeCloseTo(-p.openNet, 9);
+  });
+
   it('records declined stops and blocks nothing else', async () => {
     const s = await playOne('sess-3', false, 'hold');
     expect(s.isDone()).toBe(true);

@@ -169,7 +169,8 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
     optionLegsOf(pos.legs).length > 0 &&
     plIfClosedAt(pos, q.mid) <= -b.stopPl + 1e-9
   ) {
-    if (ctx.autoBrackets || !ctx.pause.stop_hit) {
+    // A covered call's stop is automatic: it sized the trade's risk, so it never waits to be asked.
+    if (ctx.autoBrackets || !ctx.pause.stop_hit || pos.structureId === 'covered_call') {
       const ex = contractCents(q.mid - q.natural, pos.qty);
       pos = closePosition(
         pos,

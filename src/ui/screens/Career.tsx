@@ -44,6 +44,8 @@ import './screens.css';
 import '../run/run.css';
 import { useActiveBoss, useBossPalette } from '../boss';
 import { MonthMenu, monthMenuUp } from '../run/MonthMenu';
+import { PayoutLayer } from '../run/Payout';
+import { usePayout } from '../store/payout';
 
 export function CareerScreen() {
   const go = useApp((s) => s.go);
@@ -543,7 +545,12 @@ export function RunScreen() {
   const phaseNow = engine?.state.phase;
   useEffect(() => {
     if (phaseNow && phaseNow !== 'round') useApp.getState().clearToasts();
+    // A payout belongs to its round: nothing left over plays on into the shop.
+    if (phaseNow && phaseNow !== 'round' && phaseNow !== 'tally') usePayout.getState().clear();
   }, [phaseNow]);
+  // The round's last trades (expiring on its final day) pay out on the trading screen, over the
+  // score they land on; the round's summary waits for them.
+  const paying = usePayout((s) => s.queue.length > 0);
   if (!engine) {
     return (
       <div className="screen">
@@ -568,7 +575,7 @@ export function RunScreen() {
   const coach = engine.state.config.mode === 'tutorial' ? <TutorialCoach e={engine} /> : null;
   const phase = engine.state.phase;
   let body: React.ReactElement;
-  if (phase === 'tally')
+  if (phase === 'tally' && !paying)
     body = <TallyView key={`${engine.state.quarter}-${engine.state.roundIndex}`} e={engine} />;
   else if (phase === 'shop') body = <ShopView e={engine} />;
   else if (phase === 'review_intro') body = <ReviewIntro e={engine} />;
@@ -606,6 +613,7 @@ export function RunScreen() {
     <>
       {body}
       {menu}
+      <PayoutLayer />
       {bossOn && <div className="boss-vignette" aria-hidden="true" data-testid="boss-vignette" />}
       {coach}
     </>

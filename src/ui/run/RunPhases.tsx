@@ -92,7 +92,9 @@ export function TallyView({ e }: { e: RunEngine }) {
   const r = e.state.round;
   const tallies = r.tallies;
   const totalSteps = tallies.reduce((a, t) => a + t.trace.length + 1, 0);
-  const [step, setStep] = useState(reduced ? totalSteps : 0);
+  // Each trade already played its payout when it closed, so the tally opens as the summary.
+  const played = useApp((s) => s.settings.game.payoutSpeed !== 'instant');
+  const [step, setStep] = useState(reduced || played ? totalSteps : 0);
   useEffect(() => {
     if (step >= totalSteps) return;
     const id = setTimeout(() => {

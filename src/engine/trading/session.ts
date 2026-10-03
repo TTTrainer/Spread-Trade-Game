@@ -53,7 +53,7 @@ import {
   type HeadlineEvent,
   type HeadlineProvider,
 } from '../../content/headlines';
-import { planTrade, type TradePlan } from './plan';
+import { coveredStopMult, planTrade, type TradePlan } from './plan';
 
 export interface SessionConfig {
   seed: string;
@@ -355,6 +355,8 @@ export class TradingSession {
     params: BuildParams,
     qty: number,
     legs?: Leg[],
+    /** A covered call's automatic stop multiple (the desk default when absent). */
+    stopMult?: number,
   ): TradePlan {
     const chain = this.chains.get(cardId);
     const ctx = this.contexts.get(cardId);
@@ -370,6 +372,8 @@ export class TradingSession {
       reservedCents: this.reservedCents(),
       rate: this.view(cardId).rate(),
       legs,
+      stopMult:
+        structureId === 'covered_call' ? (stopMult ?? this.config.bracketDefaults.creditStopMult) : undefined,
     });
   }
 
@@ -459,7 +463,12 @@ export class TradingSession {
       }
       case 'brackets': {
         const p = this.mustOpen(a.positionId);
-        this.replace({ ...p, brackets: a.brackets });
+        // A covered call's automatic stop sized its risk: it can tighten, never loosen or go.
+        const stopPl =
+          p.structureId === 'covered_call' && p.brackets.stopPl !== null
+            ? Math.min(a.brackets.stopPl ?? Infinity, p.brackets.stopPl)
+            : a.brackets.stopPl;
+        this.replace({ ...p, brackets: { ...a.brackets, stopPl } });
         return null;
       }
     }
@@ -590,6 +599,15 @@ export class TradingSession {
     return `${prefix}${this.counter}`;
   }
 
+  /** A covered call always carries its automatic stop, whatever else the order asked for. */
+  private bracketsFor(structureId: StructureId, openNet: number, override?: Brackets | null): Brackets {
+    const b = this.brackets(openNet, override);
+    if (structureId !== 'covered_call' || openNet >= 0) return b;
+    const mult = coveredStopMult(override?.stopMult ?? this.config.bracketDefaults.creditStopMult);
+    const stopPl = -openNet * mult;
+    return { ...b, stopPl: b.stopPl === null ? stopPl : Math.min(b.stopPl, stopPl), stopMult: mult };
+  }
+
   private brackets(openNet: number, override?: Brackets | null): Brackets {
     if (override) return override;
     if (override === null) return { targetPl: null, stopPl: null, targetPct: null, stopMult: null };
@@ -600,7 +618,14 @@ export class TradingSession {
   private async place(a: Extract<SessionAction, { t: 'place' }>): Promise<PlaceResult> {
     const card = this.card(a.cardId);
     const view = this.view(a.cardId);
-    const plan = this.planFor(a.cardId, a.structureId, a.params, a.qty, a.legs);
+    const plan = this.planFor(
+      a.cardId,
+      a.structureId,
+      a.params,
+      a.qty,
+      a.legs,
+      a.brackets?.stopMult ?? undefined,
+    );
     const fail = (reason: string): PlaceResult => {
       this.lastEvents.push({ kind: 'reject', cardId: a.cardId, text: reason });
       return {
@@ -730,7 +755,7 @@ export class TradingSession {
       midNet: plan.mid as number,
       feesCents: feesFor(plan.legs, qty, this.config.realism.fees),
       collateralCents: plan.collateralCents,
-      brackets: this.brackets(price, br),
+      brackets: this.bracketsFor(structureId, price, br),
       entry: { ...entry, fillVsMidCents: Math.round(((plan.mid as number) - price) * 10000 * qty) },
       book: this.bookFor(cardId),
     });

@@ -56,6 +56,8 @@ function install(): void {
   window.addEventListener(
     'keydown',
     (e) => {
+      // A full-screen moment (a trade's payout, a trophy) takes Enter and Space for itself.
+      if ((e.key === 'Enter' || e.key === ' ') && document.querySelector('[data-owns-keys]')) return;
       const binding = eventToBinding(e);
       const map = useApp.getState().settings.hotkeys;
       const actions = (Object.keys(map) as HotkeyAction[]).filter((a) => map[a] === binding);

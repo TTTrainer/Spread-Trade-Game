@@ -18,6 +18,7 @@ import { heatOf } from '../../content/meta';
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import { playRun } from '../../engine/sim/bot';
 import { crumb } from '../trail';
+import { usePayout } from './payout';
 
 export const CAREER_SLOT = 'career';
 export type RunSlot = 'career' | 'daily' | 'tutorial';
@@ -262,16 +263,38 @@ export const useRun = create<RunStore>((set, get) => {
     e.finishedSession = null;
   };
 
+  // Which of the current round's scored trades the screen has already been handed.
+  let seen = { key: '', n: 0 };
+  const roundKey = (e: RunEngine) => `${e.state.id}:${e.state.quarter}:${e.state.roundIndex}`;
+  /** Start counting from what's already scored (a fresh or resumed run replays nothing). */
+  const markSeen = (e: RunEngine) => {
+    seen = { key: roundKey(e), n: e.state.round.tallies.length };
+    usePayout.getState().clear();
+  };
+  /** Newly scored trades go to the payout queue (played out one at a time on screen). */
+  const queuePayouts = (e: RunEngine): boolean => {
+    const key = roundKey(e);
+    if (key !== seen.key) seen = { key, n: 0 };
+    const fresh = e.state.round.tallies.slice(seen.n);
+    seen.n = e.state.round.tallies.length;
+    const on = useApp.getState().settings.game.payoutSpeed !== 'instant' && e.state.config.mode !== 'sim';
+    if (!fresh.length || !on) return false;
+    usePayout.getState().push(fresh);
+    return true;
+  };
+
   const afterAction = async () => {
     const e = get().engine;
     if (!e) return;
     toastEvents(e.events);
+    const paying = queuePayouts(e);
     // In the tutorial Ines's lessons are the only voice, so the other characters stay quiet.
     const said = e.events.filter((x) => x.kind === 'say' && x.line).at(-1);
     if (said?.line && e.state.config.mode !== 'tutorial')
       set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
+    // A payout lands its own points on the meter; otherwise they pop straight away.
     const pts = e.events.filter((x) => x.kind === 'score');
-    if (pts.length)
+    if (pts.length && !paying)
       set({
         lastPoints: {
           points: pts.reduce((a, x) => a + (x.points ?? 0), 0),
@@ -376,6 +399,7 @@ export const useRun = create<RunStore>((set, get) => {
               cartridgePool: career ? cartridgePoolFor(profile) : undefined,
             };
         const e = await RunEngine.create(src(), config, new Date().toISOString());
+        markSeen(e);
         set({ engine: e, lastPoints: null });
         attach(e);
         const hello = e.events.find((x) => x.kind === 'say' && x.line);
@@ -400,6 +424,7 @@ export const useRun = create<RunStore>((set, get) => {
         const saved = await bridge().invoke('user.load', slot);
         if (!saved) return false;
         const e = await RunEngine.resume(src(), saved.data as RunSave);
+        markSeen(e);
         set({ engine: e, lastPoints: null, slot });
         if (e.state.phase === 'round') attach(e);
         set({ version: get().version + 1 });
@@ -433,6 +458,7 @@ export const useRun = create<RunStore>((set, get) => {
     },
 
     leave: () => {
+      usePayout.getState().clear();
       useTrading.getState().reset();
       set({ engine: null });
     },

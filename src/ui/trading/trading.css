@@ -2006,6 +2006,43 @@
   border: 1px dashed var(--line);
   padding: 1px 6px;
 }
+/* A covered call's stop is required: a solid amber frame and its own picker. */
+.ticket .plan-chip.auto-stop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--amber);
+  overflow: visible;
+}
+.plan-chip.auto-stop > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.plan-chip.auto-stop b {
+  font-weight: 400;
+  color: var(--amber);
+}
+.auto-stop-picks {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.auto-stop-picks .seg-btn {
+  padding: 0 5px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.auto-stop-picks .seg-btn.on {
+  color: #000;
+  background: var(--amber);
+  border-color: var(--amber);
+}
 @media (max-width: 1500px) {
   .tray-section.setup {
     min-width: 300px;

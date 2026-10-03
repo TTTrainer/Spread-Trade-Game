@@ -127,8 +127,10 @@ test('many trades closing at once with lines and the target: no errors, and prof
           await shot(page, '16-take-profit-1366', { width: 1366, height: 768 });
           await page.setViewportSize({ width: 1920, height: 1080 });
           await page.keyboard.press('Enter');
-          await expect(page.getByTestId('cash-deposit')).toContainText(/PROFIT TAKEN|WINS BANKED/);
-          await page.waitForTimeout(300);
+          // Cashing out plays the payout: the P/L as chips, the mult, the cartridges, the total.
+          await expect(page.getByTestId('payout')).toBeVisible({ timeout: 10_000 });
+          await expect(page.getByTestId('payout')).toContainText('CASH OUT');
+          await page.waitForTimeout(900);
           await shot(page, '16-profit-taken-1920');
           tookProfit = true;
         } else await page.keyboard.press('Enter');

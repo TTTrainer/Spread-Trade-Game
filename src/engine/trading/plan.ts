@@ -22,6 +22,7 @@ import {
 } from '../strategies/metrics';
 import { buildStructure, optionLegs, STRUCTURES } from '../strategies/structures';
 import type { BuildParams, Leg, StructureId } from '../strategies/types';
+import { BALANCE } from '../../content/balance';
 import { RR_RULES } from '../../content/structureRules';
 import type { EntrySnapshot } from '../lifecycle/types';
 
@@ -37,6 +38,8 @@ export interface PlanInput {
   rate: number;
   /** Override legs (player dragged handles on the ladder). */
   legs?: Leg[];
+  /** A covered call's automatic stop, as a multiple of its premium (desk default when absent). */
+  stopMult?: number;
 }
 
 export interface TradePlan {
@@ -113,12 +116,18 @@ export function maxQtyFor(structureId: StructureId): number {
   return structureId === 'covered_call' ? COVERED_SHARES / 100 : Number.POSITIVE_INFINITY;
 }
 
+/** A covered call's stop multiple, kept in a sane range. */
+export function coveredStopMult(stopMult: number | null | undefined): number {
+  const c = BALANCE.coveredCall;
+  return Math.max(c.minStopMult, stopMult ?? c.stopMult);
+}
+
 /**
  * The risk the cap is measured against. Defined-risk spreads: their max loss. A cash-secured put
  * can lose nearly all its collateral in theory, so the cap uses a stress loss (a drop of 3
  * expected moves, at least 25%) and the full collateral must still fit in equity. A covered call
- * is the call alone (the shares are yours already, off the books): its risk is the same stress
- * move upward, the upside given away past the strike, and it needs no cash.
+ * is the call alone (the shares are yours already, off the books) and always carries an automatic
+ * stop, so its risk is the loss at that stop plus a gap allowance, and it needs no cash.
  */
 function riskFor(
   id: StructureId,
@@ -126,6 +135,7 @@ function riskFor(
   spot: number,
   legs: Leg[],
   qty: number,
+  stopMult?: number,
 ): { risk: Cents; collateral: Cents; maxLoss: Cents } {
   const maxLoss = contractCents(m.maxLoss, qty);
   if (id === 'cash_secured_put' || id === 'covered_call') {
@@ -134,8 +144,9 @@ function riskFor(
     const k = optionLegs(legs)[0]?.strike ?? spot;
     const credit = -m.entryNet;
     if (id === 'covered_call') {
-      const stressLoss = contractCents(Math.max(0, spot * (1 + move) - k - credit), qty);
-      return { risk: stressLoss, collateral: 0, maxLoss: stressLoss };
+      const atStop = credit * coveredStopMult(stopMult) * (1 + BALANCE.coveredCall.gapAllowance);
+      const risk = contractCents(Math.max(0, atStop), qty);
+      return { risk, collateral: 0, maxLoss: risk };
     }
     const stressLoss = Math.max(0, k - spot * (1 - move) - credit);
     return { risk: contractCents(stressLoss, qty), collateral: contractCents(k - credit, qty), maxLoss };
@@ -178,7 +189,14 @@ export function planTrade(i: PlanInput): TradePlan {
     return { ...empty(i, 'Width is zero. Pick two different strikes.'), legs };
   const exp = frontExpiration(legs);
   const dte = exp ? diffDays(i.chain.date, exp) : null;
-  const { risk, collateral, maxLoss } = riskFor(i.structureId, metrics, i.chain.spot, legs, i.qty);
+  const { risk, collateral, maxLoss } = riskFor(
+    i.structureId,
+    metrics,
+    i.chain.spot,
+    legs,
+    i.qty,
+    i.stopMult,
+  );
   const riskCheck = checkRisk({
     maxLossCents: risk,
     collateralCents: collateral,
@@ -243,9 +261,15 @@ export function planTrade(i: PlanInput): TradePlan {
     fillVsMidCents: 0,
     goodRR,
   };
+  // A covered call has no width to narrow: its lever is the stop (or a further, nearer-dated call).
+  const reason = riskCheck.ok
+    ? null
+    : i.structureId === 'covered_call' && riskCheck.reason.startsWith('Max loss')
+      ? `Risk at the automatic stop is ${(riskCheck.riskPct * 100).toFixed(1)}% of equity; the cap is ${(i.riskCapPct * 100).toFixed(1)}%. Tighten the auto stop, sell a further strike or a nearer expiration, or use fewer contracts.`
+      : riskCheck.reason;
   return {
     ok: riskCheck.ok,
-    reason: riskCheck.ok ? null : riskCheck.reason,
+    reason,
     structureId: i.structureId,
     legs,
     qty: i.qty,

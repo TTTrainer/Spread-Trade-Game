@@ -237,9 +237,33 @@ export function OrderTicket() {
             </div>
           </>
         )}
-        <div className="plan-chip" data-tip="g:plan_set">
-          PLAN · take profit at {Math.round(builder.targetPct * 100)}% · stop at {builder.stopMult}× credit
-        </div>
+        {builder.structureId === 'covered_call' ? (
+          <div className="plan-chip auto-stop" data-tip="g:auto_stop" data-testid="auto-stop">
+            <span>
+              PLAN · take profit at {Math.round(builder.targetPct * 100)}% · <b>AUTO STOP</b> (sizes the risk)
+            </span>
+            <span className="auto-stop-picks">
+              {[1, 1.5, 2, 3].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`seg-btn ${builder.stopMult === m ? 'on' : ''}`}
+                  data-testid={`auto-stop-${m}`}
+                  onClick={() => {
+                    setBuilder({ stopMult: m });
+                    sfx('click');
+                  }}
+                >
+                  {m}×
+                </button>
+              ))}
+            </span>
+          </div>
+        ) : (
+          <div className="plan-chip" data-tip="g:plan_set">
+            PLAN · take profit at {Math.round(builder.targetPct * 100)}% · stop at {builder.stopMult}× credit
+          </div>
+        )}
         {(earnings || dteSealed) && (
           <label className="toggle warn-text" data-testid="earnings-ack" data-tip="g:earnings_ack">
             <input

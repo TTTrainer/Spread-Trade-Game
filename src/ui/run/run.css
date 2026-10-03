@@ -1145,14 +1145,26 @@
     conic-gradient(from 45deg at 50% 50%, #120b3a, #0a0726, #160d45, #0a0726, #120b3a);
   max-height: none;
 }
+/* Every shelf in the top row; YOUR DESK wide underneath with vouchers beside it; what you earned
+   and your build on the right. One layout at every size (the cards shrink to fit), so nothing runs
+   off the screen or under the taskbar. */
 .os-desktop {
   display: grid;
-  grid-template-columns: max-content max-content max-content minmax(320px, 1fr);
+  grid-template-columns: max-content max-content max-content max-content minmax(220px, 1fr);
   grid-template-areas:
-    'carts analyst voucher side'
-    'pair load load side';
+    'carts analyst memo page side'
+    'load load load voucher side';
   gap: 12px;
   align-items: stretch;
+}
+.os-pair {
+  display: contents;
+}
+.w-memo {
+  grid-area: memo;
+}
+.w-page {
+  grid-area: page;
 }
 .w-carts {
   grid-area: carts;
@@ -1171,35 +1183,31 @@
   min-width: 0;
 }
 .os-side .w-build {
-  flex: 1;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
-.os-pair {
-  grid-area: pair;
-  display: flex;
-  gap: 12px;
+/* The right column fills the rows the shelves set and never stretches them: what you earned
+   scrolls inside its window if the list runs long. */
+.os-side {
+  contain: size;
+  min-height: 0;
+}
+.os-side .w-log {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.os-side .w-log .os-body {
+  min-height: 0;
+  overflow-y: auto;
 }
 .w-loadout {
   grid-area: load;
   /* Its contents wrap to fit; they must not widen the shelf columns above. */
   contain: inline-size;
 }
-/* Big screens: every shelf in the top row, YOUR DESK wide underneath with vouchers beside it. */
-@media (min-width: 1501px) {
-  .os-desktop {
-    grid-template-columns: max-content max-content max-content max-content minmax(300px, 1fr);
-    grid-template-areas:
-      'carts analyst memo page side'
-      'load load load voucher side';
-  }
-  .os-pair {
-    display: contents;
-  }
-  .w-memo {
-    grid-area: memo;
-  }
-  .w-page {
-    grid-area: page;
-  }
+/* Big screens: bigger desk cards. (Only from 1800px: a 1920 screen at 125% scaling is 1536 wide.) */
+@media (min-width: 1800px) {
   .dk-cart {
     width: 150px;
     padding: 10px 8px 8px;
@@ -1253,14 +1261,17 @@
 }
 /* What the window is for, right after its name. */
 .os-sub {
-  flex: 1;
+  /* Fills what the title leaves and never widens the window (a card sets that). */
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-left: 8px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.85em;
   text-transform: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .os-ctl {
   display: flex;
@@ -1538,7 +1549,7 @@
   font-size: 13px;
   min-height: 140px;
 }
-@media (max-width: 1500px) {
+@media (max-width: 1799px) {
   .dk-cart {
     width: 100px;
     padding: 6px 4px 4px;
@@ -1790,10 +1801,10 @@
   background: rgba(0, 0, 0, 0.25);
 }
 
-@media (max-width: 1500px) {
+@media (max-width: 1799px) {
   .shop-card {
-    width: 196px;
-    min-height: 272px;
+    width: 186px;
+    min-height: 262px;
     gap: 3px;
     padding: 8px 8px 6px;
   }
@@ -3089,8 +3100,12 @@
 .ld-slot.trophy {
   display: grid;
   place-items: center;
-  font-size: 22px;
   border-color: var(--amber);
+  background: radial-gradient(circle, rgba(255, 210, 90, 0.25), var(--bg-2) 70%);
+}
+.ld-slot.trophy .pixel-trophy {
+  width: 78%;
+  height: auto;
 }
 @media (max-width: 1500px) {
   .sp-head {
@@ -3099,6 +3114,172 @@
   .sp-trophy,
   .sp-sub {
     font-size: 16px;
+  }
+}
+
+/* A boss's trophy, on its own screen: rays, a gold card, the buff in numbers. */
+.trophy-back {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  background: radial-gradient(
+    circle at 50% 46%,
+    color-mix(in srgb, var(--boss-accent, var(--amber)) 30%, var(--bg-0)) 0%,
+    color-mix(in srgb, var(--boss-tint, var(--bg-0)) 92%, #000) 62%
+  );
+}
+.tr-rays {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--amber) 16%, transparent) 0deg 7deg,
+    transparent 7deg 18deg
+  );
+  animation: tr-spin 26s linear infinite;
+  mask-image: radial-gradient(circle, #000 0%, transparent 46%);
+}
+@keyframes tr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tr-kicker {
+  position: relative;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: var(--boss-accent, var(--amber));
+  text-shadow: 2px 2px 0 #000;
+}
+.tr-card {
+  position: relative;
+  width: min(620px, 92vw);
+  perspective: 900px;
+  transform-style: preserve-3d;
+}
+.tr-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 26px 20px;
+  border: 4px solid #e7b53a;
+  outline: 3px solid #000;
+  background:
+    linear-gradient(180deg, rgba(255, 224, 138, 0.1), transparent 40%),
+    color-mix(in srgb, var(--bg-1) 92%, #000);
+  box-shadow:
+    8px 8px 0 #000,
+    0 0 60px rgba(255, 200, 80, 0.45),
+    inset 0 0 0 2px color-mix(in srgb, var(--boss-accent, var(--amber)) 60%, transparent);
+  backface-visibility: hidden;
+}
+.tr-label {
+  font-size: 16px;
+  letter-spacing: 0.4em;
+  color: #ffe08a;
+}
+.pixel-trophy {
+  display: block;
+  image-rendering: pixelated;
+  filter: drop-shadow(4px 4px 0 #000) drop-shadow(0 0 18px rgba(255, 210, 90, 0.6));
+}
+.tr-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 48px;
+  line-height: 1.05;
+  text-align: center;
+  color: #ffe08a;
+  text-shadow:
+    3px 3px 0 #000,
+    0 0 18px rgba(255, 200, 80, 0.6);
+}
+.tr-perm {
+  padding: 2px 10px;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: #000;
+  background: #e7b53a;
+  border: 2px solid #000;
+  transform: rotate(-1.5deg);
+}
+.tr-text {
+  margin: 2px 0 0;
+  font-size: 20px;
+  text-align: center;
+}
+.tr-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+}
+.tr-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 10px;
+  border: 2px solid color-mix(in srgb, #e7b53a 70%, transparent);
+  background: rgba(231, 181, 58, 0.08);
+  font-size: 22px;
+}
+.tr-k {
+  color: var(--text-dim);
+  font-size: 18px;
+}
+.tr-before {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.tr-arrow {
+  color: var(--text-dim);
+}
+.tr-after {
+  font-weight: 400;
+  font-size: 28px;
+  color: var(--up);
+  text-shadow: 2px 2px 0 #000;
+}
+.tr-claim {
+  position: relative;
+  min-width: 300px;
+  font-size: 20px;
+}
+@media (max-width: 1500px) {
+  .tr-name {
+    font-size: 38px;
+  }
+  .tr-kicker {
+    font-size: 18px;
+  }
+  .tr-text {
+    font-size: 17px;
+  }
+  .tr-row {
+    font-size: 19px;
+  }
+  .tr-after {
+    font-size: 24px;
+  }
+  .tr-face {
+    padding: 12px 20px 14px;
+    gap: 6px;
   }
 }
 
@@ -3134,4 +3315,334 @@
   max-width: 360px;
   font-size: 14px;
   white-space: normal;
+}
+
+/* ---------- the payout ----------
+ * A closed trade's scoring, played out: chips (cyan) x mult (magenta), the cartridges firing in
+ * slot order, then the total. Over the board, under modals; only the panel takes clicks. */
+.payout-back {
+  position: fixed;
+  inset: 0;
+  z-index: 620;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding-top: 15vh;
+  pointer-events: none;
+}
+.po-panel {
+  pointer-events: auto;
+  cursor: pointer;
+  width: min(760px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px 12px;
+  border: 3px solid var(--cyan);
+  background: color-mix(in srgb, var(--bg-1) 94%, #000);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 40px color-mix(in srgb, var(--cyan) 30%, transparent);
+}
+.po-panel.lose {
+  border-color: var(--down);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 30px color-mix(in srgb, var(--down) 25%, transparent);
+}
+.po-panel.on-fire {
+  border-color: var(--amber);
+  animation: po-fire 0.18s steps(2) infinite;
+}
+@keyframes po-fire {
+  50% {
+    box-shadow:
+      6px 6px 0 #000,
+      0 -6px 34px rgba(255, 140, 40, 0.75),
+      0 0 70px rgba(255, 70, 30, 0.45);
+  }
+}
+.po-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.po-kind {
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: 0.04em;
+}
+.po-kind.up {
+  color: var(--cyan);
+}
+.po-kind.down {
+  color: var(--down);
+}
+.po-trade {
+  font-size: 18px;
+  color: var(--text-dim);
+}
+.po-pl {
+  margin-left: auto;
+  font-size: 26px;
+}
+.po-score {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+}
+.po-box {
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 14px 2px;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
+}
+.po-box b {
+  font-weight: 400;
+  font-size: 46px;
+  line-height: 1;
+}
+.po-box.chips {
+  background: #1d6fe0;
+  color: #fff;
+}
+.po-box.mult {
+  background: #e0244f;
+  color: #fff;
+}
+.po-box.po-score-x {
+  background: var(--amber);
+  color: #000;
+  min-width: 110px;
+}
+.po-k {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  opacity: 0.85;
+}
+.po-x {
+  align-self: center;
+  font-size: 34px;
+  color: var(--text-dim);
+}
+.po-carts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.po-cart {
+  position: relative;
+  width: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 4px;
+  border: 2px solid var(--line);
+  background: var(--bg-2);
+  opacity: 0.55;
+  text-align: center;
+}
+.po-cart.fired {
+  opacity: 1;
+  border-color: var(--line-bright);
+}
+.po-cart.fired.op-chips {
+  border-color: #3b8bff;
+}
+.po-cart.fired.op-add,
+.po-cart.fired.op-mul {
+  border-color: #ff3a66;
+}
+.po-cn {
+  font-size: 13px;
+  line-height: 1.1;
+}
+.po-why {
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--text-dim);
+}
+.po-pop {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  font-size: 16px;
+  white-space: nowrap;
+  color: #fff;
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0 #000;
+}
+.po-pop.op-chips,
+.po-pop.op-chipsMul {
+  background: #1d6fe0;
+}
+.po-pop.op-add,
+.po-pop.op-mul {
+  background: #e0244f;
+}
+.po-pop.op-meter {
+  background: var(--amber);
+  color: #000;
+}
+.po-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 24px;
+  font-size: 16px;
+}
+.po-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+  border-left: 3px solid var(--line);
+}
+.po-line b {
+  font-weight: 400;
+}
+.po-line.op-chips b,
+.po-line.pnl b {
+  color: #6fb2ff;
+}
+.po-line.op-add b,
+.po-line.op-mul b {
+  color: #ff6f8e;
+}
+.po-line.op-meter b {
+  color: var(--amber);
+}
+.po-total {
+  align-self: center;
+  font-size: 54px;
+  line-height: 1;
+  text-shadow: 4px 4px 0 #000;
+}
+.po-total.up {
+  color: var(--amber);
+}
+.po-total.down {
+  color: var(--down);
+}
+.po-goal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.po-bar {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  border: 2px solid var(--line-bright);
+  background: var(--bg-0);
+}
+.po-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--magenta), var(--amber));
+  transition: width 0.45s ease-out;
+}
+.po-cleared {
+  padding: 0 8px;
+  border: 3px solid var(--amber);
+  color: var(--amber);
+  font-weight: 400;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.po-hint {
+  align-self: center;
+  font-size: 12px;
+}
+/* A cartridge firing on the run's rail, and the label it pops. */
+.cart-chip.cart-fire {
+  animation: cart-fire 0.5s cubic-bezier(0.3, 1.8, 0.5, 1);
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 14px rgba(255, 191, 62, 0.7);
+}
+@keyframes cart-fire {
+  0% {
+    transform: translateY(0) rotate(0) scale(1);
+  }
+  35% {
+    transform: translateY(-6px) rotate(-6deg) scale(1.16);
+  }
+  70% {
+    transform: translateY(0) rotate(4deg) scale(1.05);
+  }
+  100% {
+    transform: none;
+  }
+}
+.rail-float {
+  position: fixed;
+  z-index: 640;
+  transform: translateX(-50%);
+  pointer-events: none;
+  padding: 1px 6px;
+  font-size: 16px;
+  color: #fff;
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0 #000;
+  animation: rail-float 1s ease-out forwards;
+  white-space: nowrap;
+}
+.rail-float.op-chips,
+.rail-float.op-chipsMul {
+  background: #1d6fe0;
+}
+.rail-float.op-add,
+.rail-float.op-mul {
+  background: #e0244f;
+}
+.rail-float.op-meter {
+  background: var(--amber);
+  color: #000;
+}
+@keyframes rail-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 4px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(1);
+  }
+}
+@media (max-width: 1500px) {
+  .payout-back {
+    padding-top: 11vh;
+  }
+  .po-box {
+    min-width: 130px;
+  }
+  .po-box b {
+    font-size: 38px;
+  }
+  .po-total {
+    font-size: 44px;
+  }
+  .po-cart {
+    width: 104px;
+  }
 }

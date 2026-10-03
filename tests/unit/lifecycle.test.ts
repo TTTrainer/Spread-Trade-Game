@@ -140,6 +140,18 @@ describe('brackets and decision points', () => {
     expect(auto.pos.realizedCents).toBeLessThan(-30000);
   });
 
+  it("takes a covered call's automatic stop without asking, even with stop pauses on", () => {
+    const cc: Leg[] = [{ kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: -1 }];
+    const p = { ...open(cc, 1, -1.5), structureId: 'covered_call' as const };
+    expect(p.brackets.stopPl).toBe(3);
+    // A rally through the strike: the call's loss passes 2x the premium.
+    const r = atClose(p, day('2025-01-10', 112), ctx());
+    expect(r.decisions.map((d) => d.kind)).not.toContain('stop_hit');
+    expect(r.autoClosed).toBe(true);
+    expect(r.pos.exitReason).toBe('stop');
+    expect(r.pos.flags.closedAtPlan).toBe('stop');
+  });
+
   it('flags 21 DTE, earnings tomorrow, ex-dividend with an ITM short call, and pin risk', () => {
     const p = open();
     const d21 = atClose(p, day('2025-01-10', 101), ctx());

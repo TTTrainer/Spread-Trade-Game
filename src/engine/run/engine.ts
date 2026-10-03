@@ -537,6 +537,17 @@ export class RunEngine {
     };
   }
 
+  /** The Max-Loss Line a plain round opens with: tier, Compliance and buffs (no boss twist or tag). */
+  baseLossLinePct(): number {
+    const cfg = this.state.config;
+    return (
+      BALANCE.risk.maxLossLinePct +
+      tierMods(cfg.tier).lineDelta +
+      complianceMods(cfg.compliance).lineDelta +
+      this.passives().maxLossLineDelta
+    );
+  }
+
   cartridgeSlots(): number {
     return BALANCE.shop.cartridgeSlots + this.passives().cartridgeSlotsAdd;
   }
@@ -782,6 +793,13 @@ export class RunEngine {
         case 'takeSpoil':
           this.takeSpoil(a.id);
           break;
+        case 'setPause': {
+          // The run's own copy (a run keeps the settings it started with, so a replay matches).
+          const pause = { ...this.state.config.pause, [a.kind]: a.on };
+          this.state.config = { ...this.state.config, pause };
+          if (this.session) this.session.config.pause = { ...pause };
+          break;
+        }
         case 'forfeit':
           this.finishRun('forfeit', 'You walked away from the desk.');
           break;
@@ -1139,7 +1157,7 @@ export class RunEngine {
       facts.realizedCents,
       r.startEquityCents,
       steps,
-      winQuality(facts.returnOnRisk, facts.family),
+      winQuality(facts.returnOnRisk, facts.structureId),
     );
     r.meter += res.points;
     r.scored.push(p.id);
@@ -1157,6 +1175,9 @@ export class RunEngine {
       steps,
       trace: res.trace,
       closedOn: p.closedOn ?? '',
+      meterAfter: r.meter,
+      target: r.target,
+      exitReason: p.exitReason ?? null,
     });
     this.events.push({
       kind: 'score',
@@ -1616,15 +1637,7 @@ export class RunEngine {
     const p = this.passives();
     const target = computeTarget(q, idx, reviewId, cfg, this.writtenUp(q), bossId);
     const comp = complianceMods(cfg.compliance);
-    const line = Math.max(
-      0.02,
-      BALANCE.risk.maxLossLinePct +
-        tier.lineDelta +
-        comp.lineDelta +
-        (rule.maxLossLineDelta ?? 0) +
-        p.maxLossLineDelta +
-        st.tagEffects.calm,
-    );
+    const line = Math.max(0.02, this.baseLossLinePct() + (rule.maxLossLineDelta ?? 0) + st.tagEffects.calm);
     st.tagEffects.calm = 0;
     const burnout = st.burnoutNext;
     st.burnoutNext = false;
@@ -2028,7 +2041,9 @@ export class RunEngine {
         const c = pickCartridge(pool, srng, st.config.deskId, i === 0 ? 'U' : undefined);
         if (c) ids.push(c.id);
       }
-      if (ids.length) st.shop.spoils = { ids, taken: null };
+      const trophy = st.spoilsTrophy ?? null;
+      st.spoilsTrophy = null;
+      if (ids.length || trophy) st.shop.spoils = { ids, taken: null, trophy };
     }
     fx.freeRerolls = 0;
     st.phase = 'shop';
@@ -2075,8 +2090,10 @@ export class RunEngine {
     st.trophies ??= [];
     if (st.trophies.includes(id)) {
       r.payouts.push({ label: `${BOSS_TROPHIES[id].name} (already yours)`, cash: BALANCE.run.bossBounty });
+      st.spoilsTrophy = null;
     } else {
       st.trophies.push(id);
+      st.spoilsTrophy = id;
       this.events.push({
         kind: 'good',
         text: `TROPHY: ${BOSS_TROPHIES[id].name}. ${BOSS_TROPHIES[id].text}`,

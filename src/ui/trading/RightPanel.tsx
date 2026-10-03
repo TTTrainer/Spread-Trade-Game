@@ -429,7 +429,7 @@ export function StatsBlock() {
             tip="g:pct_risk"
           />
           <Stat
-            k={pos.structureId === 'covered_call' ? 'RISK IF IT JUMPS' : 'MAX LOSS'}
+            k={pos.structureId === 'covered_call' ? 'RISK AT AUTO STOP' : 'MAX LOSS'}
             v={money(pos.entry.maxLossCents)}
             tip="g:max_loss_trade"
             tone="down"
