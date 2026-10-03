@@ -87,7 +87,7 @@ const CASES: Record<string, () => void> = {
     expect(one('vol_arb', { ivMinusHvAtEntry: 3 })).toBeNull();
   },
   long_gamma: () => {
-    expect(one('long_gamma', { straddleBeatEm: true })).toEqual({ op: 'mul', value: 2 });
+    expect(one('long_gamma', { straddleBeatEm: true })).toEqual({ op: 'mul', value: 1.5 });
     expect(one('long_gamma', {})).toBeNull();
   },
   term_structure_tap: () => {
@@ -304,6 +304,7 @@ const CASES: Record<string, () => void> = {
   },
   straddle_stack: () => {
     expect(one('straddle_stack', { isStraddle: true, straddlesBefore: 2 })).toEqual({ op: 'add', value: 2 });
+    expect(one('straddle_stack', { isStraddle: true, straddlesBefore: 4 })).toEqual({ op: 'add', value: 2 });
     expect(one('straddle_stack', { isStraddle: true, straddlesBefore: 0 })).toBeNull();
   },
   double_time: () => {

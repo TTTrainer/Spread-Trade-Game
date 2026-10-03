@@ -145,7 +145,7 @@ export const BOSSES: Record<BossId, BossDef> = {
     role: 'Retired at 34',
     market: 'earnings_gauntlet',
     twist: { kind: 'duel' },
-    twistText: 'Duel: Chad trades the same cards. Finish with more P/L than him.',
+    twistText: 'Duel: Chad trades the same cards. Beat his P/L: score x1.5. Trail him: x0.75.',
     blocks: 'The cards to yourself',
     intro: 'I quit at thirty-four. Beat my number on your own cards, or keep the day job.',
     palette: { accent: '#4dff9a', tint: '#08261a' },

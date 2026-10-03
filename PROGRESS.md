@@ -4,16 +4,55 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2, and 1.5.0: your 1.4.2 notes, a tutorial rebuilt for people who have never traded an option, and The Pad drawn from your art sheet. Version 1.5.0. Next: your playtest of 1.5.0 (items 40–46 in `PLAYTEST.md`).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2, 1.5.0, and **1.6.0**: your 1.5 notes (scoring that follows the money, the take-profit moment, the miniplayer, cleaner screens) and **boss rounds** built from your questionnaire answers: twelve bosses, the month menu, rewards, Endless showdowns, Chad's duel and a developer test checklist. Version 1.6.0. Next: your playtest of 1.6.0 (items 47–58 in `PLAYTEST.md`, with the checklist in developer mode).
 
 ## How to run (on your PC)
 
-- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.5.0.exe`, or run `SpreadTradingGame-Portable-1.5.0.exe` directly.
+- **Play:** see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.6.0.exe`, or run `SpreadTradingGame-Portable-1.6.0.exe` directly.
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.6.0: your 1.5 notes, and boss rounds
+**Part 1, your notes:**
+
+- **Points follow the money.** Losing trades now count in full, a trade's bonus chips grow with its return on what it risked (income trades have their own bar, so a covered call isn't judged like a debit spread), a round that made money gets a bonus on top and a red one a penalty, and part of a strong round's surplus carries into the next. Targets grow 30% a quarter so a good build keeps being tested. Every desk is within 10 points of Verticals in the simulator.
+- **Taking profit feels like something.** When a profit target is hit, the clock stops and a TAKE PROFIT dialog shows the money you'd bank, where it sits between max loss and max profit, and TAKE PROFIT or LET IT RIDE. Closing a winner bursts PROFIT TAKEN into the score; taking a planned stop stamps PLAN KEPT (the habit you said you want to build).
+- **P/L next to its max** everywhere a trade shows: a bar from max loss to max profit with the stop and target ticks, on the trade card, the positions table and the dialog.
+- **The miniplayer:** small live charts of your open trades on cards that aren't on screen.
+- **Cleaner screens:** the run's top bar regrouped with the score as the biggest number; notices top right, cleared between phases; the tally counts up in steps; the shop shows every shelf in one row on big screens and YOUR DESK shows your cartridges as cards in firing order with sell and reorder; Ines speaks over the chart's oldest candles.
+- **Controls by color:** each slider wears the color of the line it moves on the chart; the first time you use a structure, its controls are explained (debit spreads say Long Δ).
+- **Market orders by default**, with "use a limit price" explained beside them.
+- **Tutorial:** pick the strategy before the direction, a drag lesson with an animated hand, and a "safe vs spicy" lesson.
+- **Live is marked WORK IN PROGRESS** on the title screen (see Next for what it still needs), and every BACK button goes where you came from (a test walks every menu path).
+
+**Part 2, boss rounds** (your questionnaire answers are in `BOSS_QUESTIONNAIRE.md`):
+
+- **Twelve bosses, one per pillar of financial planning.** Each brings a market (with its logo) and exactly one twist that shows on the chart, and nothing about prices, fills or events changes:
+  - **The Controller** seals running P/L and equity until a trade closes (brackets still fire).
+  - **The Margin Clerk** halves your risk per trade.
+  - **The Underwriter** makes losing trades count double.
+  - **The Landlord** takes 35% of your total mult.
+  - **The Early Retiree** duels you: **Chad** trades the same cards in his own book (lottery-ticket call spreads, no stops), live beside yours. Finish ahead of his P/L and the round scores x1.5; behind him, x0.75.
+  - **The Tax Man** taxes wins closed in their first 2 trading days 25%.
+  - **The Bursar** holds your leftmost cartridge as tuition.
+  - **The Allocator** adds a second goal: 3 different structure types (with a 4th ticket to do it), with a progress chip.
+  - **The Shell Company** seals chart studies and IV rank.
+  - **The Executor** seals days to expiration ("? days") until the trade is open; max profit and loss still show.
+  - **The Collector** compounds losing streaks: each loss in a row costs 25% more.
+  - **The Rebalancer** (every year end) asks x1.25 and draws a YOU vs SPY race on the chart; finish ahead for the full victory, behind and you survive.
+- **The look:** the whole board takes the boss's colors with a pulsing vignette, a case file introduces it (pillar, person, line, twist, what it blocks, its market, target and style bonus), the twist sits on the chart in one line with its live number, and sealed panels wear a lock stamp.
+- **A failed boss ends the run** (one switch in `balance.ts` turns that off).
+- **The month menu** before each Month: the quarter's three rounds with targets and payouts, the boss card with a once-per-boss reroll ($10, $25, $40, then $60), your build in firing order, and the exit plan for the whole run (take profit, stop, debit target and stop, and the pause switches). The shop shows next quarter's boss a quarter ahead, also rerollable. The tutorial skips the menu.
+- **Rewards:** a $5 bounty, a **trophy** (a permanent buff themed on the boss, shown on YOUR DESK; cash if you already hold it), the boss's **spoils** (take 1 of 3 free cartridges in the next shop), and a **style bonus** (+$3) for clearing a boss a certain way, shown under the banner as ON TRACK / MET / MISSED.
+- **Endless years are showdowns:** each year after the first, every boss's twist is a notch harsher (double losses become x2.5, the Margin Clerk leaves 40%...), labeled SHOWDOWN I, II...
+- **Flat charts for neutral desks:** every Condor, Iron Fly and Calendar lineup includes at least one range-bound chart (judged only from past prices), and no boss limits trade direction.
+- **Developer test checklist:** Settings → Game → Developer mode, then the DEV button → **TEST CHECKLIST**. Every boss, the menu, rewards and run rules are listed with what to look for, a **SET UP** button that takes you straight there, **WORKS / PROBLEM** ticks and a note. It's saved on your computer; COPY ALL or SAVE AS FILE gives me the list.
+- **Art:** the bosses use their market logos for now; `BOSS_ART_BRIEF.md` lists the 12 portraits and 12 pillar icons to make (with a prompt), and they'll replace the logos when they arrive.
+- **Balance** (simulator, careful player): a typical boss is beaten about 88% of the time and the Rebalancer about 74%, close to the 9 in 10 and 7 in 10 you agreed. The bots don't read the screen, so the bosses that only hide information (Controller, Executor, Shell Company) were set a little easier by hand.
+- Tests: every boss's twist in the score and the round, the boss draw (no repeats, Rebalancer last), rerolls and their prices, the exit plan, rewards and spoils, showdown tiers, style rules, the Allocator's goal, the Rebalancer's race, Chad's duel (including a save resumed mid-duel), and end-to-end tests that play a whole year of bosses, each sealing boss, the duel, the rewards and the checklist, with screenshots at 1920 and 1366.
 
 ### 1.5.0: your 1.4.2 notes, a tutorial for new traders, and The Pad's art
 Your notes, item by item:
@@ -421,6 +460,13 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Decisions and deviations (why things differ from the plan)
 
+- **Bosses replace the old Review rules (1.6.0).** Each boss keeps its market (which charts are dealt, and The Fed's index card) but drops that market's old rule, so a boss round has exactly one twist, as you asked. Old saves mid-Review keep their old rule.
+- **Chad's duel is a real second book, and it multiplies your score rather than deciding the Review (1.6.0).** His trades run on the same cards and the same real prices in a separate session, so his P/L is as real as yours. He retired at 34 on lottery tickets: out-of-the-money call spreads on his first two cards, one contract each, held to the end. The simulator showed that a careful player's round P/L is close to a coin flip in every boss market, so "beat Chad or the run ends" made him a 55% boss whoever he was. Instead, finishing ahead of him multiplies the round's score by 1.5 and trailing him cuts it to 0.75, and the target decides the Review as usual (about 8 in 10 for a careful player, like The Executor in the same market). Both numbers are in `balance.ts` (`duel`).
+- **The Allocator's round gets a 4th ticket (1.6.0).** With 3 tickets, three different structures meant every ticket had to be a different trade, and the simulator's careful player beat him only 64% of the time. One extra ticket keeps the twist and makes the goal reachable.
+- **The Rebalancer judges its own round against SPY (1.6.0).** Before, the full victory needed the whole year to beat SPY. Your answer was "beat SPY with a line", which needs a round you can see on the chart, so it's now the year-end round's trades against the same money in SPY over the same days.
+- **No intraday clock pressure.** The game trades daily prices, so no boss stops you pausing (your answer); the Margin Clerk's twist became half risk instead.
+- **Live mode is on hold as work in progress (1.6.0).** It works, but it's labeled WORK IN PROGRESS until it gets a proper goal and Schwab is tested on your PC. **Idea recorded for later:** a weekly leaderboard for Live (everyone plays the same real week; compare return vs SPY), which needs a server and accounts, so it's parked.
+
 - **The tutorial hides parts of the screen (1.5.0).** The plan had Ines coach over the full desk. For someone new to options that's too much at once, so the tutorial switches regions off and lights them up lesson by lesson, and the game around it is unchanged: same market, same trades, same scoring. Two small locks keep the lessons in order: the clock waits until the first trade is placed, and the planned trade stays off the chart until the chart has been explained. Both lift with SKIP LESSONS.
 - **The screen restarts itself if it freezes (1.5.0).** The freeze you saw couldn't be reproduced here, so besides the fixes there's a watchdog: the screen reports in every second, and after 12 seconds of silence the game reloads it. Runs save after every action, so a reload loses nothing. Chromium's own "not responding" signal takes about 30 seconds, which felt too long to sit through.
 
@@ -470,6 +516,9 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Known issues
 
+- **Boss balance was measured by bots that don't read the screen.** The sealing bosses (Controller, Executor, Shell Company) are set by hand; tell me if one feels unfair. Boss targets are one line each in `balance.ts` (`bossTargets`).
+- **Boss portraits and pillar icons are placeholders** (the market logos) until the art in `BOSS_ART_BRIEF.md` exists.
+
 - **The freeze from your 1.4.2 notes wasn't reproduced.** Two likely causes are fixed and the screen now recovers by itself within about 12 seconds (see 1.5.0 above). If it happens again, `game.log` will show the last 40 things the screen did; send it and I can pin it down.
 - **Balance was tuned on the SIM market.** Real data will behave a little differently (real volatility, real earnings). After you build real data, run `npm run sim -- --db <path to game.db>` and tell me if the report shows a target missed; the fix is usually one number in `balance.ts`.
 - **Frame rate was measured in a cloud box without a graphics card** (60 fps while candles form at 4×, no stalls). Please check that fast-forward looks smooth on your PC (it's in `PLAYTEST.md`).
@@ -486,10 +535,8 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-**Your 1.5.0 playtest** with the 1.5.0 exe (items 40–46 in `PLAYTEST.md`): the tutorial as a new trader would see it (if you can, hand it to someone who has never traded options and watch where they get stuck), open vs planned trades on the chart, the IN TRADE cards, the plain shop titles and bigger messages, covered calls and puts against the 500 assumed shares, and The Pad with your art.
+**Your 1.6.0 playtest** (items 47–58 in `PLAYTEST.md`). The quickest way through the bosses: turn on developer mode (Settings → Game), open the DEV panel's **TEST CHECKLIST**, press SET UP on each item, tick WORKS or PROBLEM and leave a note, then COPY ALL and send me the list. Also play at least one real run to the year end, to feel the month menu, rewards and the Rebalancer in a normal run.
 
-**Schwab on your PC** (from 1.4.2) if you haven't tried it yet: Settings → Data → Schwab, steps 1 to 5 (in `README_PLAY.md`). If anything fails, the message on screen plus `game.log` (OPEN LOG FOLDER) is all I need; the log never contains your keys.
+**Boss art:** the 12 portraits and 12 pillar icons in `BOSS_ART_BRIEF.md` (same art pipeline as before).
 
-**Three Pad pictures still missing:** the rubber duck, the lava lamp and the closing bell (the prompt is in `PAD_ART_BRIEF.md`).
-
-After that, build real market data on your PC (Settings → Data) and rerun the balance check on it (`npm run sim -- --db <path to game.db>`; Claude Code can do this for you).
+**Still open from before:** Schwab on your PC (Settings → Data → Schwab, steps 1 to 5), the three missing Pad pictures (duck, lava lamp, bell), and building real market data then rerunning the balance check on it (`npm run sim -- --db <path to game.db>`).

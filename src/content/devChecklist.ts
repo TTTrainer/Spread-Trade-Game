@@ -77,7 +77,7 @@ export const DEV_CHECKS: DevCheck[] = [
   boss(
     'early_retiree',
     'The Early Retiree (duel)',
-    'Chad opens his book when the clock starts: a YOU vs CHAD race and his trades under the banner. Clear the target AND finish with more P/L than him.',
+    'Chad opens his book when the clock starts: a YOU vs CHAD race and his trades under the banner. Finish ahead of his P/L and the round scores x1.5; behind him, x0.75.',
   ),
   boss(
     'tax_man',

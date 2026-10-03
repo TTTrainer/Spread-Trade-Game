@@ -1280,14 +1280,20 @@ export class RunEngine {
         points: r.greenBonus,
       });
     }
+    // The duel: finishing ahead of Chad multiplies the round's score, trailing him cuts it.
     const duel = this.duelNow();
     if (duel) {
-      r.duel = { you: s.realizedCents, rival: duel.rival, won: s.realizedCents > duel.rival };
+      const won = s.realizedCents > duel.rival;
+      r.duel = { you: s.realizedCents, rival: duel.rival, won };
+      const mult = won ? BALANCE.duel.winMult : BALANCE.duel.loseMult;
+      const before = r.meter;
+      if (r.meter > 0) r.meter = Math.round(r.meter * mult);
       this.events.push({
-        kind: r.duel.won ? 'good' : 'warn',
-        text: r.duel.won
-          ? `You beat Chad: ${formatCents(r.duel.you)} to his ${formatCents(r.duel.rival)}.`
-          : `Chad wins the duel: his ${formatCents(r.duel.rival)} to your ${formatCents(r.duel.you)}. The Review needs both.`,
+        kind: won ? 'good' : 'warn',
+        text: won
+          ? `You beat Chad: ${formatCents(r.duel.you)} to his ${formatCents(r.duel.rival)}. Round score x${mult}.`
+          : `Chad wins the duel: his ${formatCents(r.duel.rival)} to your ${formatCents(r.duel.you)}. Round score x${mult}.`,
+        points: r.meter - before,
       });
     }
     const goal = this.secondGoal();
@@ -1296,10 +1302,7 @@ export class RunEngine {
         kind: 'warn',
         text: `Second goal missed: ${goal.have} of ${goal.need} structure types. The Review needs both.`,
       });
-    r.status =
-      !r.breached && r.meter >= r.target && (!goal || goal.met) && (!r.duel || r.duel.won)
-        ? 'passed'
-        : 'failed';
+    r.status = !r.breached && r.meter >= r.target && (!goal || goal.met) ? 'passed' : 'failed';
     if (r.bossId) r.styleMet = styleState(BOSSES[r.bossId].style, this.styleTrades(), true) === 'met';
     // Part of a surplus carries into the next round, so a strong round leaves a cushion.
     st.carry = r.status === 'passed' ? Math.round((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;

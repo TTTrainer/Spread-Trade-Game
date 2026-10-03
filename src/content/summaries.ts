@@ -62,13 +62,13 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
     catch: 'A loss resets it',
   },
   premium_printer: { when: 'Theta Engine trade closed at 50%+ profit', get: 'Its chips ×3', kind: 'xmult' },
-  iv_crusher: { when: 'Sold at IV rank 50+, then IV falls 20%', get: '×1.5', kind: 'xmult' },
+  iv_crusher: { when: 'Sold at IV rank 50+, then IV falls 20%', get: '×2', kind: 'xmult' },
   vol_arb: {
     when: 'Opened while IV beats actual moves by 5+',
     get: '+2 mult (and shows IV−HV)',
     kind: 'mult',
   },
-  long_gamma: { when: 'Straddle or strangle beats the expected move', get: '×2', kind: 'xmult' },
+  long_gamma: { when: 'Straddle or strangle beats the expected move', get: '×1.5', kind: 'xmult' },
   term_structure_tap: { when: 'Calendar with front IV above back IV', get: '+3 mult', kind: 'mult' },
   crush_it: { when: 'Short premium through earnings, stock stays inside the move', get: '×3', kind: 'xmult' },
   earnings_sniper: {
@@ -146,7 +146,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
     catch: '+10 stress per trade',
   },
   rivals_bet: { when: "Outscore Bradley's ghost this round", get: '+$10', kind: 'cash', catch: 'Lose: −$5' },
-  the_wheel: { when: 'Covered call after a put assignment', get: '×2', kind: 'xmult' },
+  the_wheel: { when: 'Covered call after a put assignment', get: '×1.5', kind: 'xmult' },
   covered_and_chill: { when: 'Covered call expires out of the money', get: '+2 mult', kind: 'mult' },
   assignment_artist: { when: 'You get assigned', get: '+50 chips, no stress', kind: 'chips' },
   delta_neutral: {
@@ -156,7 +156,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   },
   wing_clipper: { when: 'Condor shorts both outside the expected move', get: '+40 chips', kind: 'chips' },
   pin_master: { when: 'Iron fly expires within 1% of its center', get: '×4', kind: 'xmult' },
-  straddle_stack: { when: 'Each straddle this round', get: '+1 mult to the next one', kind: 'mult' },
+  straddle_stack: { when: 'Each straddle this round', get: '+1 mult to the next one (max +2)', kind: 'mult' },
   double_time: { when: 'Double calendars', get: '+2 mult', kind: 'mult' },
 };
 

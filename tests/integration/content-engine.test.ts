@@ -382,7 +382,7 @@ describe('boss rewards', () => {
 });
 
 describe('the Early Retiree duel', () => {
-  it('Chad opens his own book when the clock starts, plays in lockstep, and the Review needs more P/L than his', async () => {
+  it('Chad opens his own book when the clock starts, plays in lockstep, and beating his P/L multiplies the score', async () => {
     const e = await RunEngine.create(src, config('duel-1'));
     await e.dispatch({ t: 'dev', op: { k: 'boss', id: 'early_retiree' } });
     await e.dispatch({ t: 'startReview' });
@@ -405,7 +405,9 @@ describe('the Early Retiree duel', () => {
     const r = e.state.round;
     expect(r.duel).toBeDefined();
     expect(r.duel!.won).toBe(r.duel!.you > r.duel!.rival);
-    if (!r.duel!.won) expect(r.status).toBe('failed');
+    // The duel multiplies the round's score (x1.5 ahead of Chad, x0.75 behind).
+    const ev = e.events.find((x) => /Round score x/.test(x.text));
+    expect(ev?.text).toContain(r.duel!.won ? `x${BALANCE.duel.winMult}` : `x${BALANCE.duel.loseMult}`);
   }, 120_000);
 });
 

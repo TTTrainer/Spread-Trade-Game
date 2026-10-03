@@ -54,8 +54,9 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 150,
     ticketsAdd: 1,
     lineupAdd: 1,
-    // Two credits a trade score about 2.5x a vertical's: targets scale to match.
-    targetMult: 2.8,
+    // Two credits a trade score about 2.5x a vertical's, and a flat chart is always dealt (1.6):
+    // targets scale to match.
+    targetMult: 3.4,
     passive: (f) =>
       f.win && f.callFlat && f.callExact && f.callBonus > 0
         ? [{ label: 'Condor desk (flat call x2)', kind: 'desk', op: 'add', value: f.callBonus }]
@@ -92,8 +93,8 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 250,
     ticketsAdd: 2,
     lineupAdd: 1,
-    // Calendars make steady small money; since 1.6 losses count in full, so the bar sits lower.
-    targetMult: 0.9,
+    // Calendars make steady small money, and a flat chart is always dealt (1.6).
+    targetMult: 1.3,
     priceRange: [10, 60],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },

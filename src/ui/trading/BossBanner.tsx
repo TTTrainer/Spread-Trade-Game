@@ -152,7 +152,8 @@ function DuelView({ e }: { e: RunEngine }) {
   if (!d.started)
     return (
       <div className="boss-race num duel-wait" data-testid="duel">
-        CHAD opens his book on these cards when the clock starts. Finish the round with more P/L than him.
+        CHAD opens his book on these cards when the clock starts. Finish ahead of his P/L for x1.5 on the
+        round.
       </div>
     );
   return (
@@ -161,7 +162,7 @@ function DuelView({ e }: { e: RunEngine }) {
       days={(e.state.round.duelRace ?? []).map((x) => ({ you: x.you, them: x.rival }))}
       label="Chad"
       testId="duel"
-      tip="Chad trades the same cards in his own book: two credit spreads, no stops, held to the end. The Review needs more P/L than his (closed trades count; his open ones at their mark)."
+      tip="Chad trades the same cards in his own book: out-of-the-money call spreads, one contract each, no stops, held to the end. Finish ahead of his P/L and your round scores x1.5; behind him, x0.75 (your closed trades count; his open ones at their mark)."
     >
       <div className="duel-book">
         {d.trades.map((t, i) => (

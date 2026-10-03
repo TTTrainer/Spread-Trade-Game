@@ -40,10 +40,20 @@ export const BALANCE = {
     spoilsCount: 3,
   },
 
-  /** The Early Retiree's duel: how many trades Chad opens, sized at this share of the risk cap. */
+  /**
+   * The Early Retiree's duel: Chad buys out-of-the-money bull call spreads (long leg at `delta`,
+   * about `dte` days out) on his first `trades` cards, sized at this share of the risk cap but
+   * never more than `maxQty` contracts.
+   */
   duel: {
     trades: 2,
-    riskShare: 0.5,
+    delta: 0.25,
+    dte: 21,
+    riskShare: 0.3,
+    maxQty: 1,
+    /** Your round score is multiplied by this when you finish ahead of Chad, or behind him. */
+    winMult: 1.5,
+    loseMult: 0.75,
   },
 
   /**
@@ -58,14 +68,14 @@ export const BALANCE = {
     margin_clerk: 0.8,
     underwriter: 0.85,
     landlord: 0.6,
-    early_retiree: 1,
+    early_retiree: 0.9,
     tax_man: 1,
     bursar: 0.85,
     allocator: 1,
     shell_company: 0.75,
     executor: 0.9,
     collector: 0.95,
-    rebalancer: 2.7,
+    rebalancer: 3,
   } as Record<string, number>,
 
   targets: {

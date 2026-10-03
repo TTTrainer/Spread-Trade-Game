@@ -171,7 +171,8 @@ async function main(): Promise<void> {
     // failed boss ends the run, so roughly half of good years are cleared.
     { bot: 'active', label: 'Active Trader', range: [0.35, 0.55] },
     { bot: 'disciplined', label: 'Disciplined Seller', range: [0.4, 0.55] },
-    { bot: 'hold', label: 'Hold-to-Expiry', range: [0.2, 0.35] },
+    // Since 1.6 the bosses (the Collector, the Underwriter) punish holding losers on purpose.
+    { bot: 'hold', label: 'Hold-to-Expiry', range: [0.15, 0.35] },
     { bot: 'greedy', label: 'Greedy', range: [0, 0.15] },
     { bot: 'random', label: 'Random', range: [0, 0.05] },
   ];

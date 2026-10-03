@@ -194,9 +194,10 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['volatility'],
     rarity: 'U',
     tag: 'ARCADE',
-    text: 'A straddle or strangle whose move beats the expected move: x2.',
+    text: 'A straddle or strangle whose move beats the expected move: x1.5.',
     synergies: ['earnings_sniper', 'straddle_stack', 'gamma_scalper'],
-    score: ({ facts }) => when(facts.win && facts.straddleBeatEm, mul('Long Gamma', 2)),
+    // x1.5 since 1.6: with chips scaled by return on risk, a winning straddle already scores big.
+    score: ({ facts }) => when(facts.win && facts.straddleBeatEm, mul('Long Gamma', 1.5)),
   },
   {
     id: 'term_structure_tap',
@@ -611,7 +612,9 @@ export const CARTRIDGES: CartridgeDef[] = [
   {
     id: 'the_wheel',
     name: 'The Wheel',
-    families: ['THETA'],
+    // EVENT, not THETA (1.6): on the Income desk every trade collects premium, so a cheap THETA
+    // card lit the THETA family on its own (the same reason Covered & Chill moved in 1.5).
+    families: ['EVENT'],
     desks: ['income'],
     rarity: 'U',
     tag: 'ARCADE',
@@ -692,12 +695,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['volatility'],
     rarity: 'R',
     tag: 'ARCADE',
-    text: 'Each straddle opened this round adds +1 mult to the next one.',
+    text: 'Each straddle opened this round adds +1 mult to the next one (up to +2).',
     synergies: ['long_gamma', 'gamma_scalper'],
     score: ({ facts }) =>
       when(
         facts.win && facts.isStraddle && facts.straddlesBefore > 0,
-        add(`Straddle Stack (${facts.straddlesBefore})`, facts.straddlesBefore),
+        add(`Straddle Stack (${facts.straddlesBefore})`, Math.min(2, facts.straddlesBefore)),
       ),
   },
   {

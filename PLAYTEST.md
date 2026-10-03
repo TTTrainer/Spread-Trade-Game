@@ -6,7 +6,7 @@ The first three items can only be checked on your Windows PC. They matter most, 
 
 | # | Try this | What to look for | Score (1–5) | Notes |
 |---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.5.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
+| 1 | **Install** with `SpreadTradingGame-Setup-1.6.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
 | 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
 | 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
 | 4 | **Tutorial** (Career → TUTORIAL; rebuilt in 1.5.0, see item 40). | Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
@@ -52,5 +52,17 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 44 | **New: covered calls and cash-secured puts against 500 assumed shares.** Start an Income run. Sell a covered call at delta .30, then at .15. Sell a cash-secured put. | Does the covered call show as bearish (a call above the price) and its chance of profit go **up** as the strike moves further away? Do P/L and equity count only the option, never the shares? Is "RISK IF IT JUMPS" clear? | | |
 | 45 | **New: the screen recovers on its own.** Play normally; if the screen ever freezes again, wait 15 seconds. | Does it come back by itself with "The screen stopped responding and was restarted"? If so, send the `game.log` (Settings → OPEN LOG FOLDER): it now records the last 40 things the screen did before the freeze. | | |
 | 46 | **New: The Pad with real art.** The Pad (title screen). Buy a desk, monitors, a chair, a plant, a lamp, a painting, a watch, a vehicle; put desk items on the desk. | Does everything sit in a sensible place in each of the four homes? Anything floating, overlapping or too small? | | |
+| 47 | **New in 1.6.0: the developer test checklist.** Settings → Game → Developer mode on, then DEV → **TEST CHECKLIST**. | Work down the list with SET UP. Tick WORKS or PROBLEM and leave a note on each, then COPY ALL and send it. | | |
+| 48 | **New: the month menu** (before every Month of a Career run). | Is it clear what the quarter asks (targets, payouts, the boss)? Did you change the exit plan or reorder the build there? Is the boss reroll worth $10? | | |
+| 49 | **New: boss rounds.** Play a run into its first Review. | Does the case file make the boss and its one twist clear? Does the board feel scary (colors, vignette)? Is the twist visible on the chart without clutter? | | |
+| 50 | **New: the sealing bosses** (Controller, Executor, Shell Company). | Is playing without running P/L, days to expiry, or studies and IV rank a fun challenge or just annoying? | | |
+| 51 | **New: the Early Retiree's duel.** | Is racing Chad on the same cards fun? Is his book clear (the race and his trades under the banner)? Too easy or too hard to beat him? | | |
+| 52 | **New: the Allocator's second goal** (3 structure types) and **the Rebalancer's YOU vs SPY race.** | Is the progress chip clear? Does the SPY race make "beat the market" feel real? | | |
+| 53 | **New: failing a boss ends the run.** | Fair, or too harsh? (One switch turns it into a write-up instead.) | | |
+| 54 | **New: boss rewards.** Beat a boss. | Do the bounty, the trophy on YOUR DESK and picking 1 of 3 free cartridges feel like a prize? Is the style bonus condition clear while you play? | | |
+| 55 | **New: difficulty.** | Typical boss about 9 in 10, the Rebalancer about 7 in 10 for a good player: does that match what you feel? Which boss is the odd one out? | | |
+| 56 | **New: Endless showdowns.** Win a year and continue into Endless. | Do Year 2's SHOWDOWN bosses feel like a fair step up? | | |
+| 57 | **New in 1.6.0: points follow the money and the take-profit moment.** Play a few rounds; let a trade hit its profit target. | Do big wins score big and losses hurt? Does the TAKE PROFIT dialog and the PROFIT TAKEN burst feel good? Is P/L vs max on the trade card clear? | | |
+| 58 | **New: the miniplayer and cleaner screens.** Open trades on two or three cards and watch a day. | Can you follow trades that aren't on screen? Is the top bar easier to read? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

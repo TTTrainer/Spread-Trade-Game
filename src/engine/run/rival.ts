@@ -1,11 +1,13 @@
 /**
  * The Early Retiree's duel: Chad trades the same cards in his own book, in lockstep with yours.
- * His book is a second trading session on the same windows (same real prices, same fills rules),
+ * His book is a second trading session on the same windows (same real prices, same fill rules),
  * so his P/L is as real as yours; nothing he does touches your book or the market.
  *
- * Chad is a set-and-forget seller: when the clock starts he sells a ~30-delta credit spread about
- * a month out on his first few cards (with the 50-day trend), sized to a share of the risk cap,
- * and holds them with no stop and no target until they expire or the window ends.
+ * Chad retired at 34 on lottery tickets: when the clock starts he buys an out-of-the-money bull
+ * call spread (long leg about 25 delta) a few weeks out on his first cards, whatever the chart
+ * says, one contract each, and holds them to the end with no stop and no target. Time decay works
+ * against him most rounds; now and then a rally pays him big. A disciplined seller beats him by
+ * banking steady premium and cutting losers.
  */
 
 import { BALANCE } from '../../content/balance';
@@ -54,26 +56,26 @@ export class Rival {
       if (placed >= d.trades) break;
       const chain = s.chain(card.id);
       if (!chain) continue;
-      const ctx = s.context(card.id);
-      const bullish = (ctx.sma50Slope ?? 0) >= 0;
-      const structureId: StructureId = bullish ? 'bull_put' : 'bear_call';
+      const structureId: StructureId = 'bull_call';
       const exp = expirationsOf(chain)
-        .filter((e) => diffDays(chain.date, e) >= 21)
-        .sort((a, b) => Math.abs(diffDays(chain.date, a) - 30) - Math.abs(diffDays(chain.date, b) - 30))[0];
+        .filter((e) => diffDays(chain.date, e) >= 14)
+        .sort(
+          (a, b) => Math.abs(diffDays(chain.date, a) - d.dte) - Math.abs(diffDays(chain.date, b) - d.dte),
+        )[0];
       if (!exp) continue;
       for (const width of [5, 2.5, 2, 1]) {
-        const one = s.planFor(card.id, structureId, { expiration: exp, delta: 0.3, width }, 1);
+        const one = s.planFor(card.id, structureId, { expiration: exp, delta: d.delta, width }, 1);
         if (!one.ok || one.maxLossCents <= 0) continue;
         const capCents = s.equityCents() * s.config.riskCapPct * d.riskShare;
-        const qty = Math.max(1, Math.floor(capCents / one.maxLossCents));
-        const plan = s.planFor(card.id, structureId, { expiration: exp, delta: 0.3, width }, qty);
+        const qty = Math.max(1, Math.min(d.maxQty, Math.floor(capCents / one.maxLossCents)));
+        const plan = s.planFor(card.id, structureId, { expiration: exp, delta: d.delta, width }, qty);
         if (!plan.ok) continue;
-        await s.dispatch({ t: 'call', cardId: card.id, bucket: bullish ? 3 : 1, confidence: 0.6 });
+        await s.dispatch({ t: 'call', cardId: card.id, bucket: 3, confidence: 0.6 });
         const res = await s.dispatch({
           t: 'place',
           cardId: card.id,
           structureId,
-          params: { expiration: exp, delta: 0.3, width },
+          params: { expiration: exp, delta: d.delta, width },
           qty,
           order: { type: 'market' },
           brackets: null,
