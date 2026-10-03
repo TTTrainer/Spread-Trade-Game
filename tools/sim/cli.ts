@@ -169,8 +169,8 @@ async function main(): Promise<void> {
   const bots: { bot: SimSpec['bot']; label: string; range: [number, number] }[] = [
     // Bosses: a good player beats a typical boss ~9 times in 10 and the final ~7 in 10, and a
     // failed boss ends the run, so roughly half of good years are cleared.
-    { bot: 'active', label: 'Active Trader', range: [0.35, 0.55] },
-    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.4, 0.55] },
+    { bot: 'active', label: 'Active Trader', range: [0.28, 0.45] },
+    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.28, 0.45] },
     // Since 1.6 the bosses (the Collector, the Underwriter) punish holding losers on purpose.
     { bot: 'hold', label: 'Hold-to-Expiry', range: [0.15, 0.35] },
     { bot: 'greedy', label: 'Greedy', range: [0, 0.15] },

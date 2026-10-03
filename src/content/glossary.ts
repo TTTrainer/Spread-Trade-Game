@@ -386,7 +386,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   risk_tier: {
     title: 'Risk Tier',
-    body: "Harder stakes, stacked like Balatro's. Clearing a year at your top tier unlocks the next.",
+    body: "Harder stakes, stacked like Balatro's: each tier adds its rule and +10% targets. Clearing a year at your top tier unlocks the next. Finding it easy? Climb.",
   },
   shop_reroll: {
     title: 'Reroll the shop (R)',

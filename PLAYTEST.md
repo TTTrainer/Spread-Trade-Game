@@ -64,5 +64,11 @@ The first three items can only be checked on your Windows PC. They matter most, 
 | 56 | **New: Endless showdowns.** Win a year and continue into Endless. | Do Year 2's SHOWDOWN bosses feel like a fair step up? | | |
 | 57 | **New in 1.6.0: points follow the money and the take-profit moment.** Play a few rounds; let a trade hit its profit target. | Do big wins score big and losses hurt? Does the TAKE PROFIT dialog and the PROFIT TAKEN burst feel good? Is P/L vs max on the trade card clear? | | |
 | 58 | **New: the miniplayer and cleaner screens.** Open trades on two or three cards and watch a day. | Can you follow trades that aren't on screen? Is the top bar easier to read? | | |
+| 59 | **New in 1.6.1: the payout.** Close a winning trade with a few cartridges on your desk. Also let one expire, and take a planned stop. | Does it feel like a Balatro hand: chips, then mult, each cartridge jumping with what it added, the total slamming into the score? Can you tell which cartridges did nothing? Is the sound good or grating? Is it too long (try FAST in Settings)? | | |
+| 60 | **New: closing at a profit.** Let a target hit; press CASH OUT. Then a trade that expires for its full credit. | Does cashing out now feel like a choice and a reward? Does EXPIRY PAYDAY land? Do the month menu's pause switches take effect right away? | | |
+| 61 | **New: the trophy screen, then the spoils screen.** Beat a boss. | Does the trophy feel like a real upgrade (the before → after numbers)? Is picking 1 of 3 on its own screen clearer? | | |
+| 62 | **New: covered calls on pricey stocks.** Income run; sell a covered call on the highest-priced card. Try the AUTO STOP 1× / 1.5× / 2× / 3× buttons on the ticket. | Can you now fit one on a pricey stock? Does RISK AT AUTO STOP make sense? When the stock rallies through the stop, does it close on its own? | | |
+| 63 | **New: the shop at your screen size.** Beat a boss and look at the shop (with vouchers and a trophy on YOUR DESK). | Is anything overlapping, cut off, or hidden under the bottom bar? | | |
+| 64 | **New: harder targets.** Play a full Career run on the desk you crushed (Income). | Does it still feel easy to make it all the way? Roughly how far over the target did you finish each round? | | |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game.

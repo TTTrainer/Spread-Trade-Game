@@ -240,7 +240,7 @@ export function OrderTicket() {
         {builder.structureId === 'covered_call' ? (
           <div className="plan-chip auto-stop" data-tip="g:auto_stop" data-testid="auto-stop">
             <span>
-              PLAN · take profit at {Math.round(builder.targetPct * 100)}% · <b>AUTO STOP</b> (sizes the risk)
+              <b>AUTO STOP</b> × premium · TP {Math.round(builder.targetPct * 100)}%
             </span>
             <span className="auto-stop-picks">
               {[1, 1.5, 2, 3].map((m) => (

@@ -75,16 +75,18 @@ export const BALANCE = {
     shell_company: 0.75,
     executor: 0.9,
     collector: 0.95,
-    rebalancer: 3,
+    rebalancer: 2.7,
   } as Record<string, number>,
 
   targets: {
     // Round 1 needs more than one typical trade (a median Verticals win scores about 220 on the
     // SIM market). Reviews ask a little less: their rules (beat SPY, stay calm) are the hard part.
-    q1: [170, 190, 160] as [number, number, number],
-    // Builds compound, so targets grow 30% a quarter (they grew 12% before 1.6, when a decent
-    // build scored 5 to 14 times the target by the fourth quarter).
-    quarterGrowth: 1.3,
+    q1: [200, 220, 150] as [number, number, number],
+    // Builds compound, so targets grow 34% a quarter (12% before 1.6, when a decent build scored
+    // 5 to 14 times the target by the fourth quarter; 30% in 1.6.0, when a strong player still
+    // finished Months at 3 to 5 times the target). Months ask more than Reviews: the boss is the
+    // Review's hard part, and a Month is where a strong build snowballs.
+    quarterGrowth: 1.34,
     /** A missed Month target is a write-up, not the end: that quarter's Review target grows this much. */
     writeUpReviewMult: 1.1,
     endlessGrowth: 1.8,
@@ -134,9 +136,9 @@ export const BALANCE = {
     /** ...and one that finished with a loss gives up this share. */
     redRoundPenalty: 0.2,
     /** This share of a passed round's surplus carries into the next round's meter... */
-    carryShare: 0.5,
-    /** ...up to this share of the next target. */
-    carryCap: 0.5,
+    carryShare: 0.35,
+    /** ...up to this share of the next target (half until 1.6.1, a head start that snowballed). */
+    carryCap: 0.25,
     levelChips: 10,
     levelMult: 0.5,
     rrMult: 1,

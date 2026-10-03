@@ -33,7 +33,9 @@ describe('round targets', () => {
       t.q1.map((x) => r10(x * t.quarterGrowth)),
     );
     expect(computeTarget(4, 2, 'annual_review', cfg)).toBe(r10(t.q1[2] * t.quarterGrowth ** 3 * 1.25));
-    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25));
+    // Every tier adds 10% to targets; Tier 5 adds its own 25% on top.
+    expect(computeTarget(1, 0, null, { tier: 5 })).toBe(r10(t.q1[0] * 1.25 * 1.5));
+    expect(computeTarget(1, 0, null, { tier: 2 })).toBe(r10(t.q1[0] * 1.2));
   });
 
   it('scale by desk, so a desk that scores more per trade asks for more', () => {
