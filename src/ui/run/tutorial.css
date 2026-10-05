@@ -221,3 +221,54 @@
 :root[data-reduced-motion='true'] .td-arrows {
   animation: none;
 }
+
+/* The live POP against the 80% a first trade aims for. */
+.tut-pop {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  margin: 6px 0 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 191, 62, 0.6);
+  background: rgba(255, 191, 62, 0.08);
+  font-size: 17px;
+}
+.tut-pop.ok {
+  border-color: var(--up);
+  background: rgba(77, 255, 154, 0.08);
+}
+.tut-pop .tp-k {
+  color: var(--text);
+}
+.tut-pop .tp-bar {
+  position: relative;
+  height: 10px;
+  background: rgba(164, 157, 224, 0.2);
+}
+.tut-pop .tp-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--amber);
+  transition: width 0.2s ease-out;
+}
+.tut-pop.ok .tp-bar i {
+  background: var(--up);
+}
+.tut-pop .tp-bar b {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.tut-pop .tp-hint {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+}
+.tut-pop.ok .tp-hint {
+  color: var(--up);
+}

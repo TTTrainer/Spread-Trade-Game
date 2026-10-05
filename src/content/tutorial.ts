@@ -97,8 +97,12 @@ export type TutPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'end';
  */
 export type TutWait = 'next' | 'view' | 'strike' | 'placed' | 'day' | 'phase';
 
-/** Something a lesson sets up as it opens. */
-export type TutEnter = 'simpleChart' | 'emChart' | 'fullChart' | 'briefTab' | 'tradeTab';
+/**
+ * Something a lesson sets up as it opens. The practice ones mark a floor or ceiling on the chart
+ * and build Ines's example trade beyond it (shown, never placed).
+ */
+export type TutEnter =
+  'simpleChart' | 'emChart' | 'fullChart' | 'briefTab' | 'tradeTab' | 'practiceLevel' | 'practiceTrade';
 
 /** A one-time lesson that interrupts the script the first time something happens. */
 export type TutMomentKind = 'recap' | 'decision' | 'closed' | 'stress' | 'endRound';
@@ -211,7 +215,41 @@ export const TUTORIAL_STEPS: TutStep[] = [
     holdClock: true,
     beforeTrade: true,
     title: 'The play: a credit spread',
-    text: "You sell a promise: 'the stock won't cross my line before the trade ends.' You're paid the moment it fills and keep the cash if the promise holds. Think landlord, not gambler.",
+    text: "You SELL a promise: 'the stock won't cross my line before the trade ends.' You're paid the moment it fills and keep the cash if the promise holds. Think landlord, not gambler.",
+  },
+  {
+    id: 'strikeword',
+    part: 2,
+    at: R0,
+    wait: 'next',
+    holdClock: true,
+    beforeTrade: true,
+    title: "What's a strike?",
+    text: "A strike is the price your promise is about. Sell a 25 put and you're saying 'it won't close under 25.' The goal: a strike the stock won't reach in time.",
+  },
+  {
+    id: 'level',
+    part: 2,
+    at: R0,
+    wait: 'next',
+    enter: 'practiceLevel',
+    holdClock: true,
+    beforeTrade: true,
+    target: 'center',
+    title: 'Watch me first',
+    text: 'One thing I look for: this stock turned back at about {level}, {touches}. That is a {kind}: prices often respect one, so a strike past it has company.',
+  },
+  {
+    id: 'example',
+    part: 2,
+    at: R0,
+    wait: 'next',
+    enter: 'practiceTrade',
+    holdClock: true,
+    beforeTrade: true,
+    target: 'center',
+    title: 'My practice trade',
+    text: 'I sell the {strike} {right}, past the {kind}, and buy one further out to cap the loss. It wins if the stock stays {side} {strike}: POP {pop}, about 4 in 5. Not placed.',
   },
   {
     id: 'view',
@@ -221,8 +259,8 @@ export const TUTORIAL_STEPS: TutStep[] = [
     holdClock: true,
     beforeTrade: true,
     target: 'center',
-    title: 'Up or down?',
-    text: "Which way over the next few weeks? Your line goes on the other side of the price. You don't need to be right, just not badly wrong.",
+    title: 'Your turn: up or down?',
+    text: 'Which way over the next few weeks? UP sells a put spread under the price, DOWN a call spread over it. You only need to not be badly wrong.',
   },
   {
     id: 'line',
@@ -234,7 +272,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: 'center',
     reveal: ['view'],
     title: 'Your line',
-    text: "The pink line is your strike. If the stock stays {side} this line until the end, you keep the money. That's the whole promise.",
+    text: "You're SELLING the {strike} {right}: the pink line. If the stock stays {side} this line until the end, you keep the money. The cyan line caps your loss.",
   },
   {
     id: 'pay',
@@ -246,7 +284,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: '[data-testid="sell-button"]',
     reveal: ['sell'],
     title: 'Paid up front',
-    text: 'SELL shows the credit you get now, the most you can lose ("risk") and POP: the odds you keep money. Read all three before you press anything.',
+    text: 'SELL shows the credit you get now, the most you can lose ("risk") and POP: the odds you keep money. For a first trade, aim for a POP near 80%.',
   },
   {
     id: 'strike',
@@ -258,7 +296,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: '[data-testid="strike-handle"]',
     reveal: ['short'],
     title: 'Grab the line',
-    text: 'Press on the pink S tag and drag it up or down (the Short Δ slider below does the same). Watch the credit and POP change as you go.',
+    text: 'Drag the pink S tag (or the Short Δ slider). Further from the price: higher POP, less credit. Try to land near 80%.',
   },
   {
     id: 'safe',
@@ -270,7 +308,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     beforeTrade: true,
     target: 'center',
     title: 'Safe or spicy?',
-    text: 'Safe: line beyond the purple EM line (the move the market expects): POP 75%+, small credit. Spicy: line near the price: twice the credit, coin-flip odds. Your call.',
+    text: 'Safe: line past the purple EM line (the move the market expects): POP 80%-ish, small credit. Spicy: near the price: more credit, coin-flip odds.',
   },
   {
     id: 'place',

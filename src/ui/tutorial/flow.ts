@@ -34,6 +34,8 @@ export interface TutCtx {
   strikeKey: string;
   /** Which side of the line wins for the trade being built. */
   side: 'above' | 'below';
+  /** Words a lesson fills in: {strike}, {right}, {pop}, and the practice trade's {level}, {kind}, {touches}. */
+  vars?: Record<string, string>;
 }
 
 export interface TutProgress {
@@ -144,8 +146,10 @@ export function partOf(p: TutProgress): number {
   return TUTORIAL_STEPS[Math.min(p.idx, TUTORIAL_STEPS.length - 1)].part;
 }
 
-export function lessonText(text: string, c: Pick<TutCtx, 'side'>): string {
-  return text.replace(/\{side\}/g, c.side);
+export function lessonText(text: string, c: Pick<TutCtx, 'side' | 'vars'>): string {
+  const vars: Record<string, string> = { ...c.vars, side: c.side };
+  // A word with nothing to fill it reads as a plain dash rather than a raw {placeholder}.
+  return text.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '—');
 }
 
 /** Where each region lives on screen. A lesson's target is a region name or a CSS selector. */

@@ -2554,7 +2554,7 @@
    oldest candles, clear of today's price). */
 .boss-stack {
   position: absolute;
-  top: 60px;
+  top: 66px;
   left: 8px;
   z-index: 6;
   max-width: 58%;

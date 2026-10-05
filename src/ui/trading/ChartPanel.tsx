@@ -613,6 +613,7 @@ export function ChartPanel() {
       {expHidden && dteSealed && <SealedExpiry by={dteSealed} />}
       {!planHidden && <StrikeHandle />}
       <PositionHud />
+      {cardId && <PracticeMarkLine cardId={cardId} />}
       <BossBanner />
       <DayRecapPanel />
       <AnimatePresence>
@@ -676,6 +677,47 @@ function ChartTitle({ cardId, legend }: { cardId: string; legend: string }) {
         {Math.abs(chg * 100).toFixed(2)}%
       </span>
       {legend && <span className="ct-legend">{legend}</span>}
+    </div>
+  );
+}
+
+/**
+ * The tutorial's practice trade: the floor (or ceiling) it was built around, as a line across the
+ * chart with a ring on each day the stock turned there.
+ */
+function PracticeMarkLine({ cardId }: { cardId: string }) {
+  const mark = useTrading((s) => s.practiceMark);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!mark) return;
+    // Follow scrolling and zooming, like the expiration line.
+    const id = setInterval(() => setTick((t) => t + 1), 150);
+    return () => clearInterval(id);
+  }, [mark]);
+  if (!mark || mark.cardId !== cardId) return null;
+  const y = chartBridge.priceToY(mark.price);
+  const w = chartBridge.plotWidth();
+  const h = chartBridge.paneHeight();
+  if (y === null || w <= 0 || y < 0 || y > h) return null;
+  const floor = mark.kind === 'floor';
+  return (
+    <div
+      className="practice-mark"
+      style={{ width: w, height: h }}
+      data-testid="practice-mark"
+      data-kind={mark.kind}
+    >
+      <div className={`pm-line ${mark.kind}`} style={{ top: y }} />
+      <span className={`pm-tag num ${mark.kind}`} style={{ top: floor ? y + 6 : y - 30 }}>
+        {floor ? '▼ FLOOR' : '▲ CEILING'} {mark.price.toFixed(2)} · turned here {mark.touches.length}×
+      </span>
+      {mark.touches.map((t) => {
+        const x = chartBridge.xForDate(t.date);
+        const ty = chartBridge.priceToY(t.price);
+        return x === null || ty === null ? null : (
+          <i key={t.date} className="pm-touch" style={{ left: x, top: ty }} />
+        );
+      })}
     </div>
   );
 }

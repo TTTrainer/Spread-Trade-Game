@@ -28,6 +28,7 @@ import { lastMark, optionLegsOf } from '../../engine/lifecycle/position';
 import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
 import { crumb } from '../trail';
 import { payoutBusy, usePayout } from './payout';
+import type { PracticeLevel } from '../../engine/teach/practice';
 
 /** The order type that will go out: a limit whenever this round has market orders off. */
 export function orderTypeOf(
@@ -198,6 +199,8 @@ interface TradingState {
   clockHold: string | null;
   /** The tutorial keeps the planned trade off the chart until it has explained the chart itself. */
   planHidden: boolean;
+  /** The tutorial's practice trade marks the floor or ceiling it was built around (on this card). */
+  practiceMark: (PracticeLevel & { cardId: string }) | null;
   /** A decision is tucked into a bar so the full chart can be reviewed. */
   reviewChart: boolean;
   setReviewChart: (v: boolean) => void;
@@ -830,6 +833,7 @@ export const useTrading = create<TradingState>((set, get) => {
     dismissRecap: () => set({ recap: null }),
     clockHold: null,
     planHidden: false,
+    practiceMark: null,
     dragging: false,
     setDragging: (v) => {
       if (get().dragging !== v) set({ dragging: v });

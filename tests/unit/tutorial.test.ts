@@ -57,6 +57,10 @@ describe('tutorial script', () => {
     expect(idx('goal')).toBeLessThan(idx('view'));
     // The strategy is described before the player picks a side; safe vs bold before placing.
     expect(idx('spread')).toBeLessThan(idx('view'));
+    // A strike is explained, and Ines shows a practice trade, before the player builds one.
+    expect(idx('strikeword')).toBeLessThan(idx('level'));
+    expect(idx('level')).toBeLessThan(idx('example'));
+    expect(idx('example')).toBeLessThan(idx('view'));
     expect(idx('strike')).toBeLessThan(idx('safe'));
     expect(idx('safe')).toBeLessThan(idx('place'));
     expect(idx('place')).toBeLessThan(idx('carts'));
@@ -132,5 +136,15 @@ describe('tutorial flow', () => {
     const line = TUTORIAL_STEPS.find((s) => s.id === 'line')!.text;
     expect(lessonText(line, { side: 'above' })).toContain('stays above this line');
     expect(lessonText(line, { side: 'below' })).toContain('stays below this line');
+    // The position is spelled out: which strike, put or call, and that you are selling it.
+    expect(lessonText(line, { side: 'above', vars: { strike: '95', right: 'put' } })).toContain(
+      "You're SELLING the 95 put",
+    );
+    // A word with nothing to fill it never shows as a raw placeholder.
+    expect(lessonText('POP {pop}', { side: 'above' })).toBe('POP —');
+    const example = TUTORIAL_STEPS.find((s) => s.id === 'example')!.text;
+    expect(
+      lessonText(example, { side: 'above', vars: { strike: '94', right: 'put', kind: 'floor', pop: '81%' } }),
+    ).toMatch(/sell the 94 put, past the floor.*POP 81%/);
   });
 });

@@ -49,11 +49,28 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await step(page, 'spread');
   await shot(page, 'tut-03b-spread-1920');
   await gotIt(page);
+  await step(page, 'strikeword');
+  await gotIt(page);
+  // A practice trade first: the floor or ceiling it's built around, marked on the real chart.
+  await step(page, 'level');
+  await expect(page.getByTestId('practice-mark')).toBeVisible();
+  await expect(coach(page)).toContainText(/turned back at about \d/);
+  await shot(page, 'tut-03c-level-1920');
+  await shot(page, 'tut-03c-level-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await gotIt(page);
+  await step(page, 'example');
+  await expect(coach(page)).toContainText(/I sell the \d+(\.\d+)? (put|call), past the (floor|ceiling)/);
+  await expect(coach(page)).toContainText(/POP \d+%/);
+  await expect(page.getByTestId('trade-badge')).toBeVisible();
+  await shot(page, 'tut-03d-example-1920');
+  await gotIt(page);
   await step(page, 'view');
   await shot(page, 'tut-04-view-1920');
   await page.getByTestId('tut-up').click();
   await step(page, 'line');
   await expect(coach(page)).toContainText('stays above this line');
+  await expect(coach(page)).toContainText(/You're SELLING the \d+(\.\d+)? put/);
   await shot(page, 'tut-05-line-1920');
   await gotIt(page);
   await step(page, 'pay');
@@ -63,6 +80,8 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await gotIt(page);
   await step(page, 'strike');
   await expect(page.locator('.tut-drag .td-hand')).toBeVisible();
+  // The live POP against the 80% a first trade aims for.
+  await expect(page.getByTestId('tut-pop')).toContainText(/POP \d+%/);
   await shot(page, 'tut-07-strike-1920');
   await shot(page, 'tut-07-strike-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -73,6 +92,7 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await step(page, 'place');
   await page.getByTestId('sell-button').click();
   await step(page, 'placed');
+  await expect(page.getByTestId('practice-mark')).toHaveCount(0);
   await shot(page, 'tut-08-placed-1920');
   await gotIt(page);
 
@@ -147,6 +167,14 @@ test('tutorial: one thing at a time, from the goal to the first trade to the sho
   await step(page, 'payoff');
   await gotIt(page);
   await step(page, 'controls');
+  // REROLL and SIT OUT are in view where Ines points, even on a small screen.
+  await shot(page, 'tut-19b-controls-1366', { width: 1366, height: 768 });
+  const inView = await page.getByTestId('reroll').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return r.top >= 0 && r.bottom <= window.innerHeight && getComputedStyle(el).visibility !== 'hidden';
+  });
+  expect(inView).toBe(true);
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await gotIt(page);
   await step(page, 'yourturn');
   await shot(page, 'tut-20-yourturn-1920');

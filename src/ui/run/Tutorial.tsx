@@ -7,7 +7,9 @@ import { sfx } from '../../audio/sfx';
 import { Portrait } from '../components/Portrait';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
-import { useTrading } from '../store/trading';
+import { liveCardId, useTrading } from '../store/trading';
+import { PRACTICE_POP, practiceLean, practiceLevel, practicePick } from '../../engine/teach/practice';
+import type { OptionLeg, StructureId } from '../../engine/strategies/types';
 import {
   TUT_START,
   acknowledge,
@@ -26,7 +28,12 @@ import {
 import './tutorial.css';
 
 const FULL_STUDIES = ['bb', 'rsi', 'vol', 'em'] as const;
-const LINE_STEP = TUTORIAL_STEPS.findIndex((s) => s.id === 'line');
+/** The plan stays off the chart until Ines shows her practice trade. */
+const EXAMPLE_STEP = TUTORIAL_STEPS.findIndex((s) => s.id === 'example');
+/** Lessons that show the live POP against the 80% a first trade aims for. */
+const POP_STEPS = ['pay', 'strike', 'safe', 'place'];
+const DELTA_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+const pctText = (x: number) => `${Math.round(x * 100)}%`;
 
 /** A snapshot of the run for the lesson rules (cheap: read on each render of the coach). */
 function contextOf(e: RunEngine, t: ReturnType<typeof useTrading.getState>): TutCtx {
@@ -41,6 +48,20 @@ function contextOf(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tut
         : 'round';
   const open = s ? s.openPositions().length + s.orders.length : 0;
   const bias = STRUCTURES[t.builder.structureId]?.bias;
+  const plan = t.plan();
+  const short = plan?.legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0);
+  const mark = t.practiceMark;
+  const vars: Record<string, string> = {};
+  if (short) {
+    vars.strike = String(short.strike);
+    vars.right = short.right === 'P' ? 'put' : 'call';
+  }
+  if (plan?.metrics) vars.pop = pctText(plan.metrics.pop);
+  if (mark) {
+    vars.level = mark.price.toFixed(2);
+    vars.kind = mark.kind;
+    vars.touches = mark.touches.length > 1 ? `${mark.touches.length} times` : 'its recent turn';
+  }
   return {
     phase,
     round: r.index,
@@ -54,6 +75,7 @@ function contextOf(e: RunEngine, t: ReturnType<typeof useTrading.getState>): Tut
     canEndRound: !!s && open === 0 && !s.inDay && r.clockStarted && !r.sitOut,
     strikeKey: JSON.stringify([t.builder.delta, t.builder.anchor, t.builder.structureId]),
     side: bias === 'bear' ? 'below' : 'above',
+    vars,
   };
 }
 
@@ -64,6 +86,51 @@ function runEnter(what: TutEnter | undefined): void {
   else if (what === 'fullChart') useTrading.setState({ studies: [...FULL_STUDIES] });
   else if (what === 'briefTab') t.setRightTab('brief');
   else if (what === 'tradeTab') t.setRightTab('trade');
+  else if (what === 'practiceLevel') showPracticeLevel();
+  else if (what === 'practiceTrade') showPracticeTrade();
+}
+
+/** Mark the floor (or ceiling) the practice trade is built around on the selected card's chart. */
+function showPracticeLevel(): void {
+  const t = useTrading.getState();
+  const cardId = liveCardId(t);
+  if (!t.session || !cardId) return;
+  const bars = t.session.view(cardId).bars();
+  const level = practiceLevel(bars, practiceLean(bars));
+  useTrading.setState({ practiceMark: level ? { ...level, cardId } : null, chainOpen: false });
+}
+
+/**
+ * Ines's example: the credit spread on the far side of the level, with the most credit that keeps
+ * POP near 80%. It only shapes the builder (never placed), and doesn't count as the player
+ * touching the trade, so "up or down?" still waits for them.
+ */
+function showPracticeTrade(): void {
+  const t = useTrading.getState();
+  const cardId = liveCardId(t);
+  if (!t.practiceMark) showPracticeLevel();
+  const mark = useTrading.getState().practiceMark;
+  const s = t.session;
+  const exp = t.builder.expiration;
+  if (!s || !cardId || !mark || !exp) return;
+  const sid: StructureId = mark.kind === 'floor' ? 'bull_put' : 'bear_call';
+  const options = DELTA_STEPS.flatMap((delta) => {
+    const p = s.planFor(cardId, sid, { expiration: exp, delta, width: t.builder.width }, 1);
+    const sh = p.legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0);
+    return p.ok && p.metrics && sh ? [{ delta, strike: sh.strike, pop: p.metrics.pop }] : [];
+  });
+  const pick = practicePick(mark, options);
+  if (!pick) return;
+  useTrading.setState({
+    builder: {
+      ...t.builder,
+      structureId: sid,
+      delta: pick.delta,
+      legs: null,
+      anchor: null,
+      callAnchor: null,
+    },
+  });
 }
 
 /** The target's box on screen, re-read a few times a second (things move as the desk lights up). */
@@ -262,12 +329,17 @@ export function TutorialCoach({ e }: { e: RunEngine }) {
     return () => useTrading.setState({ clockHold: null });
   }, []);
 
-  // The planned trade stays off the chart until Ines has explained the chart and asked up or down.
-  const planHidden = !settled.skipped && settled.idx < LINE_STEP && ctx.placed === 0 && ctx.round === 0;
+  // The planned trade stays off the chart until Ines shows her practice trade on it.
+  const planHidden = !settled.skipped && settled.idx < EXAMPLE_STEP && ctx.placed === 0 && ctx.round === 0;
   useEffect(() => {
     useTrading.setState({ planHidden });
   }, [planHidden]);
-  useEffect(() => () => useTrading.setState({ planHidden: false }), []);
+  useEffect(() => () => useTrading.setState({ planHidden: false, practiceMark: null }), []);
+  // The practice level stays on the chart while the player builds their own; the first trade clears it.
+  useEffect(() => {
+    if ((ctx.placed > 0 || settled.skipped) && useTrading.getState().practiceMark)
+      useTrading.setState({ practiceMark: null });
+  }, [ctx.placed, settled.skipped]);
 
   // The clock stays locked while a lesson before the first trade is up.
   const hold = active?.kind === 'step' && !!active.lesson.holdClock;
@@ -379,6 +451,7 @@ export function TutorialCoach({ e }: { e: RunEngine }) {
               </div>
             </div>
             <p className="tut-text">{lessonText(lesson.text, ctx)}</p>
+            {POP_STEPS.includes(lesson.id) && <PopAim />}
             <div className="tut-actions">
               {wait === 'view' ? (
                 <>
@@ -436,5 +509,32 @@ function Blockers({ hole }: { hole: { left: number; top: number; width: number; 
       />
       <div className="tut-block" style={{ left: r, top: hole.top, right: 0, height: hole.height }} />
     </>
+  );
+}
+
+/**
+ * The live POP against the 80% a first trade aims for: a bar with the target marked, and which
+ * way to move the line to get there.
+ */
+function PopAim() {
+  useTrading((s) => [s.version, s.builder.delta, s.builder.anchor, s.builder.structureId].join('|'));
+  const plan = useTrading.getState().plan();
+  const pop = plan?.metrics?.pop;
+  if (pop === undefined) return null;
+  const near = Math.abs(pop - PRACTICE_POP) <= 0.05;
+  const hint = near
+    ? '✓ right around 80%'
+    : pop < PRACTICE_POP
+      ? '▶ move the line further from the price'
+      : '◀ move the line closer for more credit';
+  return (
+    <div className={`tut-pop num ${near ? 'ok' : ''}`} data-testid="tut-pop">
+      <span className="tp-k">POP {pctText(pop)}</span>
+      <span className="tp-bar">
+        <i style={{ width: `${Math.min(100, pop * 100)}%` }} />
+        <b style={{ left: `${PRACTICE_POP * 100}%` }} title="aim: 80%" />
+      </span>
+      <span className="tp-hint">{hint}</span>
+    </div>
   );
 }
