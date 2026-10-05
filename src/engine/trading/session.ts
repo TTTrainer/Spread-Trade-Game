@@ -630,6 +630,11 @@ export class TradingSession {
       : null;
   }
 
+  /** Approval levels with too little equity: no spread can be opened, so the builder hides them. */
+  spreadsBlocked(): boolean {
+    return !!this.config.realism.approvalLevels && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS;
+  }
+
   /** The most contracts one order may have under the realism rules. */
   maxOrderQty(): number {
     return this.config.realism.liquidityLimits ? LIQUIDITY_MAX_CONTRACTS : Number.POSITIVE_INFINITY;

@@ -20,7 +20,7 @@ import {
   termStructure,
 } from '../../engine/run/analystTools';
 import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
-import { heatOf } from '../../content/meta';
+import { complianceMods, heatOf } from '../../content/meta';
 import { clientChecks } from '../../engine/run/clients';
 import { CLIENT_BY_ID } from '../../content/clients';
 import { previewScore } from '../../engine/run/preview';
@@ -595,6 +595,60 @@ export function GoalCard({ e }: { e: RunEngine }) {
   );
 }
 
+/**
+ * REROLL and SIT OUT, pinned above the round goal so they're in view whatever the lineup's length.
+ * Both only work before the clock starts, so they leave once it does; a rule that removes one
+ * (no rerolls left in the budget, the Attendance Policy) removes its button too.
+ */
+export function RunLineupControls({ e }: { e: RunEngine }) {
+  const act = useRun((s) => s.act);
+  useRun((s) => s.version);
+  useTrading((s) => s.version);
+  const st = e.state;
+  const r = st.round;
+  const canSkip = e.canSkip();
+  const showSkip = r.index < 2 && !r.sitOut && !complianceMods(st.config.compliance).noSkips;
+  if (r.clockStarted || r.sitOut || (r.rerolls <= 0 && !showSkip)) return null;
+  return (
+    <div className="run-controls" data-testid="lineup-controls">
+      {r.rerolls > 0 && (
+        <button
+          className="pixel-btn"
+          disabled={r.rerollsUsed >= r.rerolls}
+          onClick={() => (sfx('deal'), void act({ t: 'reroll' }))}
+          data-testid="reroll"
+          data-tip="g:reroll"
+        >
+          REROLL {r.rerolls - r.rerollsUsed} <Kbd>R</Kbd>
+        </button>
+      )}
+      {showSkip && (
+        <button
+          className="pixel-btn"
+          disabled={!canSkip}
+          onClick={() => void act({ t: 'skip' })}
+          data-testid="skip"
+          data-tip-title="Sit this round out (K)"
+          data-tip-body={`No trades for ${BALANCE.run.sitOutDays} trading days while the market moves without you. At the end: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a sit-out; Reviews can't be skipped.`}
+        >
+          ☕ SIT OUT →{' '}
+          {r.skipTag && (
+            <ArtIcon
+              category="tag"
+              id={r.skipTag}
+              name={TAGS[r.skipTag].name}
+              onlyIfUploaded
+              className="skip-tag-art"
+              style={{ width: 18, height: 18 }}
+            />
+          )}
+          {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function RunLeftExtra({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   useRun((s) => s.version);
@@ -626,39 +680,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
   };
   return (
     <div className="run-left">
-      <div className="run-controls">
-        <button
-          className="pixel-btn"
-          disabled={r.clockStarted || r.rerollsUsed >= r.rerolls}
-          onClick={() => (sfx('deal'), void act({ t: 'reroll' }))}
-          data-testid="reroll"
-          data-tip="g:reroll"
-        >
-          REROLL {r.rerolls - r.rerollsUsed} <Kbd>R</Kbd>
-        </button>
-        {r.index < 2 && !r.sitOut && (
-          <button
-            className="pixel-btn"
-            disabled={!canSkip}
-            onClick={() => void act({ t: 'skip' })}
-            data-testid="skip"
-            data-tip-title="Sit this round out (K)"
-            data-tip-body={`No trades for ${BALANCE.run.sitOutDays} trading days while the market moves without you. At the end: −10 stress and ${r.skipTag ? `the ${TAGS[r.skipTag].name}: ${TAGS[r.skipTag].text}` : 'a Tag'}. No shop after a sit-out; Reviews can't be skipped.`}
-          >
-            ☕ SIT OUT →{' '}
-            {r.skipTag && (
-              <ArtIcon
-                category="tag"
-                id={r.skipTag}
-                name={TAGS[r.skipTag].name}
-                onlyIfUploaded
-                className="skip-tag-art"
-                style={{ width: 18, height: 18 }}
-              />
-            )}
-            {r.skipTag ? TAGS[r.skipTag].name.replace(' Tag', '').toUpperCase() : 'TAG'} <Kbd>K</Kbd>
-          </button>
-        )}
+      <div className="run-status">
         {r.sitOut && session && (
           <div className="sitout-banner num" data-testid="sitout">
             <div>

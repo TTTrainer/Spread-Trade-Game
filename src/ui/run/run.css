@@ -320,12 +320,21 @@
   gap: 8px;
   margin-top: 6px;
 }
-.run-controls {
+.run-controls,
+.run-status {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.run-controls .pixel-btn {
+.run-status:empty {
+  display: none;
+}
+/* Pinned above the round goal: the lineup's own buttons, in view before the clock starts. */
+.t-left-pin .run-controls {
+  margin-bottom: 6px;
+}
+.run-controls .pixel-btn,
+.run-status .pixel-btn {
   font-size: 13px;
   padding: 3px 8px;
 }

@@ -37,6 +37,14 @@ test('with market orders off, cashing out and closing the other trade both go th
   await expect(page.getByTestId('market-off')).toBeVisible();
   await expect(page.getByTestId('order-market')).toHaveCount(0);
   await shot(page, '20-market-off-ticket-1920');
+  // The stock's name sits in the chart's top-left corner.
+  const sym = await page.evaluate(() => {
+    const t = (window as any).__stg.trading.getState();
+    return t.session.card(t.selectedCardId ?? t.session.cards[0].id).displaySymbol;
+  });
+  await expect(page.getByTestId('chart-symbol')).toContainText(sym);
+  // Attendance Policy isn't on, so sitting out is offered here (the next test turns it off).
+  await expect(page.getByTestId('skip')).toBeVisible();
   for (const k of ['Alt+1', 'Alt+2']) {
     await page.keyboard.press(k);
     await page.keyboard.press('4');
@@ -81,5 +89,23 @@ test('with market orders off, cashing out and closing the other trade both go th
     })
     .toBe('tally');
   expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});
+
+test('a rule that removes a control removes the button: no sit-out under the Attendance Policy', async () => {
+  test.setTimeout(120_000);
+  const { app, page } = await launchGame();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await page.evaluate(async () => {
+    const w = window as any;
+    await w.__stg.run.getState().newRun({ deskId: 'verticals', seed: 'noskip', compliance: ['no_skip'] });
+    w.__stg.app.getState().go('run');
+    await w.__stg.run.getState().act({ t: 'boardDone' });
+  });
+  await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('reroll')).toBeVisible();
+  await expect(page.getByTestId('skip')).toHaveCount(0);
+  await expect(page.getByTestId('chart-symbol')).toBeVisible();
+  await shot(page, '20-chart-symbol-1366', { width: 1366, height: 768 });
   await app.close();
 });

@@ -11,6 +11,9 @@ import { liveCardId, orderTypeOf, tradeOpen, useTrading } from '../store/trading
 import { useApp } from '../store/app';
 import { useSealed } from '../boss';
 
+/** Structures that buy and sell options together: what approval levels call a spread. */
+const SPREAD_FAMILIES = ['vertical', 'condor', 'calendar'];
+
 export function StructureCards({
   allowed,
   levels,
@@ -20,12 +23,22 @@ export function StructureCards({
 }) {
   const builder = useTrading((s) => s.builder);
   const setStructure = useTrading((s) => s.setStructure);
-  const ids = allowed ?? (Object.keys(STRUCTURES) as StructureId[]);
+  const session = useTrading((s) => s.session);
+  useTrading((s) => s.version);
+  const all = allowed ?? (Object.keys(STRUCTURES) as StructureId[]);
+  // A structure the rules won't let you open isn't offered (less confusing than a dead card).
+  const blocked = session?.spreadsBlocked() ?? false;
+  const ids = blocked ? all.filter((id) => !SPREAD_FAMILIES.includes(STRUCTURES[id].family)) : all;
   return (
     <div className="tray-section structures" data-testid="structure-cards">
       <div className="section-title" data-tip="g:structure">
         Structure
       </div>
+      {blocked && (
+        <div className="market-off num" data-testid="spreads-blocked">
+          Approval levels: spreads need a $2,000 account, so only single-leg trades are offered.
+        </div>
+      )}
       <div className="structure-row">
         {ids.map((id) => (
           <TiltCard

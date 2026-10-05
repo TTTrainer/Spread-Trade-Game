@@ -10,6 +10,7 @@ import { BUCKET_GLYPHS, BUCKET_NAMES } from '../../engine/scoring/calls';
 import { expirationsOf, quotesFor, STRUCTURES } from '../../engine/strategies/structures';
 import type { OptionLeg } from '../../engine/strategies/types';
 import { CONVICTION, convictionQty, convictionStep } from '../../engine/trading/conviction';
+import { maxQtyFor } from '../../engine/trading/plan';
 import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { SnapSlider } from '../components/SnapSlider';
@@ -153,6 +154,10 @@ export function SetupSliders() {
   const equity = session.markedEquityCents();
   const cap = session.config.riskCapPct;
   const perContract = plan?.ok && plan.qty > 0 ? plan.maxLossCents / plan.qty : null;
+  // The contract limit (liquidity rules, a covered call's shares) caps every step's size.
+  const maxQ = Math.min(maxQtyFor(sid), session.maxOrderQty());
+  const stepQty = (c: number) =>
+    perContract ? Math.min(maxQ, convictionQty(perContract, equity, cap, c)) : 0;
   return (
     <div className="tray-section setup" data-testid="setup-sliders">
       <ViewChip />
@@ -299,7 +304,7 @@ export function SetupSliders() {
           value: c.confidence,
           major: c.confidence === 0.7,
           // Each step shows the contracts it buys, so conviction reads as size (and risk).
-          mark: perContract ? `${convictionQty(perContract, equity, cap, c.confidence)}×` : c.label,
+          mark: perContract ? `${stepQty(c.confidence)}×` : c.label,
         }))}
         index={Math.max(0, convIdx)}
         onIndex={(i) => void setConfidence(CONVICTION[i].confidence)}
@@ -310,6 +315,12 @@ export function SetupSliders() {
                 {plan.qty} CONTRACT{plan.qty === 1 ? '' : 'S'}
               </b>{' '}
               <span className="dim">· {convictionStep(confidence).label}</span>
+              {Number.isFinite(maxQ) && plan.qty >= maxQ && (
+                <span className="dim" data-testid="qty-capped">
+                  {' '}
+                  · {maxQ} is the most {sid === 'covered_call' ? 'your shares cover' : 'one order may have'}
+                </span>
+              )}
             </>
           ) : (
             convictionStep(confidence).label

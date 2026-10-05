@@ -42,7 +42,8 @@ import { useSealed } from '../boss';
 import { StrikeHandle } from './StrikeHandle';
 import { DayRecapPanel } from './DayRecap';
 import { ChartZones } from './ChartZones';
-import { formingBar } from './dayPath';
+import { formingBar, priceAt } from './dayPath';
+import { useDayProgress } from './DayPlayer';
 import { AnimatePresence, motion } from 'motion/react';
 
 const toTs = (d: string) => (Date.parse(d) / 1000) as UTCTimestamp;
@@ -600,7 +601,7 @@ export function ChartPanel() {
   return (
     <div className="chart-panel panel" data-testid="chart-panel">
       <div className="chart-host" ref={hostRef} />
-      <div className="chart-legend num">{legend}</div>
+      {cardId && <ChartTitle cardId={cardId} legend={legend} />}
       {drawTool !== 'none' && (
         <div className="chart-drawhint num">
           {drawTool === 'trend' ? 'Click two points for a trendline' : 'Click a price for a horizontal line'}
@@ -648,7 +649,37 @@ export function ChartPanel() {
   );
 }
 
-/** The expiration as a vertical line: solid once the trade is on, dotted while it's a plan. */
+/**
+ * Top left of the chart: whose chart this is, its price and today's move (following the forming
+ * candle while the day plays), then the bar under the cursor.
+ */
+function ChartTitle({ cardId, legend }: { cardId: string; legend: string }) {
+  const session = useTrading((s) => s.session);
+  useTrading((s) => s.version);
+  const p = useDayProgress();
+  if (!session) return null;
+  const card = session.card(cardId);
+  const bars = session.view(cardId).bars();
+  const live = p?.anim.cards[cardId];
+  const px = live ? priceAt(live.path, p.t) : (bars.at(-1)?.close ?? 0);
+  const prev = live ? live.prevClose : (bars.at(-2)?.close ?? px);
+  const chg = prev > 0 ? px / prev - 1 : 0;
+  const up = chg >= 0;
+  const real = !session.config.blind && card.realSymbol !== card.displaySymbol ? card.realSymbol : null;
+  return (
+    <div className="chart-title num" data-testid="chart-symbol">
+      <b className="ct-sym">{card.displaySymbol}</b>
+      {real && <span className="ct-real">{real}</span>}
+      <span className="ct-px">{px.toFixed(2)}</span>
+      <span className={`ct-chg ${up ? 'up-text' : 'down-text'}`}>
+        {up ? '▲' : '▼'} {up ? '+' : '−'}
+        {Math.abs(chg * 100).toFixed(2)}%
+      </span>
+      {legend && <span className="ct-legend">{legend}</span>}
+    </div>
+  );
+}
+
 /** Top left of the chart: are these lines a trade you placed, or one you're still shaping? */
 function TradeBadge({ position, plan }: { position: Position | undefined; plan: TradePlan | null }) {
   const canTrade = useTrading(tradeOpen);

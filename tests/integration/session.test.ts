@@ -206,7 +206,12 @@ describe('trading session', () => {
     });
     expect(r1?.ok).toBe(false);
     expect(r1?.reason).toMatch(/Level 3/);
+    // The builder reads the same rules, so it can hide spreads and cap the size slider.
+    expect(a.s.spreadsBlocked()).toBe(true);
+    expect(a.s.maxOrderQty()).toBe(Number.POSITIVE_INFINITY);
     const b = await mk({ liquidityLimits: true }, 5_000_000);
+    expect(b.s.spreadsBlocked()).toBe(false);
+    expect(b.s.maxOrderQty()).toBe(10);
     const r2 = await b.s.dispatch({
       t: 'place',
       cardId: 'c1',

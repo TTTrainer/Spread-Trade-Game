@@ -37,6 +37,7 @@ import {
   careerBriefAccess,
   GoalCard,
   RunLeftExtra,
+  RunLineupControls,
   RunRightExtra,
   RunTopBar,
 } from '../run/RunParts';
@@ -602,7 +603,12 @@ export function RunScreen() {
         badges={careerBadges(engine, (sym) => sectors[sym] ?? null)}
         briefAccess={careerBriefAccess(engine)}
         leftExtra={<RunLeftExtra e={engine} />}
-        leftPinned={<GoalCard e={engine} />}
+        leftPinned={
+          <>
+            <RunLineupControls e={engine} />
+            <GoalCard e={engine} />
+          </>
+        }
         rightExtra={<RunRightExtra e={engine} />}
       />
     );
