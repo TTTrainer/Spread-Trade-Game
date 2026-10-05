@@ -108,6 +108,65 @@ describe('trading session', () => {
     expect(s.positions[0].brackets.stopPl).toBeCloseTo(-p.openNet, 9);
   });
 
+  it('with market orders off, exits still go through, and a close that cannot leaves its question open', async () => {
+    const s = new TradingSession(src, defaultSessionConfig({ seed: 'no-market', mode: 'sandbox' }));
+    s.config.execution = { ...s.config.execution, marketOrdersDisabled: true };
+    const w = src.allWindows().filter((x) => x.symbol === 'ORGR')[120];
+    await s.dispatch({ t: 'addCard', cardId: 'c1', windowId: w.id });
+    const chain = s.chain('c1')!;
+    const exp = expirationsOf(chain).find((e) => Date.parse(e) - Date.parse(chain.date) >= 28 * 86400000)!;
+    const params = { expiration: exp, delta: 0.3, width: 1 };
+    const plan = s.planFor('c1', 'bull_put', params, 1);
+    const place = (qty: number) =>
+      s.dispatch({
+        t: 'place',
+        cardId: 'c1',
+        structureId: 'bull_put',
+        params,
+        qty,
+        order: { type: 'limit', limit: plan.natural! },
+        earningsAck: true,
+      });
+    // Entries can't use a market order...
+    const blocked = await s.dispatch({
+      t: 'place',
+      cardId: 'c1',
+      structureId: 'bull_put',
+      params,
+      qty: 1,
+      order: { type: 'market' },
+      earningsAck: true,
+    });
+    expect(blocked?.filled).toBe(false);
+    // ...but a market close is sent as a limit at the natural price and fills.
+    expect((await place(1))?.filled).toBe(true);
+    await s.dispatch({ t: 'begin' });
+    await s.dispatch({ t: 'end' });
+    const p1 = s.positions.find((p) => p.status === 'open')!;
+    await s.dispatch({ t: 'close', positionId: p1.id, order: { type: 'market' } });
+    expect(s.position(p1.id)?.status).toBe('closed');
+    // A decision answered with a close that can't go through (a limit far better than the market)
+    // stays open instead of letting the day move on.
+    await place(1);
+    const p2 = s.positions.find((p) => p.status === 'open')!;
+    await s.dispatch({ t: 'begin' });
+    s.decisions.push({
+      id: 'x',
+      positionId: p2.id,
+      kind: 'target_hit',
+      date: s.view('c1').now,
+      title: 'Profit target hit',
+      message: '',
+      options: ['close', 'hold'],
+      planned: 'close',
+    });
+    await s.dispatch({ t: 'decide', dpId: 'x', action: 'close', order: { type: 'limit', limit: 0.001 } });
+    expect(s.position(p2.id)?.status).toBe('open');
+    expect(s.decisions.map((d) => d.id)).toContain('x');
+    await s.dispatch({ t: 'decide', dpId: 'x', action: 'hold' });
+    expect(s.decisions).toHaveLength(0);
+  });
+
   it('records declined stops and blocks nothing else', async () => {
     const s = await playOne('sess-3', false, 'hold');
     expect(s.isDone()).toBe(true);

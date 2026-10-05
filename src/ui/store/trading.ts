@@ -29,6 +29,14 @@ import { intradayPath, strikeTension, type OHLC } from '../trading/dayPath';
 import { crumb } from '../trail';
 import { payoutBusy, usePayout } from './payout';
 
+/** The order type that will go out: a limit whenever this round has market orders off. */
+export function orderTypeOf(
+  builder: Pick<BuilderState, 'orderType'>,
+  session: TradingSession | null,
+): 'limit' | 'market' {
+  return session?.config.execution.marketOrdersDisabled ? 'limit' : builder.orderType;
+}
+
 export interface BuilderState {
   structureId: StructureId;
   expiration: string | null;
@@ -963,6 +971,7 @@ export const useTrading = create<TradingState>((set, get) => {
         const qty = one.ok
           ? Math.min(
               maxQtyFor(builder.structureId),
+              session.maxOrderQty(),
               convictionQty(
                 one.maxLossCents,
                 session.markedEquityCents(),
@@ -1196,6 +1205,7 @@ export const useTrading = create<TradingState>((set, get) => {
               stopMult: null,
             }
         : null;
+      const orderType = orderTypeOf(builder, session);
       const r = await dispatch({
         t: 'place',
         cardId: selectedCardId,
@@ -1210,7 +1220,7 @@ export const useTrading = create<TradingState>((set, get) => {
         },
         legs: builder.legs ?? undefined,
         qty: plan.qty,
-        order: { type: builder.orderType, limit: builder.orderType === 'limit' ? limit : undefined },
+        order: { type: orderType, limit: orderType === 'limit' ? limit : undefined },
         brackets,
         earningsAck: builder.earningsAck,
       });
@@ -1218,7 +1228,7 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx(isCredit ? 'fill' : 'buy');
         // The ticket slams onto the chart and coins fly off the button.
         const st = STRUCTURES[builder.structureId];
-        const fillNet = plan.natural !== null && builder.orderType === 'market' ? plan.natural : limit;
+        const fillNet = plan.natural !== null && orderType === 'market' ? plan.natural : limit;
         const net = isCredit ? (premiumOf(fillNet, plan.legs, spot) ?? premium ?? 0) : Math.abs(fillNet);
         set({
           stamp: {

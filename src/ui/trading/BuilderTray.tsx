@@ -7,7 +7,7 @@ import { sfx } from '../../audio/sfx';
 import { money, pct, price } from '../format';
 import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { liveCardId, tradeOpen, useTrading } from '../store/trading';
+import { liveCardId, orderTypeOf, tradeOpen, useTrading } from '../store/trading';
 import { useApp } from '../store/app';
 import { useSealed } from '../boss';
 
@@ -116,9 +116,12 @@ export function OrderTicket() {
   const premium = premiumOf(mid, plan?.legs ?? [], spot);
   const credit = premium !== null;
   const limit = mid !== null && nat !== null ? mid + (nat - mid) * builder.limitFrac : null;
+  // A round with market orders off takes limits only: the ticket shows just those.
+  const marketOff = !!session?.config.execution.marketOrdersDisabled;
+  const orderType = orderTypeOf(builder, session);
   const prob =
     mid !== null && nat !== null && limit !== null
-      ? builder.orderType === 'market'
+      ? orderType === 'market'
         ? 1
         : limitFillProbability({ mid, natural: nat }, limit, session?.config.execution)
       : 0;
@@ -143,8 +146,10 @@ export function OrderTicket() {
                   ? 'This build has no price today: try another expiration or strike.'
                   : !plan.ok
                     ? plan.reason
-                    : null;
-  const disabled = !plan?.ok || !open || hasPosition || !!runBlock;
+                    : cardId && session
+                      ? session.realismBlock(cardId, plan.legs, plan.qty)
+                      : null;
+  const disabled = !plan?.ok || !open || hasPosition || !!runBlock || (!!plan && !!reason);
   const earnings = plan?.entry?.earningsInside;
   // With the Executor sealing the term, whether earnings fall inside it is sealed too: the toggle
   // is always there, worded for either case.
@@ -187,7 +192,7 @@ export function OrderTicket() {
         </span>
       </div>
       <div className="ticket-grid num">
-        {builder.orderType === 'market' ? (
+        {orderType === 'market' ? (
           <div className="order-simple" data-testid="order-simple">
             <span className="os-market" data-tip="g:order_market">
               MARKET · fills now at {price(nat !== null ? Math.abs(nat) : null)}
@@ -205,17 +210,24 @@ export function OrderTicket() {
           <>
             <div className="order-limit-head">
               <span className="dim">
+                {marketOff ? (
+                  <b className="warn-text" data-testid="market-off">
+                    Market orders are off this round.{' '}
+                  </b>
+                ) : null}
                 A limit names your price: between the middle (MID) and the price you'd get now (NAT). Closer
                 to MID pays you better but may not fill today.
               </span>
-              <button
-                className="linkish"
-                onClick={() => setBuilder({ orderType: 'market' })}
-                data-testid="order-market"
-                data-tip="g:order_market"
-              >
-                ◂ back to market
-              </button>
+              {!marketOff && (
+                <button
+                  className="linkish"
+                  onClick={() => setBuilder({ orderType: 'market' })}
+                  data-testid="order-market"
+                  data-tip="g:order_market"
+                >
+                  ◂ back to market
+                </button>
+              )}
             </div>
             <div className="limit-box">
               <input
@@ -327,13 +339,13 @@ export function OrderTicket() {
               {plan.qty} × {STRUCTURES[builder.structureId].name} on {card?.displaySymbol}
             </div>
             <div>
-              {builder.orderType === 'market'
+              {orderType === 'market'
                 ? 'Market (natural)'
                 : `Limit ${price(limit !== null ? Math.abs(limit) : null)}`}{' '}
               · fill chance {Math.round(prob * 100)}%
             </div>
             <div>
-              {plan.structureId === 'covered_call' ? 'Risk if the stock jumps 25%+' : 'Max loss'}{' '}
+              {plan.structureId === 'covered_call' ? 'Risk at the auto stop' : 'Max loss'}{' '}
               {money(plan.maxLossCents)} · max profit{' '}
               {plan.maxProfitCents === null ? 'unlimited' : money(plan.maxProfitCents)} · POP{' '}
               {pct(plan.metrics?.pop ?? 0, 0)}

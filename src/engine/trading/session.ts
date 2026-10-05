@@ -12,7 +12,14 @@ import { blindTransform, codename, openTransform, type BlindTransform } from '..
 import type { Chain, WindowDef } from '../market/types';
 import { MarketView } from '../market/view';
 import type { Cents } from '../money';
-import { BASE_EXECUTION, attemptFill, restingFill, type ExecutionMods, type OrderType } from '../orders/fill';
+import {
+  BASE_EXECUTION,
+  attemptFill,
+  restingFill,
+  type ExecutionMods,
+  type FillAttempt,
+  type OrderType,
+} from '../orders/fill';
 import { feesFor, pdtAllows } from '../orders/rules';
 import { Rng } from '../rng';
 import { STRUCTURES } from '../strategies/structures';
@@ -434,7 +441,7 @@ export class TradingSession {
       }
       case 'roll': {
         const p = this.mustOpen(a.positionId);
-        const r = rollAction(p, a.legs, a.order, this.actionEnv(p.cardId));
+        const r = rollAction(p, a.legs, this.exitAttempt(p, a.order), this.actionEnv(p.cardId));
         this.replace(r.pos);
         this.pushEvent(
           p,
@@ -599,6 +606,35 @@ export class TradingSession {
     return `${prefix}${this.counter}`;
   }
 
+  /**
+   * Why the realism rules (approval levels, liquidity limits) refuse this order, in plain words, or
+   * null. The ticket asks before you press SELL, and placing checks again.
+   */
+  realismBlock(cardId: string, legs: Leg[], qty: number): string | null {
+    const realism = this.config.realism;
+    if (realism.approvalLevels && isSpread(legs) && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS)
+      return 'Approval levels: your broker requires a Level 3 margin account with at least $2,000 for spreads.';
+    if (!realism.liquidityLimits) return null;
+    if (qty > LIQUIDITY_MAX_CONTRACTS)
+      return `Liquidity limits: at most ${LIQUIDITY_MAX_CONTRACTS} contracts per order.`;
+    const chain = this.chains.get(cardId);
+    const wide = optionLegsOf(legs).some((l) => {
+      const q = chain?.quotes.find(
+        (x) => x.right === l.right && x.strike === l.strike && x.expiration === l.expiration,
+      );
+      const mid = q ? (q.bid + q.ask) / 2 : 0;
+      return !q || mid <= 0 || (q.ask - q.bid) / mid > LIQUIDITY_MAX_SPREAD;
+    });
+    return wide
+      ? "Liquidity limits: a leg's market is too wide to trade (bid/ask over 50% of mid). Pick another strike or expiration."
+      : null;
+  }
+
+  /** The most contracts one order may have under the realism rules. */
+  maxOrderQty(): number {
+    return this.config.realism.liquidityLimits ? LIQUIDITY_MAX_CONTRACTS : Number.POSITIVE_INFINITY;
+  }
+
   /** A covered call always carries its automatic stop, whatever else the order asked for. */
   private bracketsFor(structureId: StructureId, openNet: number, override?: Brackets | null): Brackets {
     const b = this.brackets(openNet, override);
@@ -640,27 +676,8 @@ export class TradingSession {
     };
     if (!plan.ok || plan.mid === null || plan.natural === null || !plan.entry)
       return fail(plan.reason ?? 'This trade cannot be placed.');
-    const realism = this.config.realism;
-    if (realism.approvalLevels && isSpread(plan.legs) && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS)
-      return fail(
-        'Approval levels: your broker requires a Level 3 margin account with at least $2,000 for spreads.',
-      );
-    if (realism.liquidityLimits) {
-      if (a.qty > LIQUIDITY_MAX_CONTRACTS)
-        return fail(`Liquidity limits: at most ${LIQUIDITY_MAX_CONTRACTS} contracts per order.`);
-      const chain = this.chains.get(a.cardId);
-      const wide = optionLegsOf(plan.legs).some((l) => {
-        const q = chain?.quotes.find(
-          (x) => x.right === l.right && x.strike === l.strike && x.expiration === l.expiration,
-        );
-        const mid = q ? (q.bid + q.ask) / 2 : 0;
-        return !q || mid <= 0 || (q.ask - q.bid) / mid > LIQUIDITY_MAX_SPREAD;
-      });
-      if (wide)
-        return fail(
-          'Liquidity limits: one of the legs has a market too wide to trade (bid/ask over 50% of mid).',
-        );
-    }
+    const rules = this.realismBlock(a.cardId, plan.legs, a.qty);
+    if (rules) return fail(rules);
     const bidAsk = this.config.realism.bidAsk;
     const q = { mid: plan.mid, natural: bidAsk ? plan.natural : plan.mid };
     const fill = attemptFill(
@@ -827,6 +844,18 @@ export class TradingSession {
     );
   }
 
+  /**
+   * How an exit (a close or a roll) goes to the market. With market orders off, a market exit is
+   * sent as a limit at the natural price instead: a trade must always be closable.
+   */
+  private exitAttempt(p: Position, order: OrderSpec): FillAttempt {
+    if (order.type === 'market' && this.config.execution.marketOrdersDisabled) {
+      this.pushEvent(p, 'alert', 'Market orders are off: sent as a limit at the natural price.');
+      return { type: 'limit', marketable: true };
+    }
+    return { type: order.type, limit: order.limit, atMid: order.atMid };
+  }
+
   private applyClose(p: Position, order: OrderSpec, reason: Position['exitReason']): boolean {
     if (order.forceNatural) {
       const env = this.actionEnv(p.cardId);
@@ -853,12 +882,7 @@ export class TradingSession {
         return false;
       }
     }
-    const r = closeAction(
-      p,
-      { type: order.type, limit: order.limit, atMid: order.atMid },
-      this.actionEnv(p.cardId),
-      reason ?? 'manual',
-    );
+    const r = closeAction(p, this.exitAttempt(p, order), this.actionEnv(p.cardId), reason ?? 'manual');
     if (!r.fill.filled) {
       this.pushEvent(
         p,
@@ -1081,14 +1105,20 @@ export class TradingSession {
       }
       case 'close': {
         const reason = dp.kind === 'target_hit' ? 'target' : dp.kind === 'stop_hit' ? 'stop' : 'decision';
-        this.applyClose(p, order, reason);
+        // A close that can't go through (a limit that missed, the day-trade rule) leaves the
+        // question open: the day must not move on as if it had been answered.
+        if (!this.applyClose(p, order, reason)) this.reopen(dp);
         break;
       }
       case 'roll':
         if (a.legs) {
-          const r = rollAction(p, a.legs, order, this.actionEnv(p.cardId));
+          const r = rollAction(p, a.legs, this.exitAttempt(p, order), this.actionEnv(p.cardId));
           this.replace(r.pos);
           if (r.fill.filled) await this.view(p.cardId).track(a.legs);
+          else {
+            this.pushEvent(p, 'reject', r.fill.reason ?? 'Roll did not fill.');
+            this.reopen(dp);
+          }
         }
         break;
       case 'sell_shares': {
@@ -1105,6 +1135,12 @@ export class TradingSession {
       case 'adjust':
         break;
     }
+  }
+
+  /** Put an answered decision back at the front: its answer didn't go through. */
+  private reopen(dp: DecisionPoint): void {
+    this.decisionHistory.pop();
+    this.decisions = [dp, ...this.decisions.filter((d) => d.id !== dp.id)];
   }
 
   private async endDay(): Promise<void> {
