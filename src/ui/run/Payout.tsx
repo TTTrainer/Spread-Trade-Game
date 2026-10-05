@@ -25,11 +25,13 @@ import { useApp } from '../store/app';
 import { usePayout, type PayoutItem } from '../store/payout';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
+import { CollectorNotice } from './CollectorNotice';
 
 export function PayoutLayer() {
   const head = usePayout((s) => s.queue[0] ?? null);
   const e = useRun((s) => s.engine);
   if (!head || !e) return null;
+  if (head.kind === 'interest') return <CollectorNotice key={head.id} item={head} />;
   return <Payout key={head.id} item={head} e={e} />;
 }
 
@@ -81,7 +83,7 @@ function fireOnRail(id: string, text: string, op: TraceRow['op']): void {
   setTimeout(() => f.remove(), 1000);
 }
 
-function Payout({ item, e }: { item: PayoutItem; e: RunEngine }) {
+function Payout({ item, e }: { item: Extract<PayoutItem, { kind: 'trade' }>; e: RunEngine }) {
   const t = item.tally;
   const speed = useApp((s) => s.settings.game.payoutSpeed ?? 'normal');
   const reduced = useApp((s) => s.settings.display.reducedMotion);

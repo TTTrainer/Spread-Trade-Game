@@ -16,28 +16,28 @@ export interface TrophyDef {
 export const BOSS_TROPHIES: Record<BossId, TrophyDef> = {
   controller: {
     name: 'Audited Books',
-    text: 'Stress gains are 10% smaller for the rest of the run.',
-    passive: { stressGainMult: 0.9 },
+    text: 'Stress gains are 20% smaller for the rest of the run.',
+    passive: { stressGainMult: 0.8 },
   },
   margin_clerk: {
     name: 'Liquidity Line',
-    text: 'Your per-trade risk cap is 10% larger.',
-    passive: { riskCapMult: 1.1 },
+    text: 'Your per-trade risk cap is 15% larger.',
+    passive: { riskCapMult: 1.15 },
   },
   underwriter: {
     name: 'Reinsurance Treaty',
-    text: 'The Max-Loss Line sits 1% further away.',
-    passive: { maxLossLineDelta: 0.01 },
+    text: 'The Max-Loss Line sits 5% further away.',
+    passive: { maxLossLineDelta: 0.05 },
   },
   landlord: {
     name: 'Rent Roll',
-    text: 'Interest pays up to $2 more each round.',
-    passive: { interestCapAdd: 2 },
+    text: 'Interest pays up to $3 more each round.',
+    passive: { interestCapAdd: 3 },
   },
   early_retiree: {
     name: 'FIRE Number',
-    text: 'Interest pays up to $1 more, and shop rerolls cost $1 less.',
-    passive: { interestCapAdd: 1, rerollCostDelta: -1 },
+    text: 'Interest pays up to $2 more, and shop rerolls cost $1 less.',
+    passive: { interestCapAdd: 2, rerollCostDelta: -1 },
   },
   tax_man: {
     name: 'Loss Harvest',
@@ -56,18 +56,18 @@ export const BOSS_TROPHIES: Record<BossId, TrophyDef> = {
   },
   shell_company: {
     name: 'Nominee Director',
-    text: 'Shop rerolls cost $1 less.',
-    passive: { rerollCostDelta: -1 },
+    text: 'Shop rerolls cost $2 less.',
+    passive: { rerollCostDelta: -2 },
   },
   executor: {
     name: 'Living Trust',
-    text: 'Stress gains are 10% smaller for the rest of the run.',
-    passive: { stressGainMult: 0.9 },
+    text: 'Stress gains are 20% smaller for the rest of the run.',
+    passive: { stressGainMult: 0.8 },
   },
   collector: {
     name: 'Debt Paid in Full',
-    text: 'Interest pays up to $1 more, and the Max-Loss Line sits 0.5% further away.',
-    passive: { interestCapAdd: 1, maxLossLineDelta: 0.005 },
+    text: 'Interest pays up to $2 more, and the Max-Loss Line sits 2.5% further away.',
+    passive: { interestCapAdd: 2, maxLossLineDelta: 0.025 },
   },
   rebalancer: {
     name: 'Board Seat',

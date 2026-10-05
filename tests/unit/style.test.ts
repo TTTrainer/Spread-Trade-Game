@@ -38,8 +38,8 @@ describe('boss style bonuses', () => {
     expect(styleState('three_wins', [t(), t()], false)).toBe('on_track');
     expect(styleState('three_wins', [t(), t()], true)).toBe('broken');
     expect(styleState('three_wins', [t(), t(), t()], false)).toBe('met');
-    expect(styleState('hold_wins', [t({ daysHeld: 2 })], false)).toBe('broken');
-    expect(styleState('hold_wins', [t({ daysHeld: 3 })], false)).toBe('met');
+    expect(styleState('hold_wins', [t({ daysHeld: 5 })], false)).toBe('broken');
+    expect(styleState('hold_wins', [t({ daysHeld: 6 })], false)).toBe('met');
     const loss = t({ realizedCents: -100, exitReason: 'stop' });
     expect(styleState('no_streak', [loss, t(), loss], false)).toBe('met');
     expect(styleState('no_streak', [t(), loss, loss], false)).toBe('broken');

@@ -249,6 +249,11 @@ interface TradingState {
   setStructure: (id: StructureId) => void;
   reverse: () => void;
   plan: () => TradePlan | null;
+  /**
+   * The widest spread (in strikes, up to 8) whose single contract fits the risk cap: the Width
+   * slider stops there, so a tight cap (the Margin Clerk's 5%) never leaves 1 contract over it.
+   */
+  maxWidth: () => number;
   setCall: (bucket: Bucket) => Promise<void>;
   setConfidence: (c: number) => Promise<void>;
   place: (side: 'buy' | 'sell') => Promise<boolean>;
@@ -352,6 +357,7 @@ export function tradeRow(
 let feedId = 0;
 let loopToken = 0;
 // Planning runs Edge Rank over the whole chain; cache it per (session state, builder).
+let widthCache: { key: string; value: number } = { key: '', value: 8 };
 let planCache: { key: string; value: TradePlan | null } = { key: '', value: null };
 
 function sleep(ms: number): Promise<void> {
@@ -942,6 +948,52 @@ export const useTrading = create<TradingState>((set, get) => {
         sfx('whoosh');
         set({ builder: { ...b, structureId: next, legs: null, anchor: null, callAnchor: null } });
       }
+    },
+    maxWidth: () => {
+      const { session, builder, version } = get();
+      const selectedCardId = liveCardId(get());
+      if (!session || !selectedCardId || !builder.expiration) return 8;
+      const key = JSON.stringify([
+        session.config.seed,
+        version,
+        selectedCardId,
+        builder.structureId,
+        builder.expiration,
+        builder.backExpiration,
+        builder.delta,
+        builder.anchor,
+        builder.callAnchor,
+        builder.stopMult,
+      ]);
+      if (widthCache.key === key) return widthCache.value;
+      let value = 1;
+      try {
+        for (let w = 8; w >= 1; w--) {
+          const one = session.planFor(
+            selectedCardId,
+            builder.structureId,
+            {
+              expiration: builder.expiration,
+              backExpiration: builder.backExpiration ?? undefined,
+              delta: builder.delta,
+              width: w,
+              anchor: builder.anchor ?? undefined,
+              callAnchor: builder.callAnchor ?? undefined,
+            },
+            1,
+            undefined,
+            builder.stopMult,
+          );
+          if (one.metrics && one.risk?.ok) {
+            value = w;
+            break;
+          }
+        }
+      } catch {
+        value = 8;
+      }
+      widthCache = { key, value };
+      return value;
     },
     plan: () => {
       const { session, builder, version, confidence } = get();

@@ -4,6 +4,7 @@
  * snaps to real, listed values, and everything the trade depends on updates as you move them.
  */
 
+import { useEffect } from 'react';
 import { diffDays } from '../../engine/calendar';
 import { BUCKET_GLYPHS, BUCKET_NAMES } from '../../engine/scoring/calls';
 import { expirationsOf, quotesFor, STRUCTURES } from '../../engine/strategies/structures';
@@ -95,6 +96,13 @@ export function SetupSliders() {
   const inTutorial = useRun((s) => s.engine?.state.config.mode === 'tutorial');
   // The Executor seals expirations until the trade is open: evenly spaced, unlabeled stops.
   const dteSealed = useSealed('dte');
+  // The Width slider ends at the widest spread whose one contract fits the risk cap; a width
+  // past it (a new card, a tighter boss cap) steps back to it.
+  const maxWidth = useTrading((st) => st.maxWidth)();
+  useEffect(() => {
+    if (!builder.legs && !NO_WIDTH.includes(builder.structureId) && builder.width > maxWidth)
+      setBuilder({ width: maxWidth });
+  }, [maxWidth, builder.width, builder.structureId]);
   if (!session || !cardId) return null;
   const sid = builder.structureId;
   // The first time a structure is picked, each control says what it moves for that structure.
@@ -260,10 +268,24 @@ export function SetupSliders() {
           accent={anchorLong ? 'magenta' : 'cyan'}
           hint={hint('width')}
           disabled={off}
-          options={[1, 2, 3, 4, 5, 6, 7, 8].map((w) => ({ value: w, major: w === 2, mark: `${w}` }))}
-          index={Math.max(0, Math.min(7, builder.width - 1))}
+          options={Array.from({ length: maxWidth }, (_, i) => i + 1).map((w) => ({
+            value: w,
+            major: w === 2,
+            mark: `${w}`,
+          }))}
+          index={Math.max(0, Math.min(maxWidth - 1, builder.width - 1))}
           onIndex={(i) => setBuilder({ width: i + 1, legs: null })}
-          readout={plan?.metrics ? `$${price(plan.metrics.width)} wide` : `${builder.width} strikes`}
+          readout={
+            <>
+              {plan?.metrics ? `$${price(plan.metrics.width)} wide` : `${builder.width} strikes`}
+              {maxWidth < 8 && (
+                <span className="dim" data-testid="width-capped">
+                  {' '}
+                  · max {maxWidth} at your {pct(session.config.riskCapPct, 0)} risk cap
+                </span>
+              )}
+            </>
+          }
         />
       )}
       <SnapSlider

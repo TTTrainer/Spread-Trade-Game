@@ -321,6 +321,66 @@ describe('boss goals', () => {
     expect(o.race()).toBeNull();
   }, 60_000);
 
+  it('the Collector charges interest each day a losing trade sits at a strike you sold', async () => {
+    // Near-the-money bull puts on every card: some get tested within a few days.
+    let charged: RunEngine | null = null;
+    for (const seed of ['collect-1', 'collect-2', 'collect-3', 'collect-4']) {
+      const e = await inBossRound('collector', seed);
+      expect(e.rule().interestRate).toBe(0.05);
+      const s = e.session!;
+      for (const c of s.cards.slice(0, 3)) {
+        const chain = s.chain(c.id)!;
+        const exp = expirationsOf(chain).find((x) => Date.parse(x) - Date.parse(chain.date) > 20 * 86400000)!;
+        await e.dispatch({ t: 's', a: { t: 'call', cardId: c.id, bucket: 3, confidence: 0.6 } });
+        for (const width of [2, 1]) {
+          const plan = s.planFor(c.id, 'bull_put', { expiration: exp, delta: 0.45, width }, 1);
+          if (!plan.ok) continue;
+          await e.dispatch({
+            t: 's',
+            a: {
+              t: 'place',
+              cardId: c.id,
+              structureId: 'bull_put',
+              params: { expiration: exp, delta: 0.45, width },
+              qty: 1,
+              order: { type: 'market' },
+              brackets: null,
+              earningsAck: true,
+            },
+          });
+          break;
+        }
+      }
+      for (let i = 0; i < 25 && e.state.phase === 'round' && !e.state.round.interest; i++) {
+        const meter = e.state.round.meter;
+        await day(e);
+        const bill = e.events.find((x) => x.kind === 'interest');
+        if (bill) {
+          // The bill is what came off the score, trade by trade.
+          const items = bill.interest!.items;
+          const total = items.reduce((a, x) => a + x.points, 0);
+          expect(bill.points).toBe(-total);
+          expect(e.state.round.interest).toBe(total);
+          expect(e.state.round.meter).toBeLessThanOrEqual(meter - total + 1e-9);
+          for (const x of items) {
+            const p = e.session!.position(x.positionId)!;
+            expect(x.plCents).toBeLessThan(0);
+            expect(x.points).toBe(
+              Math.round((0.05 * p.entry.maxLossCents * 10_000) / e.state.round.startEquityCents),
+            );
+            expect(x.days).toBe(1);
+          }
+          expect(e.bossStyle()?.state).toBe('broken');
+        }
+      }
+      if (e.state.round.interest) {
+        charged = e;
+        break;
+      }
+    }
+    expect(charged).not.toBeNull();
+  }, 120_000);
+
   it('a boss round reports its style and pays for it when met', async () => {
     const e = await inBossRound('underwriter', 'goal-style');
     expect(e.bossStyle()).toMatchObject({ id: 'no_loser', state: 'on_track', cash: BALANCE.run.styleCash });
@@ -343,7 +403,7 @@ describe('boss rewards', () => {
     const labels = e.state.history.length ? e.state.round.payouts.map((p) => p.label) : [];
     expect(labels).toContain('Boss beaten: The Underwriter');
     expect(e.state.trophies).toEqual(['underwriter']);
-    expect(e.passives().maxLossLineDelta).toBeCloseTo(0.01);
+    expect(e.passives().maxLossLineDelta).toBeCloseTo(0.05);
     expect(e.state.cash).toBeGreaterThan(cash0);
     expect(e.state.phase).toBe('shop');
     const sp = e.state.shop?.spoils;

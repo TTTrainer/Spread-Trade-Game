@@ -60,18 +60,17 @@ describe('boss twists in the score', () => {
     expect(points({ reviewId: 'gap_risk', bossId: 'underwriter' })).toBe(points({}));
   });
 
-  it('Collector: each loss in an unbroken streak costs 25% more than the last', () => {
-    const base = points({}, loser);
-    const at = (n: number) => points({ reviewId: 'vol_spike', bossId: 'collector', lossStreak: n }, loser);
-    expect(at(0)).toBe(base);
-    // (points round once at the end, so allow a point of rounding)
-    expect(Math.abs(at(1) - base * 1.25)).toBeLessThanOrEqual(1);
-    expect(Math.abs(at(2) - base * 1.5625)).toBeLessThanOrEqual(1);
+  it("Collector: a trade's own points are untouched (his interest is charged day by day)", () => {
+    const collector = { reviewId: 'vol_spike' as const, bossId: 'collector' as const };
+    expect(points(collector, loser)).toBe(points({}, loser));
+    expect(points(collector)).toBe(points({}));
+    expect(roundRule('vol_spike', 'collector').interestRate).toBe(0.05);
   });
 
   it('Tax Man: quick wins pay 25% less; held ones and losses are untouched', () => {
-    const quick = facts({ daysOpen: 2 });
-    const held = facts({ daysOpen: 3 });
+    // Within the first week (5 trading days) is quick; the 6th day is held.
+    const quick = facts({ daysOpen: 5 });
+    const held = facts({ daysOpen: 6 });
     const tax = { reviewId: 'assignment_week' as const, bossId: 'tax_man' as const };
     expect(Math.abs(points(tax, quick) - points({}, quick) * 0.75)).toBeLessThanOrEqual(1);
     expect(points(tax, held)).toBe(points({}, held));
@@ -103,7 +102,9 @@ describe('showdown tiers and trophies', () => {
     // The text follows the numbers.
     expect(twistLine('underwriter', 0)).toBe(BOSSES.underwriter.twistText);
     expect(twistLine('underwriter', 1)).toContain('x2.5');
-    expect(twistLine('tax_man', 1)).toContain('first 3 trading days');
+    expect(twistLine('tax_man', 1)).toContain('first 6 trading days');
+    expect(showdownTwist(BOSSES.collector.twist, 1)).toEqual({ kind: 'interest', rate: 0.075 });
+    expect(twistLine('collector', 1)).toContain('7.5%');
     expect(showdownLabel(0)).toBeNull();
     expect(showdownLabel(2)).toBe('SHOWDOWN II');
     for (const id of BOSS_IDS) expect(twistLine(id, 3).length, id).toBeLessThanOrEqual(90);

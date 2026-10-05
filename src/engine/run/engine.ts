@@ -44,6 +44,7 @@ import type {
   VoucherDef,
 } from '../../content/types';
 import { lastMark } from '../lifecycle/position';
+import { testedShort } from './collector';
 import type { Position } from '../lifecycle/types';
 import type { MarketDataSource } from '../market/source';
 import type { WindowDef } from '../market/types';
@@ -51,7 +52,7 @@ import { formatCents, type Cents } from '../money';
 import { BASE_EXECUTION, combineImprove, type ExecutionMods } from '../orders/fill';
 import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
-import { runScore, winQuality } from '../scoring/mult';
+import { pnlChips, runScore, winQuality } from '../scoring/mult';
 import { STRUCTURES } from '../strategies/structures';
 import type { StructureId } from '../strategies/types';
 import { buildDebrief } from '../trading/debrief';
@@ -78,6 +79,7 @@ import {
 import type {
   DevOp,
   ExitPlan,
+  InterestItem,
   RoundState,
   RunAction,
   RunConfig,
@@ -683,6 +685,7 @@ export class RunEngine {
         realizedCents: p.realizedCents ?? 0,
         exitReason: p.exitReason ?? null,
         daysHeld: Math.max(0, p.marks.length - 1),
+        interestDays: this.state.round.interestDays?.[p.id] ?? 0,
       }));
   }
 
@@ -1006,6 +1009,7 @@ export class RunEngine {
     }
     if (hadOrder) r.ticketsUsed = Math.max(0, r.ticketsUsed - 1);
     if (sa.t === 'end') this.afterDayClose();
+    if (sa.t === 'end' && r.bossId) this.chargeInterest(s);
     if (sa.t === 'end' && r.bossId && this.rule().beatSpy) r.race = [...(r.race ?? []), raceNow(s)];
     if (sa.t === 'end' && duel && this.rival)
       r.duelRace = [...(r.duelRace ?? []), { you: raceNow(s).you, rival: this.rival.pl() }];
@@ -1019,6 +1023,48 @@ export class RunEngine {
     s.holdOpen = this.holdOpen();
     if (r.clockStarted && s.isDone()) await this.settleRound();
     return res;
+  }
+
+  /**
+   * The Collector: at each close, every losing trade whose price sits at or past a strike you sold
+   * (or within half a percent of it) is charged interest on its risk, taken off the score. Game
+   * layer only: the trade, its P/L and the ledger are untouched.
+   */
+  private chargeInterest(s: TradingSession): void {
+    const rate = this.rule().interestRate;
+    if (!rate) return;
+    const r = this.state.round;
+    const items: InterestItem[] = [];
+    for (const p of s.openPositions()) {
+      const m = lastMark(p);
+      if (!m || m.plCents >= 0) continue;
+      const hit = testedShort(p.legs, m.spot);
+      if (!hit) continue;
+      const points = Math.round(pnlChips(rate * p.entry.maxLossCents, r.startEquityCents));
+      if (points <= 0) continue;
+      r.interestDays = { ...(r.interestDays ?? {}), [p.id]: (r.interestDays?.[p.id] ?? 0) + 1 };
+      r.interest = (r.interest ?? 0) + points;
+      r.meter -= points;
+      items.push({
+        positionId: p.id,
+        symbol: p.symbol,
+        strike: hit.strike,
+        right: hit.right,
+        spot: m.spot,
+        plCents: m.plCents,
+        riskCents: p.entry.maxLossCents,
+        points,
+        days: r.interestDays[p.id],
+      });
+    }
+    if (!items.length) return;
+    const total = items.reduce((a, x) => a + x.points, 0);
+    this.events.push({
+      kind: 'interest',
+      text: `The Collector: −${total} points of interest.`,
+      points: -total,
+      interest: { items, rate, day: s.dayIndex },
+    });
   }
 
   private cartState(id: string): CartState {
@@ -2030,7 +2076,7 @@ export class RunEngine {
     st.shop = { items, rerolls: 0, freeRerolls: fx.freeRerolls };
     if (st.spoilsDue) {
       // The boss's spoils: three free cartridges you don't own and the shop isn't showing, the
-      // first at least Uncommon.
+      // first a Rare (an Uncommon if no Rare is left).
       st.spoilsDue = false;
       const srng = this.rng(`spoils:q${st.quarter}`);
       const ids: string[] = [];
@@ -2038,7 +2084,11 @@ export class RunEngine {
         const pool = cartridgePool(st).filter(
           (c) => !ids.includes(c.id) && !items.some((x) => x.kind === 'cartridge' && x.id === c.id),
         );
-        const c = pickCartridge(pool, srng, st.config.deskId, i === 0 ? 'U' : undefined);
+        const c =
+          i === 0
+            ? (pickCartridge(pool, srng, st.config.deskId, 'R') ??
+              pickCartridge(pool, srng, st.config.deskId, 'U'))
+            : pickCartridge(pool, srng, st.config.deskId);
         if (c) ids.push(c.id);
       }
       const trophy = st.spoilsTrophy ?? null;

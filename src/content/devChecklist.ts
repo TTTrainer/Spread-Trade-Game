@@ -66,7 +66,7 @@ export const DEV_CHECKS: DevCheck[] = [
   boss(
     'margin_clerk',
     'The Margin Clerk',
-    'Your risk per trade is half; the builder shows how much is held in reserve.',
+    'Your risk per trade is half (5%); the Width slider stops at the widest spread whose one contract fits, so the smallest size never goes over.',
   ),
   boss('underwriter', 'The Underwriter', 'A losing trade costs double the points.'),
   boss(
@@ -82,7 +82,7 @@ export const DEV_CHECKS: DevCheck[] = [
   boss(
     'tax_man',
     'The Tax Man',
-    'A win closed in its first 2 trading days scores 25% less; the trade card counts the days down.',
+    'A win closed within its first week (5 trading days) scores 25% less; the trade card counts the days down.',
   ),
   boss('bursar', 'The Bursar', 'Your leftmost cartridge is stamped TUITION and does nothing this round.'),
   boss(
@@ -99,7 +99,7 @@ export const DEV_CHECKS: DevCheck[] = [
   boss(
     'collector',
     'The Collector',
-    'Each loss in a row costs 25% more; the banner shows the next multiplier.',
+    'Leave a losing trade at or past a strike you sold at a close: an INTEREST NOTICE screen lists it and takes 5% of its risk off your score each day (PAY with Enter). Close it and the interest stops.',
   ),
   boss(
     'rebalancer',
@@ -117,7 +117,7 @@ export const DEV_CHECKS: DevCheck[] = [
     id: 'rewards-spoils',
     group: 'Rewards',
     title: 'Boss rewards',
-    look: 'The tally pays the boss bounty; the shop opens with the spoils (take 1 of 3 free cartridges) and the trophy appears on YOUR DESK.',
+    look: 'The tally pays the $8 bounty; the shop opens with the trophy screen (what it changed, before → after), then the spoils (1 of 3 free cartridges, the first a Rare), and the trophy sits on YOUR DESK.',
     setup: { run: true, closeMenu: true, boss: 'underwriter', clearReview: true },
   },
   {

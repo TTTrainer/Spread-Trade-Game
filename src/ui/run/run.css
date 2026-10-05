@@ -2627,8 +2627,8 @@
   box-shadow: 3px 3px 0 #000;
 }
 .boss-race svg {
-  width: 220px;
-  height: 46px;
+  width: 320px;
+  height: 80px;
 }
 .br-zero {
   stroke: var(--line);
@@ -2655,7 +2655,7 @@
 .br-legend {
   display: flex;
   flex-direction: column;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.15;
   white-space: nowrap;
 }
@@ -2738,11 +2738,11 @@
     font-size: 13px;
   }
   .boss-race svg {
-    width: 140px;
-    height: 34px;
+    width: 220px;
+    height: 56px;
   }
   .br-legend {
-    font-size: 13px;
+    font-size: 15px;
   }
 }
 
@@ -3304,8 +3304,8 @@
   flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: 13px;
+  gap: 4px 12px;
+  font-size: 15px;
   color: var(--text-dim);
 }
 .duel-book b {
@@ -3644,5 +3644,131 @@
   }
   .po-cart {
     width: 104px;
+  }
+}
+
+/* The Collector's interest notice: an overdue bill in his colors. */
+.notice-back {
+  position: fixed;
+  inset: 0;
+  z-index: 620;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--boss-tint, #000) 72%, transparent);
+}
+.notice {
+  position: relative;
+  width: min(820px, 96vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px 18px;
+  border: 3px solid var(--boss-accent, var(--down));
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(255, 122, 200, 0.07) 27px 28px),
+    color-mix(in srgb, var(--bg-1) 94%, #000);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 40px color-mix(in srgb, var(--boss-accent, var(--down)) 35%, transparent);
+}
+.nt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  /* Clear of the PAST DUE stamp on the corner. */
+  padding-right: 170px;
+}
+.nt-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--boss-accent, var(--down));
+  text-shadow: 3px 3px 0 #000;
+}
+.nt-day {
+  margin-left: auto;
+  font-size: 20px;
+  color: var(--text-dim);
+}
+.nt-line {
+  margin: 0;
+  font-size: 17px;
+}
+.nt-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nt-row {
+  display: grid;
+  grid-template-columns: 70px 1fr auto auto 64px;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--boss-accent, var(--down));
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 18px;
+}
+.nt-sym {
+  font-weight: 400;
+  color: var(--cyan);
+}
+.nt-pts {
+  font-weight: 400;
+  text-align: right;
+  color: var(--down);
+}
+.nt-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 6px 8px 0;
+  border-top: 2px dashed var(--line-bright);
+  font-size: 18px;
+  letter-spacing: 0.1em;
+}
+.nt-total b {
+  font-weight: 400;
+  font-size: 40px;
+  color: var(--down);
+  text-shadow: 3px 3px 0 #000;
+}
+.nt-stamp {
+  position: absolute;
+  right: -18px;
+  top: -26px;
+  background: color-mix(in srgb, var(--bg-1) 90%, #000);
+  box-shadow: 3px 3px 0 #000;
+  padding: 2px 12px;
+  border: 4px solid var(--down);
+  color: var(--down);
+  font-family: var(--font-display);
+  font-size: 34px;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.nt-tip {
+  margin: 0;
+  font-size: 15px;
+}
+.nt-pay {
+  align-self: center;
+  min-width: 240px;
+  font-size: 20px;
+}
+@media (max-width: 1500px) {
+  .nt-title {
+    font-size: 21px;
+  }
+  .nt-row {
+    font-size: 16px;
+    grid-template-columns: 60px 1fr auto auto 54px;
+  }
+  .nt-total b {
+    font-size: 32px;
+  }
+  .nt-stamp {
+    font-size: 26px;
   }
 }

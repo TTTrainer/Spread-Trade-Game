@@ -17,7 +17,8 @@ export type StyleId =
   | 'all_types_green'
   | 'no_stop'
   | 'no_expiry'
-  | 'no_streak';
+  | 'no_streak'
+  | 'no_interest';
 
 /** What a style needs to know about one trade (open or closed). */
 export interface StyleTrade {
@@ -27,6 +28,8 @@ export interface StyleTrade {
   exitReason: ExitReason | null;
   /** Trading days it was held (so far, for an open one). */
   daysHeld: number;
+  /** Days the Collector charged it interest. */
+  interestDays?: number;
 }
 
 export type StyleState = 'met' | 'on_track' | 'broken';
@@ -36,12 +39,13 @@ export const STYLE_TEXT: Record<StyleId, string> = {
   green: 'Finish the round green',
   no_loser: 'Not one losing trade',
   three_wins: 'Win 3 trades',
-  hold_wins: 'Every win held at least 3 trading days',
+  hold_wins: 'Every win held at least 6 trading days',
   two_wins: 'Win 2 trades',
   all_types_green: 'Every structure you trade makes money',
   no_stop: 'No trade stopped out',
   no_expiry: 'Close every trade yourself before it expires',
   no_streak: 'Never two losses in a row',
+  no_interest: "Never pay the Collector a day's interest",
 };
 
 /**
@@ -69,7 +73,7 @@ export function styleState(id: StyleId, trades: StyleTrade[], final: boolean): S
     case 'two_wins':
       return wins.length >= 2 ? 'met' : final ? 'broken' : 'on_track';
     case 'hold_wins':
-      if (wins.some((t) => t.daysHeld < 3)) return 'broken';
+      if (wins.some((t) => t.daysHeld < 6)) return 'broken';
       return done(wins.length > 0 && closed.length === trades.length);
     case 'all_types_green': {
       const byType = new Map<StructureId, number>();
@@ -87,6 +91,9 @@ export function styleState(id: StyleId, trades: StyleTrade[], final: boolean): S
     case 'no_streak':
       for (let i = 1; i < closed.length; i++)
         if (closed[i].realizedCents < 0 && closed[i - 1].realizedCents < 0) return 'broken';
+      return done(closed.length > 0 && closed.length === trades.length);
+    case 'no_interest':
+      if (trades.some((t) => (t.interestDays ?? 0) > 0)) return 'broken';
       return done(closed.length > 0 && closed.length === trades.length);
   }
 }

@@ -104,6 +104,9 @@ export interface RoundState {
   race?: { you: number; spy: number }[];
   /** The duel at each day's close: your P/L and Chad's. */
   duelRace?: { you: number; rival: number }[];
+  /** The Collector: points of interest charged so far this round, and days charged per trade. */
+  interest?: number;
+  interestDays?: Record<string, number>;
   /** The duel's result, when the round settles. */
   duel?: { you: number; rival: number; won: boolean };
   /** The boss's style bonus was earned (set when the round settles). */
@@ -350,12 +353,29 @@ export type DevOp =
   /** Straight to this quarter's Review with this boss (from a Month before its clock starts). */
   | { k: 'boss'; id: BossId };
 
+/** One trade's interest on a Collector day. */
+export interface InterestItem {
+  positionId: string;
+  symbol: string;
+  /** The sold strike the price is at or past, and which side. */
+  strike: number;
+  right: 'C' | 'P';
+  spot: number;
+  plCents: number;
+  riskCents: number;
+  /** Points taken off the score today, and the days this trade has been charged so far. */
+  points: number;
+  days: number;
+}
+
 export interface RunEvent {
-  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say';
+  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say' | 'interest';
   text: string;
   points?: number;
   /** For 'say': who speaks and how they look. */
   line?: Line;
+  /** For 'interest': the Collector's bill for the day. */
+  interest?: { items: InterestItem[]; rate: number; day: number };
 }
 
 export interface RunSave {

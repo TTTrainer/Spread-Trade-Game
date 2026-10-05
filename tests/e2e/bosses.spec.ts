@@ -225,7 +225,7 @@ test('beating a boss: the trophy on its own screen, then three free spoils, then
     .match(/(\d+)%→(\d+)%/)!
     .slice(1)
     .map(Number);
-  expect(lineAfter - lineBefore).toBe(1);
+  expect(lineAfter - lineBefore).toBe(5);
   await page.waitForTimeout(500);
   await shot(page, '17-boss-trophy-1920');
   await shot(page, '17-boss-trophy-1366', { width: 1366, height: 768 });
@@ -324,6 +324,59 @@ test('the Early Retiree duel: Chad trades the same cards in his own book, live b
   await page.waitForTimeout(800);
   await shot(page, '17-boss-duel-1920');
   await shot(page, '17-boss-duel-1366', { width: 1366, height: 768 });
+  expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});
+
+test('the Collector: a losing trade left at its strike at the close gets an interest notice', async () => {
+  test.setTimeout(240_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  await expect(page.getByTestId('title-screen')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__stg !== undefined);
+  await page.evaluate(() =>
+    (window as any).__stg.app.getState().updateSettings((x: any) => ({
+      ...x,
+      game: { ...x.game, ffSecondsPerDay: 0.2, dayPace: 'step', pauseOnTest: false, payoutSpeed: 'fast' },
+    })),
+  );
+  await faceBoss(page, 'collector', 'e2e-collect');
+  await expect(page.getByTestId('boss-live')).toContainText('paid −0');
+  // Near-the-money bull puts on three cards, then days until one is charged.
+  for (const k of ['Alt+1', 'Alt+2', 'Alt+3']) {
+    await page.keyboard.press(k);
+    await page.keyboard.press('4');
+    await page.evaluate(() => (window as any).__stg.trading.getState().setBuilder({ delta: 0.45 }));
+    await page.keyboard.press('Alt+S');
+    await page.waitForTimeout(300);
+  }
+  const notice = page.getByTestId('collector-notice');
+  for (let i = 0; i < 30; i++) {
+    if (await notice.isVisible().catch(() => false)) break;
+    const phase = await page.evaluate(() => (window as any).__stg.run.getState().engine.state.phase);
+    if (phase !== 'round') break;
+    const x = page.locator('.dr-x');
+    if (await x.isVisible().catch(() => false)) await x.click();
+    const hold = page.getByTestId('dp-hold');
+    if (await hold.isVisible().catch(() => false)) {
+      await hold.click();
+      continue;
+    }
+    await page.evaluate(() => (window as any).__stg.trading.getState().nextDay());
+    await page.waitForTimeout(400);
+  }
+  await expect(notice).toBeVisible();
+  await expect(page.getByTestId('notice-rows')).toContainText('sold put');
+  await page.waitForTimeout(700);
+  await shot(page, '21-collector-notice-1920');
+  await shot(page, '21-collector-notice-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const owed = await page.evaluate(() => (window as any).__stg.run.getState().engine.state.round.interest);
+  expect(owed).toBeGreaterThan(0);
+  await page.keyboard.press('Enter');
+  await expect(notice).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.getByTestId('boss-live')).toContainText(`paid −${owed.toLocaleString()}`);
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });

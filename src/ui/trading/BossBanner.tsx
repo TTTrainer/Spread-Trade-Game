@@ -4,6 +4,8 @@
  * cap, the card the Bursar is holding). Nothing shows outside a boss round.
  */
 
+import { lastMark } from '../../engine/lifecycle/position';
+import { testedShort } from '../../engine/run/collector';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { useActiveBoss } from '../boss';
 import { pct, pnlText } from '../format';
@@ -25,7 +27,14 @@ export function BossBanner() {
   let live: string | null = null;
   const goal = e.secondGoal();
   const race = e.race();
-  if (rule.lossStreakStep !== undefined) {
+  if (rule.interestRate !== undefined) {
+    // What he has taken, and the losing trades sitting at a strike now (charged at the close).
+    const due = (session?.openPositions() ?? []).filter((p) => {
+      const m = lastMark(p);
+      return !!m && m.plCents < 0 && !!testedShort(p.legs, m.spot);
+    }).length;
+    live = `paid −${(e.state.round.interest ?? 0).toLocaleString()}${due ? ` · ${due} at a strike: charged at the close` : ''}`;
+  } else if (rule.lossStreakStep !== undefined) {
     const n = e.lossStreak();
     live = `next loss x${(rule.lossStreakStep ** n).toFixed(2)}`;
   } else if (rule.riskCapMult !== undefined && session) {
@@ -95,8 +104,8 @@ function Race({
   children?: ReactNode;
 }) {
   const pts = [{ you: 0, them: 0 }, ...days, now];
-  const w = 220;
-  const h = 46;
+  const w = 320;
+  const h = 80;
   const vals = pts.flatMap((p) => [p.you, p.them]);
   const lo = Math.min(0, ...vals);
   const hi = Math.max(1, ...vals);

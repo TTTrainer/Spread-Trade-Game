@@ -16,6 +16,8 @@ export type RoundRule = ReviewDef['rule'] & {
   lossMult?: number;
   /** Each earlier loss in an unbroken streak multiplies the next loser's points by this. */
   lossStreakStep?: number;
+  /** The Collector's daily interest on tested losers, as a share of each trade's risk. */
+  interestRate?: number;
   /** Wins closed within this many trading days score `mult`. */
   shortWinTax?: { days: number; mult: number };
   /** The leftmost cartridge is switched off. */
@@ -55,6 +57,8 @@ export function roundRule(reviewId: ReviewId | null, bossId?: BossId | null, tie
       return { ...traits, hide: t.what };
     case 'lossStreak':
       return { ...traits, lossStreakStep: t.step };
+    case 'interest':
+      return { ...traits, interestRate: t.rate };
     case 'multCut':
       return { ...traits, multKeep: t.keep };
     case 'variety':

@@ -288,6 +288,10 @@ export const useRun = create<RunStore>((set, get) => {
     if (!e) return;
     toastEvents(e.events);
     const paying = queuePayouts(e);
+    // The Collector's bill for the day gets its own screen, after the day's payouts.
+    if (e.state.config.mode !== 'sim')
+      for (const ev of e.events)
+        if (ev.kind === 'interest' && ev.interest) usePayout.getState().pushInterest(ev.interest);
     // In the tutorial Ines's lessons are the only voice, so the other characters stay quiet.
     const said = e.events.filter((x) => x.kind === 'say' && x.line).at(-1);
     if (said?.line && e.state.config.mode !== 'tutorial')

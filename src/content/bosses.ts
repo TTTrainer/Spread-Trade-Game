@@ -36,6 +36,8 @@ export type BossTwist =
   | { kind: 'leftCartOff' }
   | { kind: 'hide'; what: SealedInfo[] }
   | { kind: 'lossStreak'; step: number }
+  /** Each day a losing trade sits at or past a strike you sold, this share of its risk comes off the score. */
+  | { kind: 'interest'; rate: number }
   | { kind: 'multCut'; keep: number }
   /** A second goal: open this many different structure types (all of them on a smaller desk). */
   | { kind: 'variety'; count: number }
@@ -160,8 +162,8 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'Ira Tolliver',
     role: 'Tax Advisor',
     market: 'assignment_week',
-    twist: { kind: 'shortWinTax', days: 2, mult: 0.75 },
-    twistText: 'Wins closed in their first 2 trading days score 25% less.',
+    twist: { kind: 'shortWinTax', days: 5, mult: 0.75 },
+    twistText: 'Wins closed within their first week (5 trading days) score 25% less.',
     blocks: 'Quick flips',
     intro: 'Short-term gains are taxed like a salary. Hold them a little, or pay me.',
     palette: { accent: '#9ad14b', tint: '#16240a' },
@@ -240,12 +242,12 @@ export const BOSSES: Record<BossId, BossDef> = {
     person: 'Vince Moretti',
     role: 'Collections',
     market: 'vol_spike',
-    twist: { kind: 'lossStreak', step: 1.25 },
-    twistText: 'Losses in a row compound: each one costs 25% more than the last.',
-    blocks: 'Shrugging off a losing streak',
-    intro: 'Miss one payment, fine. Miss two in a row and the interest starts to compound.',
+    twist: { kind: 'interest', rate: 0.05 },
+    twistText: 'Each day a loser sits at a strike you sold, pay 5% of its risk in points.',
+    blocks: 'Holding a tested loser',
+    intro: "Under water and leaning on the strike? That's a loan. Loans pay interest. Daily.",
     palette: { accent: '#ff7ac8', tint: '#2a0b20' },
-    style: 'no_streak',
+    style: 'no_interest',
     ready: true,
   },
   rebalancer: {
@@ -290,6 +292,8 @@ export function showdownTwist(t: BossTwist, tier: number): BossTwist {
       return { ...t, days: t.days + k, mult: r2(Math.max(0.4, t.mult - 0.1 * k)) };
     case 'lossStreak':
       return { ...t, step: r2(t.step + 0.1 * k) };
+    case 'interest':
+      return { ...t, rate: Math.round((t.rate + 0.025 * k) * 1000) / 1000 };
     case 'multCut':
       return { ...t, keep: r2(Math.max(0.35, t.keep - 0.1 * k)) };
     case 'variety':
@@ -318,6 +322,8 @@ export function twistLine(id: BossId, tier: number): string {
       return `Wins closed in their first ${t.days} trading days score ${Math.round((1 - t.mult) * 100)}% less.`;
     case 'lossStreak':
       return `Losses in a row compound: each one costs ${Math.round((t.step - 1) * 100)}% more than the last.`;
+    case 'interest':
+      return `Each day a loser sits at a strike you sold, pay ${+(t.rate * 100).toFixed(1)}% of its risk in points.`;
     case 'multCut':
       return `Your total mult is cut by ${Math.round((1 - t.keep) * 100)}%: the house takes its share.`;
     case 'variety':

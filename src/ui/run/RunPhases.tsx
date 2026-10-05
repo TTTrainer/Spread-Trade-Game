@@ -253,7 +253,7 @@ function RoundWhy({ e }: { e: RunEngine }) {
           : r.breached
             ? 'The account crossed the Max-Loss Line: the risk desk closed everything.'
             : 'Points and money agree: a round to learn from. The debrief below shows where it went.';
-  if (!r.tallies.length && !r.carriedIn) return null;
+  if (!r.tallies.length && !r.carriedIn && !r.interest) return null;
   return (
     <div className="panel round-why num" data-testid="tally-why">
       <div className="section-title">Why this score</div>
@@ -291,6 +291,12 @@ function RoundWhy({ e }: { e: RunEngine }) {
             </span>
           )}
           {!!r.carriedIn && <span className="cyan-text"> · carried in +{r.carriedIn}</span>}
+          {!!r.interest && (
+            <span className="down-text" data-testid="tally-interest">
+              {' '}
+              · the Collector&apos;s interest −{r.interest.toLocaleString()}
+            </span>
+          )}
         </div>
         <div className="rw-verdict">{verdict}</div>
       </div>
