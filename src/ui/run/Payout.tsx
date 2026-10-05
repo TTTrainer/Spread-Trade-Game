@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { CARTRIDGE_SUMMARY } from '../../content/summaries';
 import type { RunEngine } from '../../engine/run/engine';
+import { exitKind } from '../../engine/run/exits';
 import type { TraceRow } from '../../engine/scoring/mult';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx, type SfxName } from '../../audio/sfx';
@@ -158,6 +159,8 @@ function Payout({ item, e }: { item: Extract<PayoutItem, { kind: 'trade' }>; e: 
     if (stage !== 'total') return;
     if (t.points > 0) sfx('slam');
     else sfx(plan ? 'stop' : 'loss');
+    // Plan exits get their stamp's thunk, so keeping the plan sounds different from winging it.
+    if (t.planExit) setTimeout(() => sfx('stamp', 0.9), 140);
     if (cleared) {
       setTimeout(() => sfx('fire'), 120);
       burstAt(panel.current, 'coins', 40);
@@ -240,6 +243,8 @@ function Payout({ item, e }: { item: Extract<PayoutItem, { kind: 'trade' }>; e: 
             {money(Math.abs(t.realizedCents))}
           </span>
         </div>
+
+        <ExitStamp t={t} />
 
         <div className="po-score">
           <motion.div
@@ -371,5 +376,39 @@ function Payout({ item, e }: { item: Extract<PayoutItem, { kind: 'trade' }>; e: 
         <div className="po-hint dim num">click or Space to skip</div>
       </motion.div>
     </div>
+  );
+}
+
+/**
+ * How this trade closed, stamped so each kind feels different: the plan's target or stop (with
+ * what the stop saved against the max loss), a close by hand, or an expiry.
+ */
+function ExitStamp({ t }: { t: Extract<PayoutItem, { kind: 'trade' }>['tally'] }) {
+  const kind = exitKind(t.planExit, t.exitReason);
+  const saved =
+    kind === 'stop' && t.maxLossCents !== undefined
+      ? Math.max(0, t.maxLossCents - Math.max(0, -t.realizedCents))
+      : 0;
+  const text =
+    kind === 'target'
+      ? '✔ YOUR PLAN · TARGET BANKED'
+      : kind === 'stop'
+        ? `✔ YOUR PLAN · STOP TAKEN${saved > 0 ? ` · saved ${money(saved)} vs max loss` : ''}`
+        : kind === 'manual'
+          ? '✋ CLOSED BY HAND · off the plan'
+          : kind === 'expired'
+            ? '⌛ HELD TO EXPIRATION'
+            : '◆ CLOSED BY THE DESK';
+  return (
+    <motion.div
+      className={`po-exit num ${kind}`}
+      data-testid="po-exit"
+      data-kind={kind}
+      initial={{ scale: 1.6, rotate: -6, opacity: 0 }}
+      animate={{ scale: 1, rotate: -1.5, opacity: 1 }}
+      transition={{ delay: 0.15, type: 'spring', stiffness: 520, damping: 16 }}
+    >
+      {text}
+    </motion.div>
   );
 }

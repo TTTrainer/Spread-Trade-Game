@@ -14,6 +14,7 @@ import type { SessionAction } from '../trading/session';
 import type { TradeDebrief } from '../trading/debrief';
 import type { Line } from '../../content/characters';
 import type { PadPerk } from '../../content/meta';
+import type { ExitLog } from './exits';
 
 export type RunPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'victory' | 'defeat';
 
@@ -70,6 +71,10 @@ export interface TradeTally {
   target?: number;
   /** How it closed (target, stop, expired...). */
   exitReason?: string | null;
+  /** Target or stop when the exit plan closed it. */
+  planExit?: 'target' | 'stop' | null;
+  /** The most the trade could have lost (a stop's payout shows what it saved). */
+  maxLossCents?: number;
 }
 
 export interface RoundCard {
@@ -309,6 +314,8 @@ export interface RunStats {
   tipsSeen?: string[];
   /** Losing trades in a row. */
   lossRun?: number;
+  /** How every trade this run closed: the exit plan's scorecard. */
+  exits?: ExitLog;
 }
 
 export type RunAction =

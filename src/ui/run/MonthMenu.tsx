@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'motion/react';
-import { useEffect, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { BALANCE } from '../../content/balance';
 import { STYLE_TEXT } from '../../engine/run/style';
 import { BOSSES, showdownLabel, showdownTier, twistLine } from '../../content/bosses';
@@ -16,13 +16,15 @@ import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engi
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { ArtIcon } from '../art';
-import { Kbd } from '../components/ui';
+import { CountUp, Kbd } from '../components/ui';
 import { SnapSlider } from '../components/SnapSlider';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { CartridgeRail } from './RunParts';
+import { MONTH_CARDS, RoundEmblem } from './RoundEmblem';
+import { ExitPlanFeedback } from './ExitPlanFeedback';
 
 const TARGET_STEPS = [0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9];
 const STOP_STEPS = [1, 1.5, 2, 2.5, 3, 4];
@@ -46,6 +48,23 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
   const idx = st.roundIndex;
   const start = () => (sfx('whoosh'), void act({ t: 'boardDone' }));
   useHotkeys({ confirm: start });
+  const reduced = useApp((s) => s.settings.display.reducedMotion);
+  // The three rounds are dealt like cards, one after another, each with its snap; then the
+  // targets count up.
+  const [dealt, setDealt] = useState(reduced ? 3 : 0);
+  useEffect(() => {
+    if (reduced) return;
+    const ids = [0, 1, 2].map((i) =>
+      setTimeout(
+        () => {
+          sfx('deal', 0.9 + i * 0.12);
+          setDealt(i + 1);
+        },
+        120 + i * 140,
+      ),
+    );
+    return () => ids.forEach(clearTimeout);
+  }, []);
   // The clock waits for the menu.
   useEffect(() => {
     useTrading.setState({ clockHold: 'Close the month menu first (Enter starts the month).' });
@@ -63,17 +82,27 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
     const done = past(i);
     const now = i === idx;
     const target = i === idx ? st.round.target : e.upcomingTarget(q, i);
+    const month = i < 2 ? MONTH_CARDS[i] : null;
     return (
-      <div
+      <motion.div
         key={i}
         className={`mm-round ${now ? 'now' : ''} ${done ? done.status : ''} ${i === 2 ? 'boss' : ''}`}
         data-testid={`mm-round-${i}`}
         style={
           i === 2 && boss
             ? ({ '--boss-accent': boss.palette.accent, '--boss-tint': boss.palette.tint } as CSSProperties)
-            : undefined
+            : month
+              ? ({ '--card-accent': month.accent } as CSSProperties)
+              : undefined
         }
+        initial={reduced ? false : { rotateY: 100, y: 40, opacity: 0 }}
+        animate={
+          i < dealt ? { rotateY: 0, y: now ? -4 : 0, opacity: 1 } : { rotateY: 100, y: 40, opacity: 0 }
+        }
+        whileHover={reduced ? undefined : { y: now ? -8 : -4, rotate: i === 1 ? 0.6 : -0.6 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 22 }}
       >
+        {now && <span className="mm-shine" aria-hidden="true" />}
         <div className="mm-r-name num">{i === 2 ? 'REVIEW · BOSS' : ROUND_NAMES[i].toUpperCase()}</div>
         {i === 2 && boss ? (
           <div className="mm-boss-row">
@@ -95,14 +124,25 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
               </div>
             </div>
           </div>
+        ) : month ? (
+          <>
+            <div className="mm-r-emblem">
+              <RoundEmblem id={month.emblem} px={5} />
+            </div>
+            <div className="mm-r-title">{month.title}</div>
+          </>
         ) : (
-          <div className="mm-r-glyph">{i === 0 ? '◆' : '◆◆'}</div>
+          <div className="mm-r-glyph">◆◆◆</div>
         )}
         <div className="mm-r-target num">
-          <span className="dim">TARGET</span> <b>{target.toLocaleString()}</b>
+          <span className="dim">TARGET</span>{' '}
+          <b>
+            <CountUp value={i < dealt ? target : 0} duration={reduced ? 1 : 700} />
+          </b>
         </div>
-        <div className="mm-r-pay num dim">
-          a win pays <span className="amber-text">${BALANCE.cash.roundWin[i]}</span> + interest
+        <div className="mm-r-pay num">
+          <span className="mm-coin">WIN ${BALANCE.cash.roundWin[i]}</span>
+          <span className="dim"> + interest</span>
         </div>
         <div className="mm-r-state num">
           {done
@@ -124,7 +164,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
             ⟳ REROLL BOSS {reroll.cost !== undefined ? `$${reroll.cost}` : ''}
           </button>
         )}
-      </div>
+      </motion.div>
     );
   };
   // The switch changes this run and the default for the next ones.
@@ -154,6 +194,8 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
           <section className="mm-build">
             <div className="section-title">Your build · fires left to right</div>
             <CartridgeRail e={e} editable />
+            <div className="section-title">Your exit plan in action</div>
+            <ExitPlanFeedback e={e} />
           </section>
           <section className="mm-plan" data-testid="mm-plan">
             <div className="section-title">Exit plan · the whole run</div>

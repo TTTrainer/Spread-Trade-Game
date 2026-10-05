@@ -84,6 +84,8 @@ test('closing a trade plays the payout, fires the cartridges, then lands on the 
   );
   expect(engineMeter).not.toBe(meterBefore);
   await expect(page.getByTestId('round-meter')).toContainText(`${meterBefore.toLocaleString()} /`);
+  // How it closed is stamped on the payout (cash out at the target, or closed by hand here).
+  await expect(page.getByTestId('po-exit')).toHaveAttribute('data-kind', /target|manual/);
   await page.waitForTimeout(1300);
   await shot(page, '18-payout-steps-1920');
   await expect(page.getByTestId('payout-total')).toBeVisible({ timeout: 15_000 });

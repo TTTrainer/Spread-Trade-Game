@@ -2842,12 +2842,98 @@
   text-align: center;
   min-width: 0;
 }
+.mm-quarter {
+  perspective: 1200px;
+}
+.mm-round:not(.boss) {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--card-accent, var(--line)) 55%, var(--line));
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in srgb, var(--card-accent, var(--line)) 22%, transparent),
+      transparent 62%
+    ),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px), var(--bg-2);
+}
 .mm-round.now {
   border-color: var(--amber);
   box-shadow:
     4px 4px 0 #000,
     0 0 16px color-mix(in srgb, var(--amber) 35%, transparent);
-  transform: translateY(-3px);
+  animation: mm-now-glow 1.8s ease-in-out infinite alternate;
+}
+@keyframes mm-now-glow {
+  from {
+    box-shadow:
+      4px 4px 0 #000,
+      0 0 10px color-mix(in srgb, var(--amber) 25%, transparent);
+  }
+  to {
+    box-shadow:
+      4px 4px 0 #000,
+      0 0 26px color-mix(in srgb, var(--amber) 55%, transparent);
+  }
+}
+/* A light sweep across the round you're about to play. */
+.mm-shine {
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.14) 48%,
+    rgba(255, 255, 255, 0.04) 52%,
+    transparent 58%
+  );
+  animation: mm-sweep 3.2s ease-in-out infinite;
+}
+@keyframes mm-sweep {
+  0% {
+    transform: translateX(-60%);
+  }
+  60%,
+  100% {
+    transform: translateX(60%);
+  }
+}
+.mm-r-emblem {
+  line-height: 0;
+  padding: 8px;
+  border: 2px solid color-mix(in srgb, var(--card-accent, var(--line)) 70%, #000);
+  background: #07051a;
+  box-shadow:
+    3px 3px 0 #000,
+    0 0 18px color-mix(in srgb, var(--card-accent, var(--line)) 40%, transparent);
+  animation: mm-bob 2.6s ease-in-out infinite;
+}
+.mm-round:not(.now) .mm-r-emblem {
+  animation: none;
+  filter: saturate(0.7);
+}
+@keyframes mm-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.mm-r-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--card-accent, var(--text));
+  text-shadow: 2px 2px 0 #000;
+}
+.mm-coin {
+  display: inline-block;
+  padding: 1px 8px;
+  color: #1a1030;
+  background: var(--amber);
+  box-shadow: 2px 2px 0 #000;
 }
 .mm-round.passed {
   opacity: 0.65;
@@ -2947,6 +3033,93 @@
 }
 .mm-plan .snap {
   grid-template-columns: 96px 1fr 118px;
+}
+/* The exit plan's feedback: a sample spread the sliders move, and the run's scorecard. */
+.epf {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+}
+.epf-k {
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.epf-bar {
+  position: relative;
+  height: 14px;
+  background: rgba(164, 157, 224, 0.12);
+}
+.epf-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.epf-cut {
+  background: repeating-linear-gradient(135deg, rgba(255, 79, 109, 0.25) 0 4px, transparent 4px 8px);
+}
+.epf-risk {
+  background: color-mix(in srgb, var(--down) 55%, transparent);
+}
+.epf-bank {
+  background: var(--up);
+}
+.epf-zero {
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.epf-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 4px;
+  margin-left: -2px;
+  box-shadow: 1px 1px 0 #000;
+}
+.epf-mark.stop {
+  background: var(--magenta);
+}
+.epf-mark.target {
+  background: var(--up);
+}
+.epf-say {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 16px;
+}
+.epf-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 15px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+}
+.epf-title {
+  color: var(--amber);
+  letter-spacing: 0.1em;
+}
+.epf-chip {
+  padding: 0 6px;
+  border: 1px solid var(--line-bright);
+}
+.epf-chip.up {
+  border-color: var(--up);
+  color: var(--up);
+}
+.epf-chip.stop {
+  border-color: var(--magenta);
+  color: var(--text);
+}
+.epf-chip.stop b {
+  font-weight: 400;
+  color: var(--up);
 }
 .mm-toggle {
   display: flex;
@@ -3779,5 +3952,47 @@
   }
   .nt-stamp {
     font-size: 26px;
+  }
+}
+
+/* How a trade closed, stamped on its payout: each kind its own look. */
+.po-exit {
+  align-self: center;
+  padding: 3px 12px;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0 #000;
+  background: rgba(0, 0, 0, 0.45);
+}
+.po-exit.target {
+  color: var(--up);
+}
+.po-exit.stop {
+  color: var(--cyan);
+}
+.po-exit.manual {
+  color: var(--amber);
+  border-style: dashed;
+}
+.po-exit.expired,
+.po-exit.other {
+  color: var(--text-dim);
+}
+
+@media (max-height: 820px) {
+  .mm-r-emblem {
+    padding: 4px;
+  }
+  .mm-r-emblem svg {
+    width: 56px;
+    height: 56px;
+  }
+  .mm-r-title {
+    font-size: 20px;
+  }
+  .mm-round {
+    gap: 4px;
+    padding: 8px 10px;
   }
 }

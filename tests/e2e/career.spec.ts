@@ -114,6 +114,18 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await expect(page.getByTestId('month-menu')).toBeVisible();
   await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');
   await expect(page.getByTestId('mm-boss-name')).toBeVisible();
+  // Each Month card has its own emblem; the exit plan shows what it does and the run's scorecard.
+  await expect(page.getByTestId('round-emblem-bell')).toBeVisible();
+  await expect(page.getByTestId('round-emblem-candles')).toBeVisible();
+  await expect(page.getByTestId('exit-scorecard')).toContainText('No closes yet');
+  const example = page.getByTestId('exit-example');
+  await expect(example).toContainText('bank +$50.00');
+  await expect(example).toContainText('cut at −$200.00');
+  // Moving the stop moves the example: 1.5x the credit cuts at $150.
+  await page.getByTestId('plan-credit-stop').locator('.snap-tick').nth(1).click();
+  await expect(example).toContainText('cut at −$150.00');
+  await page.getByTestId('plan-credit-stop').locator('.snap-tick').nth(2).click();
+  await expect(example).toContainText('cut at −$200.00');
   await page.waitForTimeout(600);
   await shot(page, '06-month-menu-1920');
   await shot(page, '06-month-menu-1366', { width: 1366, height: 768 });

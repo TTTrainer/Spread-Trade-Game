@@ -45,6 +45,7 @@ import type {
 } from '../../content/types';
 import { lastMark } from '../lifecycle/position';
 import { testedShort } from './collector';
+import { exitKind, recordExit } from './exits';
 import type { Position } from '../lifecycle/types';
 import type { MarketDataSource } from '../market/source';
 import type { WindowDef } from '../market/types';
@@ -1224,6 +1225,8 @@ export class RunEngine {
       meterAfter: r.meter,
       target: r.target,
       exitReason: p.exitReason ?? null,
+      planExit: facts.closedAtPlan ?? null,
+      maxLossCents: p.entry.maxLossCents,
     });
     this.events.push({
       kind: 'score',
@@ -1278,6 +1281,12 @@ export class RunEngine {
     if (facts.ivCrushWin) ss.ivCrushWins++;
     if (facts.win && (facts.pctOfMaxProfit ?? 0) >= 0.5 && facts.exitReason !== 'expired') ss.closes50++;
     if (facts.closedAtPlan === 'stop') ss.plannedStops++;
+    ss.exits = recordExit(
+      ss.exits ?? {},
+      exitKind(facts.closedAtPlan, p.exitReason),
+      facts.realizedCents,
+      p.entry.maxLossCents,
+    );
     if (p.entry.edgeTier === 'top10') ss.edgeTop10++;
     ss.ladderBest = Math.max(ss.ladderBest, st.cartState.ladder_up?.streak ?? 0);
     if (facts.cspAssigned) ss.cspAssigned = true;
