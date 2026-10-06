@@ -6,6 +6,7 @@ import { log } from './log';
 import { registerIpc } from './ipc';
 import { registerDataHandlers } from './dataService';
 import { registerSchwabHandlers } from './schwab';
+import { registerBuilderHandlers } from './builder';
 import { registerUserHandlers } from './userDb';
 import { watchWindow } from './watchdog';
 
@@ -96,6 +97,7 @@ app.whenReady().then(() => {
   registerIpc(() => mainWindow);
   registerDataHandlers();
   registerSchwabHandlers();
+  registerBuilderHandlers();
   registerUserHandlers();
   createWindow();
   app.on('activate', () => {

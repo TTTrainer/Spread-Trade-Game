@@ -20,6 +20,7 @@ import { AchievementsScreen } from './screens/Achievements';
 import { PadScreen } from './screens/Pad';
 import { DailyScreen } from './screens/Daily';
 import { LiveScreen, LiveTrading } from './screens/Live';
+import { TradeBuilderScreen } from './screens/TradeBuilder';
 import { ContractsScreen, ContractTrading } from './screens/Contracts';
 
 const SCREENS: Partial<Record<Screen, () => React.ReactElement | null>> = {
@@ -36,6 +37,7 @@ const SCREENS: Partial<Record<Screen, () => React.ReactElement | null>> = {
   pad: PadScreen,
   daily: DailyScreen,
   live: LiveScreen,
+  builder: TradeBuilderScreen,
   liveTrading: LiveTrading,
   contracts: ContractsScreen,
   contractTrading: ContractTrading,

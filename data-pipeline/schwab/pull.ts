@@ -51,6 +51,8 @@ export async function schwabPull(opts: {
   storePath: string;
   api: SchwabMarketApi;
   symbols: string[];
+  /** Where a ticker's first pull starts (the Trade Builder's tickers reach back two years). */
+  historyFrom?: (symbol: string) => ISODate;
   now?: Date;
   log?: (m: string) => void;
   progress?: (stage: string, f: number) => void;
@@ -78,13 +80,14 @@ export async function schwabPull(opts: {
         const wantChain =
           !isIndexSeries(symbol) && closed.chainIsClose && !store.hasChain(symbol, closed.date);
         if (last && last >= closed.date && !wantChain) continue;
-        const from = last ? addDays(last, -14) : HISTORY_FROM;
+        const first = opts.historyFrom?.(symbol) ?? HISTORY_FROM;
+        const from = last ? addDays(last, -14) : first;
         let bars = mapCandles(await opts.api.priceHistory(symbol, from)).filter((b) => b.date <= closed.date);
         if (last) {
           const ratio = splitRatio(store.candles(symbol, from, last), bars);
           if (ratio) {
             log(`Schwab: ${symbol} split (x${ratio}); fetching its whole history again`);
-            bars = mapCandles(await opts.api.priceHistory(symbol, HISTORY_FROM)).filter(
+            bars = mapCandles(await opts.api.priceHistory(symbol, first)).filter(
               (b) => b.date <= closed.date,
             );
             const firstNew = bars.find((b) => b.date > last)?.date ?? closed.date;

@@ -13,6 +13,7 @@ import { NewsTicker } from './NewsTicker';
 import { OrderTicket, StructureCards } from './BuilderTray';
 import { SetupSliders } from './SetupPanel';
 import { ChainScreen } from './ChainScreen';
+import { PayoffStudio } from './PayoffStudio';
 import { CashDeposit, CashReadout } from './CashDeposit';
 import {
   AnalyzePanel,
@@ -30,12 +31,13 @@ import './trading.css';
 import { LockStamp } from './BossBanner';
 import { useSealed } from '../boss';
 
-const STUDY_LABELS: Record<StudyId, string> = {
+export const STUDY_LABELS: Record<StudyId, string> = {
   bb: 'Bollinger Bands',
   rsi: 'RSI (14)',
   macd: 'MACD',
   vol: 'Volume',
   em: 'Expected-move band',
+  em2: 'Expected move ×2 (2σ)',
   sma20: 'SMA 20',
   sma50: 'SMA 50',
   sma200: 'SMA 200',
@@ -231,8 +233,26 @@ export function TradingLayout({
   badges,
   levels,
   briefAccess,
+  payoffTab = false,
+  ticket,
+  builderExtra,
+  tabs: tabList,
+  trayExtra,
+  tradeTabExtra,
 }: {
   top: ReactNode;
+  /** A full-size PAYOFF view beside CHART and CHAIN (the Trade Builder). */
+  payoffTab?: boolean;
+  /** Replaces the order ticket (the Trade Builder copies the order instead of placing it). */
+  ticket?: ReactNode;
+  /** Goes after the setup sliders in the builder row (the Trade Builder's leg editor). */
+  builderExtra?: ReactNode;
+  /** The tray's tabs (default: builder, positions, analyze). */
+  tabs?: Panel[];
+  /** Goes at the end of the tray's tab row (the Trade Builder's study toggles). */
+  trayExtra?: ReactNode;
+  /** Goes under the payoff on the TRADE tab (the Trade Builder's leg editor). */
+  tradeTabExtra?: ReactNode;
   /** What the news brief may show (Career unlocks detail through analysts). */
   briefAccess?: BriefAccess;
   levels?: Partial<Record<StructureId, number>>;
@@ -269,6 +289,8 @@ export function TradingLayout({
   const chainOpen = useTrading((s) => s.chainOpen);
   const setChainOpen = useTrading((s) => s.setChainOpen);
   const chainKey = useApp((s) => s.settings.hotkeys.chain);
+  const payoffOpen = useTrading((s) => s.payoffOpen);
+  const setPayoffOpen = useTrading((s) => s.setPayoffOpen);
 
   useEffect(() => {
     if (shake > 0)
@@ -279,7 +301,7 @@ export function TradingLayout({
       });
   }, [shake]);
 
-  const tabs: Panel[] = ['builder', 'positions', 'analyze'];
+  const tabs: Panel[] = tabList ?? ['builder', 'positions', 'analyze'];
   useHotkeys({
     positions: () => setPanel('positions'),
     builder: () => setPanel('builder'),
@@ -347,10 +369,10 @@ export function TradingLayout({
         <ChartPanel />
         <div className="center-tabs num" role="tablist">
           <button
-            className={chainOpen ? '' : 'sel'}
-            onClick={() => setChainOpen(false)}
+            className={chainOpen || payoffOpen ? '' : 'sel'}
+            onClick={() => (setChainOpen(false), setPayoffOpen(false))}
             role="tab"
-            aria-selected={!chainOpen}
+            aria-selected={!chainOpen && !payoffOpen}
             data-testid="ctab-chart"
           >
             ◲ CHART
@@ -366,8 +388,22 @@ export function TradingLayout({
           >
             ⊞ CHAIN <span className="kbd">{chainKey}</span>
           </button>
+          {payoffTab && (
+            <button
+              className={payoffOpen ? 'sel' : ''}
+              onClick={() => setPayoffOpen(!payoffOpen)}
+              role="tab"
+              aria-selected={payoffOpen}
+              data-testid="ctab-payoff"
+              data-tip-title="Payoff, full size"
+              data-tip-body="What the trade makes or loses at every price, at expiration and on any day before it, with the expected move and where the price is likely to end."
+            >
+              ⟋ PAYOFF
+            </button>
+          )}
         </div>
         {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
+        {payoffTab && payoffOpen && !chainOpen && <PayoffStudio onClose={() => setPayoffOpen(false)} />}
         <NewsTicker />
       </div>
       <div className="t-right panel">
@@ -398,6 +434,7 @@ export function TradingLayout({
         ) : (
           <>
             <PayoffChart />
+            {tradeTabExtra}
             <StatsBlock />
           </>
         )}
@@ -426,13 +463,15 @@ export function TradingLayout({
           <button onClick={() => setHelp(true)}>
             HELP <span className="kbd">Ctrl+8</span>
           </button>
+          {trayExtra}
         </div>
         <div className="tray-body">
           {panel === 'builder' && (
             <div className="builder-row">
               <StructureCards allowed={allowedStructures} levels={levels} />
               <SetupSliders />
-              <OrderTicket />
+              {builderExtra}
+              {ticket ?? <OrderTicket />}
             </div>
           )}
           {panel === 'positions' && <PositionsDock />}

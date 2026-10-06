@@ -3,7 +3,7 @@
  * Builds into a temporary file and swaps it in only on success.
  */
 import { existsSync, renameSync, rmSync } from 'node:fs';
-import { addDays } from '../../src/engine/calendar';
+import { addDays, type ISODate } from '../../src/engine/calendar';
 import type { DataBuildRequest, DataBuildResult } from '../../src/shared/rpc';
 import { buildRealDb, LowDiskError } from '../../data-pipeline/dolt/extract';
 import { get, openDb } from '../../data-pipeline/lib/sqlite';
@@ -13,7 +13,8 @@ import { CANDIDATES } from '../../data-pipeline/dolt/tickers';
 import { downloadVix } from '../../data-pipeline/vix';
 import { buildFromSchwab } from '../../data-pipeline/schwab/build';
 import { schwabFetchApi } from '../../data-pipeline/schwab/client';
-import { schwabPull } from '../../data-pipeline/schwab/pull';
+import { HISTORY_FROM, schwabPull } from '../../data-pipeline/schwab/pull';
+import { BUILDER_BY_SYMBOL, BUILDER_HISTORY_DAYS } from '../../src/content/builderTickers';
 import { keepLaterDays, schwabTopUp } from '../../data-pipeline/schwab/topup';
 
 interface Job {
@@ -86,10 +87,12 @@ async function run(job: Job): Promise<DataBuildResult> {
     const symbols = [
       ...new Set([...CANDIDATES.map((c) => c.symbol), ...(info.kind === 'real' ? info.tickers : [])]),
     ];
+    const twoYears = addDays(new Date().toISOString().slice(0, 10) as ISODate, -BUILDER_HISTORY_DAYS);
     const r = await schwabPull({
       storePath: job.schwabStorePath,
       api: schwabFetchApi(job.schwabToken),
       symbols,
+      historyFrom: (s) => (BUILDER_BY_SYMBOL[s] ? twoYears : HISTORY_FROM),
       log,
       progress: (s, f) => progress(s, f),
     });

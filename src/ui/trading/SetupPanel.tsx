@@ -23,6 +23,10 @@ import { useActiveBoss, useSealed } from '../boss';
 import { LockStamp } from './BossBanner';
 
 const DELTA_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+/** The Trade Builder's contract counts (you size the trade yourself there). */
+const CONTRACT_STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50];
+const nearestStep = (q: number, max: number) =>
+  CONTRACT_STEPS.filter((n) => n <= max).reduce((a, n) => (Math.abs(n - q) < Math.abs(a - q) ? n : a), 1);
 const NO_WIDTH = [
   'long_straddle',
   'long_strangle',
@@ -88,6 +92,7 @@ export function SetupSliders() {
   const builder = useTrading((s) => s.builder);
   const setBuilder = useTrading((s) => s.setBuilder);
   const confidence = useTrading((s) => s.confidence);
+  const sizeMode = useTrading((s) => s.sizeMode);
   const setConfidence = useTrading((s) => s.setConfidence);
   const open = useTrading(tradeOpen);
   const plan = useTrading((s) => s.plan)();
@@ -293,40 +298,61 @@ export function SetupSliders() {
           }
         />
       )}
-      <SnapSlider
-        label="Size"
-        tip="g:conviction"
-        testId="slider-conviction"
-        accent="violet"
-        hint={hint('size')}
-        disabled={off}
-        options={CONVICTION.map((c) => ({
-          value: c.confidence,
-          major: c.confidence === 0.7,
-          // Each step shows the contracts it buys, so conviction reads as size (and risk).
-          mark: perContract ? `${stepQty(c.confidence)}×` : c.label,
-        }))}
-        index={Math.max(0, convIdx)}
-        onIndex={(i) => void setConfidence(CONVICTION[i].confidence)}
-        readout={
-          plan?.ok ? (
-            <>
-              <b className="conv-qty" data-testid="conv-qty">
-                {plan.qty} CONTRACT{plan.qty === 1 ? '' : 'S'}
-              </b>{' '}
-              <span className="dim">· {convictionStep(confidence).label}</span>
-              {Number.isFinite(maxQ) && plan.qty >= maxQ && (
-                <span className="dim" data-testid="qty-capped">
-                  {' '}
-                  · {maxQ} is the most {sid === 'covered_call' ? 'your shares cover' : 'one order may have'}
-                </span>
-              )}
-            </>
-          ) : (
-            convictionStep(confidence).label
-          )
-        }
-      />
+      {sizeMode === 'contracts' ? (
+        <SnapSlider
+          label="Contracts"
+          testId="slider-contracts"
+          accent="violet"
+          disabled={off}
+          options={CONTRACT_STEPS.filter((n) => n <= maxQ).map((n) => ({
+            value: n,
+            major: n === 1 || n === 10,
+            mark: [1, 5, 10, 20, 50].includes(n) ? `${n}` : undefined,
+          }))}
+          index={Math.max(0, CONTRACT_STEPS.filter((n) => n <= maxQ).indexOf(nearestStep(builder.qty, maxQ)))}
+          onIndex={(i) => setBuilder({ qty: CONTRACT_STEPS.filter((n) => n <= maxQ)[i] })}
+          readout={
+            <b className="conv-qty" data-testid="conv-qty">
+              {plan?.qty ?? builder.qty} CONTRACT{(plan?.qty ?? builder.qty) === 1 ? '' : 'S'}
+            </b>
+          }
+        />
+      ) : (
+        <SnapSlider
+          label="Size"
+          tip="g:conviction"
+          testId="slider-conviction"
+          accent="violet"
+          hint={hint('size')}
+          disabled={off}
+          options={CONVICTION.map((c) => ({
+            value: c.confidence,
+            major: c.confidence === 0.7,
+            // Each step shows the contracts it buys, so conviction reads as size (and risk).
+            mark: perContract ? `${stepQty(c.confidence)}×` : c.label,
+          }))}
+          index={Math.max(0, convIdx)}
+          onIndex={(i) => void setConfidence(CONVICTION[i].confidence)}
+          readout={
+            plan?.ok ? (
+              <>
+                <b className="conv-qty" data-testid="conv-qty">
+                  {plan.qty} CONTRACT{plan.qty === 1 ? '' : 'S'}
+                </b>{' '}
+                <span className="dim">· {convictionStep(confidence).label}</span>
+                {Number.isFinite(maxQ) && plan.qty >= maxQ && (
+                  <span className="dim" data-testid="qty-capped">
+                    {' '}
+                    · {maxQ} is the most {sid === 'covered_call' ? 'your shares cover' : 'one order may have'}
+                  </span>
+                )}
+              </>
+            ) : (
+              convictionStep(confidence).label
+            )
+          }
+        />
+      )}
       {plan?.ok && (
         <div
           className="conv-cap num"

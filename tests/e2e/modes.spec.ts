@@ -99,7 +99,8 @@ test('contracts: take a client request, trade it out, get paid', async () => {
 test('live: a month back with a dealt lineup, play to the latest close, new days play on', async () => {
   const { app, page } = await launchGame();
   await fastClock(page);
-  await page.getByTestId('menu-live').click();
+  await page.getByTestId('menu-builder').click();
+  await page.getByTestId('builder-classic').click();
   await expect(page.getByTestId('live-day')).toContainText('DAY 0 OF 20', { timeout: 30_000 });
   await expect(page.getByTestId('live-open-desk')).toContainText('START THE MONTH');
   await shot(page, '09-live-hub-1920');

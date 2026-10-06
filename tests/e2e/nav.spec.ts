@@ -6,7 +6,7 @@ const MENU: { id: string; screen: string }[] = [
   { id: 'menu-career', screen: 'career-screen' },
   { id: 'menu-daily', screen: 'daily-screen' },
   { id: 'menu-drills', screen: 'drills-menu' },
-  { id: 'menu-live', screen: 'live-screen' },
+  { id: 'menu-builder', screen: 'builder-screen' },
   { id: 'menu-contracts', screen: 'contracts-screen' },
   { id: 'menu-sandboxSetup', screen: 'sandbox-setup' },
   { id: 'menu-stats', screen: 'stats-screen' },
@@ -34,23 +34,31 @@ test('every title menu screen opens, and its BACK returns to the title', async (
   await app.close();
 });
 
-test('Live: desk, back to Live, then BACK goes home instead of looping', async () => {
+test('Live (the paper month, inside the Trade Builder): desk, back to Live, BACK, BACK goes home', async () => {
   const { app, page } = await launchGame();
-  await page.getByTestId('menu-live').click();
-  await expect(page.getByTestId('live-screen')).toBeVisible();
-  await expect(page.getByTestId('live-wip')).toContainText('WORK IN PROGRESS');
+  const toLive = async () => {
+    await page.getByTestId('menu-builder').click();
+    await expect(page.getByTestId('builder-screen')).toBeVisible();
+    await page.getByTestId('builder-classic').click();
+    await expect(page.getByTestId('live-screen')).toBeVisible();
+  };
+  await toLive();
   await page.getByTestId('live-open-desk').click();
   await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('live-back').click();
   await expect(page.getByTestId('live-screen')).toBeVisible();
   await backButton(page).click();
+  await expect(page.getByTestId('builder-screen')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('builder-back').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
   // And again, to make sure the second visit doesn't loop either.
-  await page.getByTestId('menu-live').click();
+  await toLive();
   await page.getByTestId('live-open-desk').click();
   await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('live-back').click();
   await backButton(page).click();
+  await expect(page.getByTestId('builder-screen')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('builder-back').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
   await app.close();
 });

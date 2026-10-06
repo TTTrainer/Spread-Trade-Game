@@ -83,6 +83,27 @@ export interface SchwabStoreStatus {
 }
 
 import type { DrillRow, RunRow, SaveSlot, TradeRow } from './userData';
+import type { BuilderLoadResult } from '../../data-pipeline/schwab/builderLoad';
+
+/** A ticker the Trade Builder offers, and how fresh its saved data is. */
+export interface BuilderListItem {
+  symbol: string;
+  name: string;
+  sector: string;
+  group: 'etf' | 'stock' | 'sim';
+  /** One of the Trade Builder's added tickers. */
+  isNew: boolean;
+  savedThrough: string | null;
+}
+
+export interface BuilderList {
+  /** Schwab is connected, so tickers load live. */
+  schwab: boolean;
+  dataKind: 'real' | 'synthetic' | 'mixed' | null;
+  tickers: BuilderListItem[];
+}
+
+export type { BuilderLoadResult };
 
 export interface RpcMap {
   'user.get': (key: string) => unknown;
@@ -113,6 +134,9 @@ export interface RpcMap {
   'schwab.disconnect': (forget: boolean) => SchwabStatus;
   /** What PULL FROM SCHWAB has saved in schwab.db. */
   'schwab.store': () => SchwabStoreStatus;
+  /** The Trade Builder: its tickers, and one ticker's data (Schwab live first, read-only). */
+  'builder.list': () => BuilderList;
+  'builder.load': (symbol: string) => BuilderLoadResult;
   'system.info': () => SystemInfo;
   'system.quit': () => void;
   /** A line in game.log from the screen (stalls, errors). */

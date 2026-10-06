@@ -8,8 +8,8 @@ const MENU: { label: string; screen: Screen; wip?: boolean }[] = [
   { label: 'Career', screen: 'career' },
   { label: 'Daily', screen: 'daily' },
   { label: 'Drills', screen: 'drills' },
-  // On hold until it's rebuilt around trading today's price for a leaderboard.
-  { label: 'Live', screen: 'live', wip: true },
+  // Today's market, for building a real trade (the old paper month is inside it).
+  { label: 'Trade Builder', screen: 'builder' },
   { label: 'Contracts', screen: 'contracts' },
   { label: 'Sandbox', screen: 'sandboxSetup' },
   { label: 'Stats', screen: 'stats' },

@@ -535,6 +535,11 @@ export function ChartPanel() {
       add(spot + em, COLORS.violet, '+EM', LineStyle.LargeDashed);
       add(spot - em, COLORS.violet, '-EM', LineStyle.LargeDashed);
     }
+    // Two standard deviations: where a short strike sits for roughly 95% odds of staying out.
+    if (studies.includes('em2') && em && !dragging) {
+      add(spot + 2 * em, 'rgba(157,107,255,0.6)', '+2σ', LineStyle.SparseDotted);
+      add(spot - 2 * em, 'rgba(157,107,255,0.6)', '-2σ', LineStyle.SparseDotted);
+    }
     if (studies.includes('sr') && !dragging)
       for (const lvl of supportResistance(session.view(cardId).bars()))
         add(

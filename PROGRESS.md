@@ -4,17 +4,45 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2, 1.5.0, 1.6.0 (boss rounds) and **1.6.1**: your 1.6.0 notes (the Balatro-style payout when a trade closes, the trophy and spoils screens, an automatic stop for covered calls, the shop's overlapping icons, and harder runs). Version 1.6.1. Next: your playtest of 1.6.1 (items 59–64 in `PLAYTEST.md`).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, and **1.7.0**: your boss checklist and playtest notes, and the **Trade Builder** (Live mode repurposed for building real trades on today's market, with 25 more tickers). Version 1.7.0. Next: your playtest of 1.7.0 (items 65–73 in `PLAYTEST.md`) while the Trade Builder's second version (an options tutorial and another 25 tickers) is built.
 
 ## How to run (on your PC)
 
-- **Play:** download from the [1.6.1 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.6.1) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.6.1.exe`, or run `SpreadTradingGame-Portable-1.6.1.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Play:** download from the [1.7.0 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.7.0.exe`, or run `SpreadTradingGame-Portable-1.7.0.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
 - **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.7.0: your boss checklist, your playtest notes, and the Trade Builder
+**The Trade Builder (your note 6: Live mode repurposed).** On the title screen, TRADE BUILDER replaces Live.
+- **Today's data first.** When Schwab is connected (Settings → Data), opening a ticker asks Schwab right then for two years of daily prices and today's option chain (read-only market data; nothing touches your account). During market hours today joins the chart at the current price. The badge at the top says **● LIVE**, **✔ CURRENT** (through the latest close) or **⚠ OUT OF DATE: data ends 2026-09-25, 6 trading days old**, with where the data came from. Without Schwab it uses the newest saved data: what PULL FROM SCHWAB saved, or the game's own data. When no real chain exists for that day, the chain is modeled from the stock's own volatility and labeled MODEL CHAIN.
+- **25 more tickers**, the next most heavily traded option markets: QQQ, IWM, TLT, GLD, SLV, XLF, SMH, XLE, UNH, MSTR, SOFI, INTC, BABA, F, BAC, MARA, RIVN, PYPL, WMT, XOM, C, SNAP, NIO, ARM, SHOP. PULL FROM SCHWAB now fetches two years of daily prices for each, plus each close's option chain, alongside the game's 25. Type a ticker in OPEN A TICKER (left) or press ALL for the full list.
+- **Studies you can toggle** in one click from the tray: Bollinger Bands, the expected move (1σ) and a new **2σ** line, SMA 50 and 200, EMA 21, Keltner Channels, support and resistance, RSI, MACD, ATR and volume.
+- **Every strategy, buildable and readable.** All 14 structures (verticals, iron condor, iron fly, broken-wing condor, straddle, strangle, covered call, cash-secured put, calendar, diagonal, double calendar). Shape them with the same sliders as the game, or leg by leg in **LEGS** on the TRADE tab (buy or sell, call or put, strike, expiration). Size is a plain contract count.
+- **The payoff, full size** (⟋ PAYOFF above the chart): P/L at expiration (filled green and red), today, and on any day before expiration (the DATE slider), with an IV slider for "what if volatility drops". Breakevens, max profit and max loss, the strikes, today's price, the ±1σ and ±2σ expected move and a shaded curve of where the price is likely to end are all labeled on the chart. Hovering reads out any price: P/L at expiration and on the chosen day, and the odds the price ends below or above it. The side panel says the trade in plain words ("You SELL the iron condor for $209 up front, betting MKTX stays in a range…"), lists the legs and shows the Greeks.
+- **COPY ORDER** (Alt+C) copies the order as text in thinkorswim's style (`SELL -1 VERTICAL SPY 100 17 OCT 25 450/445 PUT @1.20 LMT`), for you to check and enter yourself. Nothing is ever sent to a broker.
+- The old Live month is still there: TRADE BUILDER → **PAPER MONTH**.
+
+**Your boss checklist:**
+- **The Collector** is redesigned: at each day's close, every trade that is losing **and** has the price at or past a strike you sold pays 5% of its risk in points, every day it stays there, on its own **INTEREST NOTICE** screen (the trade, its strike and price, its loss, how many days it's been charged, PAY). His banner shows what he's taken and which trades will be charged at the close. Style bonus: never pay him a day's interest.
+- **The Margin Clerk:** the width slider now stops at the widest spread your cap allows, so even one contract never risks over the cap ("max 3 at your 5% risk cap").
+- **The Underwriter's trophy** moves the max-loss line 5% (was 1%). **The Shell Company's trophy** takes $2 off rerolls. Other trophies got stronger too, the boss bounty is $8, and the first spoil is a rare cartridge when one fits (your "slightly underwhelming").
+- **The Tax Man** taxes wins closed within their first week (5 trading days); his style bonus asks for wins held 6 days.
+- **The Rebalancer's and the Early Retiree's race charts** are bigger.
+- Simulator, after the changes: a typical boss is beaten 87% of the time, the Rebalancer 67%.
+
+**The month menu:** each Month has its own pixel emblem and name (Month 1 rings the **Opening bell**, Month 2 is **The climb** of three rising candles); the three rounds flip in like dealt cards, targets count up, and the round you're about to play glows with a light sweep. **The exit plan** now has a feedback loop: under YOUR BUILD, a sample spread shows what the plan banks and cuts as you move the sliders, and THIS RUN counts your targets banked, stops taken (with what each saved against the max loss), expiries and closes by hand. Every payout is stamped with how the trade closed (✔ YOUR PLAN · TARGET BANKED, ✔ YOUR PLAN · STOP TAKEN · saved $X, ✋ CLOSED BY HAND · off the plan, ⌛ HELD TO EXPIRATION), and plan exits get their own stamp sound.
+
+**Your playtest notes:**
+1. **Rerolls you couldn't see:** REROLL and SIT OUT are now pinned above the round goal before the clock starts, so they're in view where Ines points, even at 1366×768.
+2. **The tutorial:** after the credit-spread lesson, Ines explains what a strike is, then marks a **floor** (or ceiling) the stock keeps turning at on the real chart, with a ring on each turn, and shows her **practice trade** past it at about 80% POP before you build your own. Lessons now spell out the position ("You're SELLING the 95 put: the pink line"), and a live POP bar in her bubble shows where your trade sits against 80%.
+3. **The stock's name** sits in the chart's top-left corner, with its price and today's move.
+4. **The stuck loop** after cashing out with market orders off is fixed (exits go as a limit at the natural price).
+5. **Controls follow the rules:** the size slider's contract counts stop at the contract limit and say so, approval levels hide spreads you can't open, and a rule that removes a button removes it (the Attendance Policy hides SIT OUT).
+- Tests: the Trade Builder end to end (open, freshness, studies, a condor edited leg by leg, the payoff, copy order, a second ticker, a ticker with no data), its data loader (Schwab live, saved, game data, nothing), the in-memory market behind it, freshness, the order text and descriptions, the Collector and his notice, the exit scorecard, the practice trade's floor finder, the tutorial, and the controls under each rule.
 
 ### 1.6.1: your 1.6.0 notes
 - **The payout (your Balatro note).** Closing a trade now plays its score out before the clock moves on: the P/L lands as chips, then every bonus fires in the order the game applied it, with the blue CHIPS and red MULT boxes ticking (and an amber SCORE box for score multipliers). Your cartridges sit in a row on the panel: each one that fires jumps and pops what it added ("+3 mult", "×2 score") with its trigger in plain words, the same cartridge jiggles on the top bar, and the ones that did nothing stay dim. Each step plays a note a semitone higher and speeds up; the total slams in, flies into the score (which only then counts it), and a trade that clears the round catches fire. The clock, coworker lines and the next decision wait for it; click, Space or Enter skips; Settings → "Payout when a trade closes": FULL, FAST or OFF. The research and the design are in `SCORING_FEEL.md`.
@@ -530,6 +558,9 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Known issues
 
+- **The Trade Builder's live data is untested against the real Schwab service** (this cloud box can't reach it). It uses the same read-only calls as PULL FROM SCHWAB plus the chain's `underlyingPrice` field for today's price; if the LIVE badge never shows during market hours, send `game.log`. Index options ($SPX and the like) aren't in the list yet; SPY, QQQ and IWM stand in.
+- **Earnings dates in the Trade Builder** come only from the game's DoltHub data; Schwab's market data has none, so the 25 new tickers show no earnings date. Check it at your broker before holding through a report.
+
 - **Straddle Stack sits right at the cartridge cap (1.6.1).** The final simulator run measured it adding 16.2 points of run win rate (the cap is 15); the two runs before measured 13.5 on the same picks, and the difference is one run out of 37, so it's noise at the edge rather than a change. If it feels like an auto-pick, its top bonus is one number in `cartridges.ts`.
 
 - **A completed run is about 41 minutes** for an experienced player (the simulator's estimate, 59 on your first runs), a minute over your 20–40. Placing trades is most of it (about 30 seconds each, roughly 40 trades a year), and the bosses invite a few more. If runs feel long, the quickest lever is one fewer ticket in Month 2; tell me and it's one number.
@@ -552,8 +583,10 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-**Your 1.6.1 playtest** (items 59–64 in `PLAYTEST.md`): the payout when a trade closes, the trophy and spoils screens, covered calls on your pricier cards, the shop at your screen size, and whether a full run is still easy (if it is, climb a Risk Tier). Items 47–58 from 1.6.0 still stand. The quickest way through the bosses: turn on developer mode (Settings → Game), open the DEV panel's **TEST CHECKLIST**, press SET UP on each item, tick WORKS or PROBLEM and leave a note, then COPY ALL and send me the list. Also play at least one real run to the year end, to feel the month menu, rewards and the Rebalancer in a normal run.
+**Your 1.7.0 playtest** (items 65–73 in `PLAYTEST.md`): the Trade Builder first (ideally with Schwab connected during market hours, side by side with thinkorswim), then the boss fixes, the month menu and exit plan, and the tutorial's practice trade.
+
+**Trade Builder v2 (building now, while you test):** an options tutorial inside the Trade Builder, and another 25 tickers.
 
 **Boss art:** the 12 portraits and 12 pillar icons in `BOSS_ART_BRIEF.md` (same art pipeline as before).
 
-**Still open from before:** Schwab on your PC (Settings → Data → Schwab, steps 1 to 5), the three missing Pad pictures (duck, lava lamp, bell), and building real market data then rerunning the balance check on it (`npm run sim -- --db <path to game.db>`).
+**Still open from before:** the three missing Pad pictures (duck, lava lamp, bell), and building real market data then rerunning the balance check on it (`npm run sim -- --db <path to game.db>`).

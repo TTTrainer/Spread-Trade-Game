@@ -89,6 +89,8 @@ export interface SessionConfig {
    * the next sync, which moves the edge forward.
    */
   liveEdge: ISODate | null;
+  /** How much chart a live card loads behind its day (the Trade Builder shows two years). */
+  liveHistoryDays?: number;
   /**
    * The player's "holding through earnings on purpose" tick also means "don't ask me the night
    * before". Off for the balance bots, which tick it only to be allowed to trade over a report.
@@ -502,7 +504,7 @@ export class TradingSession {
     const w: WindowDef = {
       id: -1 - this.cards.length,
       symbol,
-      historyStart: addDays(entryDate, -420),
+      historyStart: addDays(entryDate, -(this.config.liveHistoryDays ?? 420)),
       entryDate,
       endDate: edge,
       forwardDays: 0,

@@ -148,7 +148,8 @@ export type StudyId =
   | 'atr'
   | 'sr'
   | 'relvol'
-  | 'em';
+  | 'em'
+  | 'em2';
 
 interface TradingState {
   session: TradingSession | null;
@@ -199,6 +200,11 @@ interface TradingState {
   clockHold: string | null;
   /** The tutorial keeps the planned trade off the chart until it has explained the chart itself. */
   planHidden: boolean;
+  /**
+   * How size is set: conviction steps that fill a share of the risk cap (the game), or a plain
+   * contract count (the Trade Builder, where you size the trade yourself).
+   */
+  sizeMode: 'conviction' | 'contracts';
   /** The tutorial's practice trade marks the floor or ceiling it was built around (on this card). */
   practiceMark: (PracticeLevel & { cardId: string }) | null;
   /** A decision is tucked into a bar so the full chart can be reviewed. */
@@ -207,6 +213,9 @@ interface TradingState {
   /** The option chain tab replaces the chart. */
   chainOpen: boolean;
   setChainOpen: (v: boolean) => void;
+  /** The Trade Builder's full-size payoff replaces the chart. */
+  payoffOpen: boolean;
+  setPayoffOpen: (v: boolean) => void;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
   stamp: { id: number; title: string; text: string; credit: boolean; plan?: boolean } | null;
@@ -240,6 +249,7 @@ interface TradingState {
       maxPositions?: number | null;
       onChange?: (() => void) | null;
       blockReason?: ((cardId: string, structureId: StructureId) => string | null) | null;
+      sizeMode?: 'conviction' | 'contracts';
     },
   ) => void;
   /** Rules outside the market that stop a trade (a Career round's tickets, window, sit-out). */
@@ -833,6 +843,7 @@ export const useTrading = create<TradingState>((set, get) => {
     dismissRecap: () => set({ recap: null }),
     clockHold: null,
     planHidden: false,
+    sizeMode: 'conviction',
     practiceMark: null,
     dragging: false,
     setDragging: (v) => {
@@ -840,10 +851,15 @@ export const useTrading = create<TradingState>((set, get) => {
     },
     reviewChart: false,
     setReviewChart: (v) => set({ reviewChart: v }),
+    payoffOpen: false,
+    setPayoffOpen: (v) => {
+      if (v !== get().payoffOpen) sfx(v ? 'select' : 'click');
+      set(v ? { payoffOpen: true, chainOpen: false } : { payoffOpen: false });
+    },
     chainOpen: false,
     setChainOpen: (v) => {
       if (v !== get().chainOpen) sfx(v ? 'select' : 'click');
-      set({ chainOpen: v });
+      set(v ? { chainOpen: true, payoffOpen: false } : { chainOpen: false });
     },
 
     init: (s, opts = {}) => {
@@ -863,6 +879,7 @@ export const useTrading = create<TradingState>((set, get) => {
         drawings: {},
         whatIf: { pricePct: 0, days: 0, ivPts: 0 },
         recordMode: opts.recordMode ?? 'sandbox',
+        sizeMode: opts.sizeMode ?? 'conviction',
         runId: opts.runId ?? null,
         deskId: opts.deskId ?? null,
         lockedStudies: opts.lockedStudies ?? [],
@@ -1003,7 +1020,14 @@ export const useTrading = create<TradingState>((set, get) => {
       const { session, builder, version, confidence } = get();
       const selectedCardId = liveCardId(get());
       if (!session || !selectedCardId || !builder.expiration) return null;
-      const key = JSON.stringify([session.config.seed, version, selectedCardId, builder, confidence]);
+      const key = JSON.stringify([
+        session.config.seed,
+        version,
+        selectedCardId,
+        builder,
+        confidence,
+        get().sizeMode,
+      ]);
       if (planCache.key === key) return planCache.value;
       try {
         const params = {
@@ -1024,18 +1048,20 @@ export const useTrading = create<TradingState>((set, get) => {
           builder.legs ?? undefined,
           builder.stopMult,
         );
-        const qty = one.ok
-          ? Math.min(
-              maxQtyFor(builder.structureId),
-              session.maxOrderQty(),
-              convictionQty(
-                one.maxLossCents,
-                session.markedEquityCents(),
-                session.config.riskCapPct,
-                confidence,
-              ),
-            )
-          : 1;
+        const qty = !one.ok
+          ? 1
+          : get().sizeMode === 'contracts'
+            ? Math.max(1, Math.min(maxQtyFor(builder.structureId), session.maxOrderQty(), builder.qty))
+            : Math.min(
+                maxQtyFor(builder.structureId),
+                session.maxOrderQty(),
+                convictionQty(
+                  one.maxLossCents,
+                  session.markedEquityCents(),
+                  session.config.riskCapPct,
+                  confidence,
+                ),
+              );
         const value =
           qty === 1
             ? one

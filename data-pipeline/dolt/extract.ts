@@ -131,7 +131,8 @@ async function scoreCandidates(
 ): Promise<CandidateScore[]> {
   const out: CandidateScore[] = [];
   const cm = m.chain;
-  for (const c of CANDIDATES) {
+  // The Trade Builder's tickers come from Schwab; the DoltHub build keeps to the game's own.
+  for (const c of CANDIDATES.filter((x) => x.group !== 'builder')) {
     const cov = await server.query<{ first: unknown; last: unknown; days: number }>(
       `SELECT MIN(${q(cm, 'date')}) AS first, MAX(${q(cm, 'date')}) AS last, COUNT(DISTINCT ${q(cm, 'date')}) AS days FROM ${from(cm)} WHERE ${q(cm, 'symbol')} = ?`,
       [c.symbol],

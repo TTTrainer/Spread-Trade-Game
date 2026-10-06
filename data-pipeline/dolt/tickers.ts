@@ -1,8 +1,11 @@
 /** Candidate tickers and the selection rule from the build plan (section 13, step 4). */
 
+import { BUILDER_TICKERS } from '../../src/content/builderTickers';
+
 export interface Candidate {
   symbol: string;
-  group: 'mag7' | 'liquid' | 'highiv' | 'context';
+  /** 'builder': the Trade Builder's extra tickers (Schwab pulls them; the game's lineups don't deal them). */
+  group: 'mag7' | 'liquid' | 'highiv' | 'context' | 'builder';
   name: string;
   sector: string;
 }
@@ -33,6 +36,12 @@ export const CANDIDATES: Candidate[] = [
   { symbol: 'HOOD', group: 'highiv', name: 'Robinhood', sector: 'Financials' },
   { symbol: 'SPY', group: 'context', name: 'SPDR S&P 500 ETF', sector: 'Index ETF' },
   { symbol: 'DIA', group: 'context', name: 'SPDR Dow Jones ETF', sector: 'Index ETF' },
+  ...BUILDER_TICKERS.map((t): Candidate => ({
+    symbol: t.symbol,
+    group: 'builder',
+    name: t.name,
+    sector: t.sector,
+  })),
 ];
 
 export interface CandidateScore {

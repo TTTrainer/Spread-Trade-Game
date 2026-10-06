@@ -20,6 +20,7 @@ export type Screen =
   | 'pad'
   | 'daily'
   | 'live'
+  | 'builder'
   | 'contracts'
   | 'tutorial'
   | 'achievements'

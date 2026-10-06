@@ -7,6 +7,7 @@ import { useTrading } from './ui/store/trading';
 import { useRun } from './ui/store/run';
 import { useProfile } from './ui/store/profile';
 import { useLive } from './ui/store/live';
+import { useBuilder } from './ui/store/builder';
 import { playRun, type BotKind } from './engine/sim/bot';
 import { useMusic } from './audio/music';
 import { fx } from './fx/overlay';
@@ -20,6 +21,7 @@ import { startDiagnostics } from './ui/diagnostics';
   run: useRun,
   profile: useProfile,
   live: useLive,
+  builder: useBuilder,
   music: useMusic,
   fx,
   chart: chartBridge,
