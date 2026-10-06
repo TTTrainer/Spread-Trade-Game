@@ -6,6 +6,7 @@ import {
   priceDensity,
   probBetween,
   tosDate,
+  tradeName,
 } from '../../src/engine/strategies/study';
 import type { Leg } from '../../src/engine/strategies/types';
 
@@ -64,6 +65,26 @@ describe('the Trade Builder readouts', () => {
     expect(d).toMatch(/Best case \$120, worst case −\$380/);
     expect(d).toMatch(/Breakeven at 17 OCT 25: 448.80/);
     expect(d).toMatch(/about 72%/);
+    // A single option is described as itself, whatever strategy the builder was on.
+    const single = describeTrade({
+      symbol: 'SPY',
+      structureId: 'bull_call',
+      qty: 1,
+      net: 2.1,
+      maxProfit: null,
+      maxLoss: 2.1,
+      breakevens: [452.1],
+      pop: 0.41,
+      expiration: '2025-10-17',
+      legs: [call(450, 1)],
+    });
+    expect(single).toMatch(/You BUY the 450 call for \$210, betting SPY rises/);
+    expect(single).toMatch(/Best case no fixed cap/);
+    expect(tradeName('bull_put', [put(440, -1)])).toBe('Short put');
+    expect(tradeName('bull_put', [put(440, -1), put(435, 1)])).toBe('Bull Put Spread');
+    expect(orderText('SPY', 'bull_call', [call(450, 1)], 2, 2.1)).toBe(
+      'BUY +2 SPY 100 17 OCT 25 450 CALL @2.10 LMT',
+    );
   });
 
   it('spreads the expiration price the way the POP does', () => {

@@ -9,8 +9,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { diffDays } from '../../engine/calendar';
 import { atmIv, frontExpiration, payoffAtExpiry, payoffNow } from '../../engine/strategies/metrics';
-import { describeTrade, legLines, orderText, priceDensity, probBetween } from '../../engine/strategies/study';
-import { STRUCTURES } from '../../engine/strategies/structures';
+import {
+  describeTrade,
+  legLines,
+  orderText,
+  priceDensity,
+  probBetween,
+  tradeName,
+} from '../../engine/strategies/study';
 import type { OptionLeg } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { money } from '../format';
@@ -53,8 +59,11 @@ export function PayoffStudio({ onClose }: { onClose: () => void }) {
   const cardId = useTrading(liveCardId);
   const plan = useTrading((s) => s.plan)();
   const toast = useApp((s) => s.toast);
-  const [days, setDays] = useState(0);
-  const [ivPts, setIvPts] = useState(0);
+  // In the store, so the options course can see where the sliders are.
+  const days = useTrading((s) => s.payoffDays);
+  const ivPts = useTrading((s) => s.payoffIv);
+  const setDays = (d: number) => useTrading.setState({ payoffDays: d });
+  const setIvPts = (v: number) => useTrading.setState({ payoffIv: v });
   const [hover, setHover] = useState<number | null>(null);
   const [boxRef, box] = useBox();
   const metrics = plan?.metrics ?? null;
@@ -64,7 +73,9 @@ export function PayoffStudio({ onClose }: { onClose: () => void }) {
   const front = curve ? frontExpiration(curve.legs) : null;
   const dte = curve && front ? Math.max(0, diffDays(curve.env.date, front)) : 0;
   const sigma = (chain && front ? atmIv(chain, front) : null) ?? plan?.entry?.iv ?? 0.3;
-  useEffect(() => setDays((d) => Math.min(d, dte)), [dte]);
+  useEffect(() => {
+    if (days > dte) setDays(dte);
+  }, [dte]);
 
   const data = useMemo(() => {
     if (!curve) return null;
@@ -145,7 +156,7 @@ export function PayoffStudio({ onClose }: { onClose: () => void }) {
       <div className="ps-main">
         <div className="ps-head num">
           <b>
-            {symbol} {plan ? STRUCTURES[plan.structureId].short : ''}
+            {symbol} {plan ? tradeName(plan.structureId, plan.legs) : ''}
           </b>{' '}
           <span className="dim">
             {qty}× · {front ?? ''} ({dte}d) · IV {(sigma * 100).toFixed(0)}%
@@ -415,6 +426,7 @@ export function PayoffStudio({ onClose }: { onClose: () => void }) {
               breakevens: metrics.breakevens,
               pop: metrics.pop,
               expiration: front,
+              legs: curve.legs,
             })}
           </p>
         )}

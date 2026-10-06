@@ -8,8 +8,8 @@ The whole files are on the GitHub **Releases** page of this project (no pieces t
 
 Then you have two ways to run the game. Use either one.
 
-- **`SpreadTradingGame-Setup-1.7.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
-- **`SpreadTradingGame-Portable-1.7.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
+- **`SpreadTradingGame-Setup-1.8.0.exe`** is a normal installer. Double-click it, choose a folder (or keep the default), and it adds a desktop and Start-menu shortcut. To remove it later, use Windows' "Add or remove programs".
+- **`SpreadTradingGame-Portable-1.8.0.exe`** runs straight away with nothing to install. Put it anywhere, for example your Desktop or a USB stick, and double-click it.
 
 **Windows will probably warn you** with a blue box: "Windows protected your PC". That happens because the game isn't signed with a paid code-signing certificate, not because anything is wrong. Click **More info**, then **Run anyway**. You only need to do this once.
 
@@ -17,7 +17,7 @@ Then you have two ways to run the game. Use either one.
 
 There are two Mac builds: **Apple chip** (M1 and later, the `arm64` files) and **Intel** (the `x64` files). If you're not sure, choose Apple menu → About This Mac: "Chip: Apple M…" means Apple chip.
 
-1. Put the parts (`SpreadTradingGame-mac-arm64-1.7.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
+1. Put the parts (`SpreadTradingGame-mac-arm64-1.8.0.zip.part0` to `part4`) and `join-mac.sh` in one folder, for example Downloads.
 2. Open **Terminal** (press ⌘ Space, type Terminal, press Return).
 3. Type `bash ` (with a space after it), drag `join-mac.sh` from Finder into the Terminal window, and press Return.
 
@@ -64,7 +64,7 @@ When it finishes, **VIEW DATA REPORT** lists the tickers, the dates covered and 
 ## 4. Keeping data current, the Trade Builder, and the paper month
 
 - **Settings → Data → SYNC LATEST DAYS** pulls the newest trading days, usually a few minutes.
-- **The Trade Builder** (title screen) is for building a real trade on today's market. Type a ticker under OPEN A TICKER (or press ALL), read it with the studies in the tray, build any strategy with the sliders or leg by leg (LEGS, on the TRADE tab), study it full size under ⟋ PAYOFF, and press **COPY ORDER** (Alt+C) to copy it as thinkorswim-style text. You enter the order at your broker yourself; nothing is ever sent. With Schwab connected (below), each ticker loads live: today's prices and option chain. Without it, the builder uses your newest saved data and the badge at the top says how out of date it is.
+- **The Trade Builder** (title screen) is for building a real trade on today's market. Type a ticker under OPEN A TICKER (or press ALL), read it with the studies in the tray, build any strategy with the sliders or leg by leg (LEGS, on the TRADE tab), study it full size under ⟋ PAYOFF, and press **COPY ORDER** (Alt+C) to copy it as thinkorswim-style text. New to options? **✎ LEARN OPTIONS** runs a 13-lesson course on the chart you have open. You enter the order at your broker yourself; nothing is ever sent. With Schwab connected (below), each ticker loads live: today's prices and option chain. Without it, the builder uses your newest saved data and the badge at the top says how out of date it is.
 - **The paper month** (Trade Builder → PAPER MONTH, the old Live) plays the most recent month: you start 20 trading days back with a dealt lineup (the market plus a few stocks), trade like any desk, and press Space to play each day. At the latest close the clock waits. **⟳ CHECK FOR NEW DAYS** fetches newer days and the month plays on from there, so it never runs out. The aim: finish ahead of simply holding the market. **NEW MONTH** starts over (closed trades stay in Stats).
 - On the SIM market there's nothing new to download, so CHECK FOR NEW DAYS moves a simulated calendar forward one week instead, and the screen says so.
 

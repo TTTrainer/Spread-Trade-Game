@@ -58,6 +58,18 @@ function optionLegs(legs: Leg[]): OptionLeg[] {
   return legs.filter((l): l is OptionLeg => l.kind === 'option');
 }
 
+/** The trade's one option when it is a single option and nothing else (no shares, no other legs). */
+export function singleOption(legs: Leg[]): OptionLeg | null {
+  return legs.length === 1 && legs[0].kind === 'option' && Math.abs(legs[0].ratio) === 1 ? legs[0] : null;
+}
+
+/** What to call the trade: the strategy's name, or "long call", "short put" for a single option. */
+export function tradeName(structureId: StructureId, legs: Leg[]): string {
+  const one = singleOption(legs);
+  if (one) return `${one.ratio < 0 ? 'Short' : 'Long'} ${one.right === 'C' ? 'call' : 'put'}`;
+  return STRUCTURES[structureId].name;
+}
+
 /**
  * The order in thinkorswim's one-line style: SELL -1 VERTICAL SPY 100 17 OCT 25 450/445 PUT @1.20 LMT.
  * `net` is per share: negative for a credit. Shapes thinkorswim has no single word for come out
@@ -79,6 +91,10 @@ export function orderText(
   const byStrike = (r: 'C' | 'P', dir: 1 | -1) =>
     ol.filter((l) => l.right === r).sort((a, b) => dir * (a.strike - b.strike));
   const shorts = ol.filter((l) => l.ratio < 0);
+  // One option on its own (the course's lessons): thinkorswim's single-leg line.
+  const single = singleOption(legs);
+  if (single)
+    return `${single.ratio < 0 ? `SELL -${qty}` : `BUY +${qty}`} ${symbol} 100 ${tosDate(single.expiration)} ${strikeText(single.strike)} ${rightWord(single.right)} ${px}`;
   switch (structureId) {
     case 'bull_put':
     case 'bear_put': {
@@ -156,14 +172,18 @@ export function describeTrade(opts: {
   breakevens: number[];
   pop: number;
   expiration: ISODate | null;
+  /** The legs, so a single option is described as itself rather than as a strategy. */
+  legs?: Leg[];
 }): string {
   const def = STRUCTURES[opts.structureId];
+  const one = opts.legs ? singleOption(opts.legs) : null;
   const dollars = (x: number) => `$${Math.round(Math.abs(x) * 100 * opts.qty).toLocaleString('en-US')}`;
   const when = opts.expiration ? ` at ${tosDate(opts.expiration)}` : '';
+  const name = one ? `${one.strike} ${one.right === 'C' ? 'call' : 'put'}` : def.name.toLowerCase();
   const head =
     opts.net < 0
-      ? `You SELL the ${def.name.toLowerCase()} for ${dollars(opts.net)} up front`
-      : `You BUY the ${def.name.toLowerCase()} for ${dollars(opts.net)}`;
+      ? `You SELL the ${name} for ${dollars(opts.net)} up front`
+      : `You BUY the ${name} for ${dollars(opts.net)}`;
   const bias: Record<string, string> = {
     bull: `betting ${opts.symbol} stays up`,
     bear: `betting ${opts.symbol} stays down`,
@@ -174,5 +194,11 @@ export function describeTrade(opts: {
     ? ` Breakeven${opts.breakevens.length > 1 ? 's' : ''}${when}: ${opts.breakevens.map((b) => b.toFixed(2)).join(' and ')}.`
     : '';
   const best = opts.maxProfit === null ? 'no fixed cap' : dollars(opts.maxProfit);
-  return `${head}, ${bias[def.bias] ?? 'on the move you expect'}. Best case ${best}, worst case −${dollars(opts.maxLoss)}.${be} Chance of profit about ${Math.round(opts.pop * 100)}%.`;
+  // A single option's bet is set by its side and type, whatever strategy the builder was on.
+  const lean = one
+    ? one.ratio > 0
+      ? `betting ${opts.symbol} ${one.right === 'C' ? 'rises' : 'falls'}`
+      : `betting ${opts.symbol} stays ${one.right === 'C' ? 'below' : 'above'} ${one.strike}`
+    : (bias[def.bias] ?? 'on the move you expect');
+  return `${head}, ${lean}. Best case ${best}, worst case −${dollars(opts.maxLoss)}.${be} Chance of profit about ${Math.round(opts.pop * 100)}%.`;
 }

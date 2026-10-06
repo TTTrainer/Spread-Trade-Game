@@ -570,3 +570,108 @@
     font-size: 14px;
   }
 }
+
+/* LEARN OPTIONS: the course on the right-hand LEARN tab. */
+.bld-learn {
+  color: #000;
+  background: var(--amber);
+  border-color: var(--amber);
+}
+.course {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 16px;
+}
+.course-kicker {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+}
+.course h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--cyan);
+  text-shadow: 2px 2px 0 #000;
+}
+.course-text {
+  margin: 0;
+  line-height: 1.35;
+  color: var(--text);
+}
+.course-task {
+  padding: 6px 8px;
+  border: 1px dashed var(--amber);
+  color: var(--amber);
+  line-height: 1.3;
+}
+.course-task.ok {
+  border-style: solid;
+  border-color: var(--up);
+  color: var(--up);
+}
+.course-quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cq-q {
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.cq-opt {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 3px 8px;
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.cq-opt:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+.cq-opt.right {
+  border-color: var(--up);
+  color: var(--up);
+}
+.cq-opt.wrong {
+  border-color: var(--down);
+  color: var(--down);
+}
+.cq-why {
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+.cq-why.right {
+  color: var(--up);
+}
+.cq-why.wrong {
+  color: var(--amber);
+}
+.course-actions {
+  display: flex;
+  gap: 6px;
+}
+.course-actions .primary {
+  flex: 1;
+}
+.course-dots {
+  display: flex;
+  gap: 3px;
+}
+.course-dots i {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+}
+.course-dots i.done {
+  background: var(--cyan);
+}
+.course-dots i.now {
+  background: var(--amber);
+}

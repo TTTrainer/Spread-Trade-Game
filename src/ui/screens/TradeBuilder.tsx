@@ -8,8 +8,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { diffDays } from '../../engine/calendar';
-import { expirationsOf, quotesFor, STRUCTURES } from '../../engine/strategies/structures';
-import { orderText } from '../../engine/strategies/study';
+import { expirationsOf, quotesFor } from '../../engine/strategies/structures';
+import { orderText, tradeName } from '../../engine/strategies/study';
+import { CoursePanel } from './CoursePanel';
 import type { OptionLeg, StructureId } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
 import { Kbd, Modal } from '../components/ui';
@@ -150,6 +151,15 @@ function BuilderTopBar() {
         data-tip-body="Load this ticker again: today's prices and chain from Schwab when connected."
       >
         {loading ? `LOADING ${loading}…` : '⟳ REFRESH'}
+      </button>
+      <button
+        className="pixel-btn bld-learn"
+        onClick={() => (sfx('select'), useTrading.getState().setRightTab('learn'))}
+        data-testid="builder-learn"
+        data-tip-title="Learn options"
+        data-tip-body="A 13-lesson course on the chart you have open: from a single call to credit spreads and condors, with one thing to try or one question per lesson."
+      >
+        ✎ LEARN OPTIONS
       </button>
       <button className="pixel-btn" onClick={() => go('live')} data-testid="builder-classic">
         PAPER MONTH ▸
@@ -397,7 +407,7 @@ function BuilderTicket() {
   return (
     <div className="tray-section ticket bld-ticket num" data-testid="builder-ticket">
       <div className="section-title">
-        Order · {STRUCTURES[plan.structureId].name} · {plan.qty}×
+        Order · {tradeName(plan.structureId, plan.legs)} · {plan.qty}×
       </div>
       <div className={`bld-net ${net < 0 ? 'credit' : 'debit'}`}>
         <span>{net < 0 ? 'CREDIT' : 'DEBIT'}</span>
@@ -483,6 +493,7 @@ export function TradeBuilderScreen() {
         tabs={['builder', 'analyze']}
         ticket={<BuilderTicket />}
         tradeTabExtra={<LegsEditor />}
+        learnTab={<CoursePanel />}
         trayExtra={<StudyStrip />}
         leftPinned={<TickerPicker />}
       />

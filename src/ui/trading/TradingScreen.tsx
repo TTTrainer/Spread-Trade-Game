@@ -239,6 +239,7 @@ export function TradingLayout({
   tabs: tabList,
   trayExtra,
   tradeTabExtra,
+  learnTab,
 }: {
   top: ReactNode;
   /** A full-size PAYOFF view beside CHART and CHAIN (the Trade Builder). */
@@ -253,6 +254,8 @@ export function TradingLayout({
   trayExtra?: ReactNode;
   /** Goes under the payoff on the TRADE tab (the Trade Builder's leg editor). */
   tradeTabExtra?: ReactNode;
+  /** A third right-hand tab, LEARN (the Trade Builder's options course). */
+  learnTab?: ReactNode;
   /** What the news brief may show (Career unlocks detail through analysts). */
   briefAccess?: BriefAccess;
   levels?: Partial<Record<StructureId, number>>;
@@ -428,8 +431,23 @@ export function TradingLayout({
           >
             TRADE
           </button>
+          {learnTab && (
+            <button
+              className={tab === 'learn' ? 'sel' : ''}
+              onClick={() => setRightTab('learn')}
+              data-testid="rtab-learn"
+              data-tip-title="Learn options"
+              data-tip-body="A short course on this chart: one idea at a time, from a single call to the credit spreads and condors you build here."
+              role="tab"
+              aria-selected={tab === 'learn'}
+            >
+              LEARN
+            </button>
+          )}
         </div>
-        {tab === 'brief' ? (
+        {tab === 'learn' && learnTab ? (
+          learnTab
+        ) : tab === 'brief' ? (
           <NewsBriefPanel access={briefAccess} />
         ) : (
           <>

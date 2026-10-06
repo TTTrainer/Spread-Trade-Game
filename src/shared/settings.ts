@@ -241,6 +241,8 @@ export interface Settings {
     seenStructures: string[];
     /** Where the tutorial's lessons are (null: from the top). */
     tutorialProgress: { idx: number; seen: string[]; skipped: boolean } | null;
+    /** The Trade Builder's options course: the lesson you're on and the lessons finished. */
+    courseProgress?: { idx: number; done: string[] } | null;
     /** Show a confirm box before each order (off: orders go out on Sell/Buy). */
     confirmOrders: boolean;
     /** Developer mode: the DEV panel (unlocks, cash and stress levers, playtest notes). */

@@ -160,7 +160,7 @@ interface TradingState {
   ff: FFState;
   panel: Panel;
   /** The right panel: the news brief or the trade view (null follows the card: brief until you build). */
-  rightTab: 'brief' | 'trade' | null;
+  rightTab: 'brief' | 'trade' | 'learn' | null;
   /** The player has started shaping a trade on this card (the right panel flips to TRADE). */
   touched: boolean;
   /** The call this build makes (read from the structure and strikes). */
@@ -216,6 +216,9 @@ interface TradingState {
   /** The Trade Builder's full-size payoff replaces the chart. */
   payoffOpen: boolean;
   setPayoffOpen: (v: boolean) => void;
+  /** The full-size payoff's DATE (days ahead) and IV (points) sliders. */
+  payoffDays: number;
+  payoffIv: number;
   setPace: (p: DayPace) => void;
   /** The order stamp slammed onto the chart after a fill. */
   stamp: { id: number; title: string; text: string; credit: boolean; plan?: boolean } | null;
@@ -279,7 +282,7 @@ interface TradingState {
   closePosition: (id: string, order?: OrderSpec) => Promise<void>;
   rollPosition: (id: string, legs: OptionLeg[], order?: OrderSpec) => Promise<void>;
   setPanel: (p: Panel) => void;
-  setRightTab: (t: 'brief' | 'trade' | null) => void;
+  setRightTab: (t: 'brief' | 'trade' | 'learn' | null) => void;
   setWhatIf: (patch: Partial<TradingState['whatIf']>) => void;
   toggleStudy: (s: StudyId) => void;
   setTimeframe: (t: 'D' | 'W') => void;
@@ -851,6 +854,8 @@ export const useTrading = create<TradingState>((set, get) => {
     },
     reviewChart: false,
     setReviewChart: (v) => set({ reviewChart: v }),
+    payoffDays: 0,
+    payoffIv: 0,
     payoffOpen: false,
     setPayoffOpen: (v) => {
       if (v !== get().payoffOpen) sfx(v ? 'select' : 'click');

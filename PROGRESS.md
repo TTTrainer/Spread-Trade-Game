@@ -4,17 +4,24 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, and **1.7.0**: your boss checklist and playtest notes, and the **Trade Builder** (Live mode repurposed for building real trades on today's market, with 25 more tickers). Version 1.7.0. Next: your playtest of 1.7.0 (items 65–73 in `PLAYTEST.md`) while the Trade Builder's second version (an options tutorial and another 25 tickers) is built.
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder) and **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course and another 25 tickers). Version 1.8.0. Next: your playtest of 1.7.0 and 1.8.0 (items 65–76 in `PLAYTEST.md`).
 
 ## How to run (on your PC)
 
-- **Play:** download from the [1.7.0 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.7.0.exe`, or run `SpreadTradingGame-Portable-1.7.0.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Play:** download from the [1.8.0 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.0) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.0.exe`, or run `SpreadTradingGame-Portable-1.8.0.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
 - **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.8.0: the Trade Builder's second version (LEARN OPTIONS, and another 25 tickers)
+- **LEARN OPTIONS** (the amber button in the Trade Builder, or its LEARN tab): a 13-lesson course on the chart you have open, from a single call to the credit spreads and condors you build here. Each lesson sets up its trade for you (a long call, a long put, a short put, a bull put, an iron condor), opens the right view, says what to look at in two or three sentences, and then either asks one question (with the answer explained, right or wrong) or asks you to do one thing with the tools: move the short strike and watch POP, drag DATE to expiration to see time decay, slide IV down to see vega, land a bull put at 75–85% POP past the expected move and a floor. The last lessons cover managing the trade (take profit around half, stop around 2× the credit) and events (earnings IV crush, assignment near expiration). Progress is saved, so it picks up where you left off.
+- **Single options** are named and priced as themselves everywhere: "Long call", "Short put", "You BUY the 350 call…", and thinkorswim's single-leg order line (`BUY +1 SPY 100 17 OCT 25 450 CALL @2.10 LMT`).
+- **Another 25 tickers:** EEM, KRE, XBI, USO, FXI, LLY, V, MA, JNJ, PFE, MRNA, KO, PEP, MCD, NKE, SBUX, T, VZ, CSCO, QCOM, CVX, DAL, CCL, DKNG, RDDT (the Trade Builder now carries 75). PULL FROM SCHWAB fetches two years of prices for these too.
+- **The particle effects can't break the screen any more:** on a computer where they can't draw (no graphics card), a failed frame is skipped and repeated failures switch the effects off quietly.
+- Tests: the course (content, legs picked by delta, tasks), the single-option names and order line, the 50 tickers, and the course end to end (a quiz that waits for an answer, tasks that wait for you, progress kept after leaving).
 
 ### 1.7.0: your boss checklist, your playtest notes, and the Trade Builder
 **The Trade Builder (your note 6: Live mode repurposed).** On the title screen, TRADE BUILDER replaces Live.
@@ -583,9 +590,9 @@ From your notes: assets need work; too cluttered and too many needy clicks; hove
 
 ## Next
 
-**Your 1.7.0 playtest** (items 65–73 in `PLAYTEST.md`): the Trade Builder first (ideally with Schwab connected during market hours, side by side with thinkorswim), then the boss fixes, the month menu and exit plan, and the tutorial's practice trade.
+**Your 1.7.0 and 1.8.0 playtest** (items 65–76 in `PLAYTEST.md`): the Trade Builder first (ideally with Schwab connected during market hours, side by side with thinkorswim), then the boss fixes, the month menu and exit plan, and the tutorial's practice trade.
 
-**Trade Builder v2 (building now, while you test):** an options tutorial inside the Trade Builder, and another 25 tickers.
+**Trade Builder v2 is done** (1.8.0): LEARN OPTIONS and another 25 tickers. Try the course as if you were teaching a friend (items 74–76).
 
 **Boss art:** the 12 portraits and 12 pillar icons in `BOSS_ART_BRIEF.md` (same art pipeline as before).
 

@@ -27,10 +27,12 @@ describe('Trade Builder data freshness', () => {
 });
 
 describe('the Trade Builder ticker list', () => {
-  it('adds 25 new, unique tickers that the game did not already carry', () => {
-    expect(BUILDER_TICKERS).toHaveLength(25);
+  it('adds two waves of 25 new, unique tickers that the game did not already carry', () => {
+    expect(BUILDER_TICKERS).toHaveLength(50);
+    expect(BUILDER_TICKERS.filter((t) => t.wave === 1)).toHaveLength(25);
+    expect(BUILDER_TICKERS.filter((t) => t.wave === 2)).toHaveLength(25);
     const syms = BUILDER_TICKERS.map((t) => t.symbol);
-    expect(new Set(syms).size).toBe(25);
+    expect(new Set(syms).size).toBe(50);
     const game = CANDIDATES.filter((c) => c.group !== 'builder').map((c) => c.symbol);
     for (const s of syms) expect(game, s).not.toContain(s);
     // Schwab pulls every candidate, so the builder's tickers are in the pull list.

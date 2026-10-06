@@ -12,7 +12,7 @@ test('trade builder: open a ticker, build a condor leg by leg, read its payoff, 
   test.setTimeout(180_000);
   const { app, page } = await launchGame();
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message} ${e.stack ?? ''}`));
   await page.getByTestId('menu-builder').click();
   await expect(page.getByTestId('builder-screen')).toBeVisible();
   await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
@@ -97,6 +97,85 @@ test('trade builder: open a ticker, build a condor leg by leg, read its payoff, 
 
   await page.getByTestId('builder-back').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
+  expect(errors, errors.join('\n')).toEqual([]);
+  await app.close();
+});
+
+/**
+ * Trade Builder v2: LEARN OPTIONS. Each lesson sets up its trade on the open ticker; a lesson with
+ * a question waits for an answer, one with a task waits for the player to do it.
+ */
+test('learn options: lessons set up real trades, questions explain, tasks wait for the player', async () => {
+  test.setTimeout(180_000);
+  const { app, page } = await launchGame();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message} ${e.stack ?? ''}`));
+  await page.getByTestId('menu-builder').click();
+  await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('builder-learn').click();
+  const course = page.getByTestId('course');
+  await expect(course).toHaveAttribute('data-lesson', 'what');
+  await shot(page, '23-learn-1920');
+  await page.getByTestId('course-next').click();
+
+  // A bought call: the payoff opens with one long call, and the question waits for an answer.
+  await expect(course).toHaveAttribute('data-lesson', 'call');
+  await expect(page.getByTestId('payoff-studio')).toBeVisible();
+  await expect(page.getByTestId('payoff-say')).toContainText(/You BUY the \d+(\.\d+)? call/);
+  await expect(page.getByTestId('builder-order')).toContainText(/BUY \+1 \S+ 100 .* CALL @/);
+  await expect(page.getByTestId('course-next')).toBeDisabled();
+  await page.getByTestId('course-opt-0').click();
+  await expect(page.getByTestId('course-why')).toContainText('Not quite');
+  await expect(page.getByTestId('course-next')).toBeEnabled();
+  await shot(page, '23-learn-quiz-1920');
+  await page.getByTestId('course-next').click();
+  await expect(course).toHaveAttribute('data-lesson', 'put');
+  await page.getByTestId('course-next').click();
+  await expect(course).toHaveAttribute('data-lesson', 'sell');
+  await page.getByTestId('course-opt-0').click();
+  await expect(page.getByTestId('course-why')).toContainText('Right');
+  await page.getByTestId('course-next').click();
+
+  // Delta: the task waits until the strike moves.
+  await expect(course).toHaveAttribute('data-lesson', 'delta');
+  await expect(page.getByTestId('course-next')).toBeDisabled();
+  await page.evaluate(() => (window as any).__stg.trading.getState().setBuilder({ delta: 0.15, legs: null }));
+  await expect(page.getByTestId('course-task')).toContainText('✓');
+  await page.getByTestId('course-next').click();
+
+  // Theta: drag DATE to expiration.
+  await expect(course).toHaveAttribute('data-lesson', 'theta');
+  await expect(page.getByTestId('course-next')).toBeDisabled();
+  const max = await page.getByTestId('ps-days').getAttribute('max');
+  await page.getByTestId('ps-days').fill(max!);
+  await expect(page.getByTestId('course-task')).toContainText('✓');
+  await shot(page, '23-learn-theta-1920');
+  await shot(page, '23-learn-theta-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.getByTestId('course-next').click();
+
+  // Vega: slide IV down.
+  await expect(course).toHaveAttribute('data-lesson', 'vega');
+  await page.getByTestId('ps-iv').fill('-10');
+  await expect(page.getByTestId('course-task')).toContainText('✓');
+  await page.getByTestId('course-next').click();
+
+  // The expected move on the chart, then the vertical.
+  await expect(course).toHaveAttribute('data-lesson', 'em');
+  await expect(page.getByTestId('study-em2')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('course-next').click();
+  await expect(course).toHaveAttribute('data-lesson', 'vertical');
+  await expect(page.getByTestId('builder-order')).toContainText('VERTICAL');
+  await page.getByTestId('course-opt-1').click();
+  await page.getByTestId('course-next').click();
+
+  // Progress is saved: leave and come back to the same lesson.
+  await expect(course).toHaveAttribute('data-lesson', 'pick');
+  await page.getByTestId('builder-back').click();
+  await page.getByTestId('menu-builder').click();
+  await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('builder-learn').click();
+  await expect(page.getByTestId('course')).toHaveAttribute('data-lesson', 'pick');
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });
