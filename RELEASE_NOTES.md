@@ -1,11 +1,19 @@
-# Spread Trading Game 1.8.0
+# Spread Trading Game 1.8.1
 
 A single-player roguelite about trading options spreads on real historical market data, now with a Trade Builder for today's market. Paper trading only; not financial advice.
 
-## What's new in 1.8.0 (the Trade Builder's second version)
+## What's new in 1.8.1
+
+- **50 tickers in all, as you meant:** the game's 25 plus the 25 added in 1.7.0. 1.8.0's second 25 (EEM through RDDT) are gone from the Trade Builder and from PULL FROM SCHWAB, so a pull is shorter. Anything already saved for them on your PC is left alone and never used.
+- **Index options in the Trade Builder:** SPX, XSP (a tenth of SPX, sized for small accounts), NDX and RUT, in their own group under ALL. Type `SPX` or `$SPX`. They load live from Schwab like any ticker (PULL FROM SCHWAB saves them too), and the order ticket marks them **CASH-SETTLED**: European style, no early assignment, no shares at expiration. Their chains are huge, so the builder asks Schwab for the strikes nearest the money and narrows the request if Schwab turns it down. Where SPX lists two contracts on the same strike and day (the AM-settled monthly and the PM-settled weekly), the builder keeps the PM one.
+- **Fix:** BUILD GAME DATA FROM SCHWAB had started sweeping the Trade Builder's extra tickers into the game's own market (since 1.7.0). Career lineups deal only the game's tickers again. If you built game data from Schwab since 1.7.0, build it once more.
+- **A new test checklist** (Settings › Game › Developer mode, then DEV › TEST CHECKLIST): only what changed since 1.6, each check tagged with its release. **▶ SET UP** takes you straight to the spot (the Trade Builder at a ticker or a LEARN OPTIONS lesson, a run with the boss or rules it needs, the tutorial from the start, Settings › Data), and **SAVE AS FILE** writes one file with every result, note and playtest note, stamped with the version.
+- **Fixes:** a LEARN OPTIONS task done in its first instant now shows its ✓; when days run fast, yesterday's recap leaves before today's arrives (two no longer stack); odd contracts (adjusted after a split, minis) no longer slip into a Schwab chain; the ticker list no longer has the chart's tabs drawn over it.
+
+## New in 1.8.0 (the Trade Builder's second version)
 
 - **LEARN OPTIONS** (the amber button in the Trade Builder): a 13-lesson course on the chart you have open, from a single call to credit spreads and iron condors, then managing the trade and the events that move it. Each lesson sets up its trade for you and asks one question (explained, right or wrong) or one thing to try: move the strike and watch POP, drag DATE to expiration to see time decay, slide IV down to see vega, land a bull put at about 80% POP. Progress is saved.
-- **Another 25 tickers** (75 in the Trade Builder): EEM, KRE, XBI, USO, FXI, LLY, V, MA, JNJ, PFE, MRNA, KO, PEP, MCD, NKE, SBUX, T, VZ, CSCO, QCOM, CVX, DAL, CCL, DKNG, RDDT.
+- Another 25 tickers (removed again in 1.8.1: you meant 50 in all).
 - Single options are named and priced as themselves ("Long call", "Short put"), with thinkorswim's single-leg order line.
 - The particle effects skip a frame they can't draw instead of raising an error on computers without a graphics card.
 
@@ -26,8 +34,8 @@ A single-player roguelite about trading options spreads on real historical marke
 
 ## Downloads
 
-- **Windows:** `SpreadTradingGame-Setup-1.8.0.exe` (installer) or `SpreadTradingGame-Portable-1.8.0.exe` (no install).
-- **Mac:** `SpreadTradingGame-mac-arm64-1.8.0.zip` (Apple chip) or `SpreadTradingGame-mac-x64-1.8.0.zip` (Intel). Unzip and drag **Spread Trading Game** into Applications.
+- **Windows:** `SpreadTradingGame-Setup-1.8.1.exe` (installer) or `SpreadTradingGame-Portable-1.8.1.exe` (no install).
+- **Mac:** `SpreadTradingGame-mac-arm64-1.8.1.zip` (Apple chip) or `SpreadTradingGame-mac-x64-1.8.1.zip` (Intel). Unzip and drag **Spread Trading Game** into Applications.
 
 The builds aren't signed with a paid certificate. On Windows, choose More info → Run anyway; on a Mac, if it says it "can't verify" the app, open System Settings → Privacy & Security and click Open Anyway. You only do this once.
 
