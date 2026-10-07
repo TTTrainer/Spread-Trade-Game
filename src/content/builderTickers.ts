@@ -1,7 +1,7 @@
 /**
  * The Trade Builder's extra tickers: the next 50 most heavily traded option markets after the 25
  * the game already carries (the Mag 7, the liquid large caps, the high-IV names, SPY and DIA), in
- * two waves of 25 (v1, then v2).
+ * two waves of 25 (v1, then v2), and the four cash-settled index options (1.8.1).
  * PULL FROM SCHWAB fetches two years of daily prices for each, plus each close's option chain;
  * the Trade Builder also asks Schwab for today's chain the moment a ticker is opened.
  */
@@ -10,9 +10,10 @@ export interface BuilderTicker {
   symbol: string;
   name: string;
   sector: string;
-  kind: 'etf' | 'stock';
-  /** The release that added it (the Trade Builder's v2 adds another 25). */
-  wave: 1 | 2;
+  /** 'index': a cash-settled, European-style index option (no shares, no early assignment). */
+  kind: 'etf' | 'stock' | 'index';
+  /** The release that added it (v1's 25, v2's 25, then the index options). */
+  wave: 1 | 2 | 3;
 }
 
 export const BUILDER_TICKERS: BuilderTicker[] = [
@@ -69,6 +70,11 @@ export const BUILDER_TICKERS: BuilderTicker[] = [
   { symbol: 'CCL', name: 'Carnival', sector: 'Consumer Discretionary', kind: 'stock', wave: 2 },
   { symbol: 'DKNG', name: 'DraftKings', sector: 'Consumer Discretionary', kind: 'stock', wave: 2 },
   { symbol: 'RDDT', name: 'Reddit', sector: 'Communication', kind: 'stock', wave: 2 },
+  // Index options: cash-settled, European style. XSP is a tenth of SPX, sized for small accounts.
+  { symbol: 'SPX', name: 'S&P 500 Index', sector: 'Index', kind: 'index', wave: 3 },
+  { symbol: 'XSP', name: 'Mini-SPX Index (1/10 of SPX)', sector: 'Index', kind: 'index', wave: 3 },
+  { symbol: 'NDX', name: 'Nasdaq-100 Index', sector: 'Index', kind: 'index', wave: 3 },
+  { symbol: 'RUT', name: 'Russell 2000 Index', sector: 'Index', kind: 'index', wave: 3 },
 ];
 
 /** How far back PULL FROM SCHWAB reaches for these tickers' daily prices. */
@@ -77,3 +83,8 @@ export const BUILDER_HISTORY_DAYS = 730;
 export const BUILDER_BY_SYMBOL: Record<string, BuilderTicker> = Object.fromEntries(
   BUILDER_TICKERS.map((t) => [t.symbol, t]),
 );
+
+export const isCashIndex = (symbol: string): boolean => BUILDER_BY_SYMBOL[symbol]?.kind === 'index';
+
+/** How Schwab spells a ticker: indexes take a leading $ ($SPX), everything else is as written. */
+export const schwabSymbol = (symbol: string): string => (isCashIndex(symbol) ? `$${symbol}` : symbol);

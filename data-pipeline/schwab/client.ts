@@ -45,7 +45,7 @@ export function schwabFetchApi(accessToken: string, fetchImpl: typeof fetch = fe
         endDate: String(Date.now()),
         needExtendedHoursData: 'false',
       }),
-    chain: (symbol: string, fromDate: ISODate, toDate: ISODate) =>
+    chain: (symbol: string, fromDate: ISODate, toDate: ISODate, strikeCount?: number) =>
       get('chains', {
         symbol,
         contractType: 'ALL',
@@ -54,6 +54,7 @@ export function schwabFetchApi(accessToken: string, fetchImpl: typeof fetch = fe
         includeUnderlyingQuote: 'false',
         fromDate,
         toDate,
+        ...(strikeCount ? { strikeCount: String(strikeCount) } : {}),
       }),
   };
 }

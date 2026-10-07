@@ -115,6 +115,31 @@ describe('Schwab market data mapping (read-only)', () => {
     expect(put?.iv).toBeGreaterThan(0.1);
     expect(put?.delta).toBeLessThan(0);
   });
+
+  it('keeps one standard contract per strike: PM-settled first, then the tighter market', () => {
+    const c = (bid: number, ask: number, extra: Record<string, unknown> = {}) => ({
+      putCall: 'PUT' as const,
+      bid,
+      ask,
+      volatility: 20,
+      strikePrice: 95,
+      expirationDate: '2026-10-16T20:00:00.000+00:00',
+      ...extra,
+    });
+    const map = (list: unknown[]) =>
+      mapChain({ putExpDateMap: { '2026-10-16:17': { '95.0': list } } }, 'SPX', '2026-09-29', 100, 0.04, 0)
+        ?.quotes ?? [];
+    // SPX's monthly Friday lists the AM-settled SPX and the PM-settled SPXW at the same strike.
+    const both = map([c(1.0, 1.1, { settlementType: 'A' }), c(0.9, 1.3, { settlementType: 'P' })]);
+    expect(both).toHaveLength(1);
+    expect(both[0].ask).toBe(1.3);
+    // Same settlement: the tighter market.
+    expect(map([c(0.9, 1.3), c(1.0, 1.1)])[0].ask).toBe(1.1);
+    // Adjusted, mini and odd-multiplier contracts never make it in.
+    expect(
+      map([c(1, 1.1, { nonStandard: true }), c(1, 1.1, { mini: true }), c(1, 1.1, { multiplier: 10 })]),
+    ).toEqual([]);
+  });
 });
 
 describe('Schwab login tokens', () => {

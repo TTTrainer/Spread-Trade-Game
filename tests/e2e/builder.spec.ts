@@ -89,9 +89,15 @@ test('trade builder: open a ticker, build a condor leg by leg, read its payoff, 
   await page.getByTestId('ticker-input').fill('QQQ');
   await page.getByTestId('ticker-input').press('Enter');
   await expect(page.getByTestId('toasts')).toContainText('No data for QQQ');
-  // The full list, with the 25 new tickers marked.
+  // An index typed the way Schwab and thinkorswim write it.
+  await page.getByTestId('ticker-input').fill('$SPX');
+  await page.getByTestId('ticker-input').press('Enter');
+  await expect(page.getByTestId('toasts')).toContainText('No data for SPX');
+  // The full list, with the new tickers marked and the index options in their own group.
   await page.getByTestId('ticker-all').click();
   await expect(page.getByTestId('ticker-list')).toContainText('Added for the Trade Builder');
+  await expect(page.getByTestId('ticker-list')).toContainText('Index options (cash-settled)');
+  await expect(page.getByTestId('pick-XSP')).toBeVisible();
   await shot(page, '22-builder-tickers-1920');
   await page.keyboard.press('Escape');
 

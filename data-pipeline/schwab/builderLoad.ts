@@ -13,12 +13,12 @@ import { addDays, isTradingDay, type ISODate } from '../../src/engine/calendar';
 import type { MarketBundle } from '../../src/engine/market/bundleSource';
 import type { MarketDataSource } from '../../src/engine/market/source';
 import type { Bar, Chain, VixBar } from '../../src/engine/market/types';
-import { BUILDER_BY_SYMBOL, BUILDER_HISTORY_DAYS } from '../../src/content/builderTickers';
+import { BUILDER_BY_SYMBOL, BUILDER_HISTORY_DAYS, isCashIndex } from '../../src/content/builderTickers';
 import { candidateInfo } from '../dolt/tickers';
 import { constantMaturityIv, normalizeQuote, volSeries } from '../lib/derived';
 import { historyChain, HISTORY_DEPTH } from '../lib/historyModel';
 import { mapCandles, mapChain, newYorkTime } from './map';
-import { tbillToRate, type SchwabMarketApi } from './pull';
+import { fetchChain, fetchHistory, tbillToRate, type SchwabMarketApi } from './pull';
 import { TBILL_SYMBOL, VIX_SYMBOL, type SchwabStore } from './store';
 
 export type BuilderSourceKind = 'schwab-live' | 'schwab-saved' | 'game';
@@ -48,7 +48,8 @@ interface Found {
 
 function nameOf(symbol: string, game: { name: string; sector: string; isEtf: boolean } | undefined) {
   const b = BUILDER_BY_SYMBOL[symbol];
-  if (b) return { name: b.name, sector: b.sector, isEtf: b.kind === 'etf' };
+  // An index moves like a broad ETF, so its modeled chain uses the same volatility rules.
+  if (b) return { name: b.name, sector: b.sector, isEtf: b.kind !== 'stock' };
   const c = candidateInfo(symbol);
   if (c) return { name: c.name, sector: c.sector, isEtf: c.sector.includes('ETF') };
   return game ?? { name: symbol, sector: '—', isEtf: false };
@@ -103,8 +104,8 @@ export async function builderLoad(opts: {
   // 1. Schwab, live.
   if (api) {
     try {
-      let bars = mapCandles(await api.priceHistory(symbol, from)).filter((b) => b.date <= today);
-      const json = (await api.chain(symbol, today, addDays(today, 70))) as {
+      let bars = mapCandles(await fetchHistory(api, symbol, from)).filter((b) => b.date <= today);
+      const json = (await fetchChain(api, symbol, today)) as {
         underlyingPrice?: number;
       } | null;
       const px = Number(json?.underlyingPrice);
@@ -185,6 +186,10 @@ export async function builderLoad(opts: {
       : [];
 
   const info = nameOf(symbol, inGame);
+  if (isCashIndex(symbol))
+    notes.push(
+      `${symbol} options settle in cash, European style: no early assignment, and no shares change hands at expiration.`,
+    );
   return {
     ok: true,
     bundle: { symbol, ...info, bars, chain, asOf, vol, earnings },

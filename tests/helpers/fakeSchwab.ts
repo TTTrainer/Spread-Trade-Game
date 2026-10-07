@@ -1,6 +1,7 @@
 /**
  * A fake Schwab market-data API over the SIM market, for tests: SPY and AAPL are two SIM
- * tickers' prices under real names, $VIX is the SIM VIX and $IRX a flat 1.5% T-bill.
+ * tickers' prices under real names (QQQ and $SPX stand in for Trade Builder tickers), $VIX is the
+ * SIM VIX and $IRX a flat 1.5% T-bill.
  */
 import type { ISODate } from '../../src/engine/calendar';
 import type { Chain } from '../../src/engine/market/types';
@@ -33,7 +34,7 @@ export function schwabChainJson(c: Chain) {
 }
 
 export function fakeSchwab(src: SyntheticSource, today: () => ISODate, scale: Record<string, number> = {}) {
-  const names: Record<string, string> = { SPY: 'MKTX', AAPL: 'HLXR' };
+  const names: Record<string, string> = { SPY: 'MKTX', AAPL: 'HLXR', QQQ: 'HLXR', $SPX: 'MKTX' };
   const calls: string[] = [];
   const api: SchwabMarketApi = {
     priceHistory: async (symbol, fromDate) => {
@@ -61,8 +62,8 @@ export function fakeSchwab(src: SyntheticSource, today: () => ISODate, scale: Re
         })),
       };
     },
-    chain: async (symbol, fromDate) => {
-      calls.push(`chain:${symbol}`);
+    chain: async (symbol, fromDate, _toDate, strikeCount) => {
+      calls.push(`chain:${symbol}${strikeCount ? `:${strikeCount}` : ''}`);
       const c = (await src.chain(names[symbol], fromDate)) as Chain;
       const k = scale[symbol] ?? 1;
       return schwabChainJson({

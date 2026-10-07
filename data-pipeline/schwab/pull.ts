@@ -4,6 +4,7 @@
  * today's option chain, and saves it all in schwab.db. Nothing here touches accounts or orders.
  */
 
+import { isCashIndex, schwabSymbol } from '../../src/content/builderTickers';
 import { addDays, type ISODate } from '../../src/engine/calendar';
 import type { Bar } from '../../src/engine/market/types';
 import { median } from '../lib/derived';
@@ -13,7 +14,51 @@ import { isIndexSeries, SchwabStore, TBILL_SYMBOL, VIX_SYMBOL } from './store';
 /** The two read-only calls (a fake in tests, fetch against Schwab in the game). */
 export interface SchwabMarketApi {
   priceHistory(symbol: string, fromDate: ISODate): Promise<unknown>;
-  chain(symbol: string, fromDate: ISODate, toDate: ISODate): Promise<unknown>;
+  /** `strikeCount`: only that many strikes either side of the money (index chains). */
+  chain(symbol: string, fromDate: ISODate, toDate: ISODate, strikeCount?: number): Promise<unknown>;
+}
+
+/**
+ * An index chain is too big to ask for whole (SPX lists a strike every 5 points and expires nearly
+ * every day), so it comes as the strikes nearest the money, with fewer days and strikes each time
+ * Schwab turns the request down.
+ */
+export const INDEX_CHAIN_STEPS = [
+  { days: 70, strikes: 120 },
+  { days: 45, strikes: 60 },
+  { days: 21, strikes: 30 },
+];
+
+const refusedLogin = (e: unknown) => /401|log ?in/i.test((e as Error).message);
+
+/** A ticker's daily candles, asked for in Schwab's spelling ($SPX). */
+export function fetchHistory(api: SchwabMarketApi, symbol: string, fromDate: ISODate): Promise<unknown> {
+  return api.priceHistory(schwabSymbol(symbol), fromDate);
+}
+
+/** A ticker's option chain from `fromDate` out to `days` later. */
+export async function fetchChain(
+  api: SchwabMarketApi,
+  symbol: string,
+  fromDate: ISODate,
+  days = 70,
+): Promise<unknown> {
+  if (!isCashIndex(symbol)) return api.chain(symbol, fromDate, addDays(fromDate, days));
+  let err: unknown = null;
+  for (const step of INDEX_CHAIN_STEPS) {
+    try {
+      return await api.chain(
+        schwabSymbol(symbol),
+        fromDate,
+        addDays(fromDate, Math.min(days, step.days)),
+        step.strikes,
+      );
+    } catch (e) {
+      if (refusedLogin(e)) throw e;
+      err = e;
+    }
+  }
+  throw err;
 }
 
 export interface PullResult {
@@ -82,12 +127,14 @@ export async function schwabPull(opts: {
         if (last && last >= closed.date && !wantChain) continue;
         const first = opts.historyFrom?.(symbol) ?? HISTORY_FROM;
         const from = last ? addDays(last, -14) : first;
-        let bars = mapCandles(await opts.api.priceHistory(symbol, from)).filter((b) => b.date <= closed.date);
+        let bars = mapCandles(await fetchHistory(opts.api, symbol, from)).filter(
+          (b) => b.date <= closed.date,
+        );
         if (last) {
           const ratio = splitRatio(store.candles(symbol, from, last), bars);
           if (ratio) {
             log(`Schwab: ${symbol} split (x${ratio}); fetching its whole history again`);
-            bars = mapCandles(await opts.api.priceHistory(symbol, first)).filter(
+            bars = mapCandles(await fetchHistory(opts.api, symbol, first)).filter(
               (b) => b.date <= closed.date,
             );
             const firstNew = bars.find((b) => b.date > last)?.date ?? closed.date;
@@ -102,7 +149,7 @@ export async function schwabPull(opts: {
         }
         const lastBar = store.candles(symbol, closed.date, closed.date)[0];
         if (wantChain && lastBar) {
-          const json = await opts.api.chain(symbol, closed.date, addDays(closed.date, 70));
+          const json = await fetchChain(opts.api, symbol, closed.date);
           const chain = mapChain(json, symbol, closed.date, lastBar.close, rate, 0);
           if (chain) {
             store.putChain(chain, now.toISOString());
@@ -113,7 +160,7 @@ export async function schwabPull(opts: {
         failed.push(symbol);
         log(`Schwab: ${symbol} skipped (${(e as Error).message})`);
         // A refused login fails every call the same way: stop instead of trying the rest.
-        if (/401|log ?in/i.test((e as Error).message)) throw e;
+        if (refusedLogin(e)) throw e;
       }
     }
     const tickers = opts.symbols.filter((s) => !failed.includes(s)).length;

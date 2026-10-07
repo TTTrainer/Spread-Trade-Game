@@ -46,7 +46,7 @@ async function list(): Promise<BuilderList> {
         symbol: c.symbol,
         name: c.name,
         sector: c.sector,
-        group: c.sector.includes('ETF') ? 'etf' : 'stock',
+        group: b?.kind === 'index' ? 'index' : c.sector.includes('ETF') ? 'etf' : 'stock',
         isNew: !!b,
         savedThrough: savedThrough(c.symbol),
       });

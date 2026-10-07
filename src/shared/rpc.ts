@@ -90,7 +90,7 @@ export interface BuilderListItem {
   symbol: string;
   name: string;
   sector: string;
-  group: 'etf' | 'stock' | 'sim';
+  group: 'etf' | 'stock' | 'index' | 'sim';
   /** One of the Trade Builder's added tickers. */
   isNew: boolean;
   savedThrough: string | null;

@@ -7,6 +7,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { isCashIndex } from '../../content/builderTickers';
 import { diffDays } from '../../engine/calendar';
 import { expirationsOf, quotesFor } from '../../engine/strategies/structures';
 import { orderText, tradeName } from '../../engine/strategies/study';
@@ -168,6 +170,9 @@ function BuilderTopBar() {
   );
 }
 
+/** What was typed, as a ticker: thinkorswim's and Schwab's $SPX is plain SPX here. */
+const clean = (q: string) => q.trim().toUpperCase().replace(/^\$/, '');
+
 /** Type a ticker and press Enter, or pick one from the full list. */
 function TickerPicker() {
   const list = useBuilder((s) => s.list);
@@ -177,7 +182,7 @@ function TickerPicker() {
   const [all, setAll] = useState(false);
   const tickers = list?.tickers ?? [];
   const hits = useMemo(() => {
-    const f = q.trim().toUpperCase();
+    const f = clean(q);
     if (!f) return [];
     return tickers
       .filter((t) => t.symbol.startsWith(f) || t.name.toUpperCase().includes(f))
@@ -202,7 +207,7 @@ function TickerPicker() {
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === 'Enter') {
-              const sym = hits[0]?.symbol ?? q.trim().toUpperCase();
+              const sym = hits[0]?.symbol ?? clean(q);
               if (sym) void go(sym);
             }
           }}
@@ -232,11 +237,13 @@ function AllTickers({ onPick, onClose }: { onPick: (s: string) => void; onClose:
   const loaded = useBuilder((s) => s.loaded);
   const groups: { name: string; filter: (g: string, isNew: boolean) => boolean }[] = [
     { name: 'Index & sector ETFs', filter: (g) => g === 'etf' },
+    { name: 'Index options (cash-settled)', filter: (g) => g === 'index' },
     { name: 'Stocks', filter: (g, n) => g === 'stock' && !n },
     { name: 'Added for the Trade Builder', filter: (g, n) => g === 'stock' && n },
     { name: 'SIM practice market', filter: (g) => g === 'sim' },
   ];
-  return (
+  // On the page itself, so the chart's CHART / CHAIN / PAYOFF tabs can't draw over it.
+  return createPortal(
     <Modal onClose={onClose} testId="ticker-list">
       <h2>Tickers</h2>
       <p className="dim small">
@@ -269,7 +276,8 @@ function AllTickers({ onPick, onClose }: { onPick: (s: string) => void; onClose:
           </div>
         );
       })}
-    </Modal>
+    </Modal>,
+    document.body,
   );
 }
 
@@ -413,6 +421,16 @@ function BuilderTicket() {
         <span>{net < 0 ? 'CREDIT' : 'DEBIT'}</span>
         <b data-testid="builder-net">{dollars(net)}</b>
         <span className="dim">{Math.abs(net).toFixed(2)}/sh</span>
+        {isCashIndex(card.realSymbol) && (
+          <span
+            className="bld-settle"
+            data-testid="builder-settle"
+            data-tip-title="Cash-settled index option"
+            data-tip-body="European style: it can't be assigned early, and at expiration the difference is paid in cash. No shares change hands."
+          >
+            CASH-SETTLED
+          </span>
+        )}
       </div>
       <div className="bld-kv">
         <span>

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ISODate } from '../../src/engine/calendar';
 import { SyntheticSource } from '../../src/engine/market/synthetic/source';
 import { builderLoad } from '../../data-pipeline/schwab/builderLoad';
-import { schwabPull } from '../../data-pipeline/schwab/pull';
+import { INDEX_CHAIN_STEPS, schwabPull, type SchwabMarketApi } from '../../data-pipeline/schwab/pull';
 import { SchwabStore } from '../../data-pipeline/schwab/store';
 import { afterClose, fakeSchwab } from '../helpers/fakeSchwab';
 
@@ -77,6 +77,55 @@ describe("the Trade Builder's data for a ticker", () => {
     expect(r.source).toBe('game');
     expect(r.bundle.asOf).toBe('2021-06-30');
     expect(r.bundle.chain?.quotes.length).toBeGreaterThan(20);
+  });
+
+  it('loads an index from Schwab as $SPX, a slice of its chain at a time, and says it settles in cash', async () => {
+    const asked: string[] = [];
+    // Schwab turns down the first, widest index request; the next, narrower one comes back.
+    const fussy: SchwabMarketApi = {
+      priceHistory: fake.api.priceHistory,
+      chain: async (symbol, from, to, strikeCount) => {
+        asked.push(`${symbol}:${strikeCount}:${to}`);
+        if ((strikeCount ?? Infinity) > INDEX_CHAIN_STEPS[1].strikes)
+          throw new Error('Schwab chains answered 502');
+        return fake.api.chain(symbol, from, to, strikeCount);
+      },
+    };
+    const r = await builderLoad({
+      symbol: 'SPX',
+      now: new Date(`${today}T15:00:00Z`),
+      api: fussy,
+      store: null,
+      game: null,
+    });
+    expect(asked).toEqual([
+      `$SPX:${INDEX_CHAIN_STEPS[0].strikes}:2021-08-10`,
+      `$SPX:${INDEX_CHAIN_STEPS[1].strikes}:2021-07-16`,
+    ]);
+    expect(fake.calls).toContain('history:$SPX:2019-06-02');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.source).toBe('schwab-live');
+    expect(r.bundle.symbol).toBe('SPX');
+    expect(r.bundle.name).toBe('S&P 500 Index');
+    expect(r.bundle.chain?.source).toBe('real');
+    expect(r.notes.join(' ')).toMatch(/settle in cash/);
+    // A refused login isn't retried: it fails the same way every time.
+    const refused = await builderLoad({
+      symbol: 'SPX',
+      now: new Date(`${today}T15:00:00Z`),
+      api: {
+        priceHistory: fake.api.priceHistory,
+        chain: async () => {
+          asked.push('again');
+          throw new Error('Schwab refused the login (401). Connect again in Settings › Data.');
+        },
+      },
+      store: null,
+      game: null,
+    });
+    expect(asked.filter((a) => a === 'again')).toHaveLength(1);
+    expect(refused.ok).toBe(false);
   });
 
   it('says plainly when a ticker has no data at all', async () => {

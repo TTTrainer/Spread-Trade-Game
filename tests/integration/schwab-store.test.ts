@@ -110,7 +110,8 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
 
   beforeAll(async () => {
     const fake = fakeSchwab(src, () => last);
-    await schwabPull({ storePath, api: fake.api, symbols: ['SPY', 'AAPL'], now: afterClose(last) });
+    // QQQ is a Trade Builder ticker: saved by the pull, never dealt by the game.
+    await schwabPull({ storePath, api: fake.api, symbols: ['SPY', 'AAPL', 'QQQ'], now: afterClose(last) });
     const r = await buildFromSchwab({ storePath, gameDbPath });
     expect(r.realChains).toBe(2);
     game = new SqliteSource(gameDbPath);

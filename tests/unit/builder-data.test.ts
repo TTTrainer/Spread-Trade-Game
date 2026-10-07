@@ -5,7 +5,7 @@ import { MarketView } from '../../src/engine/market/view';
 import { openTransform } from '../../src/engine/market/transform';
 import { LookaheadError } from '../../src/engine/market/source';
 import type { Bar, Chain } from '../../src/engine/market/types';
-import { BUILDER_TICKERS } from '../../src/content/builderTickers';
+import { BUILDER_TICKERS, isCashIndex, schwabSymbol } from '../../src/content/builderTickers';
 import { CANDIDATES } from '../../data-pipeline/dolt/tickers';
 
 describe('Trade Builder data freshness', () => {
@@ -27,16 +27,31 @@ describe('Trade Builder data freshness', () => {
 });
 
 describe('the Trade Builder ticker list', () => {
-  it('adds two waves of 25 new, unique tickers that the game did not already carry', () => {
-    expect(BUILDER_TICKERS).toHaveLength(50);
+  it('adds two waves of 25 new, unique tickers and the index options, none the game already carried', () => {
+    expect(BUILDER_TICKERS).toHaveLength(54);
     expect(BUILDER_TICKERS.filter((t) => t.wave === 1)).toHaveLength(25);
     expect(BUILDER_TICKERS.filter((t) => t.wave === 2)).toHaveLength(25);
+    expect(BUILDER_TICKERS.filter((t) => t.kind === 'index').map((t) => t.symbol)).toEqual([
+      'SPX',
+      'XSP',
+      'NDX',
+      'RUT',
+    ]);
     const syms = BUILDER_TICKERS.map((t) => t.symbol);
-    expect(new Set(syms).size).toBe(50);
+    expect(new Set(syms).size).toBe(54);
     const game = CANDIDATES.filter((c) => c.group !== 'builder').map((c) => c.symbol);
     for (const s of syms) expect(game, s).not.toContain(s);
     // Schwab pulls every candidate, so the builder's tickers are in the pull list.
     for (const s of syms) expect(CANDIDATES.some((c) => c.symbol === s)).toBe(true);
+  });
+
+  it("asks Schwab for an index in Schwab's own spelling", () => {
+    expect(schwabSymbol('SPX')).toBe('$SPX');
+    expect(schwabSymbol('XSP')).toBe('$XSP');
+    expect(schwabSymbol('SPY')).toBe('SPY');
+    expect(schwabSymbol('$VIX')).toBe('$VIX');
+    expect(isCashIndex('RUT')).toBe(true);
+    expect(isCashIndex('IWM')).toBe(false);
   });
 });
 

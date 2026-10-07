@@ -114,6 +114,12 @@ interface SchwabContract {
   volatility: number;
   strikePrice: number;
   expirationDate: string;
+  /** Adjusted (after a split or merger) and mini contracts don't deliver the standard 100 shares. */
+  nonStandard?: boolean;
+  mini?: boolean;
+  multiplier?: number;
+  /** 'A' (AM, the opening print) or 'P' (PM, the close): SPX lists both on monthly Fridays. */
+  settlementType?: string;
 }
 
 type ExpMap = Record<string, Record<string, SchwabContract[]>>;
@@ -121,7 +127,9 @@ type ExpMap = Record<string, Record<string, SchwabContract[]>>;
 /**
  * One day's chain from /marketdata/v1/chains, in the game's shape: expirations up to 70 days,
  * strikes within 30% of spot, greeks recomputed from each quote's IV the way the pipeline does
- * for DoltHub rows (Schwab's volatility is in percent; -999 means none).
+ * for DoltHub rows (Schwab's volatility is in percent; -999 means none). Only standard
+ * 100-multiplier contracts, one per strike: where two share a strike and day (SPX's AM-settled
+ * monthly beside its PM-settled weekly), the PM one, then the tighter market.
  */
 export function mapChain(
   json: unknown,
@@ -132,7 +140,11 @@ export function mapChain(
   divYield: number,
 ): Chain | null {
   const j = json as { callExpDateMap?: ExpMap; putExpDateMap?: ExpMap } | null;
-  const quotes: OptionQuote[] = [];
+  const picked = new Map<string, { c: SchwabContract; q: OptionQuote }>();
+  const better = (a: SchwabContract, qa: OptionQuote, b: SchwabContract, qb: OptionQuote) =>
+    (a.settlementType === 'P') !== (b.settlementType === 'P')
+      ? a.settlementType === 'P'
+      : qa.ask - qa.bid < qb.ask - qb.bid;
   for (const map of [j?.callExpDateMap, j?.putExpDateMap]) {
     for (const [expKey, strikes] of Object.entries(map ?? {})) {
       const expiration = expKey.slice(0, 10) as ISODate;
@@ -140,6 +152,8 @@ export function mapChain(
       if (dte < 0 || dte > 70) continue;
       for (const list of Object.values(strikes)) {
         for (const c of list) {
+          if (c.nonStandard || c.mini || (c.multiplier !== undefined && Number(c.multiplier) !== 100))
+            continue;
           const strike = Number(c.strikePrice);
           if (!(strike > 0) || Math.abs(strike / spot - 1) > 0.3) continue;
           const base: OptionQuote = {
@@ -158,11 +172,15 @@ export function mapChain(
           };
           if (base.ask <= 0) continue;
           const q = normalizeQuote(base, date, spot, rate, divYield);
-          if (q) quotes.push(q);
+          if (!q) continue;
+          const key = `${q.expiration}|${q.strike}|${q.right}`;
+          const had = picked.get(key);
+          if (!had || better(c, q, had.c, had.q)) picked.set(key, { c, q });
         }
       }
     }
   }
+  const quotes = [...picked.values()].map((p) => p.q);
   if (!quotes.length) return null;
   quotes.sort((a, b) =>
     a.expiration !== b.expiration

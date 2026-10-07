@@ -11,6 +11,7 @@
  * so the build takes seconds and the file stays small.
  */
 
+import { BUILDER_BY_SYMBOL } from '../../src/content/builderTickers';
 import { addDays, diffDays, isTradingDay, type ISODate } from '../../src/engine/calendar';
 import { macroCalendar } from '../../src/engine/market/macroCalendar';
 import type { Chain, RatePoint, SymbolInfo, VixBar } from '../../src/engine/market/types';
@@ -61,7 +62,11 @@ export async function buildFromSchwab(opts: {
   const progress = opts.progress ?? (() => undefined);
   const store = new SchwabStore(opts.storePath, { readOnly: true });
   try {
-    const tickers = store.symbols().filter((s) => store.candles(s).length > CHAIN_WARMUP_BARS + 20);
+    // The game's own tickers only: PULL FROM SCHWAB also saves the Trade Builder's, which the
+    // lineups never deal (two years of history, no earnings, and index options settle in cash).
+    const tickers = store
+      .symbols()
+      .filter((s) => !BUILDER_BY_SYMBOL[s] && store.candles(s).length > CHAIN_WARMUP_BARS + 20);
     if (!tickers.length) throw new Error('schwab.db has no price history yet. Pull from Schwab first.');
     const barsBy = new Map(tickers.map((t) => [t, store.candles(t).filter((b) => isTradingDay(b.date))]));
     const lastOf = (t: string) => barsBy.get(t)?.at(-1)?.date as ISODate;

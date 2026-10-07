@@ -221,6 +221,13 @@
 .bld-kv b {
   font-weight: 400;
 }
+.bld-settle {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--amber);
+  cursor: help;
+}
+
 .bld-order,
 .ps-order code {
   display: block;
