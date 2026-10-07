@@ -21,6 +21,7 @@ import { ArtIcon, artUrl } from '../art';
 import { chipsText, multText } from '../format';
 import { BOSSES } from '../../content/bosses';
 import { LockStamp } from '../trading/BossBanner';
+import { usePayout } from '../store/payout';
 import { useRun } from '../store/run';
 import { liveCardId, tradeOpen, useTrading } from '../store/trading';
 
@@ -130,15 +131,19 @@ function JokerCard({
   extra?: ReactNode;
 }) {
   const sum = CARTRIDGE_SUMMARY[def.id];
+  // A payout playing: the coin's stops light up and fire; the rest wait dimmed (Payout.tsx).
+  const fx = usePayout((s) => s.fx[def.id]);
+  const focus = usePayout((s) => s.focus);
+  const play = fx ? `jr-${fx.state}` : focus ? 'jr-dim' : '';
   return (
     <div
-      className={`jr-card rar-${def.rarity} ${held ? 'held' : ''} ${will ? 'will-fire' : ''}`}
+      className={`jr-card rar-${def.rarity} ${held ? 'held' : ''} ${will && !focus ? 'will-fire' : ''} ${play}`}
       data-tip={`cart:${def.id}`}
       data-testid={`cart-${def.id}`}
       data-slot={index}
     >
-      <CartridgeDevice def={def} />
-      {will && (
+      <CartridgeDevice key={fx?.hit ?? 0} def={def} className={fx?.hit ? 'jr-hit' : ''} />
+      {will && !focus && (
         <span className="jr-will num" data-testid={`will-${def.id}`}>
           {will}
         </span>

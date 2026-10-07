@@ -221,10 +221,11 @@ describe('career run loop', () => {
     await day(e);
     const g = e.goalOutlook();
     expect(g.openCount).toBe(1);
-    // Open trades count their P/L chips only: 1% of round-start equity is 100 points before mults.
+    // Open trades count their P/L chips only: 1% of round-start equity is 100 points before mults
+    // (kept to a tenth: whole on screen at ×10).
     const expected = (g.openPlCents / e.state.round.startEquityCents) * BALANCE.scoring.chipsPerUnit;
     const scaled = g.openPlCents > 0 ? expected : expected * BALANCE.scoring.lossChipsScale;
-    expect(g.openPoints).toBe(Math.round(scaled));
+    expect(g.openPoints).toBe(Math.round(scaled * 10) / 10);
   }, 60_000);
 
   it('a card whose trade closed keeps moving with the clock (its chart never freezes)', async () => {

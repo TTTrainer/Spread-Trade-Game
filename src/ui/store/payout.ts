@@ -12,8 +12,20 @@ export type PayoutItem =
   | { id: number; kind: 'trade'; tally: TradeTally }
   | { id: number; kind: 'interest'; items: InterestItem[]; rate: number; day: number; points: number };
 
+/** A cartridge on the Joker Row during a payout: lit (the coin's next stop), fired, or passed by. */
+export interface CardFx {
+  state: 'lit' | 'fired' | 'idle';
+  /** Bumped on each hit, to replay the flash and slam. */
+  hit: number;
+}
+
 interface PayoutStore {
   queue: PayoutItem[];
+  /** While a payout plays: the Joker Row dims all but the cartridges the coin has reached. */
+  focus: boolean;
+  fx: Record<string, CardFx>;
+  setFx: (id: string, state: CardFx['state'], hit?: boolean) => void;
+  setFocus: (on: boolean) => void;
   /** Bumped to fast-forward the payout on screen. */
   skipN: number;
   push: (tallies: TradeTally[]) => void;
@@ -29,6 +41,13 @@ let nextId = 0;
 
 export const usePayout = create<PayoutStore>((set, get) => ({
   queue: [],
+  focus: false,
+  fx: {},
+  setFx: (id, state, hit) => {
+    const was = get().fx[id];
+    set({ fx: { ...get().fx, [id]: { state, hit: (was?.hit ?? 0) + (hit ? 1 : 0) } } });
+  },
+  setFocus: (on) => set(on ? { focus: true, fx: {} } : { focus: false, fx: {} }),
   skipN: 0,
   push: (tallies) =>
     tallies.length &&

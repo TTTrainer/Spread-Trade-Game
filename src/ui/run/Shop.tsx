@@ -38,6 +38,7 @@ import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { Primer } from './Primer';
+import { CartridgeDevice } from './JokerRow';
 import { PixelTrophy, TrophyReveal } from './Rewards';
 
 export function itemTitle(it: ShopItem): string {
@@ -185,13 +186,17 @@ function ShopCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number 
           {it.price === 0 ? 'FREE' : `$${it.price}`}
         </span>
         <div className="sc-art">
-          <ArtIcon
-            category={it.kind === 'page' ? 'page' : it.kind}
-            id={it.id}
-            name={itemTitle(it)}
-            tone={rarity ?? it.kind}
-            scale={2}
-          />
+          {it.kind === 'cartridge' ? (
+            <CartridgeDevice def={CARTRIDGE_BY_ID[it.id]} />
+          ) : (
+            <ArtIcon
+              category={it.kind === 'page' ? 'page' : it.kind}
+              id={it.id}
+              name={itemTitle(it)}
+              tone={rarity ?? it.kind}
+              scale={2}
+            />
+          )}
         </div>
         <div className="sc-name">{itemTitle(it)}</div>
         <div className="sc-chips num">{f.chips}</div>
@@ -354,7 +359,7 @@ function DeskCartridges({ e }: { e: RunEngine }) {
               data-testid={`desk-cart-${id}`}
             >
               <span className="dk-n num">{i + 1}</span>
-              <ArtIcon category="cartridge" id={id} name={def.name} tone={def.rarity} scale={0.85} />
+              <CartridgeDevice def={def} />
               <span className="dk-name">{def.name}</span>
               {sum && (
                 <span className={`dk-get num fx-${sum.kind}`}>
@@ -823,7 +828,7 @@ export function CartridgeMini({ id }: { id: string }) {
   const s = CARTRIDGE_SUMMARY[id];
   return (
     <div className={`cart-mini rar-${c.rarity}`} data-tip={`cart:${id}`} data-testid={`kit-cart-${id}`}>
-      <ArtIcon category="cartridge" id={id} name={c.name} tone={c.rarity} />
+      <CartridgeDevice def={c} />
       <div className="cm-body">
         <div className="cm-name">{c.name}</div>
         <div className="sc-when">

@@ -1287,6 +1287,17 @@
 .sc-art .art-icon {
   filter: drop-shadow(3px 3px 0 #000);
 }
+/* Cartridges keep their game-cartridge look in the shop, on YOUR DESK and in a desk's kit. */
+.sc-art {
+  --jr-h: 118px;
+}
+.dk-cart {
+  --jr-h: 66px;
+}
+.cart-mini {
+  --jr-h: 64px;
+}
+.shop-card:hover .sc-art .jr-dev,
 .shop-card:hover .sc-art .art-icon {
   animation: sc-bob 0.9s ease-in-out infinite alternate;
 }
@@ -1497,6 +1508,9 @@
   .dk-cart .art-icon {
     width: 40px !important;
     height: 40px !important;
+  }
+  .dk-cart {
+    --jr-h: 52px;
   }
   .dk-name {
     font-size: 13px;
@@ -1752,6 +1766,9 @@
     width: 64px !important;
     height: 64px !important;
     font-size: 24px !important;
+  }
+  .sc-art {
+    --jr-h: 76px;
   }
   .sc-name {
     font-size: 15px;
@@ -2154,6 +2171,9 @@
   .career .cart-mini .art-icon {
     width: 48px !important;
     height: 48px !important;
+  }
+  .career .cart-mini {
+    --jr-h: 50px;
   }
   .career .kit-plays {
     margin-top: 4px;
@@ -3426,333 +3446,475 @@
 }
 
 /* ---------- the payout ----------
- * A closed trade's scoring, played out: chips (cyan) x mult (magenta), the cartridges firing in
- * slot order, then the total. Over the board, under modals; only the panel takes clicks. */
-.payout-back {
+ * Register → scoreboard → a coin through the Joker Row → the jackpot (Payout.tsx). The board below
+ * the top bar dims; the Joker Row and the score stay lit. Over the board, under modals; only the
+ * stage takes clicks (a click skips). Chips are blue, mult red, a score multiplier amber. */
+.pay-root {
   position: fixed;
   inset: 0;
   z-index: 620;
-  display: grid;
-  justify-items: center;
-  align-items: start;
-  padding-top: 15vh;
   pointer-events: none;
+  --chips-c: #2f86ff;
+  --mult-c: #ff3d5e;
 }
-.po-panel {
-  pointer-events: auto;
-  cursor: pointer;
-  width: min(760px, 94vw);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 18px 12px;
-  border: 3px solid var(--cyan);
-  background: color-mix(in srgb, var(--bg-1) 94%, #000);
-  box-shadow:
-    6px 6px 0 #000,
-    0 0 40px color-mix(in srgb, var(--cyan) 30%, transparent);
+.pay-dim {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(7, 5, 26, 0.55), rgba(7, 5, 26, 0.82));
+  animation: pay-fade 0.2s ease-out;
 }
-.po-panel.lose {
-  border-color: var(--down);
-  box-shadow:
-    6px 6px 0 #000,
-    0 0 30px color-mix(in srgb, var(--down) 25%, transparent);
-}
-.po-panel.on-fire {
-  border-color: var(--amber);
-  animation: po-fire 0.18s steps(2) infinite;
-}
-@keyframes po-fire {
-  50% {
-    box-shadow:
-      6px 6px 0 #000,
-      0 -6px 34px rgba(255, 140, 40, 0.75),
-      0 0 70px rgba(255, 70, 30, 0.45);
+@keyframes pay-fade {
+  from {
+    opacity: 0;
   }
 }
-.po-head {
+.pay-stage {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, 94vw);
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+  cursor: pointer;
 }
-.po-kind {
-  font-family: var(--font-display);
-  font-size: 26px;
-  letter-spacing: 0.04em;
+.pay-root.quake-a .pay-stage {
+  animation: pay-quake-a 0.32s;
 }
-.po-kind.up {
-  color: var(--cyan);
+.pay-root.quake-b .pay-stage {
+  animation: pay-quake-b 0.32s;
 }
-.po-kind.down {
-  color: var(--down);
+.pay-root.quake-big {
+  --qa: 2.2;
 }
-.po-trade {
-  font-size: 18px;
-  color: var(--text-dim);
+@keyframes pay-quake-a {
+  20% {
+    transform: translate(calc(-50% - 5px * var(--qa, 1)), calc(3px * var(--qa, 1)));
+  }
+  45% {
+    transform: translate(calc(-50% + 4px * var(--qa, 1)), calc(-3px * var(--qa, 1)));
+  }
+  70% {
+    transform: translate(calc(-50% - 2px * var(--qa, 1)), calc(1px * var(--qa, 1)));
+  }
 }
-.po-pl {
-  margin-left: auto;
-  font-size: 26px;
+@keyframes pay-quake-b {
+  20% {
+    transform: translate(calc(-50% + 5px * var(--qa, 1)), calc(-3px * var(--qa, 1)));
+  }
+  45% {
+    transform: translate(calc(-50% - 4px * var(--qa, 1)), calc(3px * var(--qa, 1)));
+  }
+  70% {
+    transform: translate(calc(-50% + 2px * var(--qa, 1)), calc(-1px * var(--qa, 1)));
+  }
 }
-.po-score {
+
+/* The scoreboard: CHIPS × MULT (× SCORE). */
+.pay-board {
+  position: relative;
   display: flex;
-  align-items: stretch;
-  justify-content: center;
+  align-items: center;
   gap: 10px;
 }
-.po-box {
-  min-width: 160px;
+.pay-box {
+  min-width: 150px;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 4px 14px 2px;
   border: 3px solid #000;
-  box-shadow: 4px 4px 0 #000;
-}
-.po-box b {
-  font-weight: 400;
-  font-size: 46px;
-  line-height: 1;
-}
-.po-box.chips {
-  background: #1d6fe0;
+  box-shadow:
+    4px 4px 0 #000,
+    inset 0 -6px 0 rgba(0, 0, 0, 0.25);
   color: #fff;
 }
-.po-box.mult {
-  background: #e0244f;
-  color: #fff;
+.pay-box.k-chips {
+  background: var(--chips-c);
 }
-.po-box.po-score-x {
+.pay-box.k-mult {
+  background: var(--mult-c);
+}
+.pay-box.k-score {
   background: var(--amber);
-  color: #000;
-  min-width: 110px;
+  color: #2a1600;
 }
-.po-k {
-  font-size: 13px;
-  letter-spacing: 0.14em;
-  opacity: 0.85;
+.pay-box.gone,
+.pay-x.gone {
+  display: none;
 }
-.po-x {
-  align-self: center;
-  font-size: 34px;
-  color: var(--text-dim);
+.pay-box b {
+  display: block;
+  font-size: 54px;
+  line-height: 0.95;
+  font-weight: 400;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
 }
-.po-carts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
+.pay-k {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  opacity: 0.9;
 }
-.po-cart {
+.pay-x {
+  font-size: 40px;
+  color: var(--text);
+}
+.pay-combo {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  margin: -16px 0 0 14px;
+  padding: 2px 8px;
+  font-size: 18px;
+  white-space: nowrap;
+  color: var(--amber);
+  border: 2px solid var(--amber);
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 14px rgba(255, 191, 62, 0.45);
+}
+.pay-combo b {
+  font-size: 24px;
+  font-weight: 400;
+}
+
+/* The register and its receipt. */
+.pay-register {
   position: relative;
-  width: 118px;
+  width: min(460px, 90vw);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 4px 4px;
-  border: 2px solid var(--line);
-  background: var(--bg-2);
-  opacity: 0.55;
-  text-align: center;
+  gap: 6px;
+  padding: 10px 14px 8px;
+  border: 3px solid var(--line-bright);
+  background: linear-gradient(180deg, #2a2160, #171042);
+  box-shadow: 6px 6px 0 #000;
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
 }
-.po-cart.fired {
-  opacity: 1;
-  border-color: var(--line-bright);
+.pay-register.faded {
+  opacity: 0.18;
+  transform: scale(0.96);
 }
-.po-cart.fired.op-chips {
-  border-color: #3b8bff;
-}
-.po-cart.fired.op-add,
-.po-cart.fired.op-mul {
-  border-color: #ff3a66;
-}
-.po-cn {
-  font-size: 13px;
-  line-height: 1.1;
-}
-.po-why {
-  font-size: 11px;
-  line-height: 1.1;
-  color: var(--text-dim);
-}
-.po-pop {
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 1px 6px;
-  font-size: 16px;
-  white-space: nowrap;
-  color: #fff;
+.pay-slot {
+  width: 86%;
+  height: 7px;
+  background: #07051a;
   border: 2px solid #000;
-  box-shadow: 2px 2px 0 #000;
 }
-.po-pop.op-chips,
-.po-pop.op-chipsMul {
-  background: #1d6fe0;
-}
-.po-pop.op-add,
-.po-pop.op-mul {
-  background: #e0244f;
-}
-.po-pop.op-meter {
-  background: var(--amber);
-  color: #000;
-}
-.po-log {
+.pay-paper {
+  width: 82%;
+  margin-top: -6px;
+  max-height: calc(100vh - 430px);
+  min-height: 40px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-height: 24px;
-  font-size: 16px;
+  justify-content: flex-end;
+  padding: 6px 10px 8px;
+  color: #241b4d;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 23px, rgba(36, 27, 77, 0.06) 23px 24px), #f3eedc;
+  box-shadow: 3px 3px 0 #000;
+  font-size: 18px;
+  line-height: 1.15;
 }
-.po-line {
+.pay-ln {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 4px;
-  border-left: 3px solid var(--line);
+  gap: 10px;
+  white-space: nowrap;
 }
-.po-line b {
-  font-weight: 400;
+.pay-ln .pay-lbl {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.po-line.op-chips b,
-.po-line.pnl b {
-  color: #6fb2ff;
+.pay-ln.hd {
+  justify-content: center;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: #5b4f93;
 }
-.po-line.op-add b,
-.po-line.op-mul b {
-  color: #ff6f8e;
+.pay-ln.rule {
+  height: 8px;
+  border-bottom: 2px dashed #9a90c6;
+  margin-bottom: 3px;
 }
-.po-line.op-meter b {
+.pay-ln.rule.dbl {
+  border-bottom-style: double;
+  border-bottom-width: 4px;
+}
+.pay-ln.sub {
+  color: #5b4f93;
+}
+.pay-ln.note {
+  justify-content: center;
+  font-size: 15px;
+  color: #6c6299;
+}
+.pay-amt {
+  flex: none;
+}
+.pay-ln.op-chips .pay-amt {
+  color: #1858c4;
+}
+.pay-ln.op-mult .pay-amt {
+  color: #d01e44;
+}
+.pay-ln.op-score .pay-amt {
+  color: #a35b00;
+}
+.pay-ln.total {
+  margin-top: 4px;
+  font-size: 26px;
+}
+.pay-ln.total.down .pay-amt {
+  color: #c4183c;
+}
+.pay-hint {
+  font-size: 12px;
+}
+
+/* The jackpot. */
+.pay-jack {
+  position: absolute;
+  top: 128px;
+  left: 50%;
+  translate: -50% 0;
+  width: min(560px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px 14px;
+  border: 3px solid var(--amber);
+  background: radial-gradient(circle at 50% 30%, #3a2a78, #120c38 70%);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 50px rgba(255, 191, 62, 0.35);
+}
+.pay-jack.on-fire {
+  animation: pay-fire 0.18s steps(2) infinite;
+}
+@keyframes pay-fire {
+  50% {
+    box-shadow:
+      6px 6px 0 #000,
+      0 -8px 40px rgba(255, 140, 40, 0.85),
+      0 0 80px rgba(255, 70, 30, 0.5);
+  }
+}
+.pay-jk {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.35em;
+  color: var(--magenta);
+}
+.pay-eq {
+  font-size: 34px;
+  color: var(--text);
+}
+.pay-eq .k-chips {
+  color: #7fb0ff;
+}
+.pay-eq .k-mult {
+  color: #ff7088;
+}
+.pay-eq .k-score {
   color: var(--amber);
 }
-.po-total {
-  align-self: center;
-  font-size: 54px;
-  line-height: 1;
-  text-shadow: 4px 4px 0 #000;
-}
-.po-total.up {
+.pay-big {
+  font-size: 104px;
+  line-height: 0.9;
   color: var(--amber);
+  text-shadow:
+    0 6px 0 #7a3d00,
+    0 0 40px rgba(255, 63, 164, 0.6);
 }
-.po-total.down {
-  color: var(--down);
-}
-.po-goal {
+.pay-goal {
+  width: 80%;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 16px;
-}
-.po-bar {
-  position: relative;
-  flex: 1;
-  height: 10px;
-  border: 2px solid var(--line-bright);
-  background: var(--bg-0);
-}
-.po-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, var(--magenta), var(--amber));
-  transition: width 0.45s ease-out;
-}
-.po-cleared {
-  padding: 0 8px;
-  border: 3px solid var(--amber);
-  color: var(--amber);
-  font-weight: 400;
-  font-family: var(--font-display);
   font-size: 18px;
-  letter-spacing: 0.06em;
+  color: var(--text-dim);
 }
-.po-hint {
-  align-self: center;
-  font-size: 12px;
+.pay-bar {
+  flex: 1;
+  height: 12px;
+  border: 2px solid var(--line-bright);
+  background: var(--bg-0, #07051a);
 }
-/* A cartridge firing on the run's rail, and the label it pops. */
-.cart-chip.cart-fire {
-  animation: cart-fire 0.5s cubic-bezier(0.3, 1.8, 0.5, 1);
-  border-color: var(--amber) !important;
-  box-shadow: 0 0 14px rgba(255, 191, 62, 0.7);
+.pay-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--magenta), var(--amber));
+  transition: width 0.6s cubic-bezier(0.3, 1.2, 0.5, 1);
 }
-@keyframes cart-fire {
-  0% {
-    transform: translateY(0) rotate(0) scale(1);
-  }
-  35% {
-    transform: translateY(-6px) rotate(-6deg) scale(1.16);
-  }
-  70% {
-    transform: translateY(0) rotate(4deg) scale(1.05);
-  }
-  100% {
-    transform: none;
-  }
+.pay-cleared {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  padding: 2px 14px;
+  color: #2a1600;
+  background: var(--amber);
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
 }
-.rail-float {
+
+/* The moving parts: tokens flying to the scoreboard, the pops under each cartridge, the coin. */
+.pay-fx {
   position: fixed;
-  z-index: 640;
-  transform: translateX(-50%);
+  inset: 0;
   pointer-events: none;
-  padding: 1px 6px;
-  font-size: 16px;
+}
+.pay-tok {
+  position: fixed;
+  z-index: 2;
+  padding: 0 8px;
+  font-size: 26px;
   color: #fff;
   border: 2px solid #000;
-  box-shadow: 2px 2px 0 #000;
-  animation: rail-float 1s ease-out forwards;
+  box-shadow: 3px 3px 0 #000;
   white-space: nowrap;
 }
-.rail-float.op-chips,
-.rail-float.op-chipsMul {
-  background: #1d6fe0;
+.pay-tok.k-chips {
+  background: var(--chips-c);
 }
-.rail-float.op-add,
-.rail-float.op-mul {
-  background: #e0244f;
+.pay-tok.k-mult {
+  background: var(--mult-c);
 }
-.rail-float.op-meter {
+.pay-tok.k-score,
+.pay-tok.k-total {
   background: var(--amber);
-  color: #000;
+  color: #2a1600;
 }
-@keyframes rail-float {
-  0% {
+.pay-tok.k-total {
+  font-size: 34px;
+}
+.pay-pop {
+  position: fixed;
+  z-index: 1;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  animation: pay-pop 0.42s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.pay-pop b {
+  padding: 0 8px;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.15;
+  white-space: nowrap;
+  color: #fff;
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0 #000;
+}
+.pay-pop.k-chips b {
+  background: var(--chips-c);
+}
+.pay-pop.k-mult b {
+  background: var(--mult-c);
+}
+.pay-pop.k-score b {
+  background: var(--amber);
+  color: #2a1600;
+}
+.pay-pop span {
+  padding: 1px 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 1.25;
+  color: #1a1450;
+  background: #fff;
+  box-shadow: 2px 2px 0 #000;
+}
+.pay-pop.k-dud b {
+  font-size: 16px;
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border-color: var(--line-bright);
+}
+.pay-pop.k-dud span {
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border: 1px dashed var(--line-bright);
+  box-shadow: none;
+}
+@keyframes pay-pop {
+  from {
     opacity: 0;
-    transform: translate(-50%, -6px) scale(0.7);
-  }
-  20% {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1.1);
-  }
-  80% {
-    opacity: 1;
-    transform: translate(-50%, 4px) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, 10px) scale(1);
+    transform: translate(-50%, -14px) scale(0.5);
   }
 }
-@media (max-width: 1500px) {
-  .payout-back {
-    padding-top: 11vh;
+.pay-coin {
+  position: fixed;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: #7a3d00;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, var(--amber) 45%, #c47a00);
+  border: 2px solid #000;
+  box-shadow: 0 0 18px rgba(255, 191, 62, 0.9);
+  opacity: 0;
+  pointer-events: none;
+}
+.pay-coin.on {
+  opacity: 1;
+}
+.pay-trail {
+  position: fixed;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 220, 120, 0.85), rgba(255, 140, 40, 0));
+  animation: pay-trail 0.4s ease-out forwards;
+}
+@keyframes pay-trail {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
   }
-  .po-box {
-    min-width: 130px;
+}
+@media (max-width: 1500px), (max-height: 820px) {
+  .pay-box {
+    min-width: 116px;
   }
-  .po-box b {
-    font-size: 38px;
+  .pay-box b {
+    font-size: 40px;
   }
-  .po-total {
-    font-size: 44px;
+  .pay-paper {
+    font-size: 16px;
+    max-height: calc(100vh - 360px);
   }
-  .po-cart {
-    width: 104px;
+  .pay-jack {
+    top: 96px;
   }
+  .pay-big {
+    font-size: 76px;
+  }
+  .pay-eq {
+    font-size: 26px;
+  }
+}
+:root[data-reduced-motion='true'] .pay-stage,
+:root[data-reduced-motion='true'] .pay-jack.on-fire {
+  animation: none !important;
 }
 
 /* The Collector's interest notice: an overdue bill in his colors. */
@@ -3884,6 +4046,8 @@
 /* How a trade closed, stamped on its payout: each kind its own look. */
 .po-exit {
   align-self: center;
+  max-width: 100%;
+  text-align: center;
   padding: 3px 12px;
   font-size: 18px;
   letter-spacing: 0.04em;
@@ -4060,6 +4224,15 @@
 .jr-card.jr-dim {
   opacity: 0.45;
 }
+.jr-card.jr-lit .jr-dev {
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
+}
+.jr-dev.jr-hit {
+  animation: jr-slam 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.jr-dev.jr-hit .jr-shell {
+  animation: jr-flash 0.32s ease-out;
+}
 .jr-card.jr-fired .jr-dev {
   filter: drop-shadow(0 0 9px rgba(255, 191, 62, 0.9));
   animation: none;
@@ -4069,9 +4242,7 @@
 }
 .jr-card.jr-idle {
   filter: grayscale(0.85) brightness(0.55);
-}
-.jr-card.jr-slam .jr-dev {
-  animation: jr-slam 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+  animation: jr-shake 0.45s;
 }
 @keyframes jr-slam {
   30% {
@@ -4084,16 +4255,10 @@
     transform: translateY(-2%);
   }
 }
-.jr-card.jr-flash .jr-shell {
-  animation: jr-flash 0.32s ease-out;
-}
 @keyframes jr-flash {
   0% {
     filter: brightness(3) saturate(0);
   }
-}
-.jr-card.jr-shake {
-  animation: jr-shake 0.45s;
 }
 @keyframes jr-shake {
   20%,
@@ -4105,33 +4270,8 @@
     transform: translateX(5%);
   }
 }
-.jr-card[data-why]::after {
-  content: attr(data-why);
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  width: max(100%, 150px);
-  margin-top: 3px;
-  padding: 3px 6px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  line-height: 1.25;
-  white-space: normal;
-  color: #1a1450;
-  background: #fff;
-  box-shadow: 2px 2px 0 #000;
-  pointer-events: none;
-}
-.jr-card.jr-idle[data-why]::after {
-  color: var(--text-dim);
-  background: var(--bg-2);
-  border: 1px dashed var(--line-bright);
-  filter: none;
-}
 :root[data-reduced-motion='true'] .jr-card.will-fire .jr-dev,
-:root[data-reduced-motion='true'] .jr-card.jr-slam .jr-dev,
-:root[data-reduced-motion='true'] .jr-card.jr-shake {
+:root[data-reduced-motion='true'] .jr-dev.jr-hit,
+:root[data-reduced-motion='true'] .jr-card.jr-idle {
   animation: none;
 }

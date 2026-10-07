@@ -53,7 +53,7 @@ import { formatCents, type Cents } from '../money';
 import { BASE_EXECUTION, combineImprove, type ExecutionMods } from '../orders/fill';
 import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
-import { pnlChips, runScore, winQuality } from '../scoring/mult';
+import { pnlChips, runScore, tenths, winQuality } from '../scoring/mult';
 import { STRUCTURES } from '../strategies/structures';
 import type { StructureId } from '../strategies/types';
 import { buildDebrief } from '../trading/debrief';
@@ -1045,7 +1045,7 @@ export class RunEngine {
       if (points <= 0) continue;
       r.interestDays = { ...(r.interestDays ?? {}), [p.id]: (r.interestDays?.[p.id] ?? 0) + 1 };
       r.interest = (r.interest ?? 0) + points;
-      r.meter -= points;
+      r.meter = tenths(r.meter - points);
       items.push({
         positionId: p.id,
         symbol: p.symbol,
@@ -1206,7 +1206,7 @@ export class RunEngine {
       steps,
       winQuality(facts.returnOnRisk, facts.structureId),
     );
-    r.meter += res.points;
+    r.meter = tenths(r.meter + res.points);
     r.scored.push(p.id);
     const card = s.card(p.cardId);
     r.tallies.push({
@@ -1269,7 +1269,7 @@ export class RunEngine {
     }
     st.totals.trades++;
     if (facts.win) st.totals.wins++;
-    st.totals.points += res.points;
+    st.totals.points = tenths(st.totals.points + res.points);
     const ss = st.stats;
     for (const stp of steps)
       if (stp.kind === 'cartridge' && stp.source && res.trace.some((t) => t.label === stp.label))
@@ -1344,10 +1344,10 @@ export class RunEngine {
     r.realizedCents = s.realizedCents;
     if (!r.breached && s.realizedCents !== 0 && r.meter > 0) {
       const green = s.realizedCents > 0;
-      r.greenBonus = Math.round(
+      r.greenBonus = tenths(
         r.meter * (green ? BALANCE.scoring.greenRoundBonus : -BALANCE.scoring.redRoundPenalty),
       );
-      r.meter += r.greenBonus;
+      r.meter = tenths(r.meter + r.greenBonus);
       this.events.push({
         kind: 'score',
         text: green
@@ -1363,7 +1363,7 @@ export class RunEngine {
       r.duel = { you: s.realizedCents, rival: duel.rival, won };
       const mult = won ? BALANCE.duel.winMult : BALANCE.duel.loseMult;
       const before = r.meter;
-      if (r.meter > 0) r.meter = Math.round(r.meter * mult);
+      if (r.meter > 0) r.meter = tenths(r.meter * mult);
       this.events.push({
         kind: won ? 'good' : 'warn',
         text: won
@@ -1381,7 +1381,7 @@ export class RunEngine {
     r.status = !r.breached && r.meter >= r.target && (!goal || goal.met) ? 'passed' : 'failed';
     if (r.bossId) r.styleMet = styleState(BOSSES[r.bossId].style, this.styleTrades(), true) === 'met';
     // Part of a surplus carries into the next round, so a strong round leaves a cushion.
-    st.carry = r.status === 'passed' ? Math.round((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;
+    st.carry = r.status === 'passed' ? tenths((r.meter - r.target) * BALANCE.scoring.carryShare) : 0;
     if (r.breached) this.say('breach', 9);
     else this.say(r.status === 'passed' ? 'target_met' : 'target_missed', 5);
     const unused = Math.max(0, r.tickets - r.ticketsUsed);
@@ -2264,7 +2264,7 @@ export class RunEngine {
         r.rerolls = Math.max(0, r.rerolls + op.delta);
         return note(`rerolls now ${r.rerolls - r.rerollsUsed}`);
       case 'meter':
-        r.meter += op.delta;
+        r.meter = tenths(r.meter + op.delta);
         return note(`meter ${op.delta >= 0 ? '+' : ''}${op.delta}`);
       case 'cartridge': {
         const c = CARTRIDGE_BY_ID[op.id];

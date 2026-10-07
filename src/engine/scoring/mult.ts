@@ -105,8 +105,16 @@ export function runScore(
     const label = s.op === 'chips' && size < 1 ? `${s.label} (thin win ×${size.toFixed(2)})` : s.label;
     trace.push({ label, op: s.op, value, chips, mult, kind: s.kind, source: s.source });
   }
-  const points = winner ? chips * mult * meter : chips * meter;
-  return { winner, chips, mult: winner ? mult : 1, points: Math.round(points), trace };
+  // The screen shows chips and points ×10 as whole numbers (SCORE_SCALE), so both are kept to a
+  // tenth here: the chips you see times the mult you see is the total you get.
+  const whole = tenths(chips);
+  const points = winner ? whole * mult * meter : whole * meter;
+  return { winner, chips, mult: winner ? mult : 1, points: tenths(points), trace };
+}
+
+/** Points to a tenth (whole on screen at ×10). Keeps sums of points free of float drift. */
+export function tenths(x: number): number {
+  return Math.round(x * 10) / 10;
 }
 
 export function levelSteps(level: number, baseChips: number): ScoreStep[] {

@@ -136,7 +136,7 @@ describe('scoring pipeline', () => {
     });
     const chop = runScore(10_000, 500_000, scoreSteps(pipe({ facts: debit, reviewId: 'the_chop' })));
     const calm = runScore(10_000, 500_000, scoreSteps(pipe({ facts: debit })));
-    expect(chop.points).toBe(Math.round(calm.points * 0.5));
+    expect(chop.points).toBe(Math.round(calm.points * 0.5 * 10) / 10);
   });
 
   it('family bonuses switch on at 2, 3 and 4', () => {

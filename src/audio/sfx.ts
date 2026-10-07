@@ -51,7 +51,8 @@ export type SfxName =
   | 'fanfare'
   | 'jackpot'
   | 'cartSlam'
-  | 'print';
+  | 'print'
+  | 'dud';
 
 const DEFS: Record<SfxName, SfxDef> = {
   click: { wave: 'square', freq: 900, sustain: 0.012, decay: 0.03, volume: 0.25, duty: 0.3 },
@@ -317,6 +318,8 @@ const DEFS: Record<SfxName, SfxDef> = {
     lowpass: 0.15,
     layer: { wave: 'sine', freq: 130, slide: 0.45, sustain: 0.03, decay: 0.15, volume: 0.5 },
   },
+  // The coin passing a cartridge that doesn't apply: flat, low, short.
+  dud: { wave: 'square', freq: 160, slide: 0.72, sustain: 0.03, decay: 0.1, volume: 0.16, duty: 0.5 },
   // The register printing a line.
   print: { wave: 'noise', freq: 7000, sustain: 0.004, decay: 0.014, volume: 0.13, lowpass: 0.95 },
   buy: {
