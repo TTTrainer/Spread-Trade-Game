@@ -2,15 +2,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { BriefAccess } from '../../engine/news/brief';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { burstAt } from '../../fx/overlay';
-import { ArtIcon, artUrl } from '../art';
+import { ArtIcon } from '../art';
 import { BALANCE } from '../../content/balance';
 import { ANALYSTS } from '../../content/analysts';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
-import { ALL_FAMILIES, FAMILY_NAMES } from '../../content/families';
-import { FAMILY_GLYPH } from '../../content/summaries';
 import { MEMOS, TAGS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
-import type { AnalystId, CartridgeDef, Family } from '../../content/types';
+import type { AnalystId, Family } from '../../content/types';
 import { diffDays } from '../../engine/calendar';
 import {
   baseRate,
@@ -38,119 +36,10 @@ import './run.css';
 import { BOSSES, type SealedInfo } from '../../content/bosses';
 import { LockStamp } from '../trading/BossBanner';
 import { usePendingPoints } from '../store/payout';
+import { JokerRow } from './JokerRow';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
-}
-
-export function CartridgeChip({
-  def,
-  index,
-  onMove,
-  extra,
-  held,
-}: {
-  def: CartridgeDef;
-  index?: number;
-  onMove?: (dir: -1 | 1) => void;
-  extra?: ReactNode;
-  /** Switched off by a boss for the round. */
-  held?: boolean;
-}) {
-  return (
-    <div
-      className={`cart-chip rar-${def.rarity} ${held ? 'held' : ''}`}
-      data-tip={`cart:${def.id}`}
-      data-testid={`cart-${def.id}`}
-    >
-      {onMove && (
-        <button className="cart-move" onClick={() => onMove(-1)} aria-label="Move left">
-          ◀
-        </button>
-      )}
-      <span className="cart-slot num">{index !== undefined ? index + 1 : ''}</span>
-      <ArtIcon
-        category="cartridge"
-        id={def.id}
-        name={def.name}
-        tone={def.rarity}
-        className="cart-art"
-        style={{ width: 20, height: 20, fontSize: 9 }}
-      />
-      <span className="cart-name">{def.name}</span>
-      <span className="cart-fam num">{def.families.join('·')}</span>
-      {onMove && (
-        <button className="cart-move" onClick={() => onMove(1)} aria-label="Move right">
-          ▶
-        </button>
-      )}
-      {extra}
-    </div>
-  );
-}
-
-export function CartridgeRail({ e, editable }: { e: RunEngine; editable?: boolean }) {
-  const act = useRun((s) => s.act);
-  const slots = e.cartridgeSlots();
-  const fam = e.families();
-  const owned = e.state.cartridges;
-  // The Bursar holds the leftmost cartridge for the round: it shows, stamped, but does nothing.
-  const r = e.state.round;
-  const held =
-    r.bossId && (e.state.phase === 'round' || e.state.phase === 'review_intro') && e.rule().leftCartOff
-      ? owned[0]
-      : null;
-  return (
-    <div className="cart-rail" data-testid="cartridge-rail" data-tip="g:cartridge_rail">
-      <div className="cart-slots">
-        {Array.from({ length: slots }, (_, i) => {
-          const id = owned[i];
-          const def = id ? CARTRIDGE_BY_ID[id] : null;
-          if (!def)
-            return (
-              <div key={i} className="cart-chip empty num">
-                slot {i + 1}
-              </div>
-            );
-          return (
-            <CartridgeChip
-              key={id}
-              def={def}
-              index={i}
-              held={id === held}
-              onMove={editable ? (d) => void act({ t: 'move', from: i, to: i + d }) : undefined}
-              extra={id === held ? <LockStamp text="TUITION" by={BOSSES[r.bossId!].name} /> : undefined}
-            />
-          );
-        })}
-      </div>
-      <div className="fam-counters num">
-        {ALL_FAMILIES.filter((f) => fam[f] > 0).map((f) => (
-          <span
-            key={f}
-            className={`fam ${fam[f] >= (f === 'CHAOS' ? 1 : 2) ? 'on' : ''}`}
-            data-tip={`family:${f}`}
-          >
-            <ArtIcon
-              category="family"
-              id={f}
-              name={FAMILY_NAMES[f]}
-              onlyIfUploaded
-              className="fam-art"
-              style={{ width: 16, height: 16 }}
-            />
-            {!artUrl('family', f) && <span className="fam-glyph">{FAMILY_GLYPH[f]}</span>}
-            {FAMILY_NAMES[f].toUpperCase()}
-            <span className="fam-pips" aria-label={`${fam[f]} of 4`}>
-              {[1, 2, 3, 4].map((i) => (
-                <i key={i} className={i <= fam[f] ? 'full' : ''} />
-              ))}
-            </span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function StressLog({ e, onClose }: { e: RunEngine; onClose: () => void }) {
@@ -309,7 +198,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         <div className="tb-spacer" />
         <FastForwardBar />
       </div>
-      <CartridgeRail e={e} />
+      <JokerRow e={e} preview />
       {stressOpen && <StressLog e={e} onClose={() => setStressOpen(false)} />}
     </div>
   );

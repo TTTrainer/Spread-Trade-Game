@@ -22,7 +22,7 @@ import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
-import { CartridgeRail } from './RunParts';
+import { JokerRow } from './JokerRow';
 import { MONTH_CARDS, RoundEmblem } from './RoundEmblem';
 import { ExitPlanFeedback } from './ExitPlanFeedback';
 
@@ -193,7 +193,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
         <div className="mm-cols">
           <section className="mm-build">
             <div className="section-title">Your build · fires left to right</div>
-            <CartridgeRail e={e} editable />
+            <JokerRow e={e} editable />
             <div className="section-title">Your exit plan in action</div>
             <ExitPlanFeedback e={e} />
           </section>

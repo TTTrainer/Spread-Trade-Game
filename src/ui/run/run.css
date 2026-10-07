@@ -198,69 +198,7 @@
   color: var(--text-faint);
 }
 
-/* ---------- cartridge rail ---------- */
-.cart-rail {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.cart-slots {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.cart-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 150px;
-  padding: 1px 8px;
-  border: 2px solid var(--rar-common);
-  background: var(--bg-2);
-  font-size: 14px;
-  box-shadow: 2px 2px 0 #000;
-}
-.cart-chip.rar-U {
-  border-color: var(--rar-uncommon);
-}
-.cart-chip.rar-R {
-  border-color: var(--rar-rare);
-}
-.cart-chip.rar-L {
-  border-color: var(--rar-legendary);
-  box-shadow:
-    2px 2px 0 #000,
-    var(--glow-amber);
-}
-.cart-chip.empty {
-  border-style: dashed;
-  border-color: var(--line);
-  color: var(--text-faint);
-  background: transparent;
-  justify-content: center;
-}
-.cart-slot {
-  color: var(--text-faint);
-}
-.cart-name {
-  flex: 1;
-  white-space: nowrap;
-}
-.cart-fam {
-  font-size: 13px;
-  color: var(--text-faint);
-}
-.cart-move {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  padding: 0 2px;
-}
-.cart-move:hover {
-  color: var(--cyan);
-}
+/* ---------- family meters (beside the Joker Row) ---------- */
 .fam-counters {
   display: flex;
   flex-wrap: wrap;
@@ -801,10 +739,6 @@
   .rtb-name {
     font-size: 16px;
   }
-  .cart-chip {
-    min-width: 120px;
-    font-size: 13px;
-  }
   .shop-item {
     width: 200px;
   }
@@ -1037,9 +971,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-.cart-chip .cart-art {
-  margin: 0 4px 0 2px;
 }
 .client-who {
   display: flex;
@@ -2717,17 +2648,12 @@
   white-space: nowrap;
   transform: rotate(-3deg);
 }
-.cart-chip.held {
-  position: relative;
-  filter: grayscale(1);
-  opacity: 0.75;
-}
-.cart-chip.held .lock-stamp {
+.jr-card.held .lock-stamp {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: calc(var(--jr-h) * 0.45);
   transform: translate(-50%, -50%) rotate(-6deg);
-  filter: none;
+  z-index: 3;
 }
 @media (max-width: 1500px) {
   .bf-name {
@@ -3995,4 +3921,217 @@
     gap: 4px;
     padding: 8px 10px;
   }
+}
+
+/* ---------- the Joker Row: cartridges as game cartridges ----------
+ * The device height follows the screen (about 100 px at 1080 tall, 68 px at 768); the label box is
+ * where the Figma shell's label window sits (fractions of the 203×240 shell). */
+.joker-row {
+  --jr-h: clamp(60px, 9.2vh, 100px);
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 3px 2px 2px;
+}
+.jr-slots {
+  display: flex;
+  gap: 2px;
+}
+/* Each card is as wide as its two-line effect text needs, so the text never runs into a neighbor. */
+.jr-card {
+  position: relative;
+  width: calc(var(--jr-h) * 1.42);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition:
+    opacity 0.2s,
+    filter 0.2s;
+}
+.jr-card.empty {
+  height: calc(var(--jr-h) + 30px);
+  border: 2px dashed var(--line);
+  justify-content: center;
+}
+.jr-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 0.1em;
+}
+.jr-dev {
+  position: relative;
+  display: block;
+  height: var(--jr-h);
+  aspect-ratio: 203 / 240;
+  flex: none;
+}
+.jr-shell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.55));
+}
+.jr-label {
+  position: absolute;
+  left: 40.2%;
+  top: 6.72%;
+  width: 45.41%;
+  height: 58.82%;
+  display: grid;
+  place-items: center;
+}
+.jr-label img,
+.jr-label > * {
+  width: 84%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.jr-name {
+  max-width: 100%;
+  font-size: clamp(11px, 1.25vh, 13px);
+  line-height: 1.15;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jr-get {
+  max-width: 100%;
+  font-size: clamp(13px, 1.5vh, 16px);
+  line-height: 0.95;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.jr-get-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-width: 0;
+}
+.jr-move {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 12px;
+}
+.jr-move:hover {
+  color: var(--cyan);
+}
+.jr-card.held .jr-dev {
+  filter: grayscale(0.9) brightness(0.6);
+}
+/* Before you place a trade: the cartridges a win would fire light up and say what they'd add. */
+.jr-card.will-fire .jr-dev {
+  filter: drop-shadow(0 0 7px rgba(255, 191, 62, 0.75));
+  animation: jr-ready 1.6s ease-in-out infinite;
+}
+.jr-will {
+  position: absolute;
+  top: calc(var(--jr-h) * 0.62);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0 6px;
+  font-size: 14px;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: #2a1600;
+  background: var(--amber);
+  box-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+@keyframes jr-ready {
+  50% {
+    filter: drop-shadow(0 0 12px rgba(255, 191, 62, 0.95));
+  }
+}
+/* The payout fires these in place (Payout.tsx sets the classes). */
+.jr-card.jr-dim {
+  opacity: 0.45;
+}
+.jr-card.jr-fired .jr-dev {
+  filter: drop-shadow(0 0 9px rgba(255, 191, 62, 0.9));
+  animation: none;
+}
+.jr-card.jr-fired .jr-name {
+  color: var(--amber);
+}
+.jr-card.jr-idle {
+  filter: grayscale(0.85) brightness(0.55);
+}
+.jr-card.jr-slam .jr-dev {
+  animation: jr-slam 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+@keyframes jr-slam {
+  30% {
+    transform: translateY(-16%);
+  }
+  55% {
+    transform: translateY(5%) scaleY(0.95);
+  }
+  78% {
+    transform: translateY(-2%);
+  }
+}
+.jr-card.jr-flash .jr-shell {
+  animation: jr-flash 0.32s ease-out;
+}
+@keyframes jr-flash {
+  0% {
+    filter: brightness(3) saturate(0);
+  }
+}
+.jr-card.jr-shake {
+  animation: jr-shake 0.45s;
+}
+@keyframes jr-shake {
+  20%,
+  60% {
+    transform: translateX(-5%);
+  }
+  40%,
+  80% {
+    transform: translateX(5%);
+  }
+}
+.jr-card[data-why]::after {
+  content: attr(data-why);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: max(100%, 150px);
+  margin-top: 3px;
+  padding: 3px 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: normal;
+  color: #1a1450;
+  background: #fff;
+  box-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+.jr-card.jr-idle[data-why]::after {
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border: 1px dashed var(--line-bright);
+  filter: none;
+}
+:root[data-reduced-motion='true'] .jr-card.will-fire .jr-dev,
+:root[data-reduced-motion='true'] .jr-card.jr-slam .jr-dev,
+:root[data-reduced-motion='true'] .jr-card.jr-shake {
+  animation: none;
 }

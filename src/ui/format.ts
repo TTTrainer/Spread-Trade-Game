@@ -34,3 +34,26 @@ export function num(x: number | null | undefined, digits = 0): string {
 export function signed(x: number, digits = 2): string {
   return `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x).toFixed(digits)}`;
 }
+
+/**
+ * Points and chips on screen are the engine's ×10, so every number reads whole (42 chips, 350
+ * points instead of 4.2 and 35). Targets scale the same way, so nothing about the balance changes.
+ * Mult is shown as it is.
+ */
+export const SCORE_SCALE = 10;
+
+/** Points (the round meter, targets, a trade's total), scaled and grouped: "1,280". */
+export function pts(x: number): string {
+  return Math.round(x * SCORE_SCALE).toLocaleString('en-US');
+}
+
+/** Chips, scaled to a whole number: "107". */
+export function chipsText(x: number): string {
+  return Math.round(x * SCORE_SCALE).toLocaleString('en-US');
+}
+
+/** Mult, at most one decimal: "3.3", "4". */
+export function multText(x: number): string {
+  const r = Math.round(x * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}

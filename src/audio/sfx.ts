@@ -48,7 +48,10 @@ export type SfxName =
   | 'multX'
   | 'slam'
   | 'fire'
-  | 'fanfare';
+  | 'fanfare'
+  | 'jackpot'
+  | 'cartSlam'
+  | 'print';
 
 const DEFS: Record<SfxName, SfxDef> = {
   click: { wave: 'square', freq: 900, sustain: 0.012, decay: 0.03, volume: 0.25, duty: 0.3 },
@@ -279,6 +282,43 @@ const DEFS: Record<SfxName, SfxDef> = {
       layer: { wave: 'sine', freq: 3136, attack: 0.3, sustain: 0.3, decay: 0.6, volume: 0.06 },
     },
   },
+  // The payout's total: a pinball jackpot (two notes trading places over a bass drop and a crash).
+  jackpot: {
+    wave: 'square',
+    freq: 660,
+    sustain: 0.48,
+    decay: 0.14,
+    volume: 0.2,
+    duty: 0.35,
+    arp: [
+      { at: 0.09, mult: 1.3333 },
+      { at: 0.18, mult: 0.75 },
+      { at: 0.27, mult: 1.3333 },
+      { at: 0.36, mult: 0.75 },
+      { at: 0.45, mult: 1.3333 },
+    ],
+    layer: {
+      wave: 'sine',
+      freq: 95,
+      slide: 0.4,
+      sustain: 0.1,
+      decay: 0.45,
+      volume: 0.55,
+      layer: { wave: 'noise', freq: 900, sustain: 0.04, decay: 0.3, volume: 0.28, lowpass: 0.2 },
+    },
+  },
+  // A cartridge pushed home in its slot: a short plastic chunk.
+  cartSlam: {
+    wave: 'noise',
+    freq: 1400,
+    sustain: 0.012,
+    decay: 0.06,
+    volume: 0.3,
+    lowpass: 0.15,
+    layer: { wave: 'sine', freq: 130, slide: 0.45, sustain: 0.03, decay: 0.15, volume: 0.5 },
+  },
+  // The register printing a line.
+  print: { wave: 'noise', freq: 7000, sustain: 0.004, decay: 0.014, volume: 0.13, lowpass: 0.95 },
   buy: {
     wave: 'square',
     freq: 392,
