@@ -195,6 +195,7 @@ const KEEP_CLEAR = [
   '[data-testid="decision-modal"]',
   '[data-testid="pos-hud"]',
   '.shop-card',
+  '.so-buy',
   '.os-taskbar',
 ];
 
@@ -217,7 +218,21 @@ export function bubblePlace(
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const { w, h } = size;
-  if (!rect) return centered ? { left: vw / 2 - w / 2, top: vh * 0.3 } : { right: 24, bottom: 24 };
+  if (!rect && centered) return { left: vw / 2 - w / 2, top: vh * 0.3 };
+  if (!rect) {
+    // No spotlight: a corner that keeps clear of the buttons the lesson asks for (NEXT ROUND in
+    // the taskbar, the shop's BUY buttons), bottom right first.
+    const corners = [
+      { x: vw - w - 24, y: vh - h - 24 },
+      { x: vw - w - 24, y: vh - h - 72 },
+      { x: 24, y: vh - h - 72 },
+      { x: vw / 2 - w / 2, y: vh - h - 72 },
+    ];
+    const cost = (c: { x: number; y: number }) =>
+      avoid.reduce((a, b) => a + overlap({ x: c.x, y: c.y, w, h }, b), 0);
+    const pick = corners.reduce((a, c) => (cost(c) < cost(a) ? c : a));
+    return { left: Math.max(12, pick.x), top: Math.max(12, pick.y) };
+  }
   const gap = PAD + 16;
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;

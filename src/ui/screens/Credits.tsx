@@ -37,10 +37,10 @@ export function CreditsScreen() {
         </p>
         <h2>Art, music and sound</h2>
         <p>
-          All pixel art (portraits, The Pad, icons, the backdrop) is drawn in code for this game; no art packs
-          are used. Music is composed and played live with <b>Tone.js</b> (MIT). Particles and the backdrop
-          render with <b>PixiJS</b> (MIT). Sound effects are synthesized in code, sfxr-style, with no sample
-          packs.
+          All art is original to this game: most pixel art (portraits, The Pad, icons, the backdrop) is drawn
+          in code, and the cartridge, memo and coupon shells were generated for it in Figma; no art packs are
+          used. Music is composed and played live with <b>Tone.js</b> (MIT). Particles and the backdrop render
+          with <b>PixiJS</b> (MIT). Sound effects are synthesized in code, sfxr-style, with no sample packs.
         </p>
         <h2>Software</h2>
         <p>

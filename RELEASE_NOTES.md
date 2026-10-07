@@ -1,8 +1,21 @@
-# Spread Trading Game 1.8.2
+# Spread Trading Game 1.8.3
 
 A single-player roguelite about trading options spreads on real historical market data, now with a Trade Builder for today's market. Paper trading only; not financial advice.
 
-## What's new in 1.8.2
+## What's new in 1.8.3
+
+- **The shop as objects, not boxes:** each item is a thing you'd pick up, with its text underneath: cartridges are game cartridges (now a little wider, with a proper arrow point), memos are clipped office memos, vouchers are coupons, playbook pages are game manuals and analysts are ID badges. The price hangs on a tag; BUY is a big key. The spoils screen and YOUR DESK use the same objects.
+- **Keycap buttons:** the buttons that matter (SELL and BUY on the ticket, ▶ PLAY, NEXT ROUND, BUY, REROLL, TAKE, CASH OUT) are chunky keys that press down when you click them or use their hotkey.
+- **Flash when it matters:** the button you most likely need next flashes amber: SELL before your first trade, ▶ PLAY once a trade is placed, NEXT ROUND when the days are used up, a free reroll, NEXT in a LEARN OPTIONS lesson once its task is done, and NEXT ROUND in the shop when nothing is left to buy. If you put off a boss's spoils, **★ NEW CARTRIDGE · CHOOSE** flashes in the taskbar until you take one, and with all 5 slots full, SELL flashes to make room.
+- **Top bar:** beveled icons for cash, tickets and stress. Stress at 75 or more, and a target slipping out of reach, pulse red.
+- **The payoff in the TRADE column:** PAYOFF now opens the full graph and its numbers in the TRADE column (in place of the small one) and switches to that column, so the chart stays in view. During a LEARN lesson it still opens over the chart.
+- **The Income desk first:** Career lists Income first and picks it by default (Verticals stays free too), and it remembers the desk you last played.
+- **Ines teaches a cash-secured put:** the tutorial runs on the Income desk; she marks a floor and sells a put under it, then you sell your own.
+- **LEARN OPTIONS, reworked:** cash-secured puts and covered calls first: wait for a level, the picture of the trade, POP, covered calls, a coached trade with a checklist that ticks as you go, then a replay that plays the next weeks of real prices against your strike. Delta, time decay, IV, the expected move, condors, managing and events follow.
+- **Bigger Rebalancer race chart** (YOU vs SPY).
+- **Fix:** Ines's lesson bubble no longer covers NEXT ROUND in the shop.
+
+## New in 1.8.2
 
 - **The Joker Row:** your cartridges now sit along the top of the trading screen as game cartridges, in the order they fire, the shell colored by rarity (grey common, cyan uncommon, pink rare, gold legendary) with the cartridge's picture on the label, its name and what it adds. While you build a trade, the cartridges a win would set off glow and say what they'd add (+150 chips, +1 mult, ×2). The same cartridges appear in the shop, on YOUR DESK and in a desk's starting kit.
 - **A new payout when a trade closes**, in three steps your eye can follow:
@@ -12,8 +25,6 @@ A single-player roguelite about trading options spreads on real historical marke
   A loss prints on the register only (losses are never multiplied). Click, Space or Enter still skips; Settings › Game › payout speed still has FAST and OFF.
 - **Whole numbers:** chips and points are shown ten times bigger, so every number is whole: "107 × 3.25 = 348" instead of "10.7 × 3.25 = 35". Targets, cartridge text and everything else that quotes points scale the same way, so nothing about the balance changes. The chips and mult on screen now multiply exactly to the total you're given.
 - **Sounds:** chiptune chips and mult, a slam for each cartridge, a flat thunk for a miss, a receipt printer, and a new jackpot.
-
-**Not in this release yet (next):** the Income desk first in Career, Ines's tutorial on a cash-secured put, and the reworked LEARN OPTIONS course (cash-secured puts and covered calls first).
 
 **Known issue (unchanged):** rarely, when many trades close on the same day, the chart library logs an error ("reading 'time'"); the game keeps going.
 

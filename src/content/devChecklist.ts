@@ -30,7 +30,7 @@ export interface DevSetup {
   game?: Partial<Settings['game']>;
 }
 
-export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2';
+export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2' | '1.8.3';
 
 export interface DevCheck {
   id: string;
@@ -61,6 +61,46 @@ const boss = (id: BossId, slug: string, title: string, look: string, clearReview
 
 export const DEV_CHECKS: DevCheck[] = [
   {
+    id: 'shop-objects',
+    group: 'Cartridges and payout',
+    ver: '1.8.3',
+    title: 'The shop as objects',
+    look: 'Take the spoils and look at the shop: cartridges, a clipped memo, a coupon, a game manual and an ID badge, text underneath, no boxes. Does buying feel better?',
+    setup: { run: true, closeMenu: true, boss: 'underwriter', clearReview: true },
+  },
+  {
+    id: 'shop-later',
+    group: 'Cartridges and payout',
+    ver: '1.8.3',
+    title: 'Spoils you put off keep flashing',
+    look: 'Press DECIDE LATER on the spoils: ★ NEW CARTRIDGE · CHOOSE flashes in the taskbar until you take one. With 5 slots full, SELL flashes to make room.',
+    setup: { run: true, closeMenu: true, boss: 'underwriter', clearReview: true },
+  },
+  {
+    id: 'run-keys',
+    group: 'Trading',
+    ver: '1.8.3',
+    title: 'Keycap buttons that flash when it matters',
+    look: 'SELL, PLAY, NEXT ROUND and BUY are chunky keys that press down (hotkeys too). The one that matters flashes: SELL before your first trade, PLAY once one is placed.',
+    setup: { run: true, closeMenu: true },
+  },
+  {
+    id: 'run-icons',
+    group: 'Trading',
+    ver: '1.8.3',
+    title: 'Top bar icons and alarms',
+    look: 'Cash, tickets and stress have beveled icons. Stress at 75 or more, and a target slipping out of reach, pulse red.',
+    setup: { run: true, closeMenu: true },
+  },
+  {
+    id: 'tb-payoff-col',
+    group: 'Trading',
+    ver: '1.8.3',
+    title: 'The payoff opens in the TRADE column',
+    look: 'Build a trade and press PAYOFF: the full graph and its numbers open in the TRADE column and the chart stays. During a LEARN lesson it opens over the chart.',
+    setup: { builder: { payoff: true } },
+  },
+  {
     id: 'cart-row',
     group: 'Cartridges and payout',
     ver: '1.8.2',
@@ -87,7 +127,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'career-income',
     group: 'Cartridges and payout',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'Income desk first',
     look: 'Career lists Income first and picks it by default (Verticals is free too). It remembers the desk you last played.',
     setup: { screen: 'career' },
@@ -175,7 +215,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-wait',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'Get paid to wait (the replay)',
     look: 'Drag your line under the floor, SELL, then PLAY the month: a coin for every day no candle touches the line. Fun, or homework? Try another month too.',
     setup: { builder: { lesson: 'wait' } },
@@ -183,7 +223,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-picture',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'The same trade as a picture',
     look: "Today's put on the P/L chart, and one question on where it starts losing. Does the picture click after the replay?",
     setup: { builder: { lesson: 'picture' } },
@@ -191,7 +231,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-pop',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'Pick a safer line',
     look: 'EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and under a floor?',
     setup: { builder: { lesson: 'pop' } },
@@ -199,7 +239,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-cc',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'The covered call replay',
     look: 'The same game upside down: your call line over the ceiling, and the month plays out. Clear why it is safe when you own the shares?',
     setup: { builder: { lesson: 'cc' } },
@@ -207,7 +247,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-coached',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'Your first trade, coached',
     look: "Build a put on today's chart: each checklist step ticks as you do it, then PLAY tests the setup on last month. Does the badge feel earned?",
     setup: { builder: { lesson: 'coached' } },
@@ -215,7 +255,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'learn-more',
     group: 'Learn Options',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'More lessons',
     look: 'After the vertical: delta, time decay, IV, the expected move, condors, managing and events. The call and put buying lessons are gone.',
     setup: { builder: { lesson: 'delta' } },
@@ -291,7 +331,7 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'tut-practice',
     group: 'Tutorial',
-    ver: '1.8.2',
+    ver: '1.8.3',
     title: 'Ines teaches a cash-secured put',
     look: 'The tutorial runs on the Income desk: Ines marks a floor and sells a put under it, then you sell your own. Is it clear what happens if it ends under the strike?',
     setup: { tutorial: true },

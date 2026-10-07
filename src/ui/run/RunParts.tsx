@@ -37,6 +37,9 @@ import { BOSSES, type SealedInfo } from '../../content/bosses';
 import { LockStamp } from '../trading/BossBanner';
 import { usePendingPoints } from '../store/payout';
 import { JokerRow } from './JokerRow';
+import icoCash from '../../../assets/ui/icon-cash.png';
+import icoTickets from '../../../assets/ui/icon-tickets.png';
+import icoStress from '../../../assets/ui/icon-stress.png';
 
 export function familyCounts(e: RunEngine): Record<Family, number> {
   return e.families();
@@ -134,10 +137,12 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
           </AnimatePresence>
         </div>
         <div className="rtb-tile rtb-cash num" data-testid="cash" data-tip="g:cash">
+          <img className="rtb-ico" src={icoCash} alt="" draggable={false} />
           <span className="rtb-k">CASH</span>
           <span className="rtb-v amber-text">${st.cash}</span>
         </div>
         <div className="rtb-tile num" data-testid="tickets" data-tip="g:tickets">
+          <img className="rtb-ico" src={icoTickets} alt="" draggable={false} />
           <span className="rtb-k">TICKETS</span>
           <span className="rtb-v">
             {Array.from({ length: r.tickets }, (_, i) => (
@@ -149,7 +154,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         </div>
         <div className="rtb-gauges">
           <div
-            className="rtb-line"
+            className={`rtb-line ${!plSealed && !r.memo.waiver && room / span < 0.35 ? 'alarm' : ''}`}
             data-tip-title="Max-Loss Line"
             data-tip-body={`Equity must stay above ${money(floor)} at every close (${Math.round(r.maxLossLinePct * 100)}% below the round's start). Cross it and the risk desk closes everything and the round fails.`}
           >
@@ -167,12 +172,14 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
             )}
           </div>
           <button
-            className="rtb-stress"
+            className={`rtb-stress ${st.stress >= 75 ? 'alarm' : ''}`}
             onClick={() => setStressOpen(true)}
             data-testid="stress"
             data-tip="g:stress"
           >
-            <span className="rtb-k">STRESS</span>
+            <span className="rtb-k">
+              <img className="rtb-ico small" src={icoStress} alt="" draggable={false} /> STRESS
+            </span>
             <Meter
               value={st.stress}
               max={100}
@@ -591,7 +598,7 @@ export function RunLeftExtra({ e }: { e: RunEngine }) {
         )}
         {noPositions && r.clockStarted && !r.sitOut && (
           <button
-            className="pixel-btn"
+            className={`pixel-btn key k-next ${(daysLeft ?? 1) <= 0 || r.ticketsUsed >= r.tickets ? 'nudge' : ''}`}
             onClick={() => void act({ t: 'endRound' })}
             data-testid="end-round"
             data-tip-title="End the round now"

@@ -208,7 +208,7 @@ export function TallyView({ e }: { e: RunEngine }) {
           )}
           <div className="modal-actions">
             <button
-              className="pixel-btn primary"
+              className="pixel-btn key k-next nudge"
               onClick={() => void act({ t: 'finishTally' })}
               data-testid="tally-continue"
             >

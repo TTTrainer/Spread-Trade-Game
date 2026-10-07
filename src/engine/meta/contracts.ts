@@ -59,7 +59,9 @@ export function contractStructures(c: ClientDef, unlocked: DeskId[]): StructureI
       )
         out.add(s);
     }
-  return [...out];
+  // Defined-risk spreads first: a cash-secured put or covered call ties up 100 shares' worth of cash,
+  // which breaks a contract's risk cap on a small account, so it shouldn't be the one picked for you.
+  return [...out].sort((a, b) => +(STRUCTURES[a].family === 'income') - +(STRUCTURES[b].family === 'income'));
 }
 
 export function contractFilled(c: ClientDef, facts: ClientTradeFacts, startEquityCents: number): boolean {

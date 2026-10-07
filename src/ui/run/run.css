@@ -2587,8 +2587,8 @@
   box-shadow: 3px 3px 0 #000;
 }
 .boss-race svg {
-  width: 320px;
-  height: 80px;
+  width: 380px;
+  height: 96px;
 }
 .br-zero {
   stroke: var(--line);
@@ -2693,8 +2693,8 @@
     font-size: 13px;
   }
   .boss-race svg {
-    width: 220px;
-    height: 56px;
+    width: 260px;
+    height: 66px;
   }
   .br-legend {
     font-size: 15px;
@@ -4089,7 +4089,7 @@
 
 /* ---------- the Joker Row: cartridges as game cartridges ----------
  * The device height follows the screen (about 100 px at 1080 tall, 68 px at 768); the label box is
- * where the Figma shell's label window sits (fractions of the 203×240 shell). */
+ * where the Figma shell's label window sits (fractions of the 215×240 shell). */
 .joker-row {
   --jr-h: clamp(60px, 9.2vh, 100px);
   display: flex;
@@ -4128,7 +4128,7 @@
   position: relative;
   display: block;
   height: var(--jr-h);
-  aspect-ratio: 203 / 240;
+  aspect-ratio: 215 / 240;
   flex: none;
 }
 .jr-shell {
@@ -4140,9 +4140,9 @@
 }
 .jr-label {
   position: absolute;
-  left: 40.2%;
+  left: 40.05%;
   top: 6.72%;
-  width: 45.41%;
+  width: 46.37%;
   height: 58.82%;
   display: grid;
   place-items: center;
@@ -4274,4 +4274,344 @@
 :root[data-reduced-motion='true'] .jr-dev.jr-hit,
 :root[data-reduced-motion='true'] .jr-card.jr-idle {
   animation: none;
+}
+
+/* ---------- shop items as objects (ItemObject.tsx): no box, the object stands on the shelf ---------- */
+.item-obj {
+  position: relative;
+  display: block;
+  height: var(--io-h, 100px);
+  max-width: 100%;
+  flex: none;
+}
+.io-shell {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.5));
+}
+.io-win {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+.io-win img,
+.io-win > * {
+  width: 88% !important;
+  height: 88% !important;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.item-obj.k-voucher {
+  height: calc(var(--io-h, 100px) * 0.7);
+}
+.shop-obj {
+  --jr-h: 112px;
+  --io-h: 112px;
+  position: relative;
+  width: 178px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding-top: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+.so-obj {
+  position: relative;
+  height: calc(var(--io-h) + 8px);
+  display: grid;
+  place-items: end center;
+  transition:
+    transform 0.14s cubic-bezier(0.3, 1.6, 0.5, 1),
+    filter 0.14s;
+}
+.shop-obj:hover .so-obj {
+  transform: translateY(-6px) rotate(-2deg);
+  filter: drop-shadow(0 0 10px rgba(255, 191, 62, 0.45));
+}
+.shop-obj.sold .so-obj {
+  filter: grayscale(1) brightness(0.5);
+}
+.so-sold {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  padding: 0 8px;
+  font-size: 24px;
+  color: var(--down);
+  border: 3px solid currentColor;
+  background: rgba(0, 0, 0, 0.6);
+}
+.shop-obj .sc-price {
+  top: 2px;
+  right: 6px;
+}
+.so-tag {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+.shop-obj.rar-U .so-tag {
+  color: var(--rar-uncommon);
+}
+.shop-obj.rar-R .so-tag {
+  color: var(--rar-rare);
+}
+.shop-obj.rar-L .so-tag {
+  color: var(--rar-legendary);
+}
+.shop-obj .sc-name {
+  font-size: 16px;
+  line-height: 1.15;
+}
+.so-get {
+  font-size: 15px;
+  line-height: 1.2;
+}
+.so-when {
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--text-dim);
+}
+.so-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+}
+.so-buy {
+  margin-top: auto;
+}
+.ld-slot:not(.vacant) {
+  --io-h: 50px;
+  --jr-h: 50px;
+  width: auto;
+  min-width: 40px;
+  border: none;
+  background: none;
+}
+
+/* ---------- keycap buttons: raised on their side, sink on press (key-btn) ---------- */
+.key-btn {
+  --face: #2fd47a;
+  --side: #14773f;
+  --ink: #062814;
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  padding: 6px 14px 10px;
+  border: 3px solid #000;
+  border-radius: 6px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--face) 78%, #fff) 0 3px,
+    var(--face) 3px calc(100% - 6px),
+    var(--side) calc(100% - 6px)
+  );
+  box-shadow: 0 4px 0 #000;
+  cursor: pointer;
+  transition:
+    transform 0.06s,
+    box-shadow 0.06s,
+    filter 0.12s;
+  white-space: nowrap;
+}
+.key-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #000;
+}
+.key-btn:active:not(:disabled),
+.key-btn.down {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #000;
+  background: linear-gradient(180deg, var(--face) 0 calc(100% - 3px), var(--side) calc(100% - 3px));
+}
+.key-btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.7);
+}
+.key-btn:focus-visible {
+  outline: 2px dashed var(--magenta);
+  outline-offset: 4px;
+}
+.key-btn.k-go {
+  --face: #2fd47a;
+  --side: #14773f;
+  --ink: #062814;
+}
+.key-btn.k-cash {
+  --face: #ffbf3e;
+  --side: #9a5d00;
+  --ink: #2a1600;
+}
+.key-btn.k-clock {
+  --face: #3ef2ff;
+  --side: #1b8fa0;
+  --ink: #04262b;
+}
+.key-btn.k-reroll {
+  --face: #9d6bff;
+  --side: #4d2fa8;
+  --ink: #fff;
+}
+.key-btn.k-next {
+  --face: #ff3ea5;
+  --side: #a01e66;
+  --ink: #fff;
+}
+.key-btn.k-cut {
+  --face: #ff4d6d;
+  --side: #99203a;
+  --ink: #fff;
+}
+.key-btn.k-off {
+  --face: #5a5390;
+  --side: #2c2760;
+  --ink: #c9c4ef;
+}
+
+/* ---------- flash when it matters: a control waiting on you flashes and nudges until you act ---------- */
+.nudge {
+  animation:
+    nudge-flash 1s steps(1) infinite,
+    nudge-wiggle 2.4s ease-in-out infinite;
+}
+@keyframes nudge-flash {
+  50% {
+    filter: brightness(1.35) drop-shadow(0 0 10px rgba(255, 191, 62, 0.95));
+  }
+}
+@keyframes nudge-wiggle {
+  0%,
+  72%,
+  100% {
+    rotate: 0deg;
+    scale: 1;
+  }
+  76% {
+    rotate: -3deg;
+    scale: 1.06;
+  }
+  80% {
+    rotate: 3deg;
+    scale: 1.06;
+  }
+  84% {
+    rotate: 0deg;
+    scale: 1;
+  }
+}
+:root[data-reduced-motion='true'] .nudge {
+  animation: nudge-flash 1.6s steps(1) infinite;
+}
+
+/* Spoils as objects: the cartridge big, its text underneath. */
+.sp-obj {
+  --jr-h: clamp(96px, 14vh, 140px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  padding: 6px 4px 2px;
+}
+.sp-obj .so-tag.rar-U {
+  color: var(--rar-uncommon);
+}
+.sp-obj .so-tag.rar-R {
+  color: var(--rar-rare);
+}
+.sp-obj .so-tag.rar-L {
+  color: var(--rar-legendary);
+}
+.sp-card:hover .sp-obj .jr-dev {
+  transform: translateY(-6px) rotate(-2deg);
+}
+.sp-obj .jr-dev {
+  transition: transform 0.14s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.os-taskbar .key-btn {
+  font-size: 18px;
+  padding: 3px 12px 8px;
+  align-self: center;
+}
+
+/* Top bar icons (beveled pixel art): cash, tickets and stress get a picture beside the number. */
+.rtb-tile:has(.rtb-ico) {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 7px;
+  align-items: center;
+  justify-content: start;
+}
+.rtb-ico {
+  grid-row: 1 / span 2;
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+.rtb-ico.small {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+@media (max-width: 1500px) {
+  .rtb-ico {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* Danger pulses red (the Max-Loss room running out, stress near burnout): look here. */
+.alarm {
+  animation: alarm 1.2s ease-in-out infinite;
+}
+@keyframes alarm {
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 61, 94, 0.9),
+      0 0 16px rgba(255, 61, 94, 0.7);
+  }
+}
+:root[data-reduced-motion='true'] .alarm {
+  animation: none;
+  box-shadow: 0 0 0 2px rgba(255, 61, 94, 0.9);
+}
+
+/* Short screens (1366×768): smaller objects and type, so YOUR DESK stays above the taskbar. */
+@media (max-height: 820px) {
+  .shop-obj {
+    --jr-h: 84px;
+    --io-h: 84px;
+    gap: 2px;
+    padding-top: 8px;
+  }
+  .shop-obj .sc-name {
+    font-size: 15px;
+  }
+  .so-get {
+    font-size: 14px;
+    line-height: 1.15;
+  }
+  .so-when,
+  .shop-obj .sc-catch {
+    font-size: 12px;
+    line-height: 1.15;
+  }
+  .so-buy.key-btn {
+    font-size: 17px;
+    padding: 3px 12px 8px;
+  }
 }

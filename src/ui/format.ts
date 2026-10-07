@@ -36,3 +36,11 @@ export function signed(x: number, digits = 2): string {
 }
 
 export { SCORE_SCALE, chipsText, multText, pts, ptsSigned } from '../engine/scoring/points';
+
+/** A hotkey presses its button on screen too: the key sinks for a beat, like a click. */
+export function pressFx(testId: string): void {
+  const el = typeof document !== 'undefined' ? document.querySelector(`[data-testid="${testId}"]`) : null;
+  if (!el) return;
+  el.classList.add('down');
+  window.setTimeout(() => el.classList.remove('down'), 120);
+}

@@ -394,7 +394,12 @@ export function TradingLayout({
           {payoffTab && (
             <button
               className={payoffOpen ? 'sel' : ''}
-              onClick={() => setPayoffOpen(!payoffOpen)}
+              onClick={() => {
+                // The payoff opens in the TRADE column beside the chart (the chart stays); during a
+                // LEARN lesson it opens over the chart so the lesson stays in view.
+                setPayoffOpen(!payoffOpen);
+                if (!payoffOpen && tab !== 'learn') setRightTab('trade');
+              }}
               role="tab"
               aria-selected={payoffOpen}
               data-testid="ctab-payoff"
@@ -406,7 +411,9 @@ export function TradingLayout({
           )}
         </div>
         {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
-        {payoffTab && payoffOpen && !chainOpen && <PayoffStudio onClose={() => setPayoffOpen(false)} />}
+        {payoffTab && payoffOpen && !chainOpen && tab !== 'trade' && (
+          <PayoffStudio onClose={() => setPayoffOpen(false)} />
+        )}
         <NewsTicker />
       </div>
       <div className="t-right panel">
@@ -451,7 +458,13 @@ export function TradingLayout({
           <NewsBriefPanel access={briefAccess} />
         ) : (
           <>
-            <PayoffChart />
+            {payoffTab && payoffOpen ? (
+              <div className="ps-in-col">
+                <PayoffStudio onClose={() => setPayoffOpen(false)} />
+              </div>
+            ) : (
+              <PayoffChart />
+            )}
             {tradeTabExtra}
             <StatsBlock />
           </>

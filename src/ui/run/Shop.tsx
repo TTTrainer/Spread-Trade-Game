@@ -16,7 +16,6 @@ import {
   ANALYST_SHORT,
   CARTRIDGE_SUMMARY,
   EFFECT_GLYPH,
-  EFFECT_LABEL,
   FAMILY_GLYPH,
   MEMO_KIND,
   MEMO_WHEN,
@@ -31,14 +30,14 @@ import type { ShopItem } from '../../engine/run/types';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
-import { ArtIcon } from '../art';
-import { Kbd, TiltCard } from '../components/ui';
+import { Kbd } from '../components/ui';
 import { chipsText, money, pts } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
 import { Primer } from './Primer';
 import { CartridgeDevice } from './JokerRow';
+import { ItemObject } from './ItemObject';
 import { PixelTrophy, TrophyReveal } from './Rewards';
 
 export function itemTitle(it: ShopItem): string {
@@ -145,6 +144,19 @@ function faceOf(e: RunEngine, it: ShopItem): CardFace {
   }
 }
 
+const KIND_WORD: Record<ShopItem['kind'], string> = {
+  cartridge: 'CARTRIDGE',
+  analyst: 'ANALYST',
+  memo: 'MEMO',
+  page: 'PLAYBOOK',
+  voucher: 'VOUCHER',
+};
+const RARITY_WORD: Record<string, string> = { C: 'COMMON', U: 'UNCOMMON', R: 'RARE', L: 'LEGENDARY' };
+
+/**
+ * One item for sale, standing on the shelf as an object (no box): its price tag, the object with
+ * its art, then its name and what it does written underneath, and a BUY key.
+ */
 function ShopCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number }) {
   const act = useRun((s) => s.act);
   const cash = e.state.cash;
@@ -161,76 +173,71 @@ function ShopCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number 
   const buy = (target: HTMLElement) => {
     sfx(afford ? 'buy' : 'error');
     if (afford) burstAt(target, rarity === 'L' ? 'sparkle' : 'coins', rarity === 'L' ? 50 : 14);
+    else
+      target
+        .closest('.shop-obj')
+        ?.animate(
+          [
+            { transform: 'translateX(0)' },
+            { transform: 'translateX(-5px)' },
+            { transform: 'translateX(5px)' },
+            { transform: 'none' },
+          ],
+          { duration: 260 },
+        );
     void act({ t: 'buy', index });
   };
+  const tag =
+    it.kind === 'cartridge' && rarity ? `${KIND_WORD[it.kind]} · ${RARITY_WORD[rarity]}` : KIND_WORD[it.kind];
   return (
     <motion.div
-      initial={{ rotateY: 90, opacity: 0 }}
-      animate={{ rotateY: 0, opacity: 1 }}
-      transition={{ delay: 0.25 + index * 0.06, type: 'spring', stiffness: 260, damping: 20 }}
+      className={`shop-obj kind-${it.kind} ${rarity ? `rar-${rarity}` : ''} ${it.sold ? 'sold' : ''} ${afford ? 'afford' : 'short'}`}
+      data-testid={`shop-item-${index}`}
+      data-tip={
+        it.kind === 'cartridge'
+          ? `cart:${it.id}`
+          : it.kind === 'page'
+            ? `struct:${it.id}`
+            : `${it.kind}:${it.id}`
+      }
+      initial={{ y: -40, opacity: 0, rotate: -4 }}
+      animate={{ y: 0, opacity: 1, rotate: 0 }}
+      transition={{ delay: 0.25 + index * 0.06, type: 'spring', stiffness: 300, damping: 16 }}
+      onMouseEnter={() => !it.sold && sfx('hover', 1 + (index % 4) * 0.04, 0.7)}
     >
-      <TiltCard
-        className={`shop-card kind-${it.kind} ${it.sold ? 'sold' : ''}`}
-        rarity={rarity}
-        disabled={it.sold}
-        testId={`shop-item-${index}`}
-        tip={
-          it.kind === 'cartridge'
-            ? `cart:${it.id}`
-            : it.kind === 'page'
-              ? `struct:${it.id}`
-              : `${it.kind}:${it.id}`
-        }
-      >
-        <span className={`sc-price num ${afford ? '' : 'short'}`}>
-          {it.price === 0 ? 'FREE' : `$${it.price}`}
-        </span>
-        <div className="sc-art">
-          {it.kind === 'cartridge' ? (
-            <CartridgeDevice def={CARTRIDGE_BY_ID[it.id]} />
-          ) : (
-            <ArtIcon
-              category={it.kind === 'page' ? 'page' : it.kind}
-              id={it.id}
-              name={itemTitle(it)}
-              tone={rarity ?? it.kind}
-              scale={2}
-            />
-          )}
-        </div>
-        <div className="sc-name">{itemTitle(it)}</div>
-        <div className="sc-chips num">{f.chips}</div>
-        <div className="sc-when">
-          <span className="sc-k num">{f.whenK}</span> {f.when}
-        </div>
-        <div className={`sc-get fx-${f.kind}`}>
-          <span className="sc-glyph" aria-hidden="true">
-            {EFFECT_GLYPH[f.kind]}
-          </span>
-          <span className="sc-get-t">
-            <span className="sc-k num">{EFFECT_LABEL[f.kind]}</span>
-            {f.get}
-          </span>
-        </div>
-        {f.catch && <div className="sc-catch">⚠ {f.catch}</div>}
-        <div className="sc-buy">
-          {it.sold ? (
-            <span className="sc-sold num">SOLD</span>
-          ) : (
-            <span
-              role="button"
-              className={`pixel-btn ${afford ? 'primary' : ''}`}
-              onClick={(ev) => {
-                ev.stopPropagation();
-                buy(ev.currentTarget);
-              }}
-              data-testid={`buy-${index}`}
-            >
-              {afford ? '▼ BUY' : 'NEED $'}
-            </span>
-          )}
-        </div>
-      </TiltCard>
+      <span className={`sc-price num ${afford ? '' : 'short'}`}>
+        {it.price === 0 ? 'FREE' : `$${it.price}`}
+      </span>
+      <div className="so-obj">
+        <ItemObject kind={it.kind} id={it.id} name={itemTitle(it)} />
+        {it.sold && <span className="so-sold num">SOLD</span>}
+      </div>
+      <div className="so-tag num">{tag}</div>
+      <div className="sc-name">{itemTitle(it)}</div>
+      <div className={`so-get fx-${f.kind}`}>
+        <span className="sc-glyph" aria-hidden="true">
+          {EFFECT_GLYPH[f.kind]}
+        </span>{' '}
+        {f.get}
+      </div>
+      <div className="so-when">
+        <span className="sc-k num">{f.whenK}</span> {f.when}
+      </div>
+      {f.catch && <div className="sc-catch">⚠ {f.catch}</div>}
+      <div className="so-chips num">{f.chips}</div>
+      {!it.sold && (
+        <button
+          type="button"
+          className={`key-btn so-buy ${afford ? 'k-go' : 'k-off'}`}
+          onClick={(ev) => {
+            ev.stopPropagation();
+            buy(ev.currentTarget);
+          }}
+          data-testid={`buy-${index}`}
+        >
+          {afford ? `BUY $${it.price}` : `NEED $${it.price - cash}`}
+        </button>
+      )}
     </motion.div>
   );
 }
@@ -333,6 +340,9 @@ function DeskCartridges({ e }: { e: RunEngine }) {
   const st = e.state;
   const slots = e.cartridgeSlots();
   const owned = st.cartridges;
+  // Slots full and a boss's prize waiting: the SELL buttons flash, since selling one makes room.
+  const sp = st.shop?.spoils;
+  const makeRoom = !!sp && !sp.taken && sp.ids.length > 0 && owned.length >= slots;
   return (
     <div className="desk-carts" data-testid="desk-carts" data-tip="g:cartridge_rail">
       {Array.from({ length: slots }, (_, i) => {
@@ -377,7 +387,7 @@ function DeskCartridges({ e }: { e: RunEngine }) {
                   ◀
                 </button>
                 <button
-                  className="dk-sell num"
+                  className={`dk-sell num ${makeRoom ? 'nudge' : ''}`}
                   onClick={() => (sfx('coin'), void act({ t: 'sell', cartridgeId: id }))}
                   data-testid={`sell-${id}`}
                   data-tip-title={`Sell ${def.name}`}
@@ -451,6 +461,11 @@ export function ShopView({ e }: { e: RunEngine }) {
     <ShopCard key={`${it.kind}-${it.id}-${i}-${shop.rerolls}`} e={e} it={it} index={i} />
   );
   const carts = byKind('cartridge');
+  // Flash what's waiting on you: an unopened prize, a free reroll, and NEXT ROUND once nothing on
+  // the shelves is affordable and no prize is waiting.
+  const spoilsWaiting = !!spoils && !spoils.taken && spoils.ids.length > 0;
+  const nothingLeft =
+    !spoilsWaiting && cost > 0 && shop.items.every((it) => it.sold || it.price > st.cash) && st.cash < cost;
   const analysts = byKind('analyst');
   const memos = byKind('memo');
   const pages = byKind('page');
@@ -489,7 +504,7 @@ export function ShopView({ e }: { e: RunEngine }) {
               {r.status === 'passed' ? '✔ TARGET MET' : '✖ MISSED (saved)'}
             </div>
             <div className="log-meter num">
-              {r.meter.toLocaleString()} <span className="dim">/ {r.target.toLocaleString()}</span>
+              {pts(r.meter)} <span className="dim">/ {pts(r.target)}</span>
             </div>
             {r.payouts.map((p, i) => (
               <div key={i} className="payout num">
@@ -590,7 +605,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                     );
                   return (
                     <span key={a.id} className="ld-slot" data-tip={`analyst:${a.id}`}>
-                      <ArtIcon category="analyst" id={a.id} name={ANALYSTS[a.id].name} scale={0.75} />
+                      <ItemObject kind="analyst" id={a.id} name={ANALYSTS[a.id].name} />
                       {a.level > 1 && <i className="ld-lv">L2</i>}
                       <button
                         className="ld-x"
@@ -611,7 +626,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                   const m = st.memos[i];
                   return m ? (
                     <span key={i} className="ld-slot" data-tip={`memo:${m}`}>
-                      <ArtIcon category="memo" id={m} name={MEMOS[m].name} scale={0.75} />
+                      <ItemObject kind="memo" id={m} name={MEMOS[m].name} />
                     </span>
                   ) : (
                     <span key={i} className="ld-slot vacant">
@@ -626,7 +641,7 @@ export function ShopView({ e }: { e: RunEngine }) {
               <div className="ld-row">
                 {DESKS[st.config.deskId].structures.map((s) => (
                   <span key={s} className="ld-slot page" data-tip={`struct:${s}`}>
-                    <ArtIcon category="page" id={s} name={STRUCTURES[s].name} scale={0.75} />
+                    <ItemObject kind="page" id={s} name={STRUCTURES[s].name} />
                     <i className="ld-lv">LV {st.levels[s] ?? 1}</i>
                   </span>
                 ))}
@@ -640,7 +655,7 @@ export function ShopView({ e }: { e: RunEngine }) {
                 )}
                 {st.vouchers.map((v) => (
                   <span key={v} className="ld-slot" data-tip={`voucher:${v}`}>
-                    <ArtIcon category="voucher" id={v} name={VOUCHERS[v].name} scale={0.75} />
+                    <ItemObject kind="voucher" id={v} name={VOUCHERS[v].name} />
                   </span>
                 ))}
                 {(st.trophies ?? []).map((b) => (
@@ -682,14 +697,19 @@ export function ShopView({ e }: { e: RunEngine }) {
           <span className="dim">STRESS</span> {st.stress}
         </span>
         <span className="os-spacer" />
-        {spoils && !spoils.taken && spoils.ids.length > 0 && !spoilsOpen && (
-          <button className="os-btn osb-reroll" onClick={() => setSpoilsOpen(true)} data-testid="spoils-open">
-            ☠ SPOILS · take 1 free
+        {spoilsWaiting && !spoilsOpen && (
+          // A prize waiting flashes until it's opened (slots full: sell one on YOUR DESK first).
+          <button
+            className="key-btn k-cash nudge"
+            onClick={() => setSpoilsOpen(true)}
+            data-testid="spoils-open"
+          >
+            ★ NEW CARTRIDGE · CHOOSE
           </button>
         )}
         <NextBoss e={e} />
         <button
-          className="os-btn reroll"
+          className={`key-btn k-reroll ${cost === 0 ? 'nudge' : ''}`}
           onClick={() => (sfx('deal'), void act({ t: 'rerollShop' }))}
           disabled={st.cash < cost}
           data-testid="shop-reroll"
@@ -698,7 +718,7 @@ export function ShopView({ e }: { e: RunEngine }) {
           <span className="reroll-ico">⟳</span> {cost === 0 ? 'FREE' : `$${cost}`} <Kbd>R</Kbd>
         </button>
         <button
-          className="os-btn next"
+          className={`key-btn k-next ${nothingLeft ? 'nudge' : ''}`}
           onClick={() => (sfx('whoosh'), void act({ t: 'leaveShop' }))}
           data-testid="leave-shop"
           data-tip-title="Next round"
@@ -763,9 +783,9 @@ function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
               animate={{ y: 0, rotate: 0, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.15 + i * 0.14 }}
             >
-              <CartridgeMini id={c} />
+              <SpoilObject id={c} />
               <button
-                className="pixel-btn primary"
+                className={`key-btn ${sp.taken === c ? 'k-cash' : 'k-go'}`}
                 disabled={!!sp.taken || full}
                 onClick={() => {
                   sfx('buy');
@@ -789,6 +809,26 @@ function Spoils({ e, onClose }: { e: RunEngine; onClose: () => void }) {
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+/** A spoil: the cartridge itself, big, with what it does written underneath. */
+function SpoilObject({ id }: { id: string }) {
+  const c = CARTRIDGE_BY_ID[id];
+  const s = CARTRIDGE_SUMMARY[id];
+  return (
+    <div className="sp-obj" data-tip={`cart:${id}`} data-testid={`kit-cart-${id}`}>
+      <CartridgeDevice def={c} />
+      <div className={`so-tag num rar-${c.rarity}`}>CARTRIDGE · {RARITY_WORD[c.rarity]}</div>
+      <div className="sc-name">{c.name}</div>
+      <div className={`so-get fx-${s.kind}`}>
+        <span className="sc-glyph">{EFFECT_GLYPH[s.kind]}</span> {s.get}
+      </div>
+      <div className="so-when">
+        <span className="sc-k num">WHEN</span> {s.when}
+      </div>
+      {s.catch && <div className="sc-catch">⚠ {s.catch}</div>}
+    </div>
   );
 }
 

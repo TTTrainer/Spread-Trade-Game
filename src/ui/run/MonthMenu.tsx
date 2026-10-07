@@ -259,7 +259,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
           <button className="pixel-btn small" onClick={onExit} data-testid="mm-exit">
             ◀ SAVE &amp; EXIT
           </button>
-          <button className="pixel-btn primary mm-go" onClick={start} data-testid="board-play">
+          <button className="pixel-btn key k-clock mm-go" onClick={start} data-testid="board-play">
             ▶ START {ROUND_NAMES[idx].toUpperCase()} <Kbd>Enter</Kbd>
           </button>
           <span />

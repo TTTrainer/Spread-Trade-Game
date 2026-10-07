@@ -298,6 +298,12 @@ describe('Contracts board', () => {
     expect(contractStructures(bear, ['verticals'])).toEqual(['bear_call', 'bear_put']);
     // A covered call pays while the stock stays below its strike: a bearish trade here.
     expect(contractStructures(bear, ['income'])).toEqual(['covered_call']);
+    // With Income unlocked first, the defined-risk spreads still come first (the one picked for you).
+    expect(contractStructures(bear, ['income', 'verticals'])).toEqual([
+      'bear_call',
+      'bear_put',
+      'covered_call',
+    ]);
     expect(contractPayout(15, true, 500)).toBe(23);
     expect(contractPayout(15, true, -500)).toBe(15);
     expect(contractPayout(15, false, 500)).toBe(0);

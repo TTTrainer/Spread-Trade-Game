@@ -326,7 +326,7 @@ export function CoursePanel() {
           ◀ BACK
         </button>
         <button
-          className="pixel-btn primary"
+          className={`pixel-btn key k-next ${ready ? 'nudge' : ''}`}
           onClick={() => go(idx + 1)}
           disabled={!ready}
           data-testid="course-next"

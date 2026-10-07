@@ -837,3 +837,48 @@
 .course-dots i.more {
   opacity: 0.55;
 }
+
+/* The full payoff inside the TRADE column: one column, the graph on top, the numbers under it. */
+.ps-in-col .payoff-studio {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
+  border-width: 1px;
+}
+.ps-in-col .payoff-studio.empty {
+  padding: 16px 8px;
+  text-align: center;
+}
+.ps-in-col .ps-plot {
+  flex: none;
+  height: 250px;
+}
+.ps-in-col .ps-head {
+  font-size: 14px;
+}
+.ps-in-col .ps-head b {
+  font-size: 17px;
+}
+.ps-in-col .ps-legend {
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-left: 0;
+  font-size: 13px;
+}
+.ps-in-col .ps-controls b {
+  min-width: 74px;
+}
+.ps-in-col .ps-side {
+  overflow: visible;
+}
+.ps-in-col .ps-net b {
+  font-size: 22px;
+}
+.ps-in-col .ps-grid2 b {
+  font-size: 15px;
+}

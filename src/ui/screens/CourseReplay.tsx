@@ -231,7 +231,7 @@ export function CourseReplay({
       <div className="cr-actions">
         {stage === 'aim' && (
           <button
-            className="pixel-btn primary"
+            className={`pixel-btn key k-go ${ok ? 'nudge' : ''}`}
             disabled={!ok}
             onClick={() => (sfx('fill'), setStage('sold'))}
             data-testid="course-sell"
@@ -244,7 +244,7 @@ export function CourseReplay({
         )}
         {stage === 'sold' && (
           <button
-            className="pixel-btn primary"
+            className={`pixel-btn key k-clock ${locked ? '' : 'nudge'}`}
             disabled={locked}
             onClick={runPlay}
             data-testid="course-play"

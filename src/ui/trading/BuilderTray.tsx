@@ -4,7 +4,7 @@ import { limitFillProbability } from '../../engine/orders/fill';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
 import { sfx } from '../../audio/sfx';
-import { money, pct, price } from '../format';
+import { money, pct, pressFx, price } from '../format';
 import { Kbd, Modal, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { liveCardId, orderTypeOf, tradeOpen, useTrading } from '../store/trading';
@@ -163,6 +163,11 @@ export function OrderTicket() {
                       ? session.realismBlock(cardId, plan.legs, plan.qty)
                       : null;
   const disabled = !plan?.ok || !open || hasPosition || !!runBlock || (!!plan && !!reason);
+  // A good first trade, built and ready, with nothing placed yet this round: its button flashes.
+  const firstReady =
+    !disabled && !!session && session.positions.length + session.orders.length === 0 && !session.clockStarted;
+  const nudgeSell = firstReady && !!credit;
+  const nudgeBuy = firstReady && !credit;
   const earnings = plan?.entry?.earningsInside;
   // With the Executor sealing the term, whether earnings fall inside it is sealed too: the toggle
   // is always there, worded for either case.
@@ -181,8 +186,8 @@ export function OrderTicket() {
   };
 
   useHotkeys({
-    sell: () => go('sell'),
-    buy: () => go('buy'),
+    sell: () => (pressFx('sell-button'), go('sell')),
+    buy: () => (pressFx('buy-button'), go('buy')),
     autoSend: () => {
       sfx('click');
       setBuilder({ autoSend: !builder.autoSend });
@@ -308,7 +313,7 @@ export function OrderTicket() {
             </div>
           )}
           <button
-            className="pixel-btn sell"
+            className={`pixel-btn key k-go sell ${nudgeSell ? 'nudge' : ''}`}
             disabled={disabled || !credit}
             onClick={() => go('sell')}
             data-testid="sell-button"
@@ -328,7 +333,7 @@ export function OrderTicket() {
             )}
           </button>
           <button
-            className="pixel-btn buy"
+            className={`pixel-btn key k-cash buy ${nudgeBuy ? 'nudge' : ''}`}
             disabled={disabled || credit}
             onClick={() => go('buy')}
             data-testid="buy-button"

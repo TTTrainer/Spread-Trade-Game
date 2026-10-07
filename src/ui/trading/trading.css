@@ -3504,3 +3504,75 @@
     opacity: 0.35;
   }
 }
+
+/* Hero buttons as keycaps (the look Jacob picked): raised on their colored side, sinking on a press
+   or on their hotkey (pressFx). Overrides the flat pixel-btn looks, so it wins on purpose. */
+.pixel-btn.key {
+  --face: #2fd47a;
+  --side: #14773f;
+  --ink: #062814;
+  color: var(--ink) !important;
+  border: 3px solid #000 !important;
+  border-radius: 6px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--face) 78%, #fff) 0 3px,
+    var(--face) 3px calc(100% - 6px),
+    var(--side) calc(100% - 6px)
+  ) !important;
+  box-shadow: 0 4px 0 #000 !important;
+  padding-bottom: 9px;
+  transition:
+    transform 0.06s,
+    box-shadow 0.06s,
+    filter 0.12s;
+}
+.pixel-btn.key:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #000 !important;
+}
+.pixel-btn.key:active:not(:disabled),
+.pixel-btn.key.down {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #000 !important;
+  background: linear-gradient(
+    180deg,
+    var(--face) 0 calc(100% - 3px),
+    var(--side) calc(100% - 3px)
+  ) !important;
+}
+.pixel-btn.key:disabled {
+  filter: grayscale(0.75) brightness(0.65);
+}
+.pixel-btn.key .btn-sub,
+.pixel-btn.key .tp-btn-sub,
+.pixel-btn.key .kbd {
+  color: inherit;
+  opacity: 0.8;
+}
+.pixel-btn.key.k-go {
+  --face: #2fd47a;
+  --side: #14773f;
+  --ink: #062814;
+}
+.pixel-btn.key.k-cash {
+  --face: #ffbf3e;
+  --side: #9a5d00;
+  --ink: #2a1600;
+}
+.pixel-btn.key.k-clock {
+  --face: #3ef2ff;
+  --side: #1b8fa0;
+  --ink: #04262b;
+}
+.pixel-btn.key.k-next {
+  --face: #ff3ea5;
+  --side: #a01e66;
+  --ink: #fff;
+}
+.pixel-btn.key.k-off {
+  --face: #5a5390;
+  --side: #2c2760;
+  --ink: #e8e4ff;
+}

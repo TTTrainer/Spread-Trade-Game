@@ -8,7 +8,7 @@ import { payoffNow, type PricingEnv } from '../../engine/strategies/metrics';
 import type { DecisionAction, DecisionPoint, Position } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
-import { money, pnlText, price } from '../format';
+import { money, pnlText, pressFx, price } from '../format';
 import { Kbd, Modal, Pnl, TiltCard } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { liveCardId, useTrading } from '../store/trading';
@@ -453,7 +453,8 @@ export function DecisionModal() {
           P/L {plSealed ? <SealedText by={plSealed} /> : <Pnl cents={m?.plCents ?? 0} />}
         </span>
         <div className="dp-actions">{buttons}</div>
-        <button className="pixel-btn" onClick={() => setPeek(false)} data-testid="dp-back">
+        {/* A decision waits behind the chart: its way back flashes until you take it. */}
+        <button className="pixel-btn key k-cash nudge" onClick={() => setPeek(false)} data-testid="dp-back">
           ▣ BACK <Kbd>V</Kbd>
         </button>
         {roll}
@@ -586,7 +587,11 @@ function TakeProfit({
         </div>
         <PlRange cents={closeNow} bounds={b} size="big" />
         <div className="tp-choices">
-          <button className="pixel-btn primary tp-take" onClick={() => onAct('close')} data-testid="dp-close">
+          <button
+            className="pixel-btn key k-cash tp-take nudge"
+            onClick={() => onAct('close')}
+            data-testid="dp-close"
+          >
             <span className="tp-btn-title">CASH OUT</span>
             <span className="tp-btn-sub num">bank {pnlText(closeNow)} and score it · Enter</span>
           </button>
@@ -626,8 +631,11 @@ export function FastForwardBar() {
   useTrading((s) => s.version);
   const toggle = useTrading((s) => s.toggle);
   const pace = useTrading((s) => s.pace);
-  useHotkeys({ playPause: () => toggle() });
+  useHotkeys({ playPause: () => (pressFx('play-button'), toggle()) });
   const started = !!session?.clockStarted;
+  // Trades placed and the clock not started yet: START CLOCK is the one thing to press.
+  const nudgeClock =
+    !started && ff !== 'running' && !!session && session.positions.length + session.orders.length > 0;
   const label =
     ff === 'running'
       ? '❚❚ PAUSE'
@@ -639,7 +647,7 @@ export function FastForwardBar() {
   return (
     <div className="ffbar num" data-testid="ff-bar">
       <button
-        className={`pixel-btn ${ff === 'running' ? '' : 'primary'}`}
+        className={`pixel-btn key ${ff === 'running' ? 'k-off' : 'k-clock'} ${nudgeClock ? 'nudge' : ''}`}
         onClick={() => toggle()}
         disabled={ff === 'decision' || ff === 'done'}
         data-testid="play-button"
