@@ -45,9 +45,9 @@ export const EFFECT_LABEL: Record<EffectKind, string> = {
 };
 
 export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
-  theta_engine: { when: 'Short premium open and in profit', get: '+3 chips a day', kind: 'chips' },
+  theta_engine: { when: 'Short premium open and in profit', get: '+30 chips a day', kind: 'chips' },
   fifty_percent_club: { when: 'Close a credit trade at 50%+ profit, early', get: '+3 mult', kind: 'mult' },
-  weekend_warrior: { when: 'Short premium held over a weekend', get: '+15 chips', kind: 'chips' },
+  weekend_warrior: { when: 'Short premium held over a weekend', get: '+150 chips', kind: 'chips' },
   twenty_one_day_rule: {
     when: 'Close or roll a winner with 21 days or less left',
     get: '+2 mult',
@@ -73,7 +73,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   crush_it: { when: 'Short premium through earnings, stock stays inside the move', get: '×3', kind: 'xmult' },
   earnings_sniper: {
     when: 'Long straddle held through earnings',
-    get: '+100 chips × move / implied',
+    get: '+1,000 chips × move / implied',
     kind: 'chips',
   },
   earnings_whisper: { when: 'Always', get: 'Earnings dates and implied moves', kind: 'info' },
@@ -84,12 +84,12 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   },
   dividend_radar: {
     when: 'A covered call collects a dividend',
-    get: '+40 chips (and warns before ex-div)',
+    get: '+400 chips (and warns before ex-div)',
     kind: 'chips',
   },
   trend_rider: { when: 'Trade points with the 50-day trend', get: '+1 mult', kind: 'mult' },
   contrarian: { when: 'Right call against the 5-day trend', get: 'Call bonus ×2', kind: 'xmult' },
-  bollinger_bouncer: { when: 'Short strike outside the Bollinger Band', get: '+30 chips', kind: 'chips' },
+  bollinger_bouncer: { when: 'Short strike outside the Bollinger Band', get: '+300 chips', kind: 'chips' },
   rsi_radar: { when: 'Bear call won from RSI 70+, or bull put from RSI 30−', get: '+2 mult', kind: 'mult' },
   macd_cross: { when: 'Enter within 2 days of a MACD cross your way', get: '+1 mult', kind: 'mult' },
   gamma_scalper: { when: 'Right "big move" call', get: 'Call bonus ×2', kind: 'xmult' },
@@ -107,7 +107,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
     kind: 'mult',
   },
   roll_artist: { when: 'Each roll for a net credit', get: '+1 mult for the round', kind: 'mult' },
-  right_sized: { when: 'Risking 3% of equity or less', get: '+25 chips', kind: 'chips' },
+  right_sized: { when: 'Risking 3% of equity or less', get: '+250 chips', kind: 'chips' },
   breakout_insurance: {
     when: 'First gap through a short strike each round',
     get: 'Counts half',
@@ -119,7 +119,7 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   portfolio_margin: { when: 'Always', get: 'Risk cap +25%', kind: 'risk' },
   edge_hunter: { when: 'Edge Rank top 10%', get: '×2 instead of ×1.5', kind: 'xmult' },
   compound_interest: { when: 'Interest after each round', get: 'Cap +$5', kind: 'cash' },
-  bonus_pool: { when: 'Every 100 points over the target', get: '+$1', kind: 'cash' },
+  bonus_pool: { when: 'Every 1,000 points over the target', get: '+$1', kind: 'cash' },
   expense_account: { when: 'Shop rerolls', get: '$1 cheaper', kind: 'cash' },
   golden_parachute: {
     when: 'A failed round or a Max-Loss breach',
@@ -148,13 +148,13 @@ export const CARTRIDGE_SUMMARY: Record<string, Summary> = {
   rivals_bet: { when: "Outscore Bradley's ghost this round", get: '+$10', kind: 'cash', catch: 'Lose: −$5' },
   the_wheel: { when: 'Covered call after a put assignment', get: '×1.5', kind: 'xmult' },
   covered_and_chill: { when: 'Covered call expires out of the money', get: '+2 mult', kind: 'mult' },
-  assignment_artist: { when: 'You get assigned', get: '+50 chips, no stress', kind: 'chips' },
+  assignment_artist: { when: 'You get assigned', get: '+500 chips, no stress', kind: 'chips' },
   delta_neutral: {
     when: 'Portfolio delta under 5 at every close',
     get: '+1 mult for the round',
     kind: 'mult',
   },
-  wing_clipper: { when: 'Condor shorts both outside the expected move', get: '+40 chips', kind: 'chips' },
+  wing_clipper: { when: 'Condor shorts both outside the expected move', get: '+400 chips', kind: 'chips' },
   pin_master: { when: 'Iron fly expires within 1% of its center', get: '×4', kind: 'xmult' },
   straddle_stack: { when: 'Each straddle this round', get: '+1 mult to the next one (max +2)', kind: 'mult' },
   double_time: { when: 'Double calendars', get: '+2 mult', kind: 'mult' },

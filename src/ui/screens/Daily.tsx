@@ -8,6 +8,7 @@ import { bridge, hasBridge } from '../bridge';
 import { useApp } from '../store/app';
 import { useProfile } from '../store/profile';
 import { computeGhost, useRun, type DailyGhost } from '../store/run';
+import { pts } from '../format';
 import './screens.css';
 import './modes.css';
 
@@ -91,8 +92,7 @@ export function DailyScreen() {
           </div>
           {result ? (
             <div className="daily-done num" data-testid="daily-result">
-              Done today: {result.points.toLocaleString()} points ({result.outcome}), Bradley{' '}
-              {result.ghost.toLocaleString()}.{' '}
+              Done today: {pts(result.points)} points ({result.outcome}), Bradley {pts(result.ghost)}.{' '}
               <span className={result.points > result.ghost ? 'up-text' : 'down-text'}>
                 {result.points > result.ghost ? 'You won the day.' : 'Bradley won the day.'}
               </span>{' '}
@@ -133,10 +133,10 @@ export function DailyScreen() {
             <div className="section-title">Bradley's ghost</div>
             {ghost ? (
               <div className="num" data-testid="ghost-score">
-                {ghost.total.toLocaleString()} points ·{' '}
+                {pts(ghost.total)} points ·{' '}
                 {ghost.rounds.map((r, i) => (
                   <span key={i} className="dim">
-                    {['M1', 'M2', 'Rev'][i]} {r.toLocaleString()}{' '}
+                    {['M1', 'M2', 'Rev'][i]} {pts(r)}{' '}
                   </span>
                 ))}
               </div>
@@ -163,8 +163,8 @@ export function DailyScreen() {
               {recent.map(([k, r]) => (
                 <tr key={k}>
                   <td>{k}</td>
-                  <td>{r.points.toLocaleString()}</td>
-                  <td>{r.ghost.toLocaleString()}</td>
+                  <td>{pts(r.points)}</td>
+                  <td>{pts(r.ghost)}</td>
                   <td className={r.points > r.ghost ? 'up-text' : 'down-text'}>{r.outcome}</td>
                 </tr>
               ))}

@@ -4,17 +4,24 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) and **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data). Version 1.8.1. Next: your playtest of 1.7.0 to 1.8.1 with the in-game TEST CHECKLIST (the same 28 checks are in `PLAYTEST.md`).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data) and **1.8.2** (the Joker Row of cartridges, the register-coin-jackpot payout, whole numbers). Version 1.8.2. Next: the Income desk first in Career, Ines's tutorial on a cash-secured put, and the LEARN OPTIONS rework (cash-secured puts and covered calls first).
 
 ## How to run (on your PC)
 
-- **Play:** download from the [1.8.1 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.1) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.1.exe`, or run `SpreadTradingGame-Portable-1.8.1.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Play:** download from the [1.8.2 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.2) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.2.exe`, or run `SpreadTradingGame-Portable-1.8.2.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
 - **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.8.2: the Joker Row, a new payout, whole numbers
+
+- **The Joker Row:** cartridges as game cartridges along the top of the run screen (shell color = rarity, art on the label, name and effect), in firing order; they glow before you place a trade that would set them off. Also in the shop, YOUR DESK and the starting kit. The shells are widened Figma-generated cartridge art, recolored per rarity (`assets/ui/cartridge-shell-*.png`).
+- **The payout, rebuilt** (`src/ui/run/Payout.tsx`): the register prints the base lines and each number flies into a CHIPS × MULT scoreboard; a coin runs the Joker Row in slot order (hit-stop, flash and slam, a pop with the reason, combo, rising pitch, shake), passing quietly over cartridges that don't apply; then the jackpot slams in the total and it flies to the score. Losses print on the register only. Skip, FAST and OFF still work.
+- **Whole numbers:** points and chips are shown ×10 (`src/engine/scoring/points.ts`); the engine keeps a trade's points to a tenth and works them out from the chips as shown, so the shown chips × mult equals the shown total (tested). All score text in the UI, the engine's messages, dialogue and content (cartridges, desks, families, achievements) uses the ×10 numbers.
+- **Not done yet:** Income desk first in Career, Ines's tutorial on a cash-secured put, the LEARN OPTIONS rework.
 
 ### 1.8.1: 50 tickers in all, index options, a new test checklist, and the Schwab-built game data fixed
 - **50 tickers in all, as you meant:** the game's 25 plus the 25 added in 1.7.0 (QQQ through SHOP). 1.8.0's second 25 (EEM, KRE, XBI, USO, FXI, LLY, V, MA, JNJ, PFE, MRNA, KO, PEP, MCD, NKE, SBUX, T, VZ, CSCO, QCOM, CVX, DAL, CCL, DKNG, RDDT) are gone from the Trade Builder and from PULL FROM SCHWAB. If a pull already saved them on your PC, that data sits unused: nothing lists it, and the Schwab build takes only the game's own tickers.

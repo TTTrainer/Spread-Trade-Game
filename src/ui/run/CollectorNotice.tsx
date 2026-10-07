@@ -10,7 +10,7 @@ import { BOSSES } from '../../content/bosses';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
 import { Kbd } from '../components/ui';
-import { money } from '../format';
+import { money, pts } from '../format';
 import { usePayout, type PayoutItem } from '../store/payout';
 import { useRun } from '../store/run';
 
@@ -95,13 +95,13 @@ export function CollectorNotice({ item }: { item: Extract<PayoutItem, { kind: 'i
               <span className="dim">
                 day {x.days} · {+(item.rate * 100).toFixed(1)}% of {money(x.riskCents)} risk
               </span>
-              <b className="nt-pts">−{x.points}</b>
+              <b className="nt-pts">−{pts(x.points)}</b>
             </div>
           ))}
         </div>
         <div className="nt-total num">
           <span>INTEREST DUE</span>
-          <b data-testid="notice-total">−{total} POINTS</b>
+          <b data-testid="notice-total">−{pts(total)} POINTS</b>
         </div>
         <motion.div
           className="nt-stamp"
@@ -113,7 +113,7 @@ export function CollectorNotice({ item }: { item: Extract<PayoutItem, { kind: 'i
         </motion.div>
         <p className="nt-tip dim">Close a tested loser before the day ends and the interest stops.</p>
         <button className="pixel-btn danger nt-pay" onClick={pay} data-testid="notice-pay">
-          PAY −{total} <Kbd>Enter</Kbd>
+          PAY −{pts(total)} <Kbd>Enter</Kbd>
         </button>
       </motion.div>
     </div>

@@ -33,7 +33,7 @@ import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
 import { ArtIcon } from '../art';
 import { Kbd, TiltCard } from '../components/ui';
-import { money } from '../format';
+import { chipsText, money, pts } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
@@ -121,7 +121,7 @@ function faceOf(e: RunEngine, it: ShopItem): CardFace {
       return {
         whenK: 'WHEN',
         when: `${STRUCTURES[it.id].short} winners`,
-        get: '+10 chips, +0.5 mult',
+        get: `+${chipsText(BALANCE.scoring.levelChips)} chips, +${BALANCE.scoring.levelMult} mult`,
         kind: 'mult',
         chips: [
           <span key="lv" className="sc-fam">
@@ -702,11 +702,11 @@ export function ShopView({ e }: { e: RunEngine }) {
           onClick={() => (sfx('whoosh'), void act({ t: 'leaveShop' }))}
           data-testid="leave-shop"
           data-tip-title="Next round"
-          data-tip-body={`${nextName}: score ${nextTarget.toLocaleString()} points to clear it.`}
+          data-tip-body={`${nextName}: score ${pts(nextTarget)} points to clear it.`}
         >
           ▶ {nextName.toUpperCase()}{' '}
           <span className="os-target">
-            ◎ {nextTarget.toLocaleString()}
+            ◎ {pts(nextTarget)}
             {nextIndex === 2 && nextQ < st.config.quarters ? '+' : ''}
           </span>{' '}
           <Kbd>Enter</Kbd>

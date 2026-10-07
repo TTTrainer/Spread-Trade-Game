@@ -18,7 +18,7 @@ export const FAMILY_NAMES: Record<Family, string> = {
 };
 
 export const FAMILY_TEXT: Record<Family, [string, string, string]> = {
-  THETA: ['+20 chips on short-premium wins', '+1 mult on short-premium wins', 'Theta chips x2'],
+  THETA: ['+200 chips on short-premium wins', '+1 mult on short-premium wins', 'Theta chips x2'],
   VEGA: ['Live IV-change readout', 'IV-crush wins x1.25', 'IV-crush wins x1.5'],
   DELTA: [
     'Trend arrow on lineup cards',

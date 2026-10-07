@@ -24,6 +24,7 @@ import { useProfile } from '../store/profile';
 import { startTutorial, useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { Kbd, Modal } from './ui';
+import { pts } from '../format';
 
 export interface DevNote {
   at: string;
@@ -45,7 +46,7 @@ function contextLine(): string {
       `run ${st.config.deskId} seed ${st.config.seed}`,
       `Q${st.quarter} R${st.roundIndex + 1} ${st.phase}`,
     );
-    parts.push(`cash $${st.cash} stress ${st.stress} meter ${st.round.meter}/${st.round.target}`);
+    parts.push(`cash $${st.cash} stress ${st.stress} score ${pts(st.round.meter)}/${pts(st.round.target)}`);
   }
   const t = useTrading.getState();
   const s = t.session;
@@ -508,7 +509,7 @@ function DevPanel({ onClose }: { onClose: () => void }) {
             </div>
             <div className="dev-row">
               <span className="dev-k">
-                ◎ METER {run ? `${run.state.round.meter}/${run.state.round.target}` : ''}
+                ◎ SCORE {run ? `${pts(run.state.round.meter)}/${pts(run.state.round.target)}` : ''}
               </span>
               <button
                 onClick={() => run && lever({ k: 'meter', delta: Math.ceil(run.state.round.target / 4) })}

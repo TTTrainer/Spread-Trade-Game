@@ -25,7 +25,7 @@ import { previewScore } from '../../engine/run/preview';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { Kbd, Meter, Modal, CountUp } from '../components/ui';
-import { money, pct, pnlText, signed } from '../format';
+import { SCORE_SCALE, chipsText, money, multText, pct, pnlText, pts, ptsSigned, signed } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useRun } from '../store/run';
 import { liveCardId, tradeOpen, useTrading } from '../store/trading';
@@ -116,7 +116,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
         <div className={`rtb-meter rtb-score ${meter >= r.target ? 'met' : ''}`} data-tip="g:meter">
           <span className="rtb-k">SCORE</span>
           <span className="rtb-score-v num" data-testid="round-meter">
-            <b>{meter.toLocaleString()}</b> / {r.target.toLocaleString()}
+            <b>{pts(meter)}</b> / {pts(r.target)}
           </span>
           <Meter value={Math.max(0, meter)} max={r.target} tone={meter >= r.target ? 'cyan' : 'magenta'} />
           <AnimatePresence>
@@ -128,8 +128,7 @@ export function RunTopBar({ e, onMenu }: { e: RunEngine; onMenu: () => void }) {
                 animate={{ y: -26, opacity: 0, scale: 1 }}
                 transition={{ duration: 1.4 }}
               >
-                {lastPoints.points >= 0 ? '+' : ''}
-                {lastPoints.points}
+                {ptsSigned(lastPoints.points)}
               </motion.span>
             )}
           </AnimatePresence>
@@ -305,7 +304,7 @@ function ModeChips({ e }: { e: RunEngine }) {
       {cfg.mode === 'daily' && <span className="chip warn">DAILY</span>}
       {cfg.mode === 'daily' && ghost && ghost.rounds[i] !== undefined && (
         <span className="chip" title="Bradley's ghost scored this on the same round" data-testid="ghost-chip">
-          BRADLEY {ghost.rounds[i].toLocaleString()}
+          BRADLEY {pts(ghost.rounds[i])}
         </span>
       )}
       {cfg.mode === 'tutorial' && <span className="chip good">TUTORIAL</span>}
@@ -422,7 +421,7 @@ export function GoalCard({ e }: { e: RunEngine }) {
         : g.openCount > 0 && ifClosedToGo <= 0
           ? 'Closing your open trades now would clear the target.'
           : g.openCount > 0
-            ? `If your open trades closed now: ${Math.max(0, ifClosedToGo).toLocaleString()} still to go.`
+            ? `If your open trades closed now: ${pts(Math.max(0, ifClosedToGo))} still to go.`
             : 'Winning trades fill the bar; confident, exact calls multiply it.';
   return (
     <div
@@ -433,7 +432,7 @@ export function GoalCard({ e }: { e: RunEngine }) {
       <div className="goal-head">
         <span className="section-title">Round goal</span>
         <span className="num dim">
-          {g.meter.toLocaleString()} / {g.target.toLocaleString()}
+          {pts(g.meter)} / {pts(g.target)}
         </span>
       </div>
       <motion.div
@@ -444,11 +443,7 @@ export function GoalCard({ e }: { e: RunEngine }) {
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 400, damping: 14 }}
       >
-        {met
-          ? '✔ TARGET MET'
-          : hole
-            ? `▼ ${Math.abs(g.meter).toLocaleString()} IN THE HOLE`
-            : `${g.toGo.toLocaleString()} TO GO`}
+        {met ? '✔ TARGET MET' : hole ? `▼ ${pts(Math.abs(g.meter))} IN THE HOLE` : `${pts(g.toGo)} TO GO`}
       </motion.div>
       <div className="goal-bar" aria-label={`${Math.round(now * 100)}% of the target`}>
         <i className="gb-now" style={{ width: `${now * 100}%` }} />
@@ -470,8 +465,7 @@ export function GoalCard({ e }: { e: RunEngine }) {
               <span className={g.openPlCents >= 0 ? 'up-text' : 'down-text'}>{pnlText(g.openPlCents)}</span>{' '}
               <span className="dim">≈</span>{' '}
               <span className={g.openPoints >= 0 ? 'up-text' : 'down-text'}>
-                {g.openPoints >= 0 ? '+' : ''}
-                {g.openPoints.toLocaleString()}
+                {ptsSigned(g.openPoints)}
                 {g.openPoints > 0 ? '+' : ''} pts
               </span>
             </>
@@ -721,21 +715,21 @@ export function ScorePreviewBox({ e }: { e: RunEngine }) {
       className="combo"
       data-testid="score-preview"
       data-tip-title="If it wins (at max profit)"
-      data-tip-body={`${p.chips} chips × ${p.mult.toFixed(2)} mult = ${p.points.toLocaleString()}. With an exact call: ${p.pointsIfExact.toLocaleString()}. The round still needs ${p.targetLeft.toLocaleString()}.`}
+      data-tip-body={`${chipsText(p.chips)} chips × ${multText(p.mult)} mult = ${pts(p.points)}. With an exact call: ${pts(p.pointsIfExact)}. The round still needs ${pts(p.targetLeft)}.`}
     >
       <div className="combo-head">
         <span className="dim">IF IT WINS</span>
         <b className="num combo-pts">
-          <CountUp value={p.points} />
+          <CountUp value={Math.round(p.points * SCORE_SCALE)} />
         </b>
         <span className="num dim">
-          {p.chips} chips × {p.mult.toFixed(1)}
+          {chipsText(p.chips)} chips × {multText(p.mult)}
         </span>
       </div>
       <div
         className="combo-fill"
         data-tip-title="Round target"
-        data-tip-body={`This trade alone would fill ${Math.round(share * 100)}% of what the round still needs (${p.targetLeft.toLocaleString()}).`}
+        data-tip-body={`This trade alone would fill ${Math.round(share * 100)}% of what the round still needs (${pts(p.targetLeft)}).`}
       >
         <span
           className={`cf-bar ${share >= 1 ? 'full' : ''}`}
@@ -769,12 +763,12 @@ export function ScorePreviewBox({ e }: { e: RunEngine }) {
                 )}
                 <b className="num">
                   {st.op === 'chips'
-                    ? `+${Math.round(st.value)}`
+                    ? `+${chipsText(st.value)}`
                     : st.op === 'add'
-                      ? `+${st.value}×`
+                      ? `+${multText(st.value)}×`
                       : st.op === 'chipsMul'
-                        ? `×${st.value}c`
-                        : `×${st.value}`}
+                        ? `×${multText(st.value)}c`
+                        : `×${multText(st.value)}`}
                 </b>{' '}
                 {st.label}
               </motion.span>

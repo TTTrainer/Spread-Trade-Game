@@ -1,8 +1,23 @@
-# Spread Trading Game 1.8.1
+# Spread Trading Game 1.8.2
 
 A single-player roguelite about trading options spreads on real historical market data, now with a Trade Builder for today's market. Paper trading only; not financial advice.
 
-## What's new in 1.8.1
+## What's new in 1.8.2
+
+- **The Joker Row:** your cartridges now sit along the top of the trading screen as game cartridges, in the order they fire, the shell colored by rarity (grey common, cyan uncommon, pink rare, gold legendary) with the cartridge's picture on the label, its name and what it adds. While you build a trade, the cartridges a win would set off glow and say what they'd add (+150 chips, +1 mult, ×2). The same cartridges appear in the shop, on YOUR DESK and in a desk's starting kit.
+- **A new payout when a trade closes**, in three steps your eye can follow:
+  1. **The register** prints the trade's receipt: the profit, the structure, your call, discipline and the rest. Each line's number flies off the receipt into a big **CHIPS × MULT** scoreboard.
+  2. **A gold coin** runs along your cartridges in order. Each one it hits freezes for a beat, flashes and slams, pops what it added and why, and sends it to the scoreboard; the combo counter, the pitch and the shake build with every hit. Cartridges that don't apply let the coin pass, grey out and say what they need.
+  3. **The jackpot:** chips × mult (× any score multiplier) lines up in the middle, the total slams in with the jackpot sound, then flies into your round score. Clearing the target sets it on fire.
+  A loss prints on the register only (losses are never multiplied). Click, Space or Enter still skips; Settings › Game › payout speed still has FAST and OFF.
+- **Whole numbers:** chips and points are shown ten times bigger, so every number is whole: "107 × 3.25 = 348" instead of "10.7 × 3.25 = 35". Targets, cartridge text and everything else that quotes points scale the same way, so nothing about the balance changes. The chips and mult on screen now multiply exactly to the total you're given.
+- **Sounds:** chiptune chips and mult, a slam for each cartridge, a flat thunk for a miss, a receipt printer, and a new jackpot.
+
+**Not in this release yet (next):** the Income desk first in Career, Ines's tutorial on a cash-secured put, and the reworked LEARN OPTIONS course (cash-secured puts and covered calls first).
+
+**Known issue (unchanged):** rarely, when many trades close on the same day, the chart library logs an error ("reading 'time'"); the game keeps going.
+
+## New in 1.8.1
 
 - **50 tickers in all, as you meant:** the game's 25 plus the 25 added in 1.7.0. 1.8.0's second 25 (EEM through RDDT) are gone from the Trade Builder and from PULL FROM SCHWAB, so a pull is shorter. Anything already saved for them on your PC is left alone and never used.
 - **Index options in the Trade Builder:** SPX, XSP (a tenth of SPX, sized for small accounts), NDX and RUT, in their own group under ALL. Type `SPX` or `$SPX`. They load live from Schwab like any ticker (PULL FROM SCHWAB saves them too), and the order ticket marks them **CASH-SETTLED**: European style, no early assignment, no shares at expiration. Their chains are huge, so the builder asks Schwab for the strikes nearest the money and narrows the request if Schwab turns it down. Where SPX lists two contracts on the same strike and day (the AM-settled monthly and the PM-settled weekly), the builder keeps the PM one.

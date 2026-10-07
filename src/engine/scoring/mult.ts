@@ -107,9 +107,9 @@ export function runScore(
   }
   // The screen shows chips and points ×10 as whole numbers (SCORE_SCALE), so both are kept to a
   // tenth here: the chips you see times the mult you see is the total you get.
-  const whole = tenths(chips);
-  const points = winner ? whole * mult * meter : whole * meter;
-  return { winner, chips, mult: winner ? mult : 1, points: tenths(points), trace };
+  const whole = Math.round(chips * 10);
+  const points = Math.round(winner ? whole * mult * meter : whole * meter) / 10;
+  return { winner, chips, mult: winner ? mult : 1, points, trace };
 }
 
 /** Points to a tenth (whole on screen at ×10). Keeps sums of points free of float drift. */

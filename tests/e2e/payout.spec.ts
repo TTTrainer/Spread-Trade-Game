@@ -83,7 +83,9 @@ test('closing a trade plays the payout, fires the cartridges, then lands on the 
     () => (window as any).__stg.run.getState().engine.state.round.meter,
   );
   expect(engineMeter).not.toBe(meterBefore);
-  await expect(page.getByTestId('round-meter')).toContainText(`${meterBefore.toLocaleString()} /`);
+  await expect(page.getByTestId('round-meter')).toContainText(
+    `${Math.round(meterBefore * 10).toLocaleString('en-US')} /`,
+  );
   // How it closed is stamped on the payout (cash out at the target, or closed by hand here).
   await expect(page.getByTestId('po-exit')).toHaveAttribute('data-kind', /target|manual/);
   await page.waitForTimeout(1300);
@@ -92,7 +94,9 @@ test('closing a trade plays the payout, fires the cartridges, then lands on the 
   await page.waitForTimeout(250);
   await shot(page, '18-payout-total-1920');
   await expect(page.getByTestId('payout')).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.getByTestId('round-meter')).toContainText(`${engineMeter.toLocaleString()} /`);
+  await expect(page.getByTestId('round-meter')).toContainText(
+    `${Math.round(engineMeter * 10).toLocaleString('en-US')} /`,
+  );
 
   // Again at 1366, skipped with Space: it jumps to the total and lands.
   await page.setViewportSize({ width: 1366, height: 768 });

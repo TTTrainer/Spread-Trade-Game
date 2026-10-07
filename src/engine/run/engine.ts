@@ -54,6 +54,7 @@ import { BASE_EXECUTION, combineImprove, type ExecutionMods } from '../orders/fi
 import { streamFor, type Rng } from '../rng';
 import { brier, calibrationGrade, meanBrier } from '../scoring/calls';
 import { pnlChips, runScore, tenths, winQuality } from '../scoring/mult';
+import { pts, ptsSigned } from '../scoring/points';
 import { STRUCTURES } from '../strategies/structures';
 import type { StructureId } from '../strategies/types';
 import { buildDebrief } from '../trading/debrief';
@@ -341,7 +342,7 @@ export class RunEngine {
     await e.enterRound(null);
     e.events = e.events.filter((x) => x.kind !== 'say');
     e.speech = null;
-    e.say('run_start', 3, { desk: DESKS[config.deskId].name, target: e.state.round.target });
+    e.say('run_start', 3, { desk: DESKS[config.deskId].name, target: pts(e.state.round.target) });
     e.flushSpeech('boot');
     e.checkpoint();
     return e;
@@ -1062,7 +1063,7 @@ export class RunEngine {
     const total = items.reduce((a, x) => a + x.points, 0);
     this.events.push({
       kind: 'interest',
-      text: `The Collector: −${total} points of interest.`,
+      text: `The Collector: −${pts(total)} points of interest.`,
       points: -total,
       interest: { items, rate, day: s.dayIndex },
     });
@@ -1230,7 +1231,7 @@ export class RunEngine {
     });
     this.events.push({
       kind: 'score',
-      text: `${card.displaySymbol} ${STRUCTURES[p.structureId].short}: ${res.points >= 0 ? '+' : ''}${res.points} points`,
+      text: `${card.displaySymbol} ${STRUCTURES[p.structureId].short}: ${ptsSigned(res.points)} points`,
       points: res.points,
     });
 
@@ -1247,8 +1248,8 @@ export class RunEngine {
     if (!facts.win && !(facts.assigned && st.config.deskId === 'income'))
       this.addStress(BALANCE.stress.perLoser, `Losing trade on ${sym}`, true);
     if (res.points <= -0.4 * r.target || facts.realizedCents <= -0.03 * r.startEquityCents)
-      this.say('big_loss', 6, { points: res.points });
-    else if (res.points >= 0.5 * r.target) this.say('big_win', 6, { points: res.points });
+      this.say('big_loss', 6, { points: pts(res.points) });
+    else if (res.points >= 0.5 * r.target) this.say('big_win', 6, { points: pts(res.points) });
     if (facts.closedAtPlan)
       this.addStress(BALANCE.stress.closeAtPlan, `Closed ${sym} at plan (${facts.closedAtPlan})`);
     if (facts.closedAtPlan && this.rng(`plan:${p.id}`).chance(0.5)) this.say('closed_at_plan', 3);
@@ -1351,8 +1352,8 @@ export class RunEngine {
       this.events.push({
         kind: 'score',
         text: green
-          ? `Green round: the round made money, +${r.greenBonus} points.`
-          : `Red round: the round lost money, ${r.greenBonus} points.`,
+          ? `Green round: the round made money, ${ptsSigned(r.greenBonus)} points.`
+          : `Red round: the round lost money, ${ptsSigned(r.greenBonus)} points.`,
         points: r.greenBonus,
       });
     }
@@ -1494,7 +1495,7 @@ export class RunEngine {
       this.addStress(BALANCE.stress.writeUp, `Written up: missed the ${ROUND_NAMES[r.index]} target`);
       this.events.push({
         kind: 'warn',
-        text: `WRITTEN UP: ${r.meter} of ${r.target} points. One miss a quarter is allowed; this quarter's Review target is ${Math.round((BALANCE.targets.writeUpReviewMult - 1) * 100)}% higher, and another miss ends the run.`,
+        text: `WRITTEN UP: ${pts(r.meter)} of ${pts(r.target)} points. One miss a quarter is allowed; this quarter's Review target is ${Math.round((BALANCE.targets.writeUpReviewMult - 1) * 100)}% higher, and another miss ends the run.`,
       });
       this.say('target_missed', 9);
     } else if (!passed) {
@@ -1513,7 +1514,7 @@ export class RunEngine {
         // The year's victory is banked; Endless ends where you fall.
         this.finishRun(
           'victory',
-          `Endless ended in ${yearLabel(st.quarter, r.index)}: ${r.breached ? 'you crossed the Max-Loss Line' : `${r.meter} of ${r.target} points`}.`,
+          `Endless ended in ${yearLabel(st.quarter, r.index)}: ${r.breached ? 'you crossed the Max-Loss Line' : `${pts(r.meter)} of ${pts(r.target)} points`}.`,
         );
         return;
       } else {
@@ -1521,7 +1522,7 @@ export class RunEngine {
           'defeat',
           r.breached
             ? 'You crossed the Max-Loss Line.'
-            : `You missed the target: ${r.meter} of ${r.target} points.`,
+            : `You missed the target: ${pts(r.meter)} of ${pts(r.target)} points.`,
         );
         return;
       }
@@ -1748,7 +1749,7 @@ export class RunEngine {
     st.phase = 'round';
     if (this.activeCartridges().includes('rivals_bet')) this.say('rival', 2, {}, 'bradley');
     else if (!reviewId && (idx === 0 || rng.chance(0.4)))
-      this.say('round_start', 2, { target, tickets: st.round.tickets });
+      this.say('round_start', 2, { target: pts(target), tickets: st.round.tickets });
     if (burnout)
       this.events.push({
         kind: 'bad',
@@ -2265,7 +2266,7 @@ export class RunEngine {
         return note(`rerolls now ${r.rerolls - r.rerollsUsed}`);
       case 'meter':
         r.meter = tenths(r.meter + op.delta);
-        return note(`meter ${op.delta >= 0 ? '+' : ''}${op.delta}`);
+        return note(`meter ${ptsSigned(op.delta)}`);
       case 'cartridge': {
         const c = CARTRIDGE_BY_ID[op.id];
         if (!c || st.cartridges.includes(op.id)) return this.warn('Already owned (or unknown).');

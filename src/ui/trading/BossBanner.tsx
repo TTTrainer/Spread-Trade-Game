@@ -8,7 +8,7 @@ import { lastMark } from '../../engine/lifecycle/position';
 import { testedShort } from '../../engine/run/collector';
 import { CARTRIDGE_BY_ID } from '../../content/cartridges';
 import { useActiveBoss } from '../boss';
-import { pct, pnlText } from '../format';
+import { pct, pnlText, pts } from '../format';
 import type { RacePoint } from '../../engine/run/race';
 import { useRun } from '../store/run';
 import { useTrading } from '../store/trading';
@@ -33,7 +33,7 @@ export function BossBanner() {
       const m = lastMark(p);
       return !!m && m.plCents < 0 && !!testedShort(p.legs, m.spot);
     }).length;
-    live = `paid −${(e.state.round.interest ?? 0).toLocaleString()}${due ? ` · ${due} at a strike: charged at the close` : ''}`;
+    live = `paid −${pts(e.state.round.interest ?? 0)}${due ? ` · ${due} at a strike: charged at the close` : ''}`;
   } else if (rule.lossStreakStep !== undefined) {
     const n = e.lossStreak();
     live = `next loss x${(rule.lossStreakStep ** n).toFixed(2)}`;

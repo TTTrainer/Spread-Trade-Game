@@ -171,7 +171,7 @@ export function previewScore(
     }),
   );
   return {
-    chips: Math.round(res.chips),
+    chips: res.chips,
     mult: res.mult,
     points: res.points,
     steps,

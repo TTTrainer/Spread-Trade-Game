@@ -12,7 +12,7 @@ import type { TraceRow } from '../../engine/scoring/mult';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
 import { CountUp, Kbd, Meter, Pnl, Stamp } from '../components/ui';
-import { money } from '../format';
+import { SCORE_SCALE, chipsText, money, multText, pts, ptsSigned } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun, type DailyGhost } from '../store/run';
@@ -22,18 +22,18 @@ import './run.css';
 export { ShopView } from './Shop';
 
 function opText(t: TraceRow): string {
-  const v = Math.round(t.value * 100) / 100;
+  const v = multText(t.value);
   switch (t.op) {
     case 'chips':
-      return `${v >= 0 ? '+' : ''}${Math.round(v)} chips`;
+      return `${t.value >= 0 ? '+' : '−'}${chipsText(Math.abs(t.value))} chips`;
     case 'chipsMul':
       return `×${v} chips`;
     case 'add':
-      return `${v >= 0 ? '+' : ''}${v} mult`;
+      return `${t.value >= 0 ? '+' : ''}${v} mult`;
     case 'mul':
       return `×${v} mult`;
     case 'meter':
-      return `meter ×${v}`;
+      return `score ×${v}`;
   }
 }
 
@@ -66,8 +66,8 @@ function Receipt({ t, shown, index }: { t: TradeTally; shown: number; index: num
         ))}
       </div>
       <div className="rc-foot num">
-        <span className="chips-text">{Math.round(last?.chips ?? 0)}</span> ×{' '}
-        <span className="mult-text">{(last?.mult ?? 1).toFixed(2)}</span>
+        <span className="chips-text">{chipsText(last?.chips ?? 0)}</span> ×{' '}
+        <span className="mult-text">{multText(t.winner ? (last?.mult ?? 1) : 1)}</span>
         {done && (
           <motion.b
             className={t.points >= 0 ? 'up-text' : 'down-text'}
@@ -75,8 +75,7 @@ function Receipt({ t, shown, index }: { t: TradeTally; shown: number; index: num
             animate={{ scale: 1 }}
           >
             {' '}
-            = {t.points >= 0 ? '+' : ''}
-            {t.points.toLocaleString()}
+            = {ptsSigned(t.points)}
           </motion.b>
         )}
       </div>
@@ -167,7 +166,7 @@ export function TallyView({ e }: { e: RunEngine }) {
             tone={meterNow >= r.target ? 'cyan' : 'magenta'}
             label={
               <>
-                {<CountUp value={meterNow} />} / {r.target.toLocaleString()}
+                {<CountUp value={Math.round(meterNow * SCORE_SCALE)} />} / {pts(r.target)}
               </>
             }
             testId="tally-meter"
@@ -277,24 +276,24 @@ function RoundWhy({ e }: { e: RunEngine }) {
           <span className="dim">POINTS</span>{' '}
           {wins.length > 0 && (
             <span className="up-text">
-              winners +{winPts.toLocaleString()} (your build: ×{avgMult.toFixed(1)} on average)
+              winners {ptsSigned(winPts)} (your build: ×{avgMult.toFixed(1)} on average)
             </span>
           )}
           {wins.length > 0 && losses.length > 0 && ' · '}
           {losses.length > 0 && (
-            <span className="down-text">losers {lossPts.toLocaleString()} (losses count in full)</span>
+            <span className="down-text">losers {ptsSigned(lossPts)} (losses count in full)</span>
           )}
           {!!r.greenBonus && (
             <span className={r.greenBonus > 0 ? 'up-text' : 'down-text'}>
               {' '}
-              · {r.greenBonus > 0 ? `green round +${r.greenBonus}` : `red round ${r.greenBonus}`}
+              · {r.greenBonus > 0 ? 'green round' : 'red round'} {ptsSigned(r.greenBonus)}
             </span>
           )}
-          {!!r.carriedIn && <span className="cyan-text"> · carried in +{r.carriedIn}</span>}
+          {!!r.carriedIn && <span className="cyan-text"> · carried in {ptsSigned(r.carriedIn)}</span>}
           {!!r.interest && (
             <span className="down-text" data-testid="tally-interest">
               {' '}
-              · the Collector&apos;s interest −{r.interest.toLocaleString()}
+              · the Collector&apos;s interest −{pts(r.interest)}
             </span>
           )}
         </div>
@@ -382,7 +381,7 @@ function BossCaseFile({ e }: { e: RunEngine }) {
           </div>
           <div className="bf-row">
             <span className="bf-k num">TARGET</span>
-            <span className="bf-v num">{st.round.target.toLocaleString()} points</span>
+            <span className="bf-v num">{pts(st.round.target)} points</span>
           </div>
           <div className="bf-row style" data-testid="boss-style-row">
             <span className="bf-k num">★ STYLE</span>
@@ -440,7 +439,7 @@ export function ReviewIntro({ e }: { e: RunEngine }) {
               <span className="dim">RULE:</span> {rv.ruleText}
             </div>
             <div>
-              <span className="dim">TARGET:</span> {st.round.target.toLocaleString()} points
+              <span className="dim">TARGET:</span> {pts(st.round.target)} points
             </div>
             <div className="dim">Reviews cannot be skipped. Entering one added stress.</div>
           </div>
@@ -508,7 +507,7 @@ export function RunEnd({
           className={`end-reason ${res.points > ghost.total ? 'up-text' : 'down-text'}`}
           data-testid="ghost-result"
         >
-          Bradley scored {ghost.total.toLocaleString()} on this seed.{' '}
+          Bradley scored {pts(ghost.total)} on this seed.{' '}
           {res.points > ghost.total ? 'You beat his ghost.' : 'His ghost wins today.'}
         </p>
       )}
@@ -518,7 +517,7 @@ export function RunEnd({
           {endless ? e.state.history.length : e.state.config.quarters * 3}
         </div>
         <div>
-          <span className="dim">Points</span> {res.points.toLocaleString()}
+          <span className="dim">Points</span> {pts(res.points)}
         </div>
         <div>
           <span className="dim">Real P/L</span> <Pnl cents={res.realizedCents} />
@@ -553,8 +552,8 @@ export function RunEnd({
               <td>
                 {yearRound(i)} {h.reviewId ? `· ${REVIEWS[h.reviewId].name}` : ''}
               </td>
-              <td>{h.target.toLocaleString()}</td>
-              <td>{h.meter.toLocaleString()}</td>
+              <td>{pts(h.target)}</td>
+              <td>{pts(h.meter)}</td>
               <td
                 className={h.status === 'passed' ? 'up-text' : h.status === 'skipped' ? 'dim' : 'down-text'}
               >

@@ -109,7 +109,7 @@ test('career: start from the menu, save and exit, continue, abandon', async () =
   await page.getByTestId('seed-input').fill('menu-seed');
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('round-meter')).toContainText(`0 / ${Q1[0]}`);
+  await expect(page.getByTestId('round-meter')).toContainText(`0 / ${(Q1[0] * 10).toLocaleString('en-US')}`);
   // The month menu comes up over the first Month: the quarter, the build and the exit plan.
   await expect(page.getByTestId('month-menu')).toBeVisible();
   await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');

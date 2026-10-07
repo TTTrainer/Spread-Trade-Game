@@ -379,7 +379,9 @@ test('the Collector: a losing trade left at its strike at the close gets an inte
   expect(owed).toBeGreaterThan(0);
   await page.keyboard.press('Enter');
   await expect(notice).toHaveCount(0, { timeout: 5_000 });
-  await expect(page.getByTestId('boss-live')).toContainText(`paid −${owed.toLocaleString()}`);
+  await expect(page.getByTestId('boss-live')).toContainText(
+    `paid −${Math.round(owed * 10).toLocaleString('en-US')}`,
+  );
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });

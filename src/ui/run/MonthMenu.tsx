@@ -21,6 +21,7 @@ import { SnapSlider } from '../components/SnapSlider';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun } from '../store/run';
+import { SCORE_SCALE, pts } from '../format';
 import { useTrading } from '../store/trading';
 import { JokerRow } from './JokerRow';
 import { MONTH_CARDS, RoundEmblem } from './RoundEmblem';
@@ -137,7 +138,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
         <div className="mm-r-target num">
           <span className="dim">TARGET</span>{' '}
           <b>
-            <CountUp value={i < dealt ? target : 0} duration={reduced ? 1 : 700} />
+            <CountUp value={i < dealt ? Math.round(target * SCORE_SCALE) : 0} duration={reduced ? 1 : 700} />
           </b>
         </div>
         <div className="mm-r-pay num">
@@ -145,13 +146,7 @@ export function MonthMenu({ e, onExit }: { e: RunEngine; onExit: () => void }) {
           <span className="dim"> + interest</span>
         </div>
         <div className="mm-r-state num">
-          {done
-            ? done.status === 'passed'
-              ? `✔ ${done.meter.toLocaleString()}`
-              : '✘ missed'
-            : now
-              ? '▶ UP NEXT'
-              : ''}
+          {done ? (done.status === 'passed' ? `✔ ${pts(done.meter)}` : '✘ missed') : now ? '▶ UP NEXT' : ''}
         </div>
         {i === 2 && boss && (
           <button

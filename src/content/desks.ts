@@ -24,7 +24,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     blurb:
       'Covered calls and cash-secured puts on 500 shares you own of each stock (off the books: only the options count). Get paid to wait.',
     structures: ['cash_secured_put', 'covered_call'],
-    passiveText: 'Assignment is not a loss event (no stress). Dividends pay +25 chips each.',
+    passiveText: 'Assignment is not a loss event (no stress). Dividends pay +250 chips each.',
     startingAnalysts: [],
     startingCartridges: ['dividend_radar'],
     unlockCost: 100,
@@ -68,7 +68,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     blurb: 'Long straddles and strangles. Buy movement before the market prices it.',
     structures: ['long_straddle', 'long_strangle'],
     passiveText:
-      'Earnings events show the implied move. Long premium held through an event: +50 chips. +3 tickets and +2 cards every round.',
+      'Earnings events show the implied move. Long premium held through an event: +500 chips. +3 tickets and +2 cards every round.',
     startingAnalysts: ['earnings_whisperer'],
     startingCartridges: [],
     unlockCost: 200,
