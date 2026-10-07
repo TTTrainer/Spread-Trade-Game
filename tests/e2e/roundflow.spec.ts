@@ -177,11 +177,19 @@ test('developer test checklist: what changed since 1.6, one click to each spot, 
   // ...a run with the rules on: no SIT OUT under the Attendance Policy...
   await openChecklist();
   await page.getByTestId('check-setup-run-rules').click();
-  await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
-  const rules = await page.evaluate(
-    () => (window as Any).__stg.run.getState().engine.state.config.compliance,
-  );
-  expect(rules).toEqual(['liquidity', 'no_market', 'no_skip']);
+  // The Trade Builder shows a trading screen too, so wait for the run itself.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const stg = (window as Any).__stg;
+          return stg.app.getState().screen === 'run'
+            ? (stg.run.getState().engine?.state.config.compliance ?? null)
+            : null;
+        }),
+      { timeout: 60_000 },
+    )
+    .toEqual(['liquidity', 'no_market', 'no_skip']);
   // ...and a boss's case file.
   await openChecklist();
   await page.getByTestId('check-setup-boss-tax-man').click();
