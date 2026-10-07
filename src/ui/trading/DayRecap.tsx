@@ -197,8 +197,10 @@ export function DayRecapPanel() {
   const pace = useTrading((s) => s.pace);
   const reviewing = useTrading((s) => s.reviewChart);
   const show = recap && !reviewing && (ff === 'paused' || ff === 'decision');
+  // One recap at a time: yesterday's finishes leaving before today's comes in, so two never
+  // stack (and a stale × can't be clicked) when the days run fast.
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {show && recap && (
         <motion.div
           key={recap.id}

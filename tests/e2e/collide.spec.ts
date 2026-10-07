@@ -27,7 +27,7 @@ test('many trades closing at once with lines and the target: no errors, and prof
   test.setTimeout(240_000);
   const { app, page, userData } = await launchGame();
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
+  page.on('pageerror', (e) => errors.push(`pageerror ${e.message} ${e.stack ?? ''}`));
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(`console ${m.text()}`);
   });
