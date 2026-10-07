@@ -122,7 +122,9 @@ export function CoursePanel() {
   );
   const [idx, setIdx] = useState(Math.min(saved?.idx ?? 0, OPTIONS_COURSE.length));
   const [picks, setPicks] = useState<Record<string, number>>({});
-  const base = useRef<CourseState | null>(null);
+  // Where things stood when the lesson opened. State, not a ref: if the player does the task
+  // before it is taken, setting it still redraws the ✓.
+  const [base, setBase] = useState<CourseState | null>(null);
   const card = useRef<HTMLDivElement>(null);
   const lesson = OPTIONS_COURSE[idx] ?? null;
   const done = saved?.done ?? [];
@@ -131,8 +133,8 @@ export function CoursePanel() {
   useEffect(() => {
     if (!lesson) return;
     applyLesson(lesson);
-    base.current = null;
-    const id = setTimeout(() => (base.current = courseState()), 0);
+    setBase(null);
+    const id = setTimeout(() => setBase(courseState()), 0);
     updateSettings((st) => ({ ...st, game: { ...st.game, courseProgress: { idx, done } } }));
     return () => clearTimeout(id);
   }, [idx]);
@@ -168,7 +170,7 @@ export function CoursePanel() {
   }
 
   const now = courseState();
-  const taskDone = lesson.task ? !!base.current && courseTaskDone(lesson.task, base.current, now) : true;
+  const taskDone = lesson.task ? !!base && courseTaskDone(lesson.task, base, now) : true;
   const pick = picks[lesson.id];
   const answered = pick !== undefined;
   const ready = lesson.quiz ? answered : taskDone;

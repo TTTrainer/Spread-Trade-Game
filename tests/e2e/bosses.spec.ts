@@ -356,13 +356,16 @@ test('the Collector: a losing trade left at its strike at the close gets an inte
     if (await notice.isVisible().catch(() => false)) break;
     const phase = await page.evaluate(() => (window as any).__stg.run.getState().engine.state.phase);
     if (phase !== 'round') break;
+    // The notice can land between the check above and these clicks, and then it covers them:
+    // give way and look for it again.
     const x = page.locator('.dr-x');
-    if (await x.isVisible().catch(() => false)) await x.click();
+    if (await x.isVisible().catch(() => false)) await x.click({ timeout: 3_000 }).catch(() => undefined);
     const hold = page.getByTestId('dp-hold');
     if (await hold.isVisible().catch(() => false)) {
-      await hold.click();
+      await hold.click({ timeout: 3_000 }).catch(() => undefined);
       continue;
     }
+    if (await notice.isVisible().catch(() => false)) break;
     await page.evaluate(() => (window as any).__stg.trading.getState().nextDay());
     await page.waitForTimeout(400);
   }
