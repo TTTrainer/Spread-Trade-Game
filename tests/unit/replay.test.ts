@@ -9,7 +9,8 @@ import {
   strikeAtEntry,
 } from '../../src/engine/teach/replay';
 
-const day = (i: number) => `2026-${String(1 + Math.floor(i / 28)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`;
+const day = (i: number) =>
+  `2026-${String(1 + Math.floor(i / 28)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`;
 const bar = (i: number, close: number, spread = 1): Bar => ({
   date: day(i),
   open: close,
