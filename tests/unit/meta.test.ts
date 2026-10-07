@@ -120,13 +120,16 @@ describe('career ladder', () => {
 describe('spending Bonus', () => {
   it('unlocks desks at their price, with the rank discount, and never twice', () => {
     const p = rich();
-    expect(deskPrice(p, 'income')).toBe(DESKS.income.unlockCost);
-    const r = unlockDesk(p, 'income');
+    expect(deskPrice(p, 'condor')).toBe(DESKS.condor.unlockCost);
+    const r = unlockDesk(p, 'condor');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.profile.desks).toEqual(['verticals', 'income']);
-    expect(r.profile.bonus).toBe(10_000 - DESKS.income.unlockCost);
-    expect(unlockDesk(r.profile, 'income').ok).toBe(false);
+    expect(r.profile.desks).toEqual(['income', 'verticals', 'condor']);
+    expect(r.profile.bonus).toBe(10_000 - DESKS.condor.unlockCost);
+    expect(unlockDesk(r.profile, 'condor').ok).toBe(false);
+    // Income and Verticals are free from the start.
+    expect(unlockDesk(p, 'income').ok).toBe(false);
+    expect(unlockDesk(p, 'verticals').ok).toBe(false);
     const associate = rich({ xp: RANKS[2].xp });
     expect(deskPrice(associate, 'calendar')).toBe(Math.round(DESKS.calendar.unlockCost * 0.75));
     const head = rich({ xp: RANKS[6].xp });
@@ -138,7 +141,7 @@ describe('spending Bonus', () => {
     const r = unlockDesk(p, 'condor');
     expect(r.ok).toBe(false);
     expect(p.bonus).toBe(0);
-    expect(p.desks).toEqual(['verticals']);
+    expect(p.desks).toEqual(['income', 'verticals']);
   });
 
   it('starts with 38 cartridges in the pool; packs open by rank or Bonus', () => {
@@ -320,7 +323,7 @@ describe('Daily and Contracts bookkeeping', () => {
 
   it('merges an old or partial saved profile over the defaults', () => {
     const p = mergeProfile({ xp: 50, desks: ['condor'], pad: { tier: 1 } });
-    expect(p.desks).toEqual(['verticals', 'condor']);
+    expect(p.desks).toEqual(['income', 'verticals', 'condor']);
     expect(p.pad.setup.monitors).toBe(0);
     expect(p.pad.setup.desk).toBe(0);
     expect(p.pad.deskItems).toEqual([]);

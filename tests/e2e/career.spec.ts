@@ -99,10 +99,11 @@ async function playToTally(page: Page, shotDecision?: string): Promise<void> {
 
 test('career: start from the menu, save and exit, continue, abandon', async () => {
   const { app, page } = await launchGame();
+  // Income comes first; this run plays Verticals (free too).
   await page.getByTestId('menu-career').click();
   await expect(page.getByTestId('career-screen')).toBeVisible();
-  await expect(page.getByTestId('desk-verticals')).toBeVisible();
-  await expect(page.getByTestId('desk-income')).toBeDisabled();
+  await expect(page.getByTestId('desk-income')).toBeEnabled();
+  await page.getByTestId('desk-verticals').click();
   await shot(page, '06-career-1920');
   // Seed, tier and Compliance live on the CHALLENGE & OPTIONS tab.
   await page.getByTestId('ctab-options').click();

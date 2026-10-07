@@ -506,11 +506,16 @@ export async function computeGhost(seed: string, deskId: DeskId): Promise<DailyG
   return ghost;
 }
 
-/** Ines's tutorial from its first lesson (Career's TUTORIAL / START OVER, and the dev checklist). */
+/**
+ * Ines's tutorial from its first lesson (Career's TUTORIAL / START OVER, and the dev checklist).
+ * It runs on the Income desk: a new trader's first trade is a cash-secured put, with the Income
+ * desk's recommended starting capital.
+ */
 export async function startTutorial(): Promise<boolean> {
   useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: null } }));
   return useRun.getState().newRun({
-    deskId: 'verticals',
+    deskId: 'income',
+    startEquityCents: useApp.getState().settings.game.incomeCapitalCents,
     seed: 'tutorial-ines',
     mode: 'tutorial',
     practice: true,

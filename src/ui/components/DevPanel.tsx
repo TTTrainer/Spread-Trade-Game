@@ -160,6 +160,7 @@ async function runSetup(s: DevSetup): Promise<void> {
     return;
   }
   if (s.screen === 'live') return app.go('live');
+  if (s.screen === 'career') return app.go('career');
   if (s.screen === 'settingsData') {
     useApp.setState({ settingsAt: 'data' });
     return app.go('settings');

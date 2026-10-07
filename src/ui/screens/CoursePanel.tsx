@@ -1,8 +1,9 @@
 /**
  * LEARN OPTIONS, the Trade Builder's course (src/content/optionsCourse.ts), on the right-hand LEARN
  * tab. Each lesson sets up its trade on the open ticker, says what to look at, and waits for you to
- * do one thing with the tools or answer one question. Progress is saved, so it picks up where you
- * left it.
+ * do something: play a sold option out on last month's real candles, do one thing with the tools,
+ * answer one question, or tick off the coached trade's checklist. Progress is saved, so it picks up
+ * where you left it.
  */
 
 import { motion } from 'motion/react';
@@ -13,6 +14,10 @@ import { frontExpiration } from '../../engine/strategies/metrics';
 import { expirationsOf } from '../../engine/strategies/structures';
 import type { StructureId } from '../../engine/strategies/types';
 import { courseTaskDone, resolveCourseLegs, type CourseState } from '../../engine/teach/course';
+import { supportResistance } from '../../engine/market/indicators';
+import { practiceLevel } from '../../engine/teach/practice';
+import type { OptionLeg } from '../../engine/strategies/types';
+import { CourseReplay, type ReplayOutcome } from './CourseReplay';
 import { sfx } from '../../audio/sfx';
 import { burstAt } from '../../fx/overlay';
 import { money } from '../format';
@@ -113,6 +118,33 @@ function fill(text: string): string {
   return text.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? '—');
 }
 
+/** The coached trade's checklist, read from the trade on today's chart. */
+function coachChecks(): { label: string; ok: boolean }[] {
+  const t = useTrading.getState();
+  const plan = t.plan();
+  const cardId = liveCardId(t);
+  const view = t.session && cardId ? t.session.view(cardId) : null;
+  const bars = view ? view.bars() : [];
+  const spot = view ? view.spot() : 0;
+  const short = plan?.legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0);
+  const floors = supportResistance(bars)
+    .filter((l) => l.kind === 'support' && l.price < spot)
+    .map((l) => l.price);
+  const floor = floors.length ? Math.max(...floors) : (practiceLevel(bars, 'up')?.price ?? null);
+  const st = courseState();
+  return [
+    { label: 'A cash-secured put', ok: t.builder.structureId === 'cash_secured_put' },
+    {
+      label: floor ? `Strike under the floor (${floor.toFixed(2)})` : 'Strike under a floor',
+      ok: !!short && floor !== null && short.right === 'P' && short.strike < floor,
+    },
+    { label: '25 to 45 days out', ok: st.dte >= 25 && st.dte <= 45 },
+    { label: 'POP 75% to 85%', ok: st.pop !== null && st.pop >= 0.75 && st.pop <= 0.85 },
+  ];
+}
+
+const MAIN = OPTIONS_COURSE.filter((l) => !l.more).length;
+
 export function CoursePanel() {
   const saved = useApp((s) => s.settings.game.courseProgress);
   const updateSettings = useApp((s) => s.updateSettings);
@@ -125,6 +157,8 @@ export function CoursePanel() {
   // Where things stood when the lesson opened. State, not a ref: if the player does the task
   // before it is taken, setting it still redraws the ✓.
   const [base, setBase] = useState<CourseState | null>(null);
+  // The replay's result, once the month has played out.
+  const [played, setPlayed] = useState<ReplayOutcome | null>(null);
   const card = useRef<HTMLDivElement>(null);
   const lesson = OPTIONS_COURSE[idx] ?? null;
   const done = saved?.done ?? [];
@@ -134,6 +168,7 @@ export function CoursePanel() {
     if (!lesson) return;
     applyLesson(lesson);
     setBase(null);
+    setPlayed(null);
     const id = setTimeout(() => setBase(courseState()), 0);
     updateSettings((st) => ({ ...st, game: { ...st.game, courseProgress: { idx, done } } }));
     return () => clearTimeout(id);
@@ -146,7 +181,7 @@ export function CoursePanel() {
         <div className="course-kicker">LEARN OPTIONS · DONE</div>
         <h3>Course complete</h3>
         <p>
-          From a single call to the iron condor, managing the trade and the events that move it.
+          From your first cash-secured put to the iron condor, managing the trade and the events that move it.
           {Object.keys(picks).length > 0 &&
             ` You got ${right} of ${OPTIONS_COURSE.filter((l) => l.quiz).length} questions right.`}
         </p>
@@ -173,7 +208,17 @@ export function CoursePanel() {
   const taskDone = lesson.task ? !!base && courseTaskDone(lesson.task, base, now) : true;
   const pick = picks[lesson.id];
   const answered = pick !== undefined;
-  const ready = lesson.quiz ? answered : taskDone;
+  const checks = lesson.checklist ? coachChecks() : [];
+  const checked = checks.every((c) => c.ok);
+  const ready = lesson.quiz ? answered : taskDone && checked && (!lesson.replay || !!played);
+  const t = useTrading.getState();
+  const cardId = liveCardId(t);
+  const view = t.session && cardId ? t.session.view(cardId) : null;
+  const plan = t.plan();
+  const short = plan?.legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0);
+  const fixedStrike = lesson.replay?.strike === 'today' && short && view ? short.strike / view.spot() : null;
+  const more = !!lesson.more;
+  const n = more ? idx - MAIN + 1 : idx + 1;
   const go = (to: number) => {
     sfx(to > idx ? 'deal' : 'click');
     if (to > idx && !done.includes(lesson.id))
@@ -203,7 +248,9 @@ export function CoursePanel() {
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
     >
       <div className="course-kicker">
-        LEARN OPTIONS · LESSON {idx + 1} OF {OPTIONS_COURSE.length}
+        {more
+          ? `LEARN OPTIONS · MORE LESSONS · ${n} OF ${OPTIONS_COURSE.length - MAIN}`
+          : `LEARN OPTIONS · LESSON ${n} OF ${MAIN}`}
       </div>
       <h3>{lesson.title}</h3>
       <p className="course-text" data-testid="course-text">
@@ -215,6 +262,34 @@ export function CoursePanel() {
           {TASK_TEXT[lesson.task.kind]}
           {lesson.task.kind === 'pop' && now.pop !== null && <b> Now {Math.round(now.pop * 100)}%.</b>}
         </div>
+      )}
+      {lesson.checklist && (
+        <ul className="course-checks" data-testid="course-checks">
+          {checks.map((c) => (
+            <li key={c.label} className={c.ok ? 'ok' : ''}>
+              {c.ok ? '✓' : '▢'} {c.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      {lesson.replay && view && (
+        <CourseReplay
+          bars={view.bars()}
+          side={lesson.replay.side}
+          fixedStrike={lesson.replay.strike === 'today' ? fixedStrike : undefined}
+          locked={lesson.replay.strike === 'today' && !checked}
+          onDone={(o) => {
+            setPlayed(o);
+            if (lesson.checklist && o.touchedOn === null) burstAt(card.current, 'confetti', 60);
+          }}
+        />
+      )}
+      {lesson.checklist && played && (
+        <p className={`course-badge ${played.touchedOn === null ? 'won' : ''}`} data-testid="course-badge">
+          {played.touchedOn === null
+            ? '★ FIRST TRADE BADGE: your setup kept the whole premium last month.'
+            : 'Close one. Try another month, or move the strike further from the price.'}
+        </p>
       )}
       {lesson.quiz && (
         <div className="course-quiz" data-testid="course-quiz">
@@ -255,14 +330,25 @@ export function CoursePanel() {
           onClick={() => go(idx + 1)}
           disabled={!ready}
           data-testid="course-next"
-          title={ready ? '' : lesson.quiz ? 'Answer the question first.' : 'Do the task first.'}
+          title={
+            ready
+              ? ''
+              : lesson.quiz
+                ? 'Answer the question first.'
+                : lesson.replay && !played
+                  ? 'Play the month out first.'
+                  : 'Do the task first.'
+          }
         >
           {idx === OPTIONS_COURSE.length - 1 ? 'FINISH ✓' : 'NEXT ▶'}
         </button>
       </div>
       <div className="course-dots" aria-hidden="true">
         {OPTIONS_COURSE.map((l, i) => (
-          <i key={l.id} className={i < idx || done.includes(l.id) ? 'done' : i === idx ? 'now' : ''} />
+          <i
+            key={l.id}
+            className={`${i < idx || done.includes(l.id) ? 'done' : i === idx ? 'now' : ''} ${l.more ? 'more' : ''}`}
+          />
         ))}
       </div>
     </motion.div>

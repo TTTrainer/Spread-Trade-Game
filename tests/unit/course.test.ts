@@ -51,11 +51,19 @@ describe('the options course', () => {
       // A lesson either asks you to do one thing or asks one question, not both.
       expect(!!(l.task && l.quiz), l.id).toBe(false);
     }
-    // It starts with a single option and reaches the credit spread and the condor.
+    // It starts from selling: the cash-secured put, the covered call, a coached trade, then the
+    // vertical; the extras come after. It never teaches buying a call.
     const at = (id: string) => ids.indexOf(id);
-    expect(at('call')).toBeLessThan(at('vertical'));
+    expect(at('wait')).toBe(0);
+    expect(at('wait')).toBeLessThan(at('cc'));
+    expect(at('cc')).toBeLessThan(at('coached'));
+    expect(at('coached')).toBeLessThan(at('vertical'));
     expect(at('vertical')).toBeLessThan(at('condor'));
     expect(at('condor')).toBeLessThan(at('manage'));
+    expect(ids).not.toContain('call');
+    const firstMore = OPTIONS_COURSE.findIndex((l) => l.more);
+    expect(OPTIONS_COURSE.slice(firstMore).every((l) => l.more)).toBe(true);
+    expect(OPTIONS_COURSE.filter((l) => l.replay).map((l) => l.id)).toEqual(['wait', 'cc', 'coached']);
   });
 
   it('turns "sell the .25 delta put" into a real strike on the open chain', () => {

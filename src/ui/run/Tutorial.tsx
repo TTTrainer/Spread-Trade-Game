@@ -96,13 +96,15 @@ function showPracticeLevel(): void {
   const cardId = liveCardId(t);
   if (!t.session || !cardId) return;
   const bars = t.session.view(cardId).bars();
-  const level = practiceLevel(bars, practiceLean(bars));
+  // A cash-secured put is sold under a floor, so on the Income desk Ines always looks for one.
+  const income = useRun.getState().engine?.state.config.deskId === 'income';
+  const level = practiceLevel(bars, income ? 'up' : practiceLean(bars));
   useTrading.setState({ practiceMark: level ? { ...level, cardId } : null, chainOpen: false });
 }
 
 /**
- * Ines's example: the credit spread on the far side of the level, with the most credit that keeps
- * POP near 80%. It only shapes the builder (never placed), and doesn't count as the player
+ * Ines's example: the cash-secured put (or, off the Income desk, the credit spread) on the far
+ * side of the level, with the most credit that keeps POP near 80%. It only shapes the builder (never placed), and doesn't count as the player
  * touching the trade, so "up or down?" still waits for them.
  */
 function showPracticeTrade(): void {
@@ -113,7 +115,8 @@ function showPracticeTrade(): void {
   const s = t.session;
   const exp = t.builder.expiration;
   if (!s || !cardId || !mark || !exp) return;
-  const sid: StructureId = mark.kind === 'floor' ? 'bull_put' : 'bear_call';
+  const income = useRun.getState().engine?.state.config.deskId === 'income';
+  const sid: StructureId = income ? 'cash_secured_put' : mark.kind === 'floor' ? 'bull_put' : 'bear_call';
   const options = DELTA_STEPS.flatMap((delta) => {
     const p = s.planFor(cardId, sid, { expiration: exp, delta, width: t.builder.width }, 1);
     const sh = p.legs.find((l): l is OptionLeg => l.kind === 'option' && l.ratio < 0);

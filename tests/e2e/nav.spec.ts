@@ -112,6 +112,7 @@ test('second-level screens: each way back lands where you came from, and home st
 
   // A Career run: SAVE & EXIT goes home, and Career's BACK afterwards still goes home.
   await page.getByTestId('menu-career').click();
+  await page.getByTestId('desk-verticals').click();
   await page.getByTestId('start-run').click();
   // SAVE & EXIT from the month menu goes home; so does the top bar's after the month starts.
   await page.getByTestId('mm-exit').click({ timeout: 60_000 });

@@ -214,8 +214,8 @@ export const TUTORIAL_STEPS: TutStep[] = [
     wait: 'next',
     holdClock: true,
     beforeTrade: true,
-    title: 'The play: a credit spread',
-    text: "You SELL a promise: 'the stock won't cross my line before the trade ends.' You're paid the moment it fills and keep the cash if the promise holds. Think landlord, not gambler.",
+    title: 'The play: a cash-secured put',
+    text: "You SELL a promise: 'if the stock drops under my price, I'll buy it there.' You're paid the moment it fills and keep the cash if it stays above. Think landlord, not gambler.",
   },
   {
     id: 'strikeword',
@@ -225,7 +225,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     holdClock: true,
     beforeTrade: true,
     title: "What's a strike?",
-    text: "A strike is the price your promise is about. Sell a 25 put and you're saying 'it won't close under 25.' The goal: a strike the stock won't reach in time.",
+    text: "A strike is the price your promise is about. Sell a 25 put and you're saying 'I'll buy it at 25 if it closes under.' Pick a strike the stock won't reach in time, at a price you'd be glad to own it.",
   },
   {
     id: 'level',
@@ -249,7 +249,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     beforeTrade: true,
     target: 'center',
     title: 'My practice trade',
-    text: 'I sell the {strike} {right}, past the {kind}, and buy one further out to cap the loss. It wins if the stock stays {side} {strike}: POP {pop}, about 4 in 5. Not placed.',
+    text: "I sell the {strike} {right}, past the {kind}. It wins if the stock stays {side} {strike}: POP {pop}. If it closes under, I'd buy the shares at {strike}. Not placed.",
   },
   {
     id: 'view',
@@ -260,7 +260,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     beforeTrade: true,
     target: 'center',
     title: 'Your turn: up or down?',
-    text: 'Which way over the next few weeks? UP sells a put spread under the price, DOWN a call spread over it. You only need to not be badly wrong.',
+    text: 'Which way over the next few weeks? A cash-secured put wins if the stock rises, goes nowhere or dips a little: pick UP. (DOWN sells a covered call instead.)',
   },
   {
     id: 'line',
@@ -272,7 +272,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: 'center',
     reveal: ['view'],
     title: 'Your line',
-    text: "You're SELLING the {strike} {right}: the pink line. If the stock stays {side} this line until the end, you keep the money. The cyan line caps your loss.",
+    text: "You're SELLING the {strike} {right}: the pink line. If the stock stays {side} this line until the end, you keep all the money.",
   },
   {
     id: 'pay',
@@ -284,7 +284,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: '[data-testid="sell-button"]',
     reveal: ['sell'],
     title: 'Paid up front',
-    text: 'SELL shows the credit you get now, the most you can lose ("risk") and POP: the odds you keep money. For a first trade, aim for a POP near 80%.',
+    text: 'SELL shows the credit you get now, what the trade risks and POP: the odds you keep money. For a first trade, aim for a POP near 80%.',
   },
   {
     id: 'strike',
@@ -458,7 +458,7 @@ export const TUTORIAL_STEPS: TutStep[] = [
     target: 'size',
     reveal: ['size', 'width'],
     title: 'How big',
-    text: 'Size is contracts; RISKING shows what one trade can lose. Careful: small, several trades. Bold: size up on your best idea. Width is the gap to your safety leg: wider pays and risks more.',
+    text: 'Size is contracts; RISKING shows what one trade can lose. Careful: small, several trades. Bold: size up on your best idea.',
   },
   {
     id: 'brief',

@@ -86,7 +86,7 @@ export function defaultProfile(): Profile {
     xp: 0,
     bonus: 0,
     bonusEarned: 0,
-    desks: ['verticals'],
+    desks: ['income', 'verticals'],
     packs: [],
     maxTier: 0,
     tierCleared: {},
@@ -118,7 +118,8 @@ export function mergeProfile(saved: unknown): Profile {
   return {
     ...d,
     ...s,
-    desks: Array.from(new Set<DeskId>(['verticals', ...(s.desks ?? [])])),
+    // Income and Verticals are free from the start (Income cost 100 Bonus before 1.8.2).
+    desks: DESK_ORDER.filter((d) => d === 'income' || d === 'verticals' || (s.desks ?? []).includes(d)),
     pad: {
       ...d.pad,
       ...s.pad,

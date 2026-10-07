@@ -27,7 +27,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
     passiveText: 'Assignment is not a loss event (no stress). Dividends pay +250 chips each.',
     startingAnalysts: [],
     startingCartridges: ['dividend_radar'],
-    unlockCost: 100,
+    unlockCost: 0,
     priceRange: [6, 18],
     recommendedCapitalCents: 5_000_000,
     targetMult: 1.1,
@@ -100,4 +100,7 @@ export const DESKS: Record<DeskId, DeskDef> = {
   },
 };
 
-export const DESK_ORDER: DeskId[] = ['verticals', 'income', 'condor', 'volatility', 'calendar'];
+// Income first: cash-secured puts and covered calls are where a new options trader starts (the
+// LEARN OPTIONS course and the tutorial teach them first). Verticals stays free too: most client
+// contracts ask for spreads, so a new player needs it.
+export const DESK_ORDER: DeskId[] = ['income', 'verticals', 'condor', 'volatility', 'calendar'];

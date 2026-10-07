@@ -9,11 +9,11 @@ describe('developer test checklist', () => {
   it('covers only what changed since 1.6, in plain words, with unique ids', () => {
     expect(new Set(DEV_CHECKS.map((c) => c.id)).size).toBe(DEV_CHECKS.length);
     for (const c of DEV_CHECKS) {
-      expect(['1.7.0', '1.8.0', '1.8.1'], c.id).toContain(c.ver);
+      expect(['1.7.0', '1.8.0', '1.8.1', '1.8.2'], c.id).toContain(c.ver);
       expect(c.look.length, c.id).toBeLessThanOrEqual(220);
       expect(c.title.length, c.id).toBeLessThan(44);
     }
-    for (const v of ['1.7.0', '1.8.0', '1.8.1'])
+    for (const v of ['1.7.0', '1.8.1', '1.8.2'])
       expect(
         DEV_CHECKS.some((c) => c.ver === v),
         v,

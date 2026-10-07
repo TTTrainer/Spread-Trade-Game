@@ -195,9 +195,10 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await page.getByRole('button', { name: 'BACK' }).click();
   await page.getByTestId('menu-career').click();
   await expect(page.getByTestId('career-rank')).toContainText('TRADER');
-  await expect(page.getByTestId('desk-income')).toBeDisabled();
-  await page.getByTestId('unlock-income').click();
+  // Income and Verticals are free from the start; the other desks are bought with Bonus.
   await expect(page.getByTestId('desk-income')).toBeEnabled();
+  await expect(page.getByTestId('desk-verticals')).toBeEnabled();
+  await expect(page.getByTestId('desk-calendar')).toBeDisabled();
   await page.getByTestId('ctab-options').click();
   await expect(page.getByTestId('tier-0')).toBeEnabled();
   await expect(page.getByTestId('tier-1')).toBeDisabled();

@@ -120,68 +120,82 @@ test('learn options: lessons set up real trades, questions explain, tasks wait f
   await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('builder-learn').click();
   const course = page.getByTestId('course');
-  await expect(course).toHaveAttribute('data-lesson', 'what');
+
+  // Get paid to wait: SELL waits for the line to sit under the floor, then the month plays out.
+  await expect(course).toHaveAttribute('data-lesson', 'wait');
+  await expect(page.getByTestId('course-replay')).toBeVisible();
+  await expect(page.getByTestId('course-sell')).toBeDisabled();
+  await expect(page.getByTestId('course-next')).toBeDisabled();
   await shot(page, '23-learn-1920');
+  const fig = page.locator('.cr-fig');
+  const box = (await fig.boundingBox())!;
+  // Drag the line near the bottom of the chart: well under any floor.
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.97, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.getByTestId('course-sell')).toBeEnabled();
+  await page.getByTestId('course-sell').click();
+  await page.getByTestId('course-play').click();
+  await expect(page.getByTestId('course-result')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('course-days-safe')).toContainText(/DAYS SAFE \d+ \/ \d+/);
+  await shot(page, '23-learn-replay-1920');
+  await shot(page, '23-learn-replay-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page.getByTestId('course-next')).toBeEnabled();
   await page.getByTestId('course-next').click();
 
-  // A bought call: the payoff opens with one long call, and the question waits for an answer.
-  await expect(course).toHaveAttribute('data-lesson', 'call');
+  // The same trade as a picture: a sold put on the payoff, and a question that waits.
+  await expect(course).toHaveAttribute('data-lesson', 'picture');
   await expect(page.getByTestId('payoff-studio')).toBeVisible();
-  await expect(page.getByTestId('payoff-say')).toContainText(/You BUY the \d+(\.\d+)? call/);
-  await expect(page.getByTestId('builder-order')).toContainText(/BUY \+1 \S+ 100 .* CALL @/);
   await expect(page.getByTestId('course-next')).toBeDisabled();
   await page.getByTestId('course-opt-0').click();
   await expect(page.getByTestId('course-why')).toContainText('Not quite');
   await expect(page.getByTestId('course-next')).toBeEnabled();
   await shot(page, '23-learn-quiz-1920');
   await page.getByTestId('course-next').click();
-  await expect(course).toHaveAttribute('data-lesson', 'put');
-  await page.getByTestId('course-next').click();
-  await expect(course).toHaveAttribute('data-lesson', 'sell');
-  await page.getByTestId('course-opt-0').click();
-  await expect(page.getByTestId('course-why')).toContainText('Right');
-  await page.getByTestId('course-next').click();
 
-  // Delta: the task waits until the strike moves.
-  await expect(course).toHaveAttribute('data-lesson', 'delta');
+  // A safer line: the task waits for POP 75–85%.
+  await expect(course).toHaveAttribute('data-lesson', 'pop');
   await expect(page.getByTestId('course-next')).toBeDisabled();
-  await page.evaluate(() => (window as any).__stg.trading.getState().setBuilder({ delta: 0.15, legs: null }));
-  await expect(page.getByTestId('course-task')).toContainText('✓');
+  await page.getByTestId('course-next').click({ force: true });
+  await expect(course).toHaveAttribute('data-lesson', 'pop');
+  await page.getByTestId('course-back').click();
+  await expect(course).toHaveAttribute('data-lesson', 'picture');
   await page.getByTestId('course-next').click();
-
-  // Theta: drag DATE to expiration.
-  await expect(course).toHaveAttribute('data-lesson', 'theta');
-  await expect(page.getByTestId('course-next')).toBeDisabled();
-  const max = await page.getByTestId('ps-days').getAttribute('max');
-  await page.getByTestId('ps-days').fill(max!);
-  await expect(page.getByTestId('course-task')).toContainText('✓');
-  await shot(page, '23-learn-theta-1920');
-  await shot(page, '23-learn-theta-1366', { width: 1366, height: 768 });
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.getByTestId('course-next').click();
-
-  // Vega: slide IV down.
-  await expect(course).toHaveAttribute('data-lesson', 'vega');
-  await page.getByTestId('ps-iv').fill('-10');
-  await expect(page.getByTestId('course-task')).toContainText('✓');
-  await page.getByTestId('course-next').click();
-
-  // The expected move on the chart, then the vertical.
-  await expect(course).toHaveAttribute('data-lesson', 'em');
-  await expect(page.getByTestId('study-em2')).toHaveAttribute('aria-pressed', 'true');
-  await page.getByTestId('course-next').click();
-  await expect(course).toHaveAttribute('data-lesson', 'vertical');
-  await expect(page.getByTestId('builder-order')).toContainText('VERTICAL');
-  await page.getByTestId('course-opt-1').click();
-  await page.getByTestId('course-next').click();
-
   // Progress is saved: leave and come back to the same lesson.
-  await expect(course).toHaveAttribute('data-lesson', 'pick');
+  await expect(course).toHaveAttribute('data-lesson', 'pop');
   await page.getByTestId('builder-back').click();
   await page.getByTestId('menu-builder').click();
   await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('builder-learn').click();
-  await expect(page.getByTestId('course')).toHaveAttribute('data-lesson', 'pick');
+  await expect(page.getByTestId('course')).toHaveAttribute('data-lesson', 'pop');
+
+  // The covered call replays the same way, upside down; the coached trade shows its checklist.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__stg.app
+      .getState()
+      .updateSettings((x: any) => ({ ...x, game: { ...x.game, courseProgress: { idx: 3, done: [] } } }));
+  });
+  await page.getByTestId('builder-back').click();
+  await page.getByTestId('menu-builder').click();
+  await page.getByTestId('builder-learn').click();
+  await expect(course).toHaveAttribute('data-lesson', 'cc');
+  await expect(page.locator('.cr-level text')).toHaveText('CEILING');
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__stg.app
+      .getState()
+      .updateSettings((x: any) => ({ ...x, game: { ...x.game, courseProgress: { idx: 4, done: [] } } }));
+  });
+  await page.getByTestId('builder-back').click();
+  await page.getByTestId('menu-builder').click();
+  await page.getByTestId('builder-learn').click();
+  await expect(course).toHaveAttribute('data-lesson', 'coached');
+  await expect(page.getByTestId('course-checks')).toContainText('A cash-secured put');
+  await expect(page.getByTestId('course-play')).toBeDisabled();
+  await shot(page, '23-learn-coached-1920');
   expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });

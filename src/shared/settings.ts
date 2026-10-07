@@ -1,4 +1,5 @@
 import type { DecisionKind } from '../engine/lifecycle/types';
+import type { DeskId } from '../content/types';
 
 export type HotkeyAction =
   | 'positions'
@@ -239,6 +240,8 @@ export interface Settings {
     tutorialDone: boolean;
     /** Structures whose first-use coach card has been seen. */
     seenStructures: string[];
+    /** The desk the last Career run started with (Career opens on it). */
+    lastDesk?: DeskId;
     /** Where the tutorial's lessons are (null: from the top). */
     tutorialProgress: { idx: number; seen: string[]; skipped: boolean } | null;
     /** The Trade Builder's options course: the lesson you're on and the lessons finished. */

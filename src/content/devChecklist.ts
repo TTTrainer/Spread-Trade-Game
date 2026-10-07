@@ -22,19 +22,26 @@ export interface DevSetup {
   clearReview?: boolean;
   /** Start the tutorial from its first lesson. */
   tutorial?: boolean;
-  /** A screen outside the run: the paper month, or Settings › Data. */
-  screen?: 'live' | 'settingsData';
+  /** A screen outside the run: the paper month, Settings › Data, or Career. */
+  screen?: 'live' | 'settingsData' | 'career';
   /** The Trade Builder: this ticker, the payoff, the full ticker list, or a LEARN OPTIONS lesson. */
   builder?: { ticker?: string; payoff?: boolean; tickers?: boolean; lesson?: string };
   /** Game settings to change first. */
   game?: Partial<Settings['game']>;
 }
 
-export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1';
+export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2';
 
 export interface DevCheck {
   id: string;
-  group: 'Trade Builder' | 'Learn Options' | 'Bosses' | 'Month menu' | 'Tutorial' | 'Trading';
+  group:
+    | 'Cartridges and payout'
+    | 'Trade Builder'
+    | 'Learn Options'
+    | 'Bosses'
+    | 'Month menu'
+    | 'Tutorial'
+    | 'Trading';
   /** The release it came in. */
   ver: DevVersion;
   title: string;
@@ -53,6 +60,38 @@ const boss = (id: BossId, slug: string, title: string, look: string, clearReview
 });
 
 export const DEV_CHECKS: DevCheck[] = [
+  {
+    id: 'cart-row',
+    group: 'Cartridges and payout',
+    ver: '1.8.2',
+    title: 'The Joker Row',
+    look: 'Your cartridges along the top as game cartridges, colored by rarity. Build a trade: the ones a win would fire glow and say what they add.',
+    setup: { run: true, closeMenu: true },
+  },
+  {
+    id: 'cart-payout',
+    group: 'Cartridges and payout',
+    ver: '1.8.2',
+    title: 'Register, coin, jackpot',
+    look: 'Cash out a winner: the receipt prints into CHIPS × MULT, the coin hits each cartridge, the jackpot slams in. Is your eye always in the right place?',
+    setup: { run: true, closeMenu: true },
+  },
+  {
+    id: 'cart-numbers',
+    group: 'Cartridges and payout',
+    ver: '1.8.2',
+    title: 'Whole numbers',
+    look: 'Chips, points and targets are 10× bigger and whole (2,000 to clear Month 1). Does the jackpot math add up on screen?',
+    setup: { run: true, closeMenu: true },
+  },
+  {
+    id: 'career-income',
+    group: 'Cartridges and payout',
+    ver: '1.8.2',
+    title: 'Income desk first',
+    look: 'Career lists Income first and picks it by default (Verticals is free too). It remembers the desk you last played.',
+    setup: { screen: 'career' },
+  },
   {
     id: 'tb-badge',
     group: 'Trade Builder',
@@ -134,36 +173,52 @@ export const DEV_CHECKS: DevCheck[] = [
     setup: { screen: 'settingsData' },
   },
   {
-    id: 'learn-start',
+    id: 'learn-wait',
     group: 'Learn Options',
-    ver: '1.8.0',
-    title: 'The course from the top',
-    look: 'Go through the 13 lessons as if teaching a friend. Short and clear? Does each trade it sets up (call, put, short put, bull put, condor) show what the text says?',
-    setup: { builder: { lesson: 'what' } },
+    ver: '1.8.2',
+    title: 'Get paid to wait (the replay)',
+    look: 'Drag your line under the floor, SELL, then PLAY the month: a coin for every day no candle touches the line. Fun, or homework? Try another month too.',
+    setup: { builder: { lesson: 'wait' } },
   },
   {
-    id: 'learn-quiz',
+    id: 'learn-picture',
     group: 'Learn Options',
-    ver: '1.8.0',
-    title: 'A lesson with a question',
-    look: 'NEXT waits for your answer, and the explanation teaches whether you were right or wrong. Are the questions fair?',
-    setup: { builder: { lesson: 'call' } },
+    ver: '1.8.2',
+    title: 'The same trade as a picture',
+    look: "Today's put on the P/L chart, and one question on where it starts losing. Does the picture click after the replay?",
+    setup: { builder: { lesson: 'picture' } },
   },
   {
-    id: 'learn-tasks',
+    id: 'learn-pop',
     group: 'Learn Options',
-    ver: '1.8.0',
-    title: 'The hands-on lessons',
-    look: "Move the strike, then (next lessons) drag DATE to expiration and slide IV down. The ✓ comes the moment it's done. Does delta, theta and vega click, or is it busywork?",
+    ver: '1.8.2',
+    title: 'Pick a safer line',
+    look: 'EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and under a floor?',
+    setup: { builder: { lesson: 'pop' } },
+  },
+  {
+    id: 'learn-cc',
+    group: 'Learn Options',
+    ver: '1.8.2',
+    title: 'The covered call replay',
+    look: 'The same game upside down: your call line over the ceiling, and the month plays out. Clear why it is safe when you own the shares?',
+    setup: { builder: { lesson: 'cc' } },
+  },
+  {
+    id: 'learn-coached',
+    group: 'Learn Options',
+    ver: '1.8.2',
+    title: 'Your first trade, coached',
+    look: "Build a put on today's chart: each checklist step ticks as you do it, then PLAY tests the setup on last month. Does the badge feel earned?",
+    setup: { builder: { lesson: 'coached' } },
+  },
+  {
+    id: 'learn-more',
+    group: 'Learn Options',
+    ver: '1.8.2',
+    title: 'More lessons',
+    look: 'After the vertical: delta, time decay, IV, the expected move, condors, managing and events. The call and put buying lessons are gone.',
     setup: { builder: { lesson: 'delta' } },
-  },
-  {
-    id: 'learn-pick',
-    group: 'Learn Options',
-    ver: '1.8.0',
-    title: 'Pick the strike like a pro',
-    look: 'EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and a floor the chart respects?',
-    setup: { builder: { lesson: 'pick' } },
   },
   boss(
     'collector',
@@ -236,9 +291,9 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'tut-practice',
     group: 'Tutorial',
-    ver: '1.7.0',
-    title: 'The practice trade',
-    look: 'Ines explains a strike, marks a floor or ceiling on the chart and builds a practice trade past it. Is the position spelled out, does the POP bar aim at 80%, and is REROLL where she points?',
+    ver: '1.8.2',
+    title: 'Ines teaches a cash-secured put',
+    look: 'The tutorial runs on the Income desk: Ines marks a floor and sells a put under it, then you sell your own. Is it clear what happens if it ends under the strike?',
     setup: { tutorial: true },
   },
   {

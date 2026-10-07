@@ -682,3 +682,158 @@
 .course-dots i.now {
   background: var(--amber);
 }
+
+/* The course's replay: last month's candles, your strike line, a coin per safe day. */
+.course-replay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+.cr-fig {
+  width: 100%;
+  height: auto;
+  background: #0a0820;
+  border: 2px solid var(--line);
+  touch-action: none;
+}
+.cr-fig.aim {
+  cursor: ns-resize;
+}
+.cr-future {
+  fill: rgba(62, 242, 255, 0.04);
+}
+.cr-entry {
+  stroke: var(--line-bright);
+  stroke-dasharray: 3 3;
+}
+.cr-small {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 10px;
+  fill: var(--text-faint);
+}
+.cr-danger {
+  fill: rgba(255, 45, 85, 0.08);
+}
+.cr-level line {
+  stroke: var(--amber);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.cr-level text {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 12px;
+  fill: var(--amber);
+}
+.cr-bar line {
+  stroke-width: 1;
+}
+.cr-bar.up line,
+.cr-bar.up rect {
+  stroke: #3ddc84;
+  fill: #3ddc84;
+}
+.cr-bar.down line,
+.cr-bar.down rect {
+  stroke: #ff4d6d;
+  fill: #ff4d6d;
+}
+.cr-bar.touch rect {
+  fill: #fff;
+  stroke: #ff2d55;
+  stroke-width: 1.5;
+}
+.cr-coin {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 11px;
+  fill: var(--amber);
+  animation: cr-coin 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes cr-coin {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.cr-strike line {
+  stroke: var(--magenta);
+  stroke-width: 2;
+}
+.cr-strike rect {
+  fill: var(--magenta);
+}
+.cr-strike text {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 13px;
+  fill: #fff;
+}
+.cr-strike.ok line {
+  stroke: #3ddc84;
+}
+.cr-strike.ok rect {
+  fill: #1f9d5c;
+}
+.cr-bar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+}
+.cr-safe b {
+  font-size: 20px;
+  color: var(--amber);
+}
+.cr-nudge {
+  display: flex;
+  gap: 4px;
+}
+.cr-actions {
+  display: flex;
+  gap: 6px;
+}
+.cr-actions .pixel-btn {
+  flex: 1;
+}
+.cr-result {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: 1px solid var(--line-bright);
+  background: var(--bg-2);
+}
+.cr-result.win {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.cr-result.lose {
+  border-color: var(--down);
+}
+.cr-empty {
+  padding: 10px;
+  border: 1px dashed var(--line);
+}
+.course-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+}
+.course-checks li {
+  color: var(--text-dim);
+}
+.course-checks li.ok {
+  color: #3ddc84;
+}
+.course-badge {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.course-badge.won {
+  color: var(--amber);
+}
+.course-dots i.more {
+  opacity: 0.55;
+}

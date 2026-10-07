@@ -54,7 +54,8 @@ export function CareerScreen() {
   const settings = useApp((s) => s.settings);
   const { saveSummary, checkSave, newRun, resume, busy, abandon } = useRun();
   const { profile, load, apply } = useProfile();
-  const [desk, setDesk] = useState<DeskId>('verticals');
+  // The desk you last started a run with, or Income (where new traders start).
+  const [desk, setDesk] = useState<DeskId>(settings.game.lastDesk ?? 'income');
   const [seed, setSeed] = useState('');
   const [tier, setTier] = useState(0);
   const [rules, setRules] = useState<string[]>([]);
@@ -86,6 +87,8 @@ export function CareerScreen() {
       return;
     }
     sfx('whoosh');
+    if (settings.game.lastDesk !== desk)
+      updateSettings((s) => ({ ...s, game: { ...s.game, lastDesk: desk } }));
     if (await newRun({ deskId: desk, seed, tier, compliance: rules, startEquityCents })) go('run');
   };
   const cont = async () => {
@@ -228,7 +231,7 @@ export function CareerScreen() {
                       onClick={() => !locked && setDesk(id)}
                       testId={`desk-${id}`}
                       tip={`desk:${id}`}
-                      rarity={id === 'verticals' ? 'U' : undefined}
+                      rarity={id === 'income' ? 'U' : undefined}
                     >
                       <ArtIcon
                         category="desk"
