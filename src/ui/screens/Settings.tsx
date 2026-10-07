@@ -99,7 +99,11 @@ export function SettingsScreen() {
   const settings = useApp((s) => s.settings);
   const update = useApp((s) => s.updateSettings);
   const back = useApp((s) => s.back);
-  const [section, setSection] = useState<Section>('game');
+  const [section, setSection] = useState<Section>(() => {
+    const at = useApp.getState().settingsAt as Section | null;
+    if (at) useApp.setState({ settingsAt: null });
+    return at ?? 'game';
+  });
   const set = (f: (s: Settings) => Settings) => update(f);
   return (
     <div className="screen settings-screen" data-testid="settings-screen">

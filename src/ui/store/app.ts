@@ -41,6 +41,8 @@ interface AppState {
   data: DataStatus | null;
   toasts: Toast[];
   helpOpen: boolean;
+  /** The Settings section to open on the next visit (then it's cleared). */
+  settingsAt: string | null;
   go: (s: Screen) => void;
   back: () => void;
   home: () => void;
@@ -76,6 +78,7 @@ export const useApp = create<AppState>((set, get) => ({
   data: null,
   toasts: [],
   helpOpen: false,
+  settingsAt: null,
   go: (s) =>
     set((st) => {
       if (st.screen === s) return st;

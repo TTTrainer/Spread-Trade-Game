@@ -120,16 +120,3 @@ describe('showdown tiers and trophies', () => {
     }
   });
 });
-
-describe('developer test checklist', () => {
-  it('has unique ids, plain text, and a setup for every built boss', async () => {
-    const { DEV_CHECKS } = await import('../../src/content/devChecklist');
-    expect(new Set(DEV_CHECKS.map((c) => c.id)).size).toBe(DEV_CHECKS.length);
-    for (const c of DEV_CHECKS) expect(c.look.length, c.id).toBeLessThanOrEqual(220);
-    for (const id of BOSS_IDS.filter((b) => BOSSES[b].ready))
-      expect(
-        DEV_CHECKS.some((c) => c.setup?.boss === id),
-        id,
-      ).toBe(true);
-  });
-});

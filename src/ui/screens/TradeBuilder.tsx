@@ -179,7 +179,8 @@ function TickerPicker() {
   const open = useBuilder((s) => s.open);
   const loading = useBuilder((s) => s.loading);
   const [q, setQ] = useState('');
-  const [all, setAll] = useState(false);
+  const all = useBuilder((s) => s.tickersOpen);
+  const setAll = useBuilder((s) => s.setTickersOpen);
   const tickers = list?.tickers ?? [];
   const hits = useMemo(() => {
     const f = clean(q);

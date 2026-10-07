@@ -24,7 +24,7 @@ import { sfx } from '../../audio/sfx';
 import { Meter, Modal, TiltCard } from '../components/ui';
 import { money } from '../format';
 import { useApp } from '../store/app';
-import { useRun } from '../store/run';
+import { startTutorial, useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { bridge, hasBridge } from '../bridge';
 import { TradingLayout } from '../trading/TradingScreen';
@@ -99,18 +99,7 @@ export function CareerScreen() {
   const tutorial = async () => {
     sfx('whoosh');
     // A new tutorial starts its lessons from the top.
-    useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: null } }));
-    if (
-      await newRun({
-        deskId: 'verticals',
-        seed: 'tutorial-ines',
-        mode: 'tutorial',
-        practice: true,
-        quarters: 1,
-        slot: 'tutorial',
-      })
-    )
-      go('run');
+    if (await startTutorial()) go('run');
   };
 
   return (

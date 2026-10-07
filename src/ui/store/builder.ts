@@ -33,6 +33,9 @@ interface BuilderStore {
   loading: string | null;
   error: string | null;
   session: TradingSession | null;
+  /** The ALL ticker list is open. */
+  tickersOpen: boolean;
+  setTickersOpen: (open: boolean) => void;
   init: () => Promise<void>;
   open: (symbol: string) => Promise<boolean>;
   /** Fetch the selected ticker again (fresh quotes). */
@@ -98,6 +101,8 @@ function newSession(edge: ISODate): TradingSession {
 export const useBuilder = create<BuilderStore>((set, get) => ({
   list: null,
   loaded: {},
+  tickersOpen: false,
+  setTickersOpen: (open) => set({ tickersOpen: open }),
   loading: null,
   error: null,
   session: null,
@@ -198,5 +203,12 @@ export const useBuilder = create<BuilderStore>((set, get) => ({
 /** Tests and a fresh start: forget every loaded ticker. */
 export function resetBuilder(): void {
   src = new BundleSource();
-  useBuilder.setState({ loaded: {}, session: null, list: null, error: null, loading: null });
+  useBuilder.setState({
+    loaded: {},
+    session: null,
+    list: null,
+    error: null,
+    loading: null,
+    tickersOpen: false,
+  });
 }

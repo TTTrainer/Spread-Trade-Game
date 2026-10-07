@@ -1,88 +1,69 @@
 # Playtest checklist
 
-Try each item, then give it a score from **1 (bad)** to **5 (great)** and a sentence on why. Short is fine ("confusing", "too easy", "loved the sound"). Send the filled-in list back to Claude Code, and anything that scores 1–2 gets fixed first.
+What changed since 1.6 (1.7.0, 1.8.0 and 1.8.1). The earlier checks are done and gone.
 
-The first three items can only be checked on your Windows PC. They matter most, because the cloud box that built the game couldn't prove them.
+**The quickest way is in the game.** Turn on Settings → Game → **Developer mode**, press the **DEV** button (or Ctrl+Shift+D) and open **TEST CHECKLIST**. It lists the same checks as below, and for each one:
 
-| # | Try this | What to look for | Score (1–5) | Notes |
-|---|---|---|---|---|
-| 1 | **Install** with `SpreadTradingGame-Setup-1.6.0.exe` (click through the "Windows protected your PC" box: More info → Run anyway). Also try the Portable exe. | Does it install and open? Desktop and Start-menu shortcuts? The title screen in under ~10 seconds? | | |
-| 2 | **Offline:** turn Wi-Fi off and play a few minutes of Career. | Everything works with no internet (only data downloads need it). | | |
-| 3 | **Smoothness:** start a Career round, place a trade, press Space and watch the fast-forward. | Candles slide in smoothly, with no stutter or freezing. (The cloud box measured about 55 fps without a graphics card.) | | |
-| 4 | **Tutorial** (Career → TUTORIAL; rebuilt in 1.5.0, see item 40). | Did you understand the loop by the end? Is her mug on your desk in The Pad? | | |
-| 5 | **Your first real run** on the Verticals desk. | Does it feel fair? Is 30–40 minutes about right? Were the targets too easy or too hard? | | |
-| 6 | **Calling your shot** with keys `1`–`5` and `Shift+1`–`5`. | Quick and natural, or a chore? | | |
-| 7 | **Building and placing** a bull put: expiration chips, delta and width, the price ladder on the chart, Alt+S. | Do the payoff, POP and max loss make sense before you click? | | |
-| 8 | **Declining a stop** at a decision point (choose Hold when the stop hits). | Did the game make the cost clear (stress, the meter)? | | |
-| 9 | **The tally and the shop:** receipts, mult pops, buying and reordering cartridges. | Satisfying? Did you understand why a cartridge scored? | | |
-| 10 | **A Review** (every third round). | Did COMPLY-3000's rule change how you traded? | | |
-| 11 | **The debrief** strip after a round: open a card. | Do the reveal, P/L attribution, grade and "alternates" teach you something? | | |
-| 12 | **A drill** (Drills → 60-Second Blind Call, then one mini-game). | Fun in short bursts? Right difficulty? | | |
-| 13 | **Stats → Export CSV,** then open the file in Excel. | Do the numbers look right? Does the CSV open cleanly? | | |
-| 14 | **A second desk:** earn Bonus, unlock Income or Condor on the Career screen, and play it. | Does it feel different from Verticals and just as winnable? | | |
-| 15 | **Endless:** win a year, then CONTINUE INTO ENDLESS. | Does Year 2 feel like a fair stretch? | | |
-| 16 | **Daily:** play today's Daily and compare with Bradley's ghost. | Would you come back tomorrow for the streak? | | |
-| 17 | **Contracts:** take a client request and fill it. | Is the live ✔/✘ checklist clear? Is the Bonus worth it? | | |
-| 18 | **Paper month (the old Live; in 1.7.0 it's Trade Builder → PAPER MONTH):** START THE MONTH, trade, and play to the latest close. Then CHECK FOR NEW DAYS (on SIM it moves a week). | Is it clear how to trade? Does "beat the market this month" give you something to aim for? | | |
-| 19 | **Real data:** Settings → Data → BUILD REAL DATA (a few hours, about 16 GB; see README_PLAY.md). | Did it finish? Does VIEW DATA REPORT look sensible? Does Career now deal real tickers (blind)? | | |
-| 20 | **Look and sound:** music style and CRT style in Settings, The Pad, the title screen, reduced motion. | Does it feel like a retro-future desk? Any screen hard to read? | | |
-| 21 | **New in 1.3.0: shaping a trade.** Use the sliders (Expires, Short Δ, Width, Conviction) and drag both strike handles on the chart. | Do the gauges, the green/red zones and the cushion bracket tell you enough while you move things? | | |
-| 22 | **New: trade on a later day.** Press Space with no trade, read the recap's watchlist, then trade on day 2 or 3. | Does waiting feel like a real choice? Is the 10-day window about right? | | |
-| 23 | **New: the sit-out skip** (K). Let the 5 days pass. | Worth it for the Tag and −10 stress? | | |
-| 24 | **New: DESK/OS shop.** Read a few WHEN/GET cards and the BUILD.SYS window. | Do you understand a cartridge in a second? Can you see your combos building? | | |
-| 25 | **New: option chain (Ctrl+5) and the roll dialog.** Click a bid to sell; open ROLL on a position. | Is the chain quick to use? Does the STAY vs ROLL chart make the choice clear? | | |
-| 26 | **New: Developer mode** (Settings → Game). Take a note with a screenshot, then EXPORT .MD. | Is this useful for your notes? What else should the panel do? | | |
-| 27 | **Mac:** install with `join-mac.sh` (see README_PLAY.md), then play a round. | Did it open? Do the keys (⌘ or Control, ⌥ Option) and the menu bar behave? Anything look off compared with Windows? | | |
-| 28 | **New in 1.4.0: size and risk.** Move the Size slider on a credit spread. | Is it obvious that more contracts means more risk (the RISKING bar, LIKELY LOSS/GAIN)? | | |
-| 29 | **New: the credit lands.** Sell a credit spread. | Does the big +$ CREDIT DEPOSITED and the BALANCE bump feel good? | | |
-| 30 | **New: round goal card** (bottom of the lineup). Play a round. | Can you tell at a glance how far you are from winning, and what closing your open trades would do? | | |
-| 31 | **New: expiration line and decisions.** Watch the dotted EXP line become solid after you trade. When a strike gets hit, press V (REVIEW CHART). | Can you judge the chart before choosing Close / Hold / Roll? Did candles ever go missing? | | |
-| 32 | **New: greyed-out SELL.** Try to trade when you can't (no tickets, one trade per card). | Does the ⚠ message tell you what to fix? | | |
-| 33 | **New: Schwab (read-only).** Settings → Data → Schwab: save keys, log in, CONNECT. | Did it connect? Any error text you didn't understand? | | |
-| 34 | **New in 1.4.2: build from Schwab.** After connecting: step 4 **PULL FROM SCHWAB**, then step 5 **BUILD GAME DATA FROM SCHWAB** (after 4:15 pm New York time, to also get real option chains). Then play Live or a Career run. | Did the pull and build finish, and in how long? Does the line under step 4 show what `schwab.db` holds? Do the MODEL labels make sense? | | |
-| 35 | **New: tougher round targets.** Play a Career run on Verticals. | Does round 1 now usually take two or more good trades? Is a missed Month (a write-up) a fair warning rather than the end? Too hard, too easy? | | |
-| 36 | **New: covered calls and cash-secured puts.** Start an Income run (it asks for starting capital; try $50,000). Sell a covered call and let it expire below the strike; sell a put that expires above its strike. | Does SELL show the premium you collect? Does an out-of-the-money option expire worthless with the premium kept (no shares assigned)? | | |
-| 37 | **New: strike lines.** Drag a strike line far past the chart's edge; try an iron condor. | Does the line stay pinned at the edge instead of vanishing? Can you drag both the put side and the call side of a condor? While dragging, are the labels on the right out of the way? | | |
-| 38 | **New: your trades on the chart.** Open a trade and play a few days. | Can you see where the trade sits (the shaded box from entry to expiry, the SOLD tag) without it getting in the way? Does the expiration line keep up with the DTE slider? | | |
-| 39 | **New: small fixes.** Career → CHALLENGE & OPTIONS (risk tiers); the shop with Ines talking. | Does the tier list read cleanly? Is Ines's box out of the way of the shop? | | |
-| 40 | **New in 1.5.0: the tutorial, as a beginner would see it.** Career → TUTORIAL (START OVER if you've played it). Pretend you've never traded an option. Ideally, hand it to a friend who hasn't. | Does the desk start empty and light up one thing at a time? Is each lesson short enough to take in? Is anything said before it's shown, or shown without being explained? Does SKIP LESSONS turn everything on? | | |
-| 41 | **New: open trades vs a planned trade on the chart.** Shape a trade on one card, then look at a card where a trade is open. | Bold solid "● YOUR" lines and an OPEN TRADE badge for a real trade, thin dashed PLAN lines and a "not placed yet" badge for a planned one. Can you tell them apart at a glance? | | |
-| 42 | **New: which cards have trades.** Open trades on two cards and click around during the round. | Do the lineup cards' **● IN TRADE** banner (with live P/L) and **✓ CLOSED** banner make it obvious where your positions are? | | |
-| 43 | **New: shop windows in plain words** (CARTRIDGES · powerups, YOUR BUILD · family bonuses, …) and **bigger messages** (the pop-ups in the middle of the screen). | Easier to read? Do the messages catch your eye now without getting in the way? | | |
-| 44 | **New: covered calls and cash-secured puts against 500 assumed shares.** Start an Income run. Sell a covered call at delta .30, then at .15. Sell a cash-secured put. | Does the covered call show as bearish (a call above the price) and its chance of profit go **up** as the strike moves further away? Do P/L and equity count only the option, never the shares? Is "RISK IF IT JUMPS" clear? | | |
-| 45 | **New: the screen recovers on its own.** Play normally; if the screen ever freezes again, wait 15 seconds. | Does it come back by itself with "The screen stopped responding and was restarted"? If so, send the `game.log` (Settings → OPEN LOG FOLDER): it now records the last 40 things the screen did before the freeze. | | |
-| 46 | **New: The Pad with real art.** The Pad (title screen). Buy a desk, monitors, a chair, a plant, a lamp, a painting, a watch, a vehicle; put desk items on the desk. | Does everything sit in a sensible place in each of the four homes? Anything floating, overlapping or too small? | | |
-| 47 | **New in 1.6.0: the developer test checklist.** Settings → Game → Developer mode on, then DEV → **TEST CHECKLIST**. | Work down the list with SET UP. Tick WORKS or PROBLEM and leave a note on each, then COPY ALL and send it. | | |
-| 48 | **New: the month menu** (before every Month of a Career run). | Is it clear what the quarter asks (targets, payouts, the boss)? Did you change the exit plan or reorder the build there? Is the boss reroll worth $10? | | |
-| 49 | **New: boss rounds.** Play a run into its first Review. | Does the case file make the boss and its one twist clear? Does the board feel scary (colors, vignette)? Is the twist visible on the chart without clutter? | | |
-| 50 | **New: the sealing bosses** (Controller, Executor, Shell Company). | Is playing without running P/L, days to expiry, or studies and IV rank a fun challenge or just annoying? | | |
-| 51 | **New: the Early Retiree's duel.** | Is racing Chad on the same cards fun? Is his book clear (the race and his trades under the banner)? Too easy or too hard to beat him? | | |
-| 52 | **New: the Allocator's second goal** (3 structure types) and **the Rebalancer's YOU vs SPY race.** | Is the progress chip clear? Does the SPY race make "beat the market" feel real? | | |
-| 53 | **New: failing a boss ends the run.** | Fair, or too harsh? (One switch turns it into a write-up instead.) | | |
-| 54 | **New: boss rewards.** Beat a boss. | Do the bounty, the trophy on YOUR DESK and picking 1 of 3 free cartridges feel like a prize? Is the style bonus condition clear while you play? | | |
-| 55 | **New: difficulty.** | Typical boss about 9 in 10, the Rebalancer about 7 in 10 for a good player: does that match what you feel? Which boss is the odd one out? | | |
-| 56 | **New: Endless showdowns.** Win a year and continue into Endless. | Do Year 2's SHOWDOWN bosses feel like a fair step up? | | |
-| 57 | **New in 1.6.0: points follow the money and the take-profit moment.** Play a few rounds; let a trade hit its profit target. | Do big wins score big and losses hurt? Does the TAKE PROFIT dialog and the PROFIT TAKEN burst feel good? Is P/L vs max on the trade card clear? | | |
-| 58 | **New: the miniplayer and cleaner screens.** Open trades on two or three cards and watch a day. | Can you follow trades that aren't on screen? Is the top bar easier to read? | | |
-| 59 | **New in 1.6.1: the payout.** Close a winning trade with a few cartridges on your desk. Also let one expire, and take a planned stop. | Does it feel like a Balatro hand: chips, then mult, each cartridge jumping with what it added, the total slamming into the score? Can you tell which cartridges did nothing? Is the sound good or grating? Is it too long (try FAST in Settings)? | | |
-| 60 | **New: closing at a profit.** Let a target hit; press CASH OUT. Then a trade that expires for its full credit. | Does cashing out now feel like a choice and a reward? Does EXPIRY PAYDAY land? Do the month menu's pause switches take effect right away? | | |
-| 61 | **New: the trophy screen, then the spoils screen.** Beat a boss. | Does the trophy feel like a real upgrade (the before → after numbers)? Is picking 1 of 3 on its own screen clearer? | | |
-| 62 | **New: covered calls on pricey stocks.** Income run; sell a covered call on the highest-priced card. Try the AUTO STOP 1× / 1.5× / 2× / 3× buttons on the ticket. | Can you now fit one on a pricey stock? Does RISK AT AUTO STOP make sense? When the stock rallies through the stop, does it close on its own? | | |
-| 63 | **New: the shop at your screen size.** Beat a boss and look at the shop (with vouchers and a trophy on YOUR DESK). | Is anything overlapping, cut off, or hidden under the bottom bar? | | |
-| 64 | **New: harder targets.** Play a full Career run on the desk you crushed (Income). | Does it still feel easy to make it all the way? Roughly how far over the target did you finish each round? | | |
-| 65 | **New in 1.7.0: the Trade Builder** (title screen → TRADE BUILDER). With Schwab connected (Settings → Data), open SPY, then QQQ, then one of the 25 new tickers (ALL lists them). | Does the badge say ● LIVE during market hours (✔ CURRENT after the close)? Without Schwab, does ⚠ OUT OF DATE say plainly how old the data is? Do today's prices and chain match thinkorswim? | | |
-| 66 | **New: building any strategy.** In the Trade Builder, try a bull put, an iron condor, a butterfly (iron fly), a calendar and a straddle. Change a leg in LEGS (TRADE tab). | Can you build what you trade in under a minute? Do the legs, credit, max loss, breakevens and POP match what thinkorswim's Analyze tab shows? | | |
-| 67 | **New: the full-size payoff** (⟋ PAYOFF above the chart). Hover across prices, slide DATE and IV. | Can you read the trade at a glance: breakevens, max profit and loss, today vs expiration, the expected move, where the price is likely to end? What's missing? | | |
-| 68 | **New: studies and COPY ORDER.** Toggle BB, EM, 2σ, S/R and the rest in the tray; press COPY ORDER (Alt+C) and paste into a note. | Are these the studies you use? Does the order text read like thinkorswim's (check every leg before using it)? | | |
-| 69 | **New: the Collector's interest notice.** Dev checklist → The Collector; leave a losing spread at or past its short strike through a close. | Does the INTEREST NOTICE make holding a tested loser feel costly? Is 5% of the risk a day about right? | | |
-| 70 | **New: the other boss fixes.** Margin Clerk (the width slider stops at your cap), Underwriter trophy (5%), Tax Man (first 5 trading days), Shell Company trophy ($2 off rerolls), Rebalancer and Early Retiree charts (bigger). | Do these match what you asked for? | | |
-| 71 | **New: the month menu and the exit plan.** Start a Career run. Move the Stop slider. Later, take a planned stop. | Do the round emblems and the deal-in feel flashier? Does the sample spread under YOUR BUILD show what the plan does as you slide? Does each payout's stamp (TARGET BANKED, STOP TAKEN · saved $X, CLOSED BY HAND) make closing feel different by kind? | | |
-| 72 | **New: the tutorial's practice trade** (Career → TUTORIAL → START OVER). | Does Ines's floor (or ceiling) on the chart and her practice trade make the goal clear? Is "You're SELLING the 95 put" clear? Does the POP bar get you to about 80%? Can you see REROLL where she points? | | |
-| 73 | **New: controls follow the rules.** Run with Thin Books, Best Execution Audit or the Attendance Policy. Look at the chart's top left. | Do the size slider and buttons match what the rules allow (no SIT OUT under the Attendance Policy)? Is the ticker name on the chart where you wanted it? | | |
-| 74 | **New in 1.8.0: LEARN OPTIONS.** Trade Builder → ✎ LEARN OPTIONS. Go through all 13 lessons as if you were teaching a friend who has never traded options. | Is each lesson short and clear? Do the trades it sets up (long call, short put, bull put, condor) show what the text says? Are the questions fair, and do the explanations teach? Is anything missing that you'd want a beginner to know? | | |
-| 75 | **New: the course's tasks.** The lessons that ask you to move the strike, drag DATE, slide IV, and land 75–85% POP. | Do they make the idea click (theta, vega, delta), or feel like busywork? | | |
-| 76 | *(Dropped in 1.8.1: 1.8.0's second 25 tickers are gone; you meant 50 in all.)* After PULL FROM SCHWAB, open a few of the 25 from 1.7.0 instead (QQQ through SHOP under ALL). | Do they load (live with Schwab, or saved)? Any ticker that fails? Any you'd swap for one you trade? | | |
-| 77 | **New in 1.8.1: index options.** With Schwab connected, open SPX, XSP, NDX and RUT in the Trade Builder (type `SPX` or `$SPX`, or ALL → INDEX OPTIONS). Build a bull put on SPX and on XSP. | Do they load ● LIVE during market hours? Do the strikes, credit and POP match thinkorswim's (SPX's weekly, PM-settled series)? Is the CASH-SETTLED tag clear? If one fails to load, what does the badge's note say? | | |
-| 78 | **New: Schwab-built game data stays the game's.** Only if you use BUILD GAME DATA FROM SCHWAB: build it again after PULL FROM SCHWAB, then start a Career run. | Do the lineups deal only the game's 25 tickers (no QQQ, SOFI or SPX)? | | |
+1. **▶ SET UP** takes you straight to the spot: the Trade Builder at the right lesson or ticker, a run with the boss or the rules it needs, the tutorial from the start, or Settings › Data. (A run check replaces the run you're in.)
+2. Try it, then tick **✔ WORKS** or **✘ PROBLEM** and type a note.
+3. When you're done, press **⤓ SAVE AS FILE**. It writes `test-checklist-<version>.md` with every result and note, plus your playtest notes from the DEV panel, and that's the file to send back. Your ticks are kept between sessions, so you can do a few at a time.
 
-**Anything else:** ideas, annoyances, things you'd pay for in a real game.
+### Trade Builder
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 1 | **Today's data and the freshness badge** | 1.7.0 | With Schwab connected the badge says ● LIVE in market hours, ✔ CURRENT after the close; otherwise ⚠ OUT OF DATE with how many trading days old. The ticker name sits top-left on the chart. |
+| 2 | **Build any strategy** | 1.7.0 | Try a bull put, iron condor, iron fly, calendar and straddle; change a leg under LEGS (TRADE tab). Do credit, max loss, breakevens and POP match thinkorswim's Analyze tab? |
+| 3 | **The full-size payoff** | 1.7.0 | Hover across prices; slide DATE and IV. Can you read breakevens, max profit and loss, today vs expiration and the expected move at a glance? What's missing? |
+| 4 | **Studies on and off** | 1.7.0 | Toggle BB, EM, 2σ, S/R, SMA, EMA, Keltner, RSI, MACD, ATR and volume in the tray. Are these the studies you use? |
+| 5 | **COPY ORDER** | 1.7.0 | Press COPY ORDER (Alt+C) and paste it into a note: does it read like thinkorswim's order line, every leg right? Nothing is ever sent. |
+| 6 | **The ticker list: 50 in all** | 1.8.1 | ALL lists the game's 25, the 25 added for the builder (QQQ to SHOP) and the four index options. 1.8.0's second 25 (EEM to RDDT) are gone. |
+| 7 | **Index options** | 1.8.1 | With Schwab connected, SPX (and XSP, NDX, RUT) load like any ticker, marked CASH-SETTLED. Do strikes and credits match thinkorswim's SPX weeklies? Without Schwab it says so plainly. |
+| 8 | **The paper month** | 1.7.0 | The old Live month, now Trade Builder › PAPER MONTH: it starts 20 trading days back and plays to the latest close. |
+| 9 | **PULL FROM SCHWAB** | 1.7.0 | Run PULL FROM SCHWAB: it saves two years for the builder's tickers and the latest close's chains. Then open a few in the Trade Builder. Any that fail? |
+| 10 | **Game data built from Schwab** | 1.8.1 | Only if you use it: BUILD GAME DATA FROM SCHWAB, then start a Career run. The lineups deal only the game's 25 tickers (no QQQ, SOFI or SPX). |
+
+### Learn Options
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 11 | **The course from the top** | 1.8.0 | Go through the 13 lessons as if teaching a friend. Short and clear? Does each trade it sets up (call, put, short put, bull put, condor) show what the text says? |
+| 12 | **A lesson with a question** | 1.8.0 | NEXT waits for your answer, and the explanation teaches whether you were right or wrong. Are the questions fair? |
+| 13 | **The hands-on lessons** | 1.8.0 | Move the strike, then (next lessons) drag DATE to expiration and slide IV down. The ✓ comes the moment it's done. Does delta, theta and vega click, or is it busywork? |
+| 14 | **Pick the strike like a pro** | 1.8.0 | EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and a floor the chart respects? |
+
+### Bosses
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 15 | **The Collector's interest notice** | 1.7.0 | Leave a losing trade at or past a strike you sold through a close: an INTEREST NOTICE takes 5% of its risk off your score each day. Costly enough to make you close it? |
+| 16 | **Margin Clerk: the width cap** | 1.7.0 | The Width slider stops at the widest spread whose one contract fits your risk cap. |
+| 17 | **Tax Man: the first week** | 1.7.0 | A win closed within its first 5 trading days scores 25% less; the trade card counts the days down. |
+| 18 | **Underwriter trophy: 5%** | 1.7.0 | The Review is cleared for you: the bounty pays, and the trophy screen shows the Underwriter's trophy at 5%. A prize worth having? |
+| 19 | **Shell Company trophy: $2 off rerolls** | 1.7.0 | The Review is cleared for you: the trophy takes $2 off every reroll, and the shop prices show it. |
+| 20 | **Rebalancer: the bigger race chart** | 1.7.0 | The YOU vs SPY race on the chart is bigger and easy to read while you trade. |
+| 21 | **Early Retiree: the bigger duel** | 1.7.0 | The YOU vs CHAD race and Chad's trades are bigger and easy to follow. |
+
+### Month menu
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 22 | **Emblems and the deal-in** | 1.7.0 | Each round has an emblem and a name, dealt in like cards. Flashier, and still quick? |
+| 23 | **The exit plan, shown** | 1.7.0 | Slide Take profit and Stop: the sample spread under YOUR BUILD shows what the plan does. After a few closes, the scorecard shows how your exits went. |
+| 24 | **How each trade closed** | 1.7.0 | Close one at its target, take a planned stop, close one by hand: each payout is stamped TARGET BANKED, STOP TAKEN · saved $X or CLOSED BY HAND. Different enough? |
+
+### Tutorial
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 25 | **The practice trade** | 1.7.0 | Ines explains a strike, marks a floor or ceiling on the chart and builds a practice trade past it. Is the position spelled out, does the POP bar aim at 80%, and is REROLL where she points? |
+
+### Trading
+
+| # | Check | Since | What to look for |
+|---|---|---|---|
+| 26 | **Controls follow the rules** | 1.7.0 | Thin Books, Best Execution Audit and Attendance Policy are on: the size slider stops at 10, there's no market order, and no SIT OUT. |
+| 27 | **Cashing out with market orders off** | 1.7.0 | Open two trades. When one hits its target, CASH OUT, then close the other: both go through and nothing gets stuck. |
+| 28 | **One day recap at a time** | 1.8.1 | Open a trade and play several days quickly: yesterday's recap leaves before today's arrives, never two stacked. |
+
+**Anything else:** ideas, annoyances, things you'd pay for in a real game. Add them as playtest notes in the DEV panel (with a screenshot if it helps) and they go into the same file.

@@ -10,6 +10,7 @@ import { ANALYSTS, ANALYST_IDS } from '../../content/analysts';
 import { BOSSES, BOSS_IDS, type BossId } from '../../content/bosses';
 import { CARTRIDGES } from '../../content/cartridges';
 import { DEV_CHECKS, type DevSetup } from '../../content/devChecklist';
+import { OPTIONS_COURSE } from '../../content/optionsCourse';
 import { MEMOS, MEMO_IDS, VOUCHERS, VOUCHER_IDS } from '../../content/items';
 import type { AnalystId, MemoId, VoucherId } from '../../content/types';
 import { unlockEverything } from '../../engine/meta/profile';
@@ -18,8 +19,9 @@ import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
+import { useBuilder } from '../store/builder';
 import { useProfile } from '../store/profile';
-import { useRun } from '../store/run';
+import { startTutorial, useRun } from '../store/run';
 import { useTrading } from '../store/trading';
 import { Kbd, Modal } from './ui';
 
@@ -87,24 +89,89 @@ interface CheckResult {
 
 const CHECKS_KEY = 'devChecklist';
 
-function checklistMarkdown(res: Record<string, CheckResult>): string {
+/** The checklist for the dev: by group, each check's result and note, then the playtest notes. */
+function checklistMarkdown(res: Record<string, CheckResult>, version: string, notes: DevNote[]): string {
   const mark = (r?: CheckResult) => (r?.status === 'ok' ? '[x]' : r?.status === 'issue' ? '[!]' : '[ ]');
+  const groups = [...new Set(DEV_CHECKS.map((c) => c.group))];
+  const done = DEV_CHECKS.filter((c) => res[c.id]?.status).length;
+  const issues = DEV_CHECKS.filter((c) => res[c.id]?.status === 'issue').length;
   return [
-    '# Test checklist',
+    `# Test checklist · Spread Trading Game ${version}`,
     '',
-    ...DEV_CHECKS.map((c) => {
-      const r = res[c.id];
-      return `- ${mark(r)} **${c.title}** (${c.group})${r?.note ? `: ${r.note}` : ''}${r?.at ? ` _(${r.at})_` : ''}`;
-    }),
+    `Saved ${new Date().toLocaleString()}. ${done} of ${DEV_CHECKS.length} checked, ${issues} with a problem. [x] works, [!] problem, [ ] not tried.`,
+    ...groups.flatMap((g) => [
+      '',
+      `## ${g}`,
+      '',
+      ...DEV_CHECKS.filter((c) => c.group === g).map((c) => {
+        const r = res[c.id];
+        return `- ${mark(r)} **${c.title}** (${c.ver})${r?.note ? `: ${r.note}` : ''}${r?.at ? ` _(${r.at})_` : ''}`;
+      }),
+    ]),
+    ...(notes.length ? ['', notesMarkdown(notes).replace(/^# /, '## ')] : []),
   ].join('\n');
+}
+
+const waitFor = async (ok: () => boolean, ms = 20_000): Promise<boolean> => {
+  const t0 = Date.now();
+  while (!ok() && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 100));
+  return ok();
+};
+
+/** Into the Trade Builder, then the ticker, payoff, ticker list or course lesson a check needs. */
+async function builderSetup(b: NonNullable<DevSetup['builder']>): Promise<void> {
+  const app = useApp.getState();
+  if (b.lesson) {
+    const idx = Math.max(
+      0,
+      OPTIONS_COURSE.findIndex((l) => l.id === b.lesson),
+    );
+    app.updateSettings((st) => ({
+      ...st,
+      game: { ...st.game, courseProgress: { idx, done: st.game.courseProgress?.done ?? [] } },
+    }));
+  }
+  app.go('builder');
+  // The builder opens its first ticker on arrival; without any data there's nothing more to set.
+  const ready = await waitFor(() => {
+    const s = useBuilder.getState().session;
+    return !!s && useTrading.getState().session === s && !useBuilder.getState().loading;
+  });
+  if (b.ticker) await useBuilder.getState().open(b.ticker);
+  if (!ready) return;
+  const t = useTrading.getState();
+  if (b.payoff) t.setPayoffOpen(true);
+  if (b.tickers) useBuilder.getState().setTickersOpen(true);
+  if (b.lesson) {
+    // Away and back, so the course opens at the lesson just set.
+    t.setRightTab('trade');
+    await new Promise((r) => setTimeout(r, 50));
+    useTrading.getState().setRightTab('learn');
+  }
 }
 
 /** Run a check's setup through the same store actions the screens use. */
 async function runSetup(s: DevSetup): Promise<void> {
+  const app = useApp.getState();
+  if (s.game) app.updateSettings((st) => ({ ...st, game: { ...st.game, ...s.game } }));
+  if (s.tutorial) {
+    if (await startTutorial()) app.go('run');
+    return;
+  }
+  if (s.screen === 'live') return app.go('live');
+  if (s.screen === 'settingsData') {
+    useApp.setState({ settingsAt: 'data' });
+    return app.go('settings');
+  }
+  if (s.builder) return builderSetup(s.builder);
   const run = useRun.getState();
   if (s.run) {
-    await run.newRun({ deskId: 'verticals', seed: `devcheck-${Date.now().toString(36)}` });
-    useApp.getState().go('run');
+    await run.newRun({
+      deskId: 'verticals',
+      seed: `devcheck-${Date.now().toString(36)}`,
+      compliance: s.compliance,
+    });
+    app.go('run');
   }
   const act = useRun.getState().act;
   if (s.cash) await act({ t: 'dev', op: { k: 'cash', delta: s.cash } });
@@ -122,12 +189,19 @@ async function runSetup(s: DevSetup): Promise<void> {
 function Checklist({ onClose }: { onClose: () => void }) {
   const toast = useApp((s) => s.toast);
   const [res, setRes] = useState<Record<string, CheckResult>>({});
+  const [version, setVersion] = useState('');
+  const [notes, setNotes] = useState<DevNote[]>([]);
   useEffect(() => {
     if (!hasBridge()) return;
     void bridge()
       .invoke('user.get', CHECKS_KEY)
       .then((r) => setRes(((r as Record<string, CheckResult> | null) ?? {}) as Record<string, CheckResult>));
+    void bridge()
+      .invoke('system.info')
+      .then((i) => setVersion(i.version));
+    void loadNotes().then(setNotes);
   }, []);
+  const markdown = () => checklistMarkdown(res, version, notes);
   const save = (next: Record<string, CheckResult>) => {
     setRes(next);
     if (hasBridge()) void bridge().invoke('user.set', CHECKS_KEY, next);
@@ -149,7 +223,9 @@ function Checklist({ onClose }: { onClose: () => void }) {
         <span className="num">
           <b>{done}</b> of {DEV_CHECKS.length} checked
         </span>
-        <span className="dim small">SET UP starts what the check needs (it replaces the current run).</span>
+        <span className="dim small">
+          What changed since 1.6. SET UP takes you to it (a run check replaces the current run).
+        </span>
       </div>
       <div className="dc-list">
         {groups.map((g) => (
@@ -160,7 +236,9 @@ function Checklist({ onClose }: { onClose: () => void }) {
               return (
                 <div key={c.id} className={`dc-row ${r?.status ?? ''}`} data-testid={`check-${c.id}`}>
                   <div className="dc-main">
-                    <b>{c.title}</b>
+                    <b>
+                      {c.title} <span className="dc-ver">{c.ver}</span>
+                    </b>
                     <div className="dim small">{c.look}</div>
                     <input
                       className="dc-note"
@@ -210,7 +288,7 @@ function Checklist({ onClose }: { onClose: () => void }) {
         <button
           className="pixel-btn"
           onClick={() => {
-            void navigator.clipboard?.writeText(checklistMarkdown(res));
+            void navigator.clipboard?.writeText(markdown());
             toast('Checklist copied.', 'good');
           }}
           data-testid="check-copy"
@@ -223,8 +301,8 @@ function Checklist({ onClose }: { onClose: () => void }) {
             if (!hasBridge()) return;
             const path = await bridge().invoke(
               'system.saveTextFile',
-              'test-checklist.md',
-              checklistMarkdown(res),
+              `test-checklist-${version || 'dev'}.md`,
+              markdown(),
             );
             if (path) toast(`Checklist saved to ${path}`, 'good');
           }}

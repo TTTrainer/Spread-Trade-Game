@@ -505,3 +505,16 @@ export async function computeGhost(seed: string, deskId: DeskId): Promise<DailyG
   if (hasBridge()) await bridge().invoke('user.set', 'dailyGhost', ghost);
   return ghost;
 }
+
+/** Ines's tutorial from its first lesson (Career's TUTORIAL / START OVER, and the dev checklist). */
+export async function startTutorial(): Promise<boolean> {
+  useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: null } }));
+  return useRun.getState().newRun({
+    deskId: 'verticals',
+    seed: 'tutorial-ines',
+    mode: 'tutorial',
+    practice: true,
+    quarters: 1,
+    slot: 'tutorial',
+  });
+}

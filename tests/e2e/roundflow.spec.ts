@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { dismissBoard, launchGame, shot } from './helpers';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,29 +127,69 @@ test('developer mode: notes, unlock everything and run levers', async () => {
   await app.close();
 });
 
-test('developer test checklist: tick, note, and a one-click setup into a boss', async () => {
-  const { app, page } = await launchGame();
+test('developer test checklist: what changed since 1.6, one click to each spot, and the file for the dev', async () => {
+  test.setTimeout(180_000);
+  const { app, page, exportDir } = await launchGame();
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (e) => errors.push(`${e.message} ${e.stack ?? ''}`));
   await settings(page, { devMode: true });
-  await page.keyboard.press('Control+Shift+D');
-  await page.getByTestId('dev-tab-checklist').click();
-  await expect(page.getByTestId('dev-checklist')).toBeVisible();
-  await page.getByTestId('check-ok-menu-basics').click();
-  await page.getByTestId('check-note-menu-reroll').fill('Reroll felt cheap.');
-  await expect(page.getByTestId('check-menu-basics')).toHaveClass(/ok/);
+  const openChecklist = async () => {
+    await page.keyboard.press('Control+Shift+D');
+    await page.getByTestId('dev-tab-checklist').click();
+    await expect(page.getByTestId('dev-checklist')).toBeVisible();
+  };
+  await openChecklist();
+  // Only what changed since 1.6, each tagged with its release; the 1.6 checks are gone.
+  await expect(page.getByTestId('check-tb-badge')).toContainText('1.7.0');
+  await expect(page.getByTestId('check-learn-quiz')).toContainText('1.8.0');
+  await expect(page.getByTestId('check-tb-tickers')).toContainText('1.8.1');
+  await expect(page.getByTestId('check-menu-basics')).toHaveCount(0);
+  await page.getByTestId('check-ok-menu-emblems').click();
+  await page.getByTestId('check-issue-run-rules').click();
+  await page.getByTestId('check-note-run-rules').fill('Slider went past 10.');
+  await expect(page.getByTestId('check-menu-emblems')).toHaveClass(/ok/);
   await page.waitForTimeout(300);
   await shot(page, '12-dev-checklist-1920');
   await shot(page, '12-dev-checklist-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });
-  // One click sets up the Executor's case file.
-  await page.getByTestId('check-setup-boss-executor').click();
+
+  // SAVE AS FILE: one file for the dev, stamped with the version, by group, with the notes.
+  await page.getByTestId('check-export').click();
+  await expect(page.getByTestId('toasts')).toContainText('Checklist saved');
+  const file = readdirSync(exportDir).find((f) => f.startsWith('test-checklist-'));
+  expect(file).toMatch(/^test-checklist-\d+\.\d+\.\d+\.md$/);
+  const md = readFileSync(join(exportDir, file as string), 'utf8');
+  expect(md).toMatch(/^# Test checklist · Spread Trading Game \d+\.\d+\.\d+/);
+  expect(md).toContain('## Trade Builder');
+  expect(md).toContain('- [x] **Emblems and the deal-in** (1.7.0)');
+  expect(md).toContain('- [!] **Controls follow the rules** (1.7.0): Slider went past 10.');
+
+  // SET UP into a LEARN OPTIONS lesson: the Trade Builder opens at that lesson.
+  await page.getByTestId('check-setup-learn-quiz').click();
+  await expect(page.getByTestId('builder-screen')).toBeVisible();
+  await expect(page.getByTestId('course')).toHaveAttribute('data-lesson', 'call', { timeout: 60_000 });
+  // ...the full ticker list...
+  await openChecklist();
+  await page.getByTestId('check-setup-tb-tickers').click();
+  await expect(page.getByTestId('ticker-list')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('ticker-list')).toContainText('Index options (cash-settled)');
+  await page.keyboard.press('Escape');
+  // ...a run with the rules on: no SIT OUT under the Attendance Policy...
+  await openChecklist();
+  await page.getByTestId('check-setup-run-rules').click();
+  await expect(page.getByTestId('trading-screen')).toBeVisible({ timeout: 60_000 });
+  const rules = await page.evaluate(
+    () => (window as Any).__stg.run.getState().engine.state.config.compliance,
+  );
+  expect(rules).toEqual(['liquidity', 'no_market', 'no_skip']);
+  // ...and a boss's case file.
+  await openChecklist();
+  await page.getByTestId('check-setup-boss-tax-man').click();
   await expect(page.getByTestId('review-intro')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('boss-name')).toHaveText('THE EXECUTOR');
+  await expect(page.getByTestId('boss-name')).toHaveText('THE TAX MAN');
   // The ticks and notes are kept.
-  await page.keyboard.press('Control+Shift+D');
-  await page.getByTestId('dev-tab-checklist').click();
-  await expect(page.getByTestId('check-note-menu-reroll')).toHaveValue('Reroll felt cheap.');
-  expect(errors).toEqual([]);
+  await openChecklist();
+  await expect(page.getByTestId('check-note-run-rules')).toHaveValue('Slider went past 10.');
+  expect(errors, errors.join('\n')).toEqual([]);
   await app.close();
 });
