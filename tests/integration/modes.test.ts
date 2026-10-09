@@ -8,6 +8,13 @@ import { playRun } from '../../src/engine/sim/bot';
 import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
 import { defaultSessionConfig, TradingSession } from '../../src/engine/trading/session';
 import { addDays } from '../../src/engine/calendar';
+import {
+  LIVE_LINEUP,
+  LIVE_MONTH_DAYS,
+  liveMonthProgress,
+  liveMonthStart,
+  pickLiveLineup,
+} from '../../src/engine/trading/liveMonth';
 import { contractBoard, contractPayout, contractStructures } from '../../src/engine/meta/contracts';
 import { cartridgePoolFor, defaultProfile } from '../../src/engine/meta/profile';
 
@@ -225,6 +232,49 @@ describe('Live sessions', () => {
   }, 120_000);
 });
 
+describe('Live month', () => {
+  it('deals a lineup a month back, moves the whole desk with the clock and waits at the latest close', async () => {
+    const meta = await src.meta();
+    const days = await src.tradingDays(addDays(meta.lastDate, -200), meta.lastDate);
+    const edge = days[days.length - 40];
+    const start = liveMonthStart(days, edge);
+    expect(days.filter((d) => d > start && d <= edge)).toHaveLength(LIVE_MONTH_DAYS);
+    const symbols = await src.symbols();
+    const lineup = pickLiveLineup(symbols, meta.benchmark, 'month-1', start);
+    expect(lineup).toEqual(pickLiveLineup(symbols, meta.benchmark, 'month-1', start));
+    expect(lineup.length).toBeGreaterThanOrEqual(LIVE_LINEUP);
+    expect(new Set(lineup).size).toBe(lineup.length);
+    const s = new TradingSession(
+      src,
+      defaultSessionConfig({
+        seed: 'month-1',
+        mode: 'live',
+        liveEdge: edge,
+        benchmark: meta.benchmark,
+        advanceIdle: true,
+      }),
+    );
+    s.holdOpen = true;
+    for (const [i, sym] of lineup.entries())
+      await s.dispatch({ t: 'addLive', cardId: `L${i + 1}`, symbol: sym, entryDate: start });
+    expect(s.atLiveEdge()).toBe(false);
+    // No trades: the untraded desk still plays day by day up to the latest close, then waits.
+    let guard = 0;
+    while (!s.atLiveEdge() && guard++ < 40) {
+      await s.dispatch({ t: 'begin' });
+      await s.dispatch({ t: 'end' });
+    }
+    expect(s.atLiveEdge()).toBe(true);
+    for (const c of s.cards) expect(s.view(c.id).now).toBe(edge);
+    expect(liveMonthProgress(days, start, edge, edge)).toEqual({
+      day: LIVE_MONTH_DAYS,
+      total: LIVE_MONTH_DAYS,
+      caughtUp: true,
+    });
+    expect(s.isDone()).toBe(false);
+  }, 120_000);
+});
+
 describe('Contracts board', () => {
   it('deals five clients on blind windows, the same all week', async () => {
     const windows = await src.windows({});
@@ -246,7 +296,14 @@ describe('Contracts board', () => {
   it('allows only the structures of unlocked desks that fit, and pays for filling plus profit', () => {
     const bear = CLIENT_BY_ID.garage;
     expect(contractStructures(bear, ['verticals'])).toEqual(['bear_call', 'bear_put']);
-    expect(contractStructures(bear, ['income'])).toEqual([]);
+    // A covered call pays while the stock stays below its strike: a bearish trade here.
+    expect(contractStructures(bear, ['income'])).toEqual(['covered_call']);
+    // With Income unlocked first, the defined-risk spreads still come first (the one picked for you).
+    expect(contractStructures(bear, ['income', 'verticals'])).toEqual([
+      'bear_call',
+      'bear_put',
+      'covered_call',
+    ]);
     expect(contractPayout(15, true, 500)).toBe(23);
     expect(contractPayout(15, true, -500)).toBe(15);
     expect(contractPayout(15, false, 500)).toBe(0);

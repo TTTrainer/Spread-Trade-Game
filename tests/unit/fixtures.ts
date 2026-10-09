@@ -36,6 +36,7 @@ export function facts(over: Partial<TradeFacts> = {}): TradeFacts {
     credit: true,
     creditOfWidth: 0.34,
     pctOfMaxProfit: 0.6,
+    returnOnRisk: 0.2,
     closedAtPlan: null,
     exitReason: 'manual',
     expiredWorthless: false,

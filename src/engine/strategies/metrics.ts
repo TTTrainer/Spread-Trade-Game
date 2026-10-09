@@ -228,6 +228,75 @@ export function probabilityOfProfit(
   return Math.min(1, Math.max(0, p));
 }
 
+/**
+ * What a trade is likely to do, not just what it could do. Max loss over max profit draws a
+ * straight line between the strikes and makes a short strike close to the price look better
+ * (more credit per dollar of width) while hiding that it loses far more often. Here every
+ * price at expiration is weighted by how likely it is (lognormal, at the given volatility), so
+ * partial losses between the strikes count at their real size and their real odds.
+ */
+export interface ExpectedOutcome {
+  /** Probability-weighted gain, per share per unit: the average of the winning outcomes' size × odds. */
+  expGain: number;
+  /** Probability-weighted loss (a positive number). */
+  expLoss: number;
+  /** Expected value at expiration: expGain − expLoss. */
+  ev: number;
+  /** Chance of losing (nearly) the most the trade can lose. */
+  pMaxLoss: number;
+  /** Chance the price touches the nearest short strike before expiration (reflection rule). */
+  pTouch: number | null;
+  /** The volatility used, and whether it's the stock's realized movement or the options' IV. */
+  sigma: number;
+  basis: 'realized' | 'implied';
+}
+
+export function expectedOutcome(
+  legs: Leg[],
+  entryNet: number,
+  env: PricingEnv,
+  spot: number,
+  sigma: number,
+  basis: ExpectedOutcome['basis'],
+  maxLoss: number,
+): ExpectedOutcome {
+  const fe = frontExpiration(legs) ?? env.date;
+  const t = Math.max(diffDays(env.date, fe), 0.5) / 365;
+  const sd = Math.max(1e-4, sigma) * Math.sqrt(t);
+  const mu = Math.log(spot) + (env.rate - env.divYield - 0.5 * sigma * sigma) * t;
+  // Integrate over the standard normal on a fine grid (±7 sd), trapezoid rule.
+  const N = 700;
+  const zLo = -7;
+  const dz = 14 / N;
+  let gain = 0;
+  let loss = 0;
+  let pMax = 0;
+  let wsum = 0;
+  for (let i = 0; i <= N; i++) {
+    const z = zLo + i * dz;
+    const w = (i === 0 || i === N ? 0.5 : 1) * Math.exp(-0.5 * z * z);
+    const v = payoffAtExpiry(legs, entryNet, Math.exp(mu + sd * z), env);
+    if (v > 0) gain += w * v;
+    else loss -= w * v;
+    if (maxLoss > 0 && -v >= maxLoss * 0.99) pMax += w;
+    wsum += w;
+  }
+  gain /= wsum;
+  loss /= wsum;
+  pMax /= wsum;
+  // The short strike nearest the price: the chance of trading through it at any time is about
+  // twice the chance of finishing beyond it (driftless reflection principle).
+  const shorts = optionLegs(legs).filter((l) => l.ratio < 0 && l.expiration === fe);
+  let pTouch: number | null = null;
+  if (shorts.length) {
+    const k = shorts.reduce((b, l) => (Math.abs(l.strike - spot) < Math.abs(b.strike - spot) ? l : b));
+    const zK = (Math.log(k.strike) - mu) / sd;
+    const beyond = k.right === 'P' ? normCdf(zK) : 1 - normCdf(zK);
+    pTouch = Math.min(1, 2 * beyond);
+  }
+  return { expGain: gain, expLoss: loss, ev: gain - loss, pMaxLoss: pMax, pTouch, sigma, basis };
+}
+
 function bisectZero(f: (x: number) => number, a: number, b: number): number {
   let lo = a;
   let hi = b;
@@ -290,7 +359,11 @@ export function computeMetrics(
 
 /** Plain-English Greeks for the stats panel ("you make about $6 a day from time decay"). */
 export function plainGreeks(g: TradeMetrics['greeks'], units: number): string[] {
-  const d = (x: number) => `$${Math.abs(Math.round(x * units)).toLocaleString('en-US')}`;
+  // Small trades decay by cents a day; rounding those to "$0" read as "nothing happens".
+  const d = (x: number) => {
+    const v = Math.abs(x * units);
+    return v < 10 ? `$${v.toFixed(2)}` : `$${Math.round(v).toLocaleString('en-US')}`;
+  };
   const lines: string[] = [];
   lines.push(
     Math.abs(g.theta) < 0.05

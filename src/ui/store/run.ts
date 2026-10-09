@@ -17,6 +17,8 @@ import { cartridgePoolFor, perksFor, recordDaily } from '../../engine/meta/profi
 import { heatOf } from '../../content/meta';
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import { playRun } from '../../engine/sim/bot';
+import { crumb } from '../trail';
+import { usePayout } from './payout';
 
 export const CAREER_SLOT = 'career';
 export type RunSlot = 'career' | 'daily' | 'tutorial';
@@ -57,6 +59,8 @@ export interface NewRunOpts {
   quarters?: number;
   compliance?: string[];
   slot?: RunSlot;
+  /** Starting capital for this run (defaults to the setting). */
+  startEquityCents?: number;
 }
 
 interface RunStore {
@@ -244,6 +248,7 @@ export const useRun = create<RunStore>((set, get) => {
       deskId: e.state.config.deskId,
       lockedStudies: chartist ? [] : CHARTIST_STUDIES,
       external: (a: SessionAction) => sessionAct(a),
+      blockReason: (cardId, structureId) => get().engine?.tradeBlock(cardId, structureId) ?? null,
     });
     useTrading.getState().setStructure(DESKS[e.state.config.deskId].structures[0]);
   };
@@ -258,14 +263,42 @@ export const useRun = create<RunStore>((set, get) => {
     e.finishedSession = null;
   };
 
+  // Which of the current round's scored trades the screen has already been handed.
+  let seen = { key: '', n: 0 };
+  const roundKey = (e: RunEngine) => `${e.state.id}:${e.state.quarter}:${e.state.roundIndex}`;
+  /** Start counting from what's already scored (a fresh or resumed run replays nothing). */
+  const markSeen = (e: RunEngine) => {
+    seen = { key: roundKey(e), n: e.state.round.tallies.length };
+    usePayout.getState().clear();
+  };
+  /** Newly scored trades go to the payout queue (played out one at a time on screen). */
+  const queuePayouts = (e: RunEngine): boolean => {
+    const key = roundKey(e);
+    if (key !== seen.key) seen = { key, n: 0 };
+    const fresh = e.state.round.tallies.slice(seen.n);
+    seen.n = e.state.round.tallies.length;
+    const on = useApp.getState().settings.game.payoutSpeed !== 'instant' && e.state.config.mode !== 'sim';
+    if (!fresh.length || !on) return false;
+    usePayout.getState().push(fresh);
+    return true;
+  };
+
   const afterAction = async () => {
     const e = get().engine;
     if (!e) return;
     toastEvents(e.events);
+    const paying = queuePayouts(e);
+    // The Collector's bill for the day gets its own screen, after the day's payouts.
+    if (e.state.config.mode !== 'sim')
+      for (const ev of e.events)
+        if (ev.kind === 'interest' && ev.interest) usePayout.getState().pushInterest(ev.interest);
+    // In the tutorial Ines's lessons are the only voice, so the other characters stay quiet.
     const said = e.events.filter((x) => x.kind === 'say' && x.line).at(-1);
-    if (said?.line) set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
+    if (said?.line && e.state.config.mode !== 'tutorial')
+      set({ speech: { line: said.line, n: (get().speech?.n ?? 0) + 1 } });
+    // A payout lands its own points on the meter; otherwise they pop straight away.
     const pts = e.events.filter((x) => x.kind === 'score');
-    if (pts.length)
+    if (pts.length && !paying)
       set({
         lastPoints: {
           points: pts.reduce((a, x) => a + (x.points ?? 0), 0),
@@ -335,6 +368,7 @@ export const useRun = create<RunStore>((set, get) => {
       quarters = 4,
       compliance = [],
       slot = 'career',
+      startEquityCents,
     }) => {
       set({ busy: true, error: null, slot });
       try {
@@ -351,7 +385,7 @@ export const useRun = create<RunStore>((set, get) => {
               deskId,
               mode,
               tier,
-              startEquityCents: settings.game.startingCapitalCents,
+              startEquityCents: startEquityCents ?? settings.game.startingCapitalCents,
               pureMarket: settings.game.pureMarket,
               realism: { ...settings.realism },
               pause: { ...settings.game.pause },
@@ -369,10 +403,12 @@ export const useRun = create<RunStore>((set, get) => {
               cartridgePool: career ? cartridgePoolFor(profile) : undefined,
             };
         const e = await RunEngine.create(src(), config, new Date().toISOString());
+        markSeen(e);
         set({ engine: e, lastPoints: null });
         attach(e);
         const hello = e.events.find((x) => x.kind === 'say' && x.line);
-        if (hello?.line) set({ speech: { line: hello.line, n: (get().speech?.n ?? 0) + 1 } });
+        if (hello?.line && config.mode !== 'tutorial')
+          set({ speech: { line: hello.line, n: (get().speech?.n ?? 0) + 1 } });
         await persist(e, slot);
         set({ version: get().version + 1, saveSummary: summaryOf(e) });
         return true;
@@ -392,6 +428,7 @@ export const useRun = create<RunStore>((set, get) => {
         const saved = await bridge().invoke('user.load', slot);
         if (!saved) return false;
         const e = await RunEngine.resume(src(), saved.data as RunSave);
+        markSeen(e);
         set({ engine: e, lastPoints: null, slot });
         if (e.state.phase === 'round') attach(e);
         set({ version: get().version + 1 });
@@ -411,6 +448,7 @@ export const useRun = create<RunStore>((set, get) => {
       serial(async () => {
         const e = get().engine;
         if (!e) return null;
+        crumb(`run ${a.t === 's' ? `s.${a.a.t}` : a.t}`);
         const r = await e.dispatch(a);
         await afterAction();
         return r;
@@ -424,6 +462,7 @@ export const useRun = create<RunStore>((set, get) => {
     },
 
     leave: () => {
+      usePayout.getState().clear();
       useTrading.getState().reset();
       set({ engine: null });
     },
@@ -465,4 +504,22 @@ export async function computeGhost(seed: string, deskId: DeskId): Promise<DailyG
   };
   if (hasBridge()) await bridge().invoke('user.set', 'dailyGhost', ghost);
   return ghost;
+}
+
+/**
+ * Ines's tutorial from its first lesson (Career's TUTORIAL / START OVER, and the dev checklist).
+ * It runs on the Income desk: a new trader's first trade is a cash-secured put, with the Income
+ * desk's recommended starting capital.
+ */
+export async function startTutorial(): Promise<boolean> {
+  useApp.getState().updateSettings((st) => ({ ...st, game: { ...st.game, tutorialProgress: null } }));
+  return useRun.getState().newRun({
+    deskId: 'income',
+    startEquityCents: useApp.getState().settings.game.incomeCapitalCents,
+    seed: 'tutorial-ines',
+    mode: 'tutorial',
+    practice: true,
+    quarters: 1,
+    slot: 'tutorial',
+  });
 }

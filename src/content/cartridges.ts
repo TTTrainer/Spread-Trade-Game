@@ -48,10 +48,11 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['verticals', 'condor', 'income'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: '+8 chips for every trading day a short-premium position is open and in profit.',
+    // +3 a day: at +8 the balance simulator found it doubled the win rate once targets rose in 1.4.2.
+    text: '+30 chips for every trading day a short-premium position is open and in profit.',
     synergies: ['fifty_percent_club', 'premium_printer', 'weekend_warrior'],
     onDayClose: ({ positions, addChips }) => {
-      for (const p of positions) if (p.shortPremium && p.inProfit) addChips(p.id, 8);
+      for (const p of positions) if (p.shortPremium && p.inProfit) addChips(p.id, 3);
     },
     score: ({ facts }) => when(facts.win && facts.thetaChips > 0, chips('Theta Engine', facts.thetaChips)),
   },
@@ -80,7 +81,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Short premium held over a weekend: +15 chips.',
+    text: 'Short premium held over a weekend: +150 chips.',
     synergies: ['theta_engine', 'credit_where_due'],
     score: ({ facts }) =>
       when(facts.win && facts.shortPremium && facts.heldOverWeekend, chips('Weekend Warrior', 15)),
@@ -193,9 +194,10 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['volatility'],
     rarity: 'U',
     tag: 'ARCADE',
-    text: 'A straddle or strangle whose move beats the expected move: x2.',
+    text: 'A straddle or strangle whose move beats the expected move: x1.5.',
     synergies: ['earnings_sniper', 'straddle_stack', 'gamma_scalper'],
-    score: ({ facts }) => when(facts.win && facts.straddleBeatEm, mul('Long Gamma', 2)),
+    // x1.5 since 1.6: with chips scaled by return on risk, a winning straddle already scores big.
+    score: ({ facts }) => when(facts.win && facts.straddleBeatEm, mul('Long Gamma', 1.5)),
   },
   {
     id: 'term_structure_tap',
@@ -236,7 +238,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['volatility'],
     rarity: 'U',
     tag: 'ARCADE',
-    text: 'A long straddle held through earnings: +100 chips x (actual move / implied move).',
+    text: 'A long straddle held through earnings: +1,000 chips x (actual move / implied move).',
     synergies: ['long_gamma', 'earnings_whisper'],
     score: ({ facts }) =>
       when(
@@ -272,7 +274,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['income'],
     rarity: 'C',
     tag: 'REAL',
-    text: 'Warns about early assignment before ex-dividend dates. Covered calls that collect a dividend: +40 chips.',
+    text: 'Warns about early assignment before ex-dividend dates. Covered calls that collect a dividend: +400 chips.',
     synergies: ['covered_and_chill', 'the_wheel'],
     score: ({ facts }) => when(facts.win && facts.coveredCallDividend, chips('Dividend Radar', 40, 'REAL')),
   },
@@ -311,7 +313,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['verticals'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Short strike outside the Bollinger Band at entry: +30 chips.',
+    text: 'Short strike outside the Bollinger Band at entry: +300 chips.',
     synergies: ['rsi_radar', 'contrarian'],
     score: ({ facts }) => when(facts.win && facts.shortOutsideBollinger, chips('Bollinger Bouncer', 30)),
   },
@@ -434,7 +436,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Trades risking 3% of equity or less: +25 chips.',
+    text: 'Trades risking 3% of equity or less: +250 chips.',
     synergies: ['stop_discipline', 'patience_pays'],
     score: ({ facts }) => when(facts.win && facts.riskPct <= 0.03 + 1e-9, chips('Right-Sized', 25)),
   },
@@ -526,7 +528,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'U',
     tag: 'ARCADE',
-    text: '+$1 for every 100 points over the round target.',
+    text: '+$1 for every 1,000 points over the round target.',
     synergies: ['compound_interest', 'patience_pays'],
     onRoundEnd: ({ meter: m, target, passed }) =>
       passed && m > target ? { cash: Math.floor((m - target) / 100), note: 'Bonus Pool' } : undefined,
@@ -574,9 +576,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: 'any',
     rarity: 'U',
     tag: 'ARCADE',
-    text: '+3 mult on winners, but losers cannot be closed before expiration.',
+    text: '+1 mult on winners, but losers cannot be closed before expiration.',
     synergies: ['golden_parachute', 'iron_stomach'],
-    score: ({ facts }) => when(facts.win, add('Bag Holder', 3)),
+    // +3 in 1.6.0. With 1.6.1's tighter targets an unconditional mult on every winner was the
+    // strongest card in the simulator (+23 points of run win rate at +3, +20 at +2; the lock
+    // alone, at +0, about +5).
+    score: ({ facts }) => when(facts.win, add('Bag Holder', 1)),
     passive: { losersLocked: true },
   },
   {
@@ -610,7 +615,9 @@ export const CARTRIDGES: CartridgeDef[] = [
   {
     id: 'the_wheel',
     name: 'The Wheel',
-    families: ['THETA'],
+    // EVENT, not THETA (1.6): on the Income desk every trade collects premium, so a cheap THETA
+    // card lit the THETA family on its own (the same reason Covered & Chill moved in 1.5).
+    families: ['EVENT'],
     desks: ['income'],
     rarity: 'U',
     tag: 'ARCADE',
@@ -626,7 +633,9 @@ export const CARTRIDGES: CartridgeDef[] = [
   {
     id: 'covered_and_chill',
     name: 'Covered & Chill',
-    families: ['THETA'],
+    // EVENT, not THETA: on the Income desk every trade is short premium, so as a cheap THETA card
+    // it was mostly a ticket to the THETA family bonus (+15.7 points of win rate in the simulator).
+    families: ['EVENT'],
     desks: ['income'],
     rarity: 'C',
     tag: 'ARCADE',
@@ -641,7 +650,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['income'],
     rarity: 'U',
     tag: 'ARCADE',
-    text: 'Assignments give +50 chips instead of stress.',
+    text: 'Assignments give +500 chips instead of stress.',
     synergies: ['the_wheel', 'dividend_radar'],
     score: ({ facts }) => when(facts.win && facts.assigned, chips('Assignment Artist', 50)),
   },
@@ -665,7 +674,7 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['condor'],
     rarity: 'C',
     tag: 'ARCADE',
-    text: 'Condors with both short strikes outside the expected move: +40 chips.',
+    text: 'Condors with both short strikes outside the expected move: +400 chips.',
     synergies: ['delta_neutral', 'crush_it', 'pin_master'],
     score: ({ facts }) => when(facts.win && facts.condorOutsideEm, chips('Wing Clipper', 40)),
   },
@@ -689,12 +698,12 @@ export const CARTRIDGES: CartridgeDef[] = [
     desks: ['volatility'],
     rarity: 'R',
     tag: 'ARCADE',
-    text: 'Each straddle opened this round adds +1 mult to the next one.',
+    text: 'Each straddle opened this round adds +1 mult to the next one (up to +2).',
     synergies: ['long_gamma', 'gamma_scalper'],
     score: ({ facts }) =>
       when(
         facts.win && facts.isStraddle && facts.straddlesBefore > 0,
-        add(`Straddle Stack (${facts.straddlesBefore})`, facts.straddlesBefore),
+        add(`Straddle Stack (${facts.straddlesBefore})`, Math.min(2, facts.straddlesBefore)),
       ),
   },
   {

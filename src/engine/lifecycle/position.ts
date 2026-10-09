@@ -418,6 +418,54 @@ export function convertLegToStock(
   );
 }
 
+/** Covered calls and cash-secured puts trade against shares kept off the books. */
+export const isIncomeTrade = (structureId: string): boolean =>
+  structureId === 'covered_call' || structureId === 'cash_secured_put';
+
+/**
+ * An assignment on a covered call or cash-secured put. Both trade against 500 shares the player
+ * is assumed to own, kept off the books: the shares are called away from (or bought into) that
+ * holding, and the trade settles at the option's intrinsic value, so its result is the option's
+ * alone (the premium, less what the assignment was worth). Nothing is left holding shares.
+ */
+export function settleIncomeAssignment(pos: Position, leg: OptionLeg, date: ISODate, spot: number): Position {
+  const cashDelta = contractCents(leg.ratio * intrinsic(leg, spot), pos.qty);
+  const shares = Math.abs(leg.ratio) * 100 * pos.qty;
+  const detail =
+    leg.right === 'C'
+      ? `Called away: ${shares} of your shares sold at ${leg.strike} (the stock is at ${spot.toFixed(2)}; the gain past the strike is what the call gave up)`
+      : `Assigned: bought ${shares} shares at ${leg.strike} into your holding (the stock is at ${spot.toFixed(2)})`;
+  return addEvent(
+    {
+      ...pos,
+      legs: removeLeg(pos.legs, leg),
+      cashCents: pos.cashCents + cashDelta,
+      flags: { ...pos.flags, assigned: true },
+      lastLegs: [],
+    },
+    { date, kind: 'assigned', detail, cashCents: cashDelta },
+  );
+}
+
+/**
+ * A covered call over an ex-dividend date: the dividend goes to your shares, off the books (it is
+ * not this trade's P/L), and is noted so the Income desk's dividend bonuses still count it.
+ */
+export function noteCoveredDividend(pos: Position, amountPerShare: number, date: ISODate): Position {
+  const covered = optionLegsOf(pos.legs).some((l) => l.right === 'C' && l.ratio < 0);
+  if (!covered) return pos;
+  const amount = contractCents(amountPerShare, pos.qty);
+  return addEvent(
+    { ...pos, flags: { ...pos.flags, dividendsCents: pos.flags.dividendsCents + amount } },
+    {
+      date,
+      kind: 'dividend',
+      detail: `Dividend ${amountPerShare.toFixed(2)}/share on your shares (kept off this trade's P/L)`,
+      cashCents: amount,
+    },
+  );
+}
+
 /** Cash-settle an expiring leg at intrinsic value (expiration mechanics off, or both legs ITM). */
 export function settleLegAtIntrinsic(pos: Position, leg: OptionLeg, spot: number): Position {
   const cashDelta = contractCents(leg.ratio * intrinsic(leg, spot), pos.qty);

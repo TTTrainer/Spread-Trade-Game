@@ -120,13 +120,16 @@ describe('career ladder', () => {
 describe('spending Bonus', () => {
   it('unlocks desks at their price, with the rank discount, and never twice', () => {
     const p = rich();
-    expect(deskPrice(p, 'income')).toBe(DESKS.income.unlockCost);
-    const r = unlockDesk(p, 'income');
+    expect(deskPrice(p, 'condor')).toBe(DESKS.condor.unlockCost);
+    const r = unlockDesk(p, 'condor');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.profile.desks).toEqual(['verticals', 'income']);
-    expect(r.profile.bonus).toBe(10_000 - DESKS.income.unlockCost);
-    expect(unlockDesk(r.profile, 'income').ok).toBe(false);
+    expect(r.profile.desks).toEqual(['income', 'verticals', 'condor']);
+    expect(r.profile.bonus).toBe(10_000 - DESKS.condor.unlockCost);
+    expect(unlockDesk(r.profile, 'condor').ok).toBe(false);
+    // Income and Verticals are free from the start.
+    expect(unlockDesk(p, 'income').ok).toBe(false);
+    expect(unlockDesk(p, 'verticals').ok).toBe(false);
     const associate = rich({ xp: RANKS[2].xp });
     expect(deskPrice(associate, 'calendar')).toBe(Math.round(DESKS.calendar.unlockCost * 0.75));
     const head = rich({ xp: RANKS[6].xp });
@@ -138,7 +141,7 @@ describe('spending Bonus', () => {
     const r = unlockDesk(p, 'condor');
     expect(r.ok).toBe(false);
     expect(p.bonus).toBe(0);
-    expect(p.desks).toEqual(['verticals']);
+    expect(p.desks).toEqual(['income', 'verticals']);
   });
 
   it('starts with 38 cartridges in the pool; packs open by rank or Bonus', () => {
@@ -172,12 +175,14 @@ describe('spending Bonus', () => {
   });
 
   it('collections get pricier as they grow', () => {
-    expect(COLLECTIONS.art.items).toHaveLength(12);
-    expect(COLLECTIONS.watches.items).toHaveLength(8);
-    expect(COLLECTIONS.vehicles.items).toHaveLength(6);
+    // What's for sale matches the pictures in art sheet 4; retired pieces stay for their owners.
+    const live = (c: keyof typeof COLLECTIONS) => COLLECTIONS[c].items.filter((i) => !i.retired);
+    expect(live('art')).toHaveLength(8);
+    expect(live('watches')).toHaveLength(9);
+    expect(live('vehicles')).toHaveLength(4);
     let p = rich();
     const prices: number[] = [];
-    for (const it of COLLECTIONS.art.items) {
+    for (const it of COLLECTIONS.art.items.filter((i) => !i.retired)) {
       const before = p.bonus;
       const r = buyCollectionItem(p, 'art', it.id);
       expect(r.ok).toBe(true);
@@ -188,17 +193,30 @@ describe('spending Bonus', () => {
     for (let i = 1; i < prices.length; i++) expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
     expect(prices[0]).toBe(collectionPrice('art', 0));
     expect(buyCollectionItem(p, 'art', COLLECTIONS.art.items[0].id).ok).toBe(false);
+    // Retired pieces (no picture any more) are no longer sold.
+    const retired = COLLECTIONS.art.items.find((i) => i.retired)!;
+    expect(buyCollectionItem(rich(), 'art', retired.id)).toEqual({
+      ok: false,
+      reason: 'No longer for sale.',
+    });
   });
 
   it('upgrades desk setups one level at a time until maxed', () => {
     let p = rich();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const r = buySetup(p, 'monitors');
       expect(r.ok).toBe(true);
       if (r.ok) p = r.profile;
     }
-    expect(p.pad.setup.monitors).toBe(4);
+    expect(p.pad.setup.monitors).toBe(3);
     expect(buySetup(p, 'monitors').ok).toBe(false);
+    for (let i = 0; i < 4; i++) {
+      const r = buySetup(p, 'desk');
+      expect(r.ok).toBe(true);
+      if (r.ok) p = r.profile;
+    }
+    expect(p.pad.setup.desk).toBe(4);
+    expect(buySetup(p, 'desk').ok).toBe(false);
   });
 
   it('cosmetics unlock by rank, Bonus, Heat, tier and the tutorial', () => {
@@ -216,20 +234,20 @@ describe('spending Bonus', () => {
     expect(buyCosmetic(rich(), 'theme_amber').ok).toBe(false); // earned, not bought
   });
 
-  it('shows at most four desk items, and only owned ones', () => {
+  it('shows at most six desk items, and only owned ones', () => {
     let p = rich({ tutorialDone: true, xp: RANKS[3].xp, heatBest: 12 });
-    for (const id of ['item_duck', 'item_bell']) {
+    for (const id of ['item_duck', 'item_bell', 'item_pens']) {
       const r = buyCosmetic(p, id);
       if (r.ok) p = r.profile;
     }
-    for (const v of ['mug', 'duck', 'bell', 'bonsai']) {
+    for (const v of ['mug', 'duck', 'bell', 'bonsai', 'notebook', 'pens']) {
       const r = toggleDeskItem(p, v);
       expect(r.ok).toBe(true);
       if (r.ok) p = r.profile;
     }
     expect(toggleDeskItem(p, 'lava').ok).toBe(false); // desk full
     const off = toggleDeskItem(p, 'mug');
-    expect(off.ok && off.profile.pad.deskItems).toEqual(['duck', 'bell', 'bonsai']);
+    expect(off.ok && off.profile.pad.deskItems).toEqual(['duck', 'bell', 'bonsai', 'notebook', 'pens']);
     expect(toggleDeskItem(defaultProfile(), 'trophy').ok).toBe(false);
   });
 });
@@ -305,10 +323,33 @@ describe('Daily and Contracts bookkeeping', () => {
 
   it('merges an old or partial saved profile over the defaults', () => {
     const p = mergeProfile({ xp: 50, desks: ['condor'], pad: { tier: 1 } });
-    expect(p.desks).toEqual(['verticals', 'condor']);
+    expect(p.desks).toEqual(['income', 'verticals', 'condor']);
     expect(p.pad.setup.monitors).toBe(0);
+    expect(p.pad.setup.desk).toBe(0);
     expect(p.pad.deskItems).toEqual([]);
+    // Levels from an older, longer track are clamped; unknown desk items are dropped.
+    const old = mergeProfile({ pad: { setup: { monitors: 4, lighting: 3 }, deskItems: ['mug', 'nope'] } });
+    expect(old.pad.setup.monitors).toBe(3);
+    expect(old.pad.setup.lighting).toBe(3);
+    expect(old.pad.deskItems).toEqual(['mug']);
     expect(p.daily.results).toEqual({});
     expect(mergeProfile(null)).toEqual(defaultProfile());
+  });
+});
+
+describe('developer mode', () => {
+  it('unlocks every desk, pack, tier and cosmetic without losing progress', async () => {
+    const { unlockEverything, defaultProfile, cartridgePoolFor, cosmeticUnlocked, packUnlocked } =
+      await import('../../src/engine/meta/profile');
+    const { CARTRIDGE_PACKS, COSMETICS } = await import('../../src/content/meta');
+    const { DESK_ORDER } = await import('../../src/content/desks');
+    const p = { ...defaultProfile(), bonus: 12 };
+    const q = unlockEverything(p);
+    expect(q.desks).toEqual(DESK_ORDER);
+    for (const pk of CARTRIDGE_PACKS) expect(packUnlocked(q, pk.id)).toBe(true);
+    expect(cartridgePoolFor(q).length).toBe(CARTRIDGES.length);
+    expect(COSMETICS.every((c) => cosmeticUnlocked(q, c))).toBe(true);
+    expect(q.bonus).toBe(5012);
+    expect(p.desks.length).toBeLessThan(q.desks.length);
   });
 });

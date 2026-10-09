@@ -1,4 +1,5 @@
 import type { DecisionKind } from '../engine/lifecycle/types';
+import type { DeskId } from '../content/types';
 
 export type HotkeyAction =
   | 'positions'
@@ -58,7 +59,9 @@ export type HotkeyAction =
   | 'qtyDown'
   | 'presetWeekly'
   | 'presetSwing'
-  | 'presetMine';
+  | 'presetMine'
+  | 'chain'
+  | 'devPanel';
 
 /** thinkorswim defaults (plus game-only keys). Remappable in Settings. */
 export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
@@ -120,6 +123,8 @@ export const DEFAULT_HOTKEYS: Record<HotkeyAction, string> = {
   presetWeekly: 'W',
   presetSwing: 'M',
   presetMine: 'Y',
+  chain: 'Ctrl+5',
+  devPanel: 'Ctrl+Shift+D',
 };
 
 export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
@@ -176,11 +181,13 @@ export const HOTKEY_LABELS: Record<HotkeyAction, string> = {
   strikeDown: 'Short strike down one',
   expNext: 'Later expiration',
   expPrev: 'Earlier expiration',
-  qtyUp: 'One more contract',
-  qtyDown: 'One fewer contract',
+  qtyUp: 'More conviction (size)',
+  qtyDown: 'Less conviction (size)',
   presetWeekly: 'Setup: weekly',
   presetSwing: 'Setup: 30-45 day swing',
   presetMine: 'Setup: my saved setup',
+  chain: 'Option chain (full screen)',
+  devPanel: 'Developer panel (developer mode)',
 };
 
 export type DayPace = 'step' | '1' | '2' | '4';
@@ -192,8 +199,10 @@ export interface SavedSetup {
   delta: number;
   /** Width in strike steps. */
   width: number;
-  /** Risk per trade as a share of equity (sizes the contracts). */
+  /** Risk per trade as a share of equity (older saves). */
   riskPct: number;
+  /** Conviction (0.5-0.9): the confidence behind the call and the share of the risk cap used. */
+  conviction?: number;
   targetPct: number;
   stopMult: number;
 }
@@ -203,23 +212,44 @@ export interface Settings {
   version: number;
   game: {
     startingCapitalCents: number;
+    /**
+     * Starting capital for Income desk runs. Cash-secured puts and covered calls tie up the whole
+     * share price, so a small account can barely open one; the game asks before each Income run.
+     */
+    incomeCapitalCents: number;
     shortDelta: number;
     bucketMode: 'em' | 'fixed';
     /** Seconds per trading day at 1x (the candle plays for most of it). */
     ffSecondsPerDay: number;
     /** How the clock runs: one day per press, or continuously at 1x, 2x or 4x. */
     dayPace: DayPace;
+    /** How a closed trade's scoring plays out on screen (the payout). */
+    payoutSpeed: 'normal' | 'fast' | 'instant';
     /** Pause the clock (no pop-up) the first time a day trades near or through a short strike. */
     pauseOnTest: boolean;
     /** The player's own saved builder setup (the MY SETUP preset). */
     mySetup: SavedSetup | null;
     /** Calling a direction switches to a structure that fits it (up: bull put, down: bear call). */
     callPicksStructure: boolean;
+    /** Your trading plan, set once: take profit at this share of max profit... */
+    planTargetPct: number;
+    /** ...and stop a credit spread when the loss reaches this many times the credit. */
+    planStopMult: number;
     pause: Record<DecisionKind, boolean>;
     pureMarket: boolean;
     tutorialDone: boolean;
+    /** Structures whose first-use coach card has been seen. */
+    seenStructures: string[];
+    /** The desk the last Career run started with (Career opens on it). */
+    lastDesk?: DeskId;
+    /** Where the tutorial's lessons are (null: from the top). */
+    tutorialProgress: { idx: number; seen: string[]; skipped: boolean } | null;
+    /** The Trade Builder's options course: the lesson you're on and the lessons finished. */
+    courseProgress?: { idx: number; done: string[] } | null;
     /** Show a confirm box before each order (off: orders go out on Sell/Buy). */
     confirmOrders: boolean;
+    /** Developer mode: the DEV panel (unlocks, cash and stress levers, playtest notes). */
+    devMode: boolean;
   };
   realism: {
     bidAsk: boolean;
@@ -248,23 +278,28 @@ export interface Settings {
   data: { gameDbPath: string | null };
 }
 
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 5;
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
   game: {
     startingCapitalCents: 500_000,
+    incomeCapitalCents: 5_000_000,
     shortDelta: 0.3,
     bucketMode: 'em',
-    ffSecondsPerDay: 1.4,
-    dayPace: '1',
+    ffSecondsPerDay: 5.6,
+    dayPace: 'step',
+    payoutSpeed: 'normal',
     pauseOnTest: true,
     mySetup: null,
     callPicksStructure: true,
-    // Only the moments that need a real decision stop the clock. Targets close at plan by
-    // themselves; a touched short strike and 21 DTE show up as notices.
+    planTargetPct: 0.5,
+    planStopMult: 2,
+    // Only the moments that need a real decision stop the clock. A hit target waits for you to
+    // take the profit (1.6: closing is the player's call); a touched short strike and 21 DTE
+    // show up as notices.
     pause: {
-      target_hit: false,
+      target_hit: true,
       stop_hit: true,
       short_touched: false,
       dte21: false,
@@ -275,7 +310,10 @@ export const DEFAULT_SETTINGS: Settings = {
     },
     pureMarket: false,
     tutorialDone: false,
+    seenStructures: [],
+    tutorialProgress: null,
     confirmOrders: false,
+    devMode: false,
   },
   realism: {
     bidAsk: true,
@@ -309,15 +347,30 @@ export function mergeSettings(saved: unknown): Settings {
   const s = (saved ?? {}) as Partial<Settings>;
   // Version 2 (playtest feedback): fewer clock stops. Older saves take the new pause defaults.
   const old = (s.version ?? 1) < 2;
-  // Version 3: days play out as forming candles, so the old fast default (0.35 s) becomes 1.4 s.
-  const v3 = (s.version ?? 1) < 3 && s.game?.ffSecondsPerDay === 0.35 ? { ffSecondsPerDay: 1.4 } : {};
+  // Version 3: days play out as forming candles, so the old fast default (0.35 s) became 1.4 s.
+  // Version 4 (playtest 3): day by day is the default, and 1x runs at a quarter of the v3 speed.
+  const ver = s.version ?? 1;
+  // Version 5 (playtest 5): a hit profit target pauses so taking the profit is the player's move.
+  const v5 = ver < 5 ? { target_hit: true } : {};
+  const oldSpeed = s.game?.ffSecondsPerDay;
+  const v3 =
+    ver < 4
+      ? {
+          dayPace: 'step' as const,
+          ...(oldSpeed === undefined || oldSpeed === 0.35 || oldSpeed === 1.4
+            ? { ffSecondsPerDay: 5.6 }
+            : {}),
+        }
+      : {};
   return {
     version: SETTINGS_VERSION,
     game: {
       ...DEFAULT_SETTINGS.game,
       ...s.game,
       ...v3,
-      pause: old ? { ...DEFAULT_SETTINGS.game.pause } : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause },
+      pause: old
+        ? { ...DEFAULT_SETTINGS.game.pause }
+        : { ...DEFAULT_SETTINGS.game.pause, ...s.game?.pause, ...v5 },
     },
     realism: { ...DEFAULT_SETTINGS.realism, ...s.realism },
     blind: { ...DEFAULT_SETTINGS.blind, ...s.blind },

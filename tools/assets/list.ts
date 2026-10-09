@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ART_CATEGORY_TEXT, ART_SIZES, ART_SLOTS, type ArtCategory } from '../../src/content/art';
+import { ART_CATEGORY_TEXT, ART_SIZES, ART_SLOTS, slotSize, type ArtCategory } from '../../src/content/art';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const artDir = join(root, 'assets', 'art');
@@ -35,6 +35,7 @@ const order: ArtCategory[] = [
   'family',
   'cardback',
   'achievement',
+  'pad',
 ];
 
 const lines: string[] = [];
@@ -69,7 +70,8 @@ lines.push(
     const all = ART_SLOTS.filter((s) => s.category === c);
     const have = all.filter((s) => files.has(s.file)).length;
     const sz = ART_SIZES[c];
-    return `| ${ART_CATEGORY_TEXT[c].title} | ${sz.w} × ${sz.h} | ${have} / ${all.length} | ${ART_CATEGORY_TEXT[c].priority === 1 ? '**1 (first)**' : ART_CATEGORY_TEXT[c].priority === 2 ? '2' : '3 (nice to have)'} |`;
+    const size = c === 'pad' ? 'varies' : `${sz.w} × ${sz.h}`;
+    return `| ${ART_CATEGORY_TEXT[c].title} | ${size} | ${have} / ${all.length} | ${ART_CATEGORY_TEXT[c].priority === 1 ? '**1 (first)**' : ART_CATEGORY_TEXT[c].priority === 2 ? '2' : '3 (nice to have)'} |`;
   }),
   '',
 );
@@ -80,7 +82,7 @@ for (const f of files) {
   else {
     const slot = ART_SLOTS.find((s) => s.file === f)!;
     const sz = pngSize(join(artDir, f));
-    const want = ART_SIZES[slot.category];
+    const want = slotSize(slot);
     if (!sz) problems.push(`- \`${f}\` isn't a valid PNG.`);
     else if (sz.w !== want.w || sz.h !== want.h)
       problems.push(`- \`${f}\` is ${sz.w} × ${sz.h}; it should be ${want.w} × ${want.h}.`);
@@ -94,15 +96,21 @@ for (const c of order) {
   lines.push(
     `## ${t.title}`,
     '',
-    `**${sz.w} × ${sz.h} px.** Shown on: ${t.where}.`,
+    c === 'pad' ? '**Sizes vary: see each row.**' : `**${sz.w} × ${sz.h} px.**`,
+    `Shown on: ${t.where}.`,
     '',
-    '| ✓ | File name | Item | What it does | Drawing idea |',
-    '|---|---|---|---|---|',
+    c === 'pad'
+      ? '| ✓ | File name | Size | Item | What it is | Drawing idea |'
+      : '| ✓ | File name | Item | What it does | Drawing idea |',
+    c === 'pad' ? '|---|---|---|---|---|---|' : '|---|---|---|---|---|',
   );
   for (const s of ART_SLOTS.filter((x) => x.category === c)) {
     const cell = (x: string) => x.replace(/\|/g, '/').replace(/\n/g, ' ');
+    const size = slotSize(s);
     lines.push(
-      `| ${files.has(s.file) ? '✅' : '⬜'} | \`${s.file}\` | ${cell(s.name)} | ${cell(s.what)} | ${cell(s.idea)} |`,
+      c === 'pad'
+        ? `| ${files.has(s.file) ? '✅' : '⬜'} | \`${s.file}\` | ${size.w} × ${size.h} | ${cell(s.name)} | ${cell(s.what)} | ${cell(s.idea)} |`
+        : `| ${files.has(s.file) ? '✅' : '⬜'} | \`${s.file}\` | ${cell(s.name)} | ${cell(s.what)} | ${cell(s.idea)} |`,
     );
   }
   lines.push('');

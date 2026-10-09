@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launchGame, shot } from './helpers';
+import { dismissBoard, launchGame, shot } from './helpers';
 import { BALANCE } from '../../src/content/balance';
 
 const Q1 = BALANCE.targets.q1;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Any = any;
 
 type RunState = {
   phase: string;
@@ -46,7 +48,7 @@ async function fastClock(page: Page): Promise<void> {
     const s = (window as unknown as { __stg: Stg }).__stg;
     s.app.getState().updateSettings((x) => ({
       ...(x as object),
-      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06, pauseOnTest: false },
+      game: { ...(x as { game: object }).game, ffSecondsPerDay: 0.06, pauseOnTest: false, dayPace: '4' },
     }));
   });
 }
@@ -62,9 +64,9 @@ async function runState(page: Page): Promise<RunState | null> {
 async function sellBullPut(page: Page): Promise<void> {
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+2');
-  await expect(page.getByTestId('call-3')).toHaveClass(/selected/);
+  await expect(page.getByTestId('view-chip')).toContainText('UP');
   await page.getByTestId('structure-bull_put').click();
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await expect(page.getByTestId('score-preview')).toBeVisible();
   await page.keyboard.press('Alt+S');
   // Orders send straight away by default (no confirm box).
@@ -77,6 +79,9 @@ async function playToTally(page: Page, shotDecision?: string): Promise<void> {
   let shotTaken = false;
   for (let i = 0; i < 600; i++) {
     if (await page.getByTestId('tally-screen').isVisible()) return;
+    // Days with news (and recaps) hold the clock; keep it going.
+    const ff = await page.evaluate(() => (window as unknown as { __stg: Stg }).__stg.trading.getState().ff);
+    if (ff === 'paused') await page.keyboard.press('Space');
     const modal = page.getByTestId('decision-modal');
     if (await modal.isVisible()) {
       if (shotDecision && !shotTaken) {
@@ -94,15 +99,39 @@ async function playToTally(page: Page, shotDecision?: string): Promise<void> {
 
 test('career: start from the menu, save and exit, continue, abandon', async () => {
   const { app, page } = await launchGame();
+  // Income comes first; this run plays Verticals (free too).
   await page.getByTestId('menu-career').click();
   await expect(page.getByTestId('career-screen')).toBeVisible();
-  await expect(page.getByTestId('desk-verticals')).toBeVisible();
-  await expect(page.getByTestId('desk-income')).toBeDisabled();
+  await expect(page.getByTestId('desk-income')).toBeEnabled();
+  await page.getByTestId('desk-verticals').click();
   await shot(page, '06-career-1920');
+  // Seed, tier and Compliance live on the CHALLENGE & OPTIONS tab.
+  await page.getByTestId('ctab-options').click();
   await page.getByTestId('seed-input').fill('menu-seed');
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('round-meter')).toContainText(`0 / ${Q1[0]}`);
+  await expect(page.getByTestId('round-meter')).toContainText(`0 / ${(Q1[0] * 10).toLocaleString('en-US')}`);
+  // The month menu comes up over the first Month: the quarter, the build and the exit plan.
+  await expect(page.getByTestId('month-menu')).toBeVisible();
+  await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');
+  await expect(page.getByTestId('mm-boss-name')).toBeVisible();
+  // Each Month card has its own emblem; the exit plan shows what it does and the run's scorecard.
+  await expect(page.getByTestId('round-emblem-bell')).toBeVisible();
+  await expect(page.getByTestId('round-emblem-candles')).toBeVisible();
+  await expect(page.getByTestId('exit-scorecard')).toContainText('No closes yet');
+  const example = page.getByTestId('exit-example');
+  await expect(example).toContainText('bank +$50.00');
+  await expect(example).toContainText('cut at −$200.00');
+  // Moving the stop moves the example: 1.5x the credit cuts at $150.
+  await page.getByTestId('plan-credit-stop').locator('.snap-tick').nth(1).click();
+  await expect(example).toContainText('cut at −$150.00');
+  await page.getByTestId('plan-credit-stop').locator('.snap-tick').nth(2).click();
+  await expect(example).toContainText('cut at −$200.00');
+  await page.waitForTimeout(600);
+  await shot(page, '06-month-menu-1920');
+  await shot(page, '06-month-menu-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await dismissBoard(page);
   // Director Kessler (or a colleague) greets the new run.
   await expect(page.getByTestId('dialogue')).toBeVisible();
   await expect(page.getByTestId('dialogue').locator('canvas')).toBeVisible();
@@ -153,6 +182,7 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
       .go('run'),
   );
   await expect(page.getByTestId('run-topbar')).toBeVisible();
+  await dismissBoard(page);
 
   // Round 1 through the real UI.
   await sellBullPut(page);
@@ -163,17 +193,42 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
   await page.setViewportSize({ width: 1920, height: 1080 });
   await playToTally(page, '06-decision-1920');
   await shot(page, '06-tally-anim-1920');
-  await page.getByTestId('tally-skip').click();
+  // Each trade's scoring already played as its payout, so the tally opens counted (a skip is
+  // there only when the payout is set to OFF).
+  const skip = page.getByTestId('tally-skip');
+  if (await skip.isVisible().catch(() => false)) await skip.click();
   await expect(page.getByTestId('tally-continue')).toBeVisible();
   await shot(page, '06-tally-1920');
   await page.getByTestId('tally-continue').click();
   await expect(page.getByTestId('shop-screen')).toBeVisible();
+  // The windows pop open one by one; shoot the settled desk.
+  await expect(page.getByTestId('desk-carts')).toBeVisible();
+  await page.waitForTimeout(1200);
   await shot(page, '06-shop-1920');
   await shot(page, '06-shop-1366', { width: 1366, height: 768 });
-  await page.setViewportSize({ width: 1920, height: 1080 });
+  // A colleague's line in the shop sits in the lower right, clear of the offers and NEXT.
+  await page.evaluate(() =>
+    (window as Any).__stg.run.setState({
+      speech: {
+        line: {
+          who: 'ines',
+          mood: 'happy',
+          text: 'Nice round. Spend on what your build actually uses, not on shiny things.',
+        },
+        n: 99,
+      },
+    }),
+  );
+  await expect(page.locator('.dialogue.who-ines')).toBeVisible();
+  await expect(page.getByTestId('dialogue')).toHaveCount(1);
+  await page.waitForTimeout(1200);
+  await shot(page, '06-shop-dialogue-1366');
+  await shot(page, '06-shop-dialogue-1920', { width: 1920, height: 1080 });
+  await page.evaluate(() => (window as Any).__stg.run.getState().clearSpeech());
   const cashBefore = (await runState(page))?.cash ?? 0;
   await page.getByTestId('leave-shop').click();
   await expect(page.getByTestId('run-topbar')).toBeVisible();
+  await dismissBoard(page);
   const r2 = await runState(page);
   expect(r2?.roundIndex).toBe(1);
   expect(r2?.round.target).toBe(Q1[1]);
@@ -231,18 +286,45 @@ test('career: a full 12-round Verticals run with tally, shop, Review and resume'
 
   // Let the bot finish the year through the same store actions, stopping to look at the Review.
   let sawReview = false;
+  let sawNextBoss = false;
   for (let i = 0; i < 400; i++) {
     const st = await runState(page);
     if (!st || st.phase === 'victory' || st.phase === 'defeat') break;
     if (st.phase === 'review_intro' && !sawReview) {
+      // The boss's case file, in the boss's colors.
       await expect(page.getByTestId('review-intro')).toBeVisible();
+      await expect(page.getByTestId('boss-name')).toBeVisible();
+      await expect(page.getByTestId('boss-twist')).not.toBeEmpty();
+      await expect(page.getByTestId('boss-vignette')).toBeAttached();
+      expect(await page.evaluate(() => document.documentElement.dataset.boss)).toBeTruthy();
       await page.waitForTimeout(1200);
       await shot(page, '06-review-1920');
+      await shot(page, '06-review-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      // Into its round: the twist sits on the chart, and the top bar names the boss.
+      await page.getByTestId('review-accept').click();
+      await expect(page.getByTestId('boss-banner')).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId('boss-chip')).toBeVisible();
+      await page.waitForTimeout(800);
+      await shot(page, '06-boss-round-1920');
+      await shot(page, '06-boss-round-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
       sawReview = true;
+      continue;
+    }
+    if (st.phase === 'shop' && st.roundIndex === 2 && !sawNextBoss) {
+      // After a Review the shop shows the next quarter's boss, a quarter ahead.
+      await expect(page.getByTestId('shop-next-boss')).toBeVisible();
+      await page.waitForTimeout(1200);
+      await shot(page, '06-shop-next-boss-1920');
+      await shot(page, '06-shop-next-boss-1366', { width: 1366, height: 768 });
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      sawNextBoss = true;
     }
     await page.evaluate(() => (window as unknown as { __stg: Stg }).__stg.botPlay('disciplined', 1));
   }
   expect(sawReview).toBe(true);
+  expect(sawNextBoss).toBe(true);
   const end = await runState(page);
   expect(['victory', 'defeat']).toContain(end?.phase);
   expect(end?.history.length).toBe(12);

@@ -15,9 +15,13 @@ import { sfx } from '../../audio/sfx';
 import { money, pnlClass, pnlText } from '../format';
 import { Kbd } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
-import { useTrading, type DayAnim } from '../store/trading';
-import { livePl, priceAt } from './dayPath';
+import { liveCardId, useTrading, type DayAnim } from '../store/trading';
+import { formingBar, livePl, priceAt } from './dayPath';
+import { MiniCandles } from './DayRecap';
+import { boundsOf, PlRange, shareText } from './PlRange';
 import { RollDialog } from './RollDialog';
+import { useActiveBoss, useSealed } from '../boss';
+import { SealedText } from './BossBanner';
 
 /** Progress (0..1) of the day being played, redrawn about 30 times a second; null between days. */
 export function useDayProgress(): { anim: DayAnim; t: number } | null {
@@ -60,38 +64,26 @@ export function useLivePl(positionId: string, settledCents: number): number {
 export function LivePnl({ pos }: { pos: Position }) {
   const settled = pos.status === 'open' ? (lastMark(pos)?.plCents ?? 0) : (pos.realizedCents ?? 0);
   const cents = useLivePl(pos.id, settled);
+  const sealed = useSealed('pnl');
+  if (sealed && pos.status === 'open') return <SealedText by={sealed} />;
   return <span className={`pnl num ${pnlClass(cents)}`}>{pnlText(cents)}</span>;
 }
 
-// ---------------- the trade card over the chart ----------------
-
-function planCents(p: Position): { stop: number; target: number } {
-  const perShare = 100 * p.qty * 100;
-  const stop = p.brackets.stopPl !== null ? Math.round(p.brackets.stopPl * perShare) : p.entry.maxLossCents;
-  const target =
-    p.brackets.targetPl !== null
-      ? Math.round(p.brackets.targetPl * perShare)
-      : (p.entry.maxProfitCents ?? p.entry.maxLossCents);
-  return { stop: Math.max(1, stop), target: Math.max(1, target) };
-}
-
-/** Stop on the left, target on the right, today's P/L as the marker. */
-function TugMeter({ cents, stop, target }: { cents: number; stop: number; target: number }) {
-  const x = cents >= 0 ? 50 + Math.min(1, cents / target) * 50 : 50 - Math.min(1, -cents / stop) * 50;
-  const hot = cents <= -stop * 0.8 ? 'near-stop' : cents >= target * 0.8 ? 'near-target' : '';
+/** The P/L-vs-max bar and readout for a positions table row, moving with the day. */
+export function LiveVsMax({ pos }: { pos: Position }) {
+  const settled = pos.status === 'open' ? (lastMark(pos)?.plCents ?? 0) : (pos.realizedCents ?? 0);
+  const cents = useLivePl(pos.id, settled);
+  const sealed = useSealed('pnl') && pos.status === 'open';
+  const b = boundsOf(pos);
   return (
-    <div className={`tug ${hot}`} data-tip="g:tug_meter">
-      <span className="tug-end down num">STOP −{money(stop)}</span>
-      <span className="tug-track">
-        <span className="tug-half loss" />
-        <span className="tug-half gain" />
-        <span className="tug-mid" />
-        <span className="tug-dot" style={{ left: `${x}%` }} />
-      </span>
-      <span className="tug-end up num">+{money(target)} TARGET</span>
+    <div className="pos-range">
+      <PlRange cents={sealed ? null : cents} bounds={b} size="mini" />
+      {!sealed && <span className={cents >= 0 ? 'up' : 'down'}>{shareText(cents, b)}</span>}
     </div>
   );
 }
+
+// ---------------- the trade card over the chart ----------------
 
 function HudRow({
   p,
@@ -107,7 +99,7 @@ function HudRow({
   const settled = p.status === 'open' ? (lastMark(p)?.plCents ?? 0) : (p.realizedCents ?? 0);
   const cents = useLivePl(p.id, settled);
   const spot = useLivePrice(p.cardId, view?.spot() ?? 0);
-  const { stop, target } = planCents(p);
+  const bounds = boundsOf(p);
   const shorts = optionLegsOf(p.legs).filter((l) => l.ratio < 0);
   const nearest = shorts.length
     ? shorts.reduce((a, l) => (Math.abs(l.strike - spot) < Math.abs(a.strike - spot) ? l : a))
@@ -121,6 +113,10 @@ function HudRow({
       ? Math.min(...optionLegsOf(p.legs).map((l) => diffDays(view.now, l.expiration)))
       : null;
   const theta = (lastMark(p)?.greeks.theta ?? 0) * p.qty;
+  const tax = useActiveBoss()?.rule.shortWinTax;
+  const sealedBy = useSealed('pnl');
+  const plSealed = p.status === 'open' ? sealedBy : null;
+  const held = Math.max(0, p.marks.length - 1);
   return (
     <div className={`hud-row ${selected ? 'sel' : ''} ${p.status}`} data-testid={`hud-${p.id}`}>
       <div className="hud-head">
@@ -129,14 +125,24 @@ function HudRow({
           {STRUCTURES[p.structureId].short} {p.entry.shortStrikes.join('/')}
           {p.qty > 1 ? ` ×${p.qty}` : ''}
         </span>
-        <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:pl_open">
-          {pnlText(cents)}
+        <span className="hud-inhand num dim" data-tip="g:credit_view">
+          {p.openNet < 0 ? 'IN HAND' : 'PAID'} {money(Math.round(Math.abs(p.openNet) * 100 * 100 * p.qty))}
         </span>
+        {plSealed ? (
+          <span className="hud-pl num">
+            <span className="hud-pl-k">IF CLOSED</span> <SealedText by={plSealed} />
+          </span>
+        ) : (
+          <span className={`hud-pl num ${pnlClass(cents)}`} data-tip="g:credit_view">
+            <span className="hud-pl-k">{p.status === 'open' ? 'IF CLOSED' : 'REALIZED'}</span>{' '}
+            {pnlText(cents)}
+          </span>
+        )}
         <AnimatePresence>
-          {floats.map((f) => (
+          {(plSealed ? [] : floats).map((f) => (
             <motion.span
               key={f.id}
-              className={`hud-float num ${f.cents >= 0 ? 'up' : 'down'}`}
+              className={`hud-float unreal num ${f.cents >= 0 ? 'up' : 'down'}`}
               initial={{ y: 6, opacity: 0, scale: 0.8 }}
               animate={{ y: -18, opacity: [0, 1, 1, 0], scale: 1 }}
               transition={{ duration: 1.6, ease: 'easeOut' }}
@@ -148,9 +154,21 @@ function HudRow({
       </div>
       {p.status === 'open' ? (
         <>
-          <TugMeter cents={cents} stop={stop} target={target} />
+          <PlRange cents={plSealed ? null : cents} bounds={bounds} />
           <div className="hud-facts num dim">
+            {!plSealed && (
+              <span className={cents >= 0 ? 'up' : 'down'} data-testid="hud-share">
+                {shareText(cents, bounds)}
+              </span>
+            )}
             {dte !== null && <span data-tip="g:dte">{dte} DTE</span>}
+            {tax && (
+              <span className={held <= tax.days ? 'down' : 'up'} data-testid="hud-tax">
+                {held <= tax.days
+                  ? `TAXED x${tax.mult} for ${tax.days - held + 1} more day${tax.days - held + 1 === 1 ? '' : 's'}`
+                  : 'TAX-FREE'}
+              </span>
+            )}
             <span data-tip="g:pos_theta" className={theta >= 0 ? 'up' : 'down'}>
               Θ {theta >= 0 ? '+' : '−'}${Math.abs(theta).toFixed(0)}/day
             </span>
@@ -172,22 +190,83 @@ function HudRow({
   );
 }
 
+/**
+ * The miniplayer: a small live chart for each open trade on a card that isn't on screen, with its
+ * strikes, P/L and range, so nothing moves unseen while the clock runs. Click one to watch it.
+ */
+function MiniTile({ p }: { p: Position }) {
+  const session = useTrading((s) => s.session);
+  const select = useTrading((s) => s.select);
+  const prog = useDayProgress();
+  const view = session?.view(p.cardId);
+  const settled = p.status === 'open' ? (lastMark(p)?.plCents ?? 0) : (p.realizedCents ?? 0);
+  const cents = useLivePl(p.id, settled);
+  const sealedBy = useSealed('pnl');
+  const plSealed = p.status === 'open' ? sealedBy : null;
+  if (!view) return null;
+  let bars = view.bars().slice(-18);
+  const card = prog?.anim.cards[p.cardId];
+  // While the day plays, the newest candle forms here too.
+  if (card && prog && bars.length && bars[bars.length - 1].date === card.date) {
+    const live = formingBar(card.path, prog.t);
+    bars = [...bars.slice(0, -1), { ...bars[bars.length - 1], ...live }];
+  }
+  const legs = optionLegsOf(p.legs);
+  return (
+    <button
+      className={`mini-tile ${p.status} ${plSealed ? '' : cents >= 0 ? 'up' : 'down'}`}
+      data-testid={`mini-${p.id}`}
+      onClick={() => {
+        sfx('select');
+        select(p.cardId);
+      }}
+      data-tip-title={`${p.symbol}: ${STRUCTURES[p.structureId].name}`}
+      data-tip-body="An open trade on another card. Click to put it on the big chart."
+    >
+      <span className="mt-head">
+        <span className="mt-sym">{p.symbol}</span>
+        {plSealed ? (
+          <span className="mt-pl num sealed-num">🔒</span>
+        ) : (
+          <span className={`mt-pl num ${pnlClass(cents)}`}>{pnlText(cents)}</span>
+        )}
+      </span>
+      <MiniCandles
+        bars={bars}
+        shorts={legs.filter((l) => l.ratio < 0).map((l) => l.strike)}
+        longs={legs.filter((l) => l.ratio > 0).map((l) => l.strike)}
+        width={104}
+        height={44}
+      />
+      {p.status === 'open' ? (
+        <PlRange cents={plSealed ? null : cents} bounds={boundsOf(p)} size="mini" />
+      ) : (
+        <span className="mt-closed num">CLOSED · {p.exitReason}</span>
+      )}
+    </button>
+  );
+}
+
 /** The live trade card in the corner of the chart while the clock is running. */
 export function PositionHud() {
   const session = useTrading((s) => s.session);
   useTrading((s) => s.version);
   const ff = useTrading((s) => s.ff);
-  const selectedCard = useTrading((s) => s.selectedCardId);
+  const selectedCard = useTrading(liveCardId);
   const floats = useTrading((s) => s.floats);
   const note = useTrading((s) => s.testNote);
   const anim = useTrading((s) => s.dayAnim);
   const closePosition = useTrading((s) => s.closePosition);
   const [rolling, setRolling] = useState<Position | null>(null);
-  if (!session || ff === 'idle' || ff === 'done') return null;
+  const recap = useTrading((s) => s.recap);
+  // The day recap covers the same ground (and more) while it is up.
+  if (!session || ff === 'idle' || ff === 'done' || (recap && (ff === 'paused' || ff === 'decision')))
+    return null;
   // Open trades, plus any that closed during the day being played.
   const rows = session.positions.filter((p) => p.status === 'open' || (anim && anim.positions[p.id]));
   if (!rows.length) return null;
-  rows.sort((a, b) => Number(b.cardId === selectedCard) - Number(a.cardId === selectedCard));
+  const here = rows.filter((p) => p.cardId === selectedCard);
+  const elsewhere = rows.filter((p) => p.cardId !== selectedCard);
   const focus =
     rows.find((p) => p.status === 'open' && p.cardId === selectedCard) ??
     rows.find((p) => p.status === 'open');
@@ -199,13 +278,16 @@ export function PositionHud() {
           ⚠ {note} <Kbd>Space</Kbd> keep going · <Kbd>Alt+F</Kbd> close
         </div>
       )}
-      {rows.slice(0, 3).map((p) => (
-        <HudRow
-          key={p.id}
-          p={p}
-          selected={p.cardId === selectedCard}
-          floats={floats.filter((f) => f.positionId === p.id)}
-        />
+      {elsewhere.length > 0 && (
+        <div className="mini-player" data-testid="mini-player">
+          {elsewhere.slice(0, 3).map((p) => (
+            <MiniTile key={p.id} p={p} />
+          ))}
+          {elsewhere.length > 3 && <span className="mt-more num dim">+{elsewhere.length - 3}</span>}
+        </div>
+      )}
+      {here.slice(0, 2).map((p) => (
+        <HudRow key={p.id} p={p} selected floats={floats.filter((f) => f.positionId === p.id)} />
       ))}
       {waiting && focus && (
         <div className="hud-actions">
@@ -232,7 +314,7 @@ export function PositionHud() {
 
 // ---------------- pace ----------------
 
-const PACE_LABEL: Record<DayPace, string> = { step: 'DAY BY DAY', '1': '1×', '2': '2×', '4': '4×' };
+const PACE_LABEL: Record<DayPace, string> = { step: 'DAY', '1': '1×', '2': '2×', '4': '4×' };
 const PACE_ORDER: DayPace[] = ['step', '1', '2', '4'];
 
 export function PaceControls() {
@@ -260,6 +342,7 @@ export function PaceControls() {
             data-testid={`pace-${p}`}
           >
             {PACE_LABEL[p]}
+            {p === 'step' && <span className="pace-wide"> BY DAY</span>}
           </button>
         ))}
       </span>

@@ -140,6 +140,18 @@ describe('brackets and decision points', () => {
     expect(auto.pos.realizedCents).toBeLessThan(-30000);
   });
 
+  it("takes a covered call's automatic stop without asking, even with stop pauses on", () => {
+    const cc: Leg[] = [{ kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: -1 }];
+    const p = { ...open(cc, 1, -1.5), structureId: 'covered_call' as const };
+    expect(p.brackets.stopPl).toBe(3);
+    // A rally through the strike: the call's loss passes 2x the premium.
+    const r = atClose(p, day('2025-01-10', 112), ctx());
+    expect(r.decisions.map((d) => d.kind)).not.toContain('stop_hit');
+    expect(r.autoClosed).toBe(true);
+    expect(r.pos.exitReason).toBe('stop');
+    expect(r.pos.flags.closedAtPlan).toBe('stop');
+  });
+
   it('flags 21 DTE, earnings tomorrow, ex-dividend with an ITM short call, and pin risk', () => {
     const p = open();
     const d21 = atClose(p, day('2025-01-10', 101), ctx());
@@ -211,19 +223,77 @@ describe('expiration', () => {
     expect(sold.pos.realizedCents).toBe(30000 - 60000);
   });
 
-  it('flips a seeded coin for pin risk within 0.5% of a short strike', () => {
+  it('expires out-of-the-money shorts worthless and assigns in-the-money ones, even by a cent', () => {
     const csp: Leg[] = [{ kind: 'option', right: 'P', strike: 95, expiration: EXP, ratio: -1 }];
-    let assigned = 0;
-    for (let i = 0; i < 400; i++) {
-      const r = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng(`pin${i}`) }));
-      if (r.assignedToday) assigned++;
+    // Just above a short put's strike: worthless, the credit is kept, no shares.
+    const otm = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin') }));
+    expect(otm.assignedToday).toBe(false);
+    expect(otm.pos.status).toBe('closed');
+    expect(otm.pos.exitReason).toBe('expired');
+    expect(otm.pos.realizedCents).toBe(10000);
+    // A cent in the money: assigned 100 shares at the strike.
+    const itm = endOfDay(open(csp, 1, -1), day(EXP, 94.99), ctx({ rng: new Rng('pin') }));
+    expect(itm.assignedToday).toBe(true);
+    expect(stockRatio(itm.pos.legs)).toBe(1);
+  });
+
+  it('covered calls and cash-secured puts settle as the option alone (your 500 shares stay off the books)', () => {
+    // A covered call is the call alone: sold the 105 call for 1.50.
+    const cc = {
+      ...open([{ kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: -1 }], 1, -1.5),
+      structureId: 'covered_call' as const,
+    };
+    for (const spot of [100, 97, 104.99]) {
+      const r = endOfDay(cc, day(EXP, spot), ctx());
+      // Below the strike: expires worthless, premium kept, whatever the shares did.
+      expect(r.pos.status).toBe('closed');
+      expect(r.pos.realizedCents).toBe(15000);
+      expect(r.assignedToday).toBe(false);
+      expect(stockRatio(r.pos.legs)).toBe(0);
     }
-    expect(assigned).toBeGreaterThan(150);
-    expect(assigned).toBeLessThan(250);
-    const again = endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday;
-    expect(endOfDay(open(csp, 1, -1), day(EXP, 95.2), ctx({ rng: new Rng('pin7') })).assignedToday).toBe(
-      again,
-    );
+    // Above the strike: the shares are called away at 105; the trade gives back the 3 past it.
+    const up = endOfDay(cc, day(EXP, 108), ctx());
+    expect(up.assignedToday).toBe(true);
+    expect(up.pos.status).toBe('closed');
+    expect(up.pos.legs).toEqual([]);
+    expect(up.pos.realizedCents).toBe(15000 - 30000);
+    expect(up.pos.events.find((e) => e.kind === 'assigned')?.detail).toMatch(/Called away/);
+    // A cash-secured put assigned at 95 with the stock at 90: bought into your holding, the trade
+    // is the premium less the 5 below the strike, and nothing is left holding shares.
+    const csp = {
+      ...open([{ kind: 'option', right: 'P', strike: 95, expiration: EXP, ratio: -1 }], 1, -1.2),
+      structureId: 'cash_secured_put' as const,
+    };
+    const down = endOfDay(csp, day(EXP, 90), ctx());
+    expect(down.assignedToday).toBe(true);
+    expect(down.pos.status).toBe('closed');
+    expect(down.pos.realizedCents).toBe(12000 - 50000);
+    expect(down.pos.flags.assigned).toBe(true);
+    expect(down.pos.events.find((e) => e.kind === 'assigned')?.detail).toMatch(/bought 100 shares at 95/);
+    expect(endOfDay(csp, day(EXP, 96), ctx()).pos.realizedCents).toBe(12000);
+  });
+
+  it('a covered call saved before 1.5 (still holding its shares) keeps the premium and sells them at that close', () => {
+    const cc: Leg[] = [
+      { kind: 'stock', ratio: 1 },
+      { kind: 'option', right: 'C', strike: 105, expiration: EXP, ratio: -1 },
+    ];
+    // Bought the shares at 100 and sold the call for 1.50: a 98.50 net debit per share.
+    const p = { ...open(cc, 1, 98.5), structureId: 'covered_call' as const };
+    const flat = endOfDay(p, day(EXP, 100), ctx());
+    expect(flat.pos.status).toBe('closed');
+    expect(flat.pos.legs).toEqual([]);
+    // Shares unchanged at 100: the result is exactly the premium.
+    expect(flat.pos.realizedCents).toBe(15000);
+    expect(flat.pos.events.at(-1)?.detail).toMatch(/premium kept/);
+    // Below the strike but the stock fell: premium kept, the share loss is part of the trade.
+    const down = endOfDay(p, day(EXP, 97), ctx());
+    expect(down.pos.realizedCents).toBe(15000 - 30000);
+    // Above the strike: the call is assigned and the shares go at 105.
+    const up = endOfDay(p, day(EXP, 108), ctx());
+    expect(up.assignedToday).toBe(true);
+    expect(up.pos.status).toBe('closed');
+    expect(up.pos.realizedCents).toBe(15000 + 50000);
   });
 
   it('cash-settles at intrinsic when expiration mechanics are off', () => {
@@ -281,6 +351,37 @@ describe('early assignment and dividends', () => {
       ctx({ realism: { ...DEFAULT_REALISM, earlyAssignment: false } }),
     );
     expect(off.assignedToday).toBe(false);
+    // As a cash-secured put, an early assignment settles on the spot: no shares left behind.
+    for (let i = 0; i < 200; i++) {
+      const r = endOfDay(
+        { ...open(csp, 1, -3), structureId: 'cash_secured_put' },
+        flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }),
+        ctx({ rng: new Rng(`ea${i}`) }),
+      );
+      if (!r.assignedToday) continue;
+      expect(r.pos.status).toBe('closed');
+      expect(r.pos.realizedCents).toBe(30000 - 200000);
+      expect(stockRatio(r.pos.legs)).toBe(0);
+      break;
+    }
+  });
+
+  it('a covered call over an ex-dividend date notes the dividend but keeps it out of the P/L', () => {
+    const cc = {
+      ...open([{ kind: 'option', right: 'C', strike: 110, expiration: EXP, ratio: -1 }], 1, -1),
+      structureId: 'covered_call' as const,
+    };
+    const r = atClose(
+      cc,
+      flatBook(
+        { date: '2025-01-28', spot: 100, expirations: [EXP] },
+        { exDivToday: { symbol: 'T', exDate: '2025-01-28', amount: 0.5 } },
+      ),
+      ctx(),
+    );
+    expect(r.pos.cashCents).toBe(cc.cashCents);
+    expect(r.pos.flags.dividendsCents).toBe(5000);
+    expect(r.pos.events.some((e) => e.kind === 'dividend' && (e.cashCents ?? 0) > 0)).toBe(true);
   });
 });
 

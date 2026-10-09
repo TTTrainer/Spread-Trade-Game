@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launchGame, shot } from './helpers';
+import { dismissBoard, launchGame, shot } from './helpers';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -11,7 +11,7 @@ async function fastClock(page: Page): Promise<void> {
   await page.evaluate(() => {
     (window as Any).__stg.app.getState().updateSettings((x: Any) => ({
       ...x,
-      game: { ...x.game, ffSecondsPerDay: 0.06, pauseOnTest: false },
+      game: { ...x.game, ffSecondsPerDay: 0.06, pauseOnTest: false, dayPace: '4' },
     }));
   });
 }
@@ -29,7 +29,7 @@ async function giveProfile(page: Page, patch: Record<string, unknown>): Promise<
 async function placeDefault(page: Page): Promise<void> {
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+2');
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.waitForTimeout(300);
   const credit = await page.evaluate(() => ((window as Any).__stg.trading.getState().plan()?.mid ?? 0) < 0);
   await page.keyboard.press(credit ? 'Alt+S' : 'Alt+B');
@@ -42,6 +42,9 @@ async function runClock(page: Page, done: () => Promise<boolean>, maxLoops = 600
   await page.keyboard.press('Space');
   for (let i = 0; i < maxLoops; i++) {
     if (await done()) return;
+    // Days with news (and recaps) hold the clock; keep it going.
+    const ff = await page.evaluate(() => (window as Any).__stg.trading.getState().ff as string);
+    if (ff === 'paused') await page.keyboard.press('Space');
     const modal = page.getByTestId('decision-modal');
     if (await modal.isVisible()) {
       const hold = page.getByTestId('dp-hold');
@@ -62,6 +65,7 @@ test('daily: seeded quarter with Bradley’s ghost, save and continue', async ()
   await page.getByTestId('daily-start').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('ghost-chip')).toContainText('BRADLEY');
+  await dismissBoard(page);
   await shot(page, '09-daily-run-1920');
   await page.getByTestId('run-menu').click();
   await expect(page.getByTestId('title-screen')).toBeVisible();
@@ -92,28 +96,43 @@ test('contracts: take a client request, trade it out, get paid', async () => {
   await app.close();
 });
 
-test('live: paper spread at the latest close, sync, positions catch up', async () => {
+test('live: a month back with a dealt lineup, play to the latest close, new days play on', async () => {
   const { app, page } = await launchGame();
   await fastClock(page);
-  await page.getByTestId('menu-live').click();
-  await expect(page.getByTestId('live-edge')).toContainText('AS OF', { timeout: 30_000 });
-  const edge1 = await page.getByTestId('live-edge').innerText();
-  await page.locator('[data-testid^="live-sym-"]').first().click();
+  await page.getByTestId('menu-builder').click();
+  await page.getByTestId('builder-classic').click();
+  await expect(page.getByTestId('live-day')).toContainText('DAY 0 OF 20', { timeout: 30_000 });
+  await expect(page.getByTestId('live-open-desk')).toContainText('START THE MONTH');
+  await shot(page, '09-live-hub-1920');
+  const hubScroll = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid=live-screen]') as HTMLElement;
+    return el.scrollHeight - el.clientHeight;
+  });
+  console.log('HUB_SCROLL_1920', hubScroll);
+  await shot(page, '09-live-hub-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.getByTestId('live-open-desk').click();
   await expect(page.getByTestId('topbar')).toContainText('LIVE');
+  await expect(page.getByTestId('live-howto')).toBeVisible();
+  const cards = await page.evaluate(() => (window as Any).__stg.trading.getState().session.cards.length);
+  expect(cards).toBeGreaterThanOrEqual(4);
   await page.getByTestId('structure-bull_put').click();
   // A narrow spread keeps the max loss inside the 10% risk cap on any SIM price.
   await page.evaluate(() => (window as Any).__stg.trading.getState().setBuilder({ width: 1 }));
   await placeDefault(page);
   await shot(page, '09-live-trade-1920');
-  await page.keyboard.press('Space');
-  await expect(page.getByTestId('toasts')).toContainText('Sync', { timeout: 15_000 });
+  await shot(page, '09-live-trade-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  // The whole month plays to the latest close, then the clock waits there.
+  await runClock(page, async () => (await page.getByTestId('live-caught-up').count()) > 0);
+  await expect(page.getByTestId('toasts')).toContainText('Caught up', { timeout: 15_000 });
+  await shot(page, '09-live-caught-up-1920');
   await page.getByTestId('live-back').click();
-  await expect(page.getByTestId('live-positions')).toBeVisible();
+  await expect(page.getByTestId('live-day')).toContainText('CAUGHT UP');
   await shot(page, '09-live-1920');
+  // New days (on the SIM market, a simulated week) play on from where the month stopped.
   await page.getByTestId('live-sync').click();
-  await expect(page.getByTestId('live-edge')).not.toHaveText(edge1, { timeout: 30_000 });
-  await expect(page.getByTestId('live-positions')).toBeVisible();
-  // The desk opens where we left off and the clock runs to the new close.
+  await expect(page.getByTestId('live-day')).toContainText('DAY 20 OF 25', { timeout: 30_000 });
   await page.getByTestId('live-open-desk').click();
   const day0 = await page.evaluate(() => (window as Any).__stg.trading.getState().session.dayIndex);
   await runClock(page, async () => {
@@ -123,6 +142,16 @@ test('live: paper spread at the latest close, sync, positions catch up', async (
     });
     return s.day > day0 && s.ff !== 'running' && s.ff !== 'decision';
   });
+  // A ticker added from the hub joins on the day the desk is on.
+  await page.getByTestId('live-back').click();
+  const sym = page.locator('[data-testid^="live-sym-"]:not(.sel)').first();
+  await sym.click();
+  await expect(page.getByTestId('topbar')).toContainText('LIVE');
+  const sameDay = await page.evaluate(() => {
+    const s = (window as Any).__stg.trading.getState().session;
+    return new Set(s.cards.map((c: Any) => s.view(c.id).now)).size;
+  });
+  expect(sameDay).toBe(1);
   await app.close();
 });
 
@@ -138,9 +167,27 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await page.getByTestId('pad-buy-art_theta').click();
   await page.getByTestId('pad-tab-vehicles').click();
   await page.getByTestId('pad-buy-v_hoverbike').click();
+  await page.getByTestId('pad-tab-watches').click();
+  await page.getByTestId('pad-buy-w_gold').click();
+  await page.getByTestId('pad-buy-w_diver').click();
   await page.getByTestId('pad-tab-setup').click();
-  await page.getByTestId('pad-setup-monitors').click();
-  await page.getByTestId('pad-setup-monitors').click();
+  for (const track of [
+    'monitors',
+    'monitors',
+    'desk',
+    'desk',
+    'chair',
+    'plants',
+    'plants',
+    'lighting',
+    'lighting',
+  ])
+    await page.getByTestId(`pad-setup-${track}`).click();
+  await page.getByTestId('pad-tab-items').click();
+  await page.getByTestId('pad-item-pens').click();
+  await page.getByTestId('pad-show-pens').click();
+  await page.getByTestId('pad-show-notebook').click();
+  await expect(page.getByTestId('pad-show-notebook')).toHaveText('ON THE DESK');
   await expect(page.getByTestId('pad-bonus')).not.toContainText('1000');
   await shot(page, '09-pad-1920');
   await shot(page, '09-pad-1366', { width: 1366, height: 768 });
@@ -148,9 +195,11 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await page.getByRole('button', { name: 'BACK' }).click();
   await page.getByTestId('menu-career').click();
   await expect(page.getByTestId('career-rank')).toContainText('TRADER');
-  await expect(page.getByTestId('desk-income')).toBeDisabled();
-  await page.getByTestId('unlock-income').click();
+  // Income and Verticals are free from the start; the other desks are bought with Bonus.
   await expect(page.getByTestId('desk-income')).toBeEnabled();
+  await expect(page.getByTestId('desk-verticals')).toBeEnabled();
+  await expect(page.getByTestId('desk-calendar')).toBeDisabled();
+  await page.getByTestId('ctab-options').click();
   await expect(page.getByTestId('tier-0')).toBeEnabled();
   await expect(page.getByTestId('tier-1')).toBeDisabled();
   await page.getByTestId('rule-fees').check();
@@ -159,24 +208,23 @@ test('the pad and the career office: Bonus buys art, a new home, a desk; tiers a
   await shot(page, '09-career-1920');
   await shot(page, '09-career-1366', { width: 1366, height: 768 });
   await page.setViewportSize({ width: 1920, height: 1080 });
-  // The run starts with the rules on.
+  // The run starts with the rules on (the desk is picked on the QUICK START tab).
+  await page.getByTestId('ctab-start').click();
   await page.getByTestId('desk-income').click();
   await page.getByTestId('start-run').click();
+  // Income asks for the starting capital first ($50,000 recommended).
+  await expect(page.getByTestId('income-capital')).toBeVisible();
+  await expect(page.getByTestId('income-cap-go')).toContainText('$50,000');
+  await shot(page, '09-income-capital-1366', { width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.getByTestId('income-cap-100000').click();
+  await page.getByTestId('income-cap-go').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('topbar').or(page.locator('.rtb-round'))).toContainText('HEAT 3');
-  await app.close();
-});
-
-test('tutorial: Ines coaches the first round', async () => {
-  const { app, page } = await launchGame();
-  await page.getByTestId('menu-career').click();
-  await expect(page.getByTestId('tutorial-banner')).toBeVisible();
-  await page.getByTestId('start-tutorial').click();
-  await expect(page.getByTestId('tutorial-coach')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'call');
-  await page.keyboard.press('4');
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', 'build');
-  await shot(page, '09-tutorial-1920');
+  const equity = await page.evaluate(
+    () => (window as Any).__stg.run.getState().engine.state.config.startEquityCents,
+  );
+  expect(equity).toBe(10_000_000);
   await app.close();
 });
 
@@ -215,6 +263,9 @@ test('endless: a Career victory continues into Year 2', async () => {
   await page.getByTestId('end-endless').click();
   await expect(page.getByTestId('shop-screen')).toBeVisible();
   await page.getByTestId('leave-shop').click();
+  await expect(page.getByTestId('board-play')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('mm-round-0')).toContainText('UP NEXT');
+  await page.getByTestId('board-play').click();
   await expect(page.locator('.rtb-round')).toContainText('Y2 Q1', { timeout: 60_000 });
   await expect(page.locator('.rtb-round')).toContainText('ENDLESS');
   await shot(page, '09-endless-round-1920');

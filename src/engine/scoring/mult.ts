@@ -41,6 +41,9 @@ export interface TraceRow {
   value: number;
   chips: number;
   mult: number;
+  /** Where it came from (the payout animation fires the matching cartridge). */
+  kind?: ScoreSourceKind;
+  source?: string;
 }
 
 export interface ScoreResult {
@@ -49,6 +52,20 @@ export interface ScoreResult {
   mult: number;
   points: number; // what the meter moves by
   trace: TraceRow[];
+}
+
+/**
+ * How much of its bonus chips a win keeps: all of them once it earned BONUS_FULL_ROR of what it
+ * risked (a credit spread closed at its 50% target is about 0.2), less for a scrape. Measured on
+ * risk, not account size, so a careful small trade scores as well as a big one.
+ */
+export function winQuality(returnOnRisk: number | null, structureId?: string): number {
+  if (returnOnRisk === null) return 1;
+  // A cash-secured put's risk is a stress drop in the stock, so a good one earns a far smaller
+  // share of its risk than a spread does. (A covered call's risk is its automatic stop: a spread's.)
+  const full =
+    structureId === 'cash_secured_put' ? BALANCE.scoring.incomeFullRoR : BALANCE.scoring.bonusFullRoR;
+  return Math.max(0, Math.min(1, returnOnRisk / full));
 }
 
 export function pnlChips(realizedCents: Cents, roundStartEquityCents: Cents): number {
@@ -64,24 +81,40 @@ export function runScore(
   realizedCents: Cents,
   roundStartEquityCents: Cents,
   steps: ScoreStep[],
+  /** The win's quality (winQuality): scales its bonus chips. */
+  quality = 1,
 ): ScoreResult {
   const winner = realizedCents > 0;
-  const base = pnlChips(realizedCents, roundStartEquityCents) * (winner ? 1 : BALANCE.scoring.lossChipsScale);
-  const trace: TraceRow[] = [{ label: 'P/L', op: 'chips', value: base, chips: base, mult: 1 }];
+  const pnl = pnlChips(realizedCents, roundStartEquityCents);
+  const base = pnl * (winner ? 1 : BALANCE.scoring.lossChipsScale);
+  const trace: TraceRow[] = [{ label: 'P/L', op: 'chips', value: base, chips: base, mult: 1, kind: 'pnl' }];
+  // Bonus chips grow with the win's quality: a scrape that earned little of what it risked can't
+  // farm the same bonuses as a real win.
+  const size = winner ? Math.max(0, Math.min(1, quality)) : 1;
   let chips = base;
   let mult = 1;
   let meter = 1;
   for (const s of steps) {
     if (!winner && s.op !== 'meter') continue; // losers: chips are never multiplied or padded
-    if (s.op === 'chips') chips += s.value;
-    else if (s.op === 'chipsMul') chips *= s.value;
-    else if (s.op === 'add') mult += s.value;
-    else if (s.op === 'mul') mult *= s.value;
-    else meter *= s.value;
-    trace.push({ label: s.label, op: s.op, value: s.value, chips, mult });
+    const value = s.op === 'chips' ? s.value * size : s.value;
+    if (s.op === 'chips') chips += value;
+    else if (s.op === 'chipsMul') chips *= value;
+    else if (s.op === 'add') mult += value;
+    else if (s.op === 'mul') mult *= value;
+    else meter *= value;
+    const label = s.op === 'chips' && size < 1 ? `${s.label} (thin win ×${size.toFixed(2)})` : s.label;
+    trace.push({ label, op: s.op, value, chips, mult, kind: s.kind, source: s.source });
   }
-  const points = winner ? chips * mult * meter : chips * meter;
-  return { winner, chips, mult: winner ? mult : 1, points: Math.round(points), trace };
+  // The screen shows chips and points ×10 as whole numbers (SCORE_SCALE), so both are kept to a
+  // tenth here: the chips you see times the mult you see is the total you get.
+  const whole = Math.round(chips * 10);
+  const points = Math.round(winner ? whole * mult * meter : whole * meter) / 10;
+  return { winner, chips, mult: winner ? mult : 1, points, trace };
+}
+
+/** Points to a tenth (whole on screen at ×10). Keeps sums of points free of float drift. */
+export function tenths(x: number): number {
+  return Math.round(x * 10) / 10;
 }
 
 export function levelSteps(level: number, baseChips: number): ScoreStep[] {

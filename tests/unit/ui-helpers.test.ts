@@ -22,6 +22,16 @@ describe('settings', () => {
     expect(m.hotkeys.buy).toBe('Alt+B');
     expect(mergeSettings(null)).toEqual(DEFAULT_SETTINGS);
   });
+
+  it('pauses on a hit profit target, including for saves from before 1.6', () => {
+    expect(DEFAULT_SETTINGS.game.pause.target_hit).toBe(true);
+    const old = mergeSettings({ version: 4, game: { pause: { target_hit: false, stop_hit: false } } });
+    expect(old.game.pause.target_hit).toBe(true);
+    expect(old.game.pause.stop_hit).toBe(false);
+    // Once on the new version, switching it off sticks.
+    const now = mergeSettings({ version: 5, game: { pause: { target_hit: false } } });
+    expect(now.game.pause.target_hit).toBe(false);
+  });
 });
 
 describe('format', () => {

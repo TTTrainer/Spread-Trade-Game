@@ -16,6 +16,7 @@
  *   --seed S        seed prefix (default "sim")
  *   --workers N     worker threads (default: CPU count)
  *   --only bots|desks|carts   run one section
+ *   --bots a,b      only these bots (quick tuning runs; the report is partial)
  */
 
 import { cpus } from 'node:os';
@@ -48,6 +49,8 @@ const DB = process.argv.includes('--db') ? resolve(arg('db', '')) : null;
 const SEED = arg('seed', 'sim');
 const WORKERS = Number(arg('workers', String(Math.max(1, cpus().length))));
 const ONLY = arg('only', 'all');
+/** Only these bots (comma list), for quick tuning runs. */
+const BOTS = process.argv.includes('--bots') ? arg('bots', '').split(',') : null;
 
 /**
  * Seconds a person spends on each action in the UI (for the run-time estimate). Two paces: a
@@ -118,6 +121,21 @@ async function runAll(specs: SimSpec[], label: string): Promise<SimResult[]> {
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+function correlation(xs: number[], ys: number[]): number {
+  const n = Math.min(xs.length, ys.length);
+  if (n < 3) return 0;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) ** 2;
+    syy += (ys[i] - my) ** 2;
+  }
+  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0;
+}
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const winRate = (rs: SimResult[]) => (rs.length ? rs.filter((r) => r.completed).length / rs.length : 0);
 const minutes = (r: SimResult, pace: keyof typeof UI_SECONDS = 'experienced') =>
@@ -149,22 +167,26 @@ async function main(): Promise<void> {
 
   // ---------------- bots ----------------
   const bots: { bot: SimSpec['bot']; label: string; range: [number, number] }[] = [
-    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.55, 0.65] },
-    { bot: 'hold', label: 'Hold-to-Expiry', range: [0.2, 0.35] },
+    // Bosses: a good player beats a typical boss ~9 times in 10 and the final ~7 in 10, and a
+    // failed boss ends the run, so roughly half of good years are cleared.
+    { bot: 'active', label: 'Active Trader', range: [0.28, 0.45] },
+    { bot: 'disciplined', label: 'Disciplined Seller', range: [0.28, 0.45] },
+    // Since 1.6 the bosses (the Collector, the Underwriter) punish holding losers on purpose.
+    { bot: 'hold', label: 'Hold-to-Expiry', range: [0.15, 0.35] },
     { bot: 'greedy', label: 'Greedy', range: [0, 0.15] },
     { bot: 'random', label: 'Random', range: [0, 0.05] },
   ];
   let disciplined: SimResult[] = [];
   if (ONLY === 'all' || ONLY === 'bots') {
     const results: Record<string, SimResult[]> = {};
-    for (const b of bots)
+    for (const b of bots.filter((x) => !BOTS || BOTS.includes(x.bot)))
       results[b.bot] = await runAll(
         Array.from({ length: RUNS }, (_, i) =>
           spec(`${SEED}-${b.bot}-${i}`, b.bot, 'verticals', b.bot === 'random' ? 'random' : 'families'),
         ),
         b.label,
       );
-    disciplined = results.disciplined;
+    disciplined = results.disciplined ?? [];
     lines.push('## Bots on the Verticals desk', '');
     lines.push(
       '| Bot | Runs | Run win rate (95% CI) | Beat SPY | Rounds cleared (mean) | Lost to the Max-Loss Line | Real P/L per run (mean) | Trades per run | Est. run time |',
@@ -172,6 +194,7 @@ async function main(): Promise<void> {
     lines.push('|---|---|---|---|---|---|---|---|---|');
     for (const b of bots) {
       const rs = results[b.bot];
+      if (!rs) continue;
       const w = winRate(rs);
       const breach = rs.filter((r) => r.failReason === 'breach').length / rs.length;
       lines.push(
@@ -187,51 +210,120 @@ async function main(): Promise<void> {
       if (errs.length) lines.push('', `> ${errs.length} ${b.label} runs hit an error: ${errs[0].error}`);
     }
     lines.push('');
-    // Where runs end, for the disciplined bot.
-    const byRound = Array.from({ length: 12 }, (_, i) => disciplined.filter((r) => r.failRound === i).length);
-    lines.push(
-      '### Where Disciplined Seller runs end',
-      '',
-      '| Round | ' +
-        [
-          'Q1 M1',
-          'Q1 M2',
-          'Q1 Rev',
-          'Q2 M1',
-          'Q2 M2',
-          'Q2 Rev',
-          'Q3 M1',
-          'Q3 M2',
-          'Q3 Rev',
-          'Q4 M1',
-          'Q4 M2',
-          'Q4 Annual',
-        ].join(' | ') +
-        ' |',
-    );
-    lines.push('|---|' + '---|'.repeat(12));
-    lines.push('| Runs ending there | ' + byRound.join(' | ') + ' |');
-    const reached = Array.from(
-      { length: 12 },
-      (_, i) => disciplined.filter((r) => r.roundsPlayed > i).length,
-    );
-    const passedAt = Array.from(
-      { length: 12 },
-      (_, i) => disciplined.filter((r) => r.rounds[i] && r.rounds[i].status !== 'failed').length,
-    );
-    lines.push(
-      '| Pass rate when reached | ' +
-        reached.map((n, i) => (n ? pct(passedAt[i] / n) : '—')).join(' | ') +
-        ' |',
-    );
-    const ratio = Array.from({ length: 12 }, (_, i) =>
-      mean(
-        disciplined
-          .filter((r) => r.rounds[i] && r.rounds[i].status !== 'skipped')
-          .map((r) => r.rounds[i].meter / Math.max(1, r.rounds[i].target)),
-      ),
-    );
-    lines.push('| Mean score / target | ' + ratio.map((x) => x.toFixed(2)).join(' | ') + ' |', '');
+    // Where runs end, and how scores compare with targets, for the two players the targets are tuned on.
+    for (const who of ['active', 'disciplined'] as const) {
+      const rs = results[who];
+      if (!rs) continue;
+      const label = bots.find((x) => x.bot === who)?.label ?? who;
+      const byRound = Array.from({ length: 12 }, (_, i) => rs.filter((r) => r.failRound === i).length);
+      lines.push(
+        `### Where ${label} runs end`,
+        '',
+        '| Round | ' +
+          [
+            'Q1 M1',
+            'Q1 M2',
+            'Q1 Rev',
+            'Q2 M1',
+            'Q2 M2',
+            'Q2 Rev',
+            'Q3 M1',
+            'Q3 M2',
+            'Q3 Rev',
+            'Q4 M1',
+            'Q4 M2',
+            'Q4 Annual',
+          ].join(' | ') +
+          ' |',
+      );
+      lines.push('|---|' + '---|'.repeat(12));
+      lines.push('| Runs ending there | ' + byRound.join(' | ') + ' |');
+      const reached = Array.from({ length: 12 }, (_, i) => rs.filter((r) => r.roundsPlayed > i).length);
+      const passedAt = Array.from(
+        { length: 12 },
+        (_, i) => rs.filter((r) => r.rounds[i] && r.rounds[i].status !== 'failed').length,
+      );
+      lines.push(
+        '| Pass rate when reached | ' +
+          reached.map((n, i) => (n ? pct(passedAt[i] / n) : '—')).join(' | ') +
+          ' |',
+      );
+      const ratio = Array.from({ length: 12 }, (_, i) =>
+        mean(
+          rs
+            .filter((r) => r.rounds[i] && r.rounds[i].status !== 'skipped')
+            .map((r) => r.rounds[i].meter / Math.max(1, r.rounds[i].target)),
+        ),
+      );
+      lines.push('| Mean score / target | ' + ratio.map((x) => x.toFixed(2)).join(' | ') + ' |', '');
+      // Does the score follow the money? Rounds passed while losing money, and the correlation.
+      const played = rs.flatMap((r) => r.rounds.filter((x) => x.status !== 'skipped'));
+      const passed = played.filter((x) => x.status === 'passed');
+      const passedLosing = passed.filter((x) => x.realizedCents < 0).length;
+      const losing = played.filter((x) => x.realizedCents < 0);
+      const corr = correlation(
+        played.map((x) => x.meter / Math.max(1, x.target)),
+        played.map((x) => x.realizedCents),
+      );
+      lines.push(
+        `Score and money: ${pct(passed.length ? passedLosing / passed.length : 0)} of passed rounds lost money; ${pct(losing.length ? losing.filter((x) => x.status === 'passed').length / losing.length : 0)} of money-losing rounds still passed; correlation between a round's score and its P/L ${corr.toFixed(2)}.`,
+        '',
+      );
+      const q = (xs: number[], p: number) => {
+        const v = [...xs].sort((a, b) => a - b);
+        return v.length ? v[Math.min(v.length - 1, Math.floor(p * v.length))] : 0;
+      };
+      for (const i of [0, 1, 2, 3, 6, 9, 11]) {
+        const rr = rs.filter((r) => r.rounds[i] && r.rounds[i].status !== 'skipped').map((r) => r.rounds[i]);
+        const ratios = rr.map((x) => x.meter / Math.max(1, x.target));
+        console.log(
+          `    round ${i}: n=${rr.length} score/target p10 ${q(ratios, 0.1).toFixed(2)} p25 ${q(ratios, 0.25).toFixed(2)} p50 ${q(ratios, 0.5).toFixed(2)} p90 ${q(ratios, 0.9).toFixed(2)} · P/L p50 ${money(
+            q(
+              rr.map((x) => x.realizedCents),
+              0.5,
+            ),
+          )} · pass ${pct(rr.filter((x) => x.status === 'passed').length / Math.max(1, rr.length))}`,
+        );
+      }
+      // Each boss: how often a run that reached it got past it (targets: ~90% typical, ~70% final).
+      const byBoss = new Map<string, { n: number; pass: number }>();
+      for (const r of rs)
+        for (const x of r.rounds)
+          if (x.bossId && x.status !== 'skipped') {
+            const b = byBoss.get(x.bossId) ?? { n: 0, pass: 0 };
+            b.n++;
+            if (x.status === 'passed') b.pass++;
+            byBoss.set(x.bossId, b);
+          }
+      const bossLine = [...byBoss]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, b]) => `${id} ${pct(b.pass / b.n)} (n=${b.n})`)
+        .join(' · ');
+      console.log(`  ${label} vs bosses: ${bossLine}`);
+      if (who === 'disciplined') {
+        const typical = [...byBoss].filter(([id]) => id !== 'rebalancer');
+        const tn = typical.reduce((a, [, x]) => a + x.n, 0);
+        const tp = typical.reduce((a, [, x]) => a + x.pass, 0) / Math.max(1, tn);
+        const fin = byBoss.get('rebalancer');
+        const fp = fin ? fin.pass / fin.n : 0;
+        checks.push({
+          name: 'Typical boss beaten (Disciplined, Q1-Q3)',
+          target: '85%–95%',
+          actual: pct(tp),
+          pass: tp >= 0.85 && tp <= 0.95,
+        });
+        checks.push({
+          name: 'Final boss beaten (Disciplined, the Rebalancer)',
+          target: '62%–78%',
+          actual: pct(fp),
+          pass: fp >= 0.62 && fp <= 0.78,
+        });
+      }
+      lines.push(`**${label} vs bosses** (share of runs that reached a boss and beat it): ${bossLine}`, '');
+      console.log(
+        `  ${label}: passed-while-losing ${pct(passed.length ? passedLosing / passed.length : 0)}, losing-rounds-passed ${pct(losing.length ? losing.filter((x) => x.status === 'passed').length / losing.length : 0)}, score~P/L r=${corr.toFixed(2)}, score/target by quarter ${[0, 3, 6, 9].map((i) => mean(rs.filter((r) => r.rounds[i]).map((r) => r.rounds[i].meter / Math.max(1, r.rounds[i].target))).toFixed(1)).join('/')}`,
+      );
+    }
     const done = disciplined.filter((r) => r.completed);
     const set = done.length ? done : disciplined;
     const time = mean(set.map((r) => minutes(r)));
@@ -436,7 +528,11 @@ async function main(): Promise<void> {
     }),
     '',
   ];
-  const out = join(root, 'sim', ONLY === 'all' ? 'REPORT.md' : `REPORT-${ONLY}.md`);
+  const out = join(
+    root,
+    'sim',
+    ONLY === 'all' && !BOTS ? 'REPORT.md' : `REPORT-${ONLY}${BOTS ? '-bots' : ''}.md`,
+  );
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, [...header, ...lines, ...footer].join('\n'));
   console.log('');
