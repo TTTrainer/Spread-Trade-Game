@@ -1,6 +1,8 @@
-# Prompt for another Claude: fetch price data for the added tickers
-Paste the block into **Claude Code on your PC** (any empty folder; it needs normal internet and
-`pip`). claude.ai chats often can't install packages or reach Yahoo, so use Claude Code.
+# Prompt for another Claude: fetch price data and collect the missing bot files
+Paste the block into **Claude Code on your PC**, opened in your **other trading project** (the one
+with the spread-trading simulator, `optionlib.py`, trial docs). It needs normal internet and `pip`;
+claude.ai chats often can't install packages or reach Yahoo, so use Claude Code.
+It makes one file, `for_trading_bot.zip`. Upload that zip to the trading-bot chat.
 
 ## Why these tickers (chosen before looking at any 2024–2026 prices)
 Picked from the game's ticker list (MASTER_PROMPT §13.4) and the game's SIM stand-ins. The picks are
@@ -25,16 +27,19 @@ known limits: 5 correlated tech names and too few samples to reach n = 200.
 | *Optional:* XOM, KO, UPS, EA | SIM-only types: oil major, dividend staple, logistics, game publisher | Energy/staples/industrial diversity |
 
 ```
-Fetch daily price files for the Options Signal Bot, in the exact format its simulator reads.
+Two jobs for the Options Signal Bot: (A) fetch daily price files for 12 tickers plus VIX, and
+(B) collect the bot files that live in this project. Put everything in one zip.
 Validate format only. Do NOT describe, chart, summarize or comment on prices, returns or trends
 in chat or in any file: later trial bots read these outputs, and any description of what a price
 did is a look-ahead leak.
 
-1. SETUP: pip install yfinance pandas
+1. SETUP: in this project folder, run: mkdir export_for_bot ; cd export_for_bot
+   then: pip install yfinance pandas tabulate
 
-2. SAVE AND RUN this script as fetch_prices.py (add --optional only if Jacob asked for XOM KO UPS EA):
+2. (A) PRICES. Inside export_for_bot, save and run this script as fetch_prices.py
+   (add --optional only if Jacob asked for XOM KO UPS EA):
 
-import sys, hashlib, datetime as dt, urllib.request, io, zipfile, os
+import sys, hashlib, datetime as dt, urllib.request, io, os
 import pandas as pd, yfinance as yf
 TRADE = ["META","TSLA","JPM","BA","COST","NFLX","AMD","CRM","COIN","GME"]
 CONTEXT = ["SPY","DIA"]
@@ -104,22 +109,45 @@ with open("DATA_MANIFEST.md", "w") as m:
     for f in files:
         m.write(f"- {f}  rows={sum(1 for _ in open(f)) - 1}  sha256={hashlib.sha256(open(f,'rb').read()).hexdigest()}\n")
     m.write("\n" + tab.to_markdown(index=False) + "\n")
-with zipfile.ZipFile("new_tickers_2024_2026.zip", "w", zipfile.ZIP_DEFLATED) as z:
-    for f in files + ["DATA_MANIFEST.md"]: z.write(f)
 print(tab.to_string(index=False))
-print("zip:", os.path.abspath("new_tickers_2024_2026.zip"), os.path.getsize("new_tickers_2024_2026.zip"), "bytes")
 
 3. If a ticker FAILS (Yahoo rate limit): wait 60 s and re-run the script once. Do not swap in a
    different data source without Jacob's OK; mixed sources give inconsistent adjustments.
    If any check is False, do not edit the data by hand. Report it.
-   (pip install tabulate if to_markdown errors.)
 
-4. CHAT OUTPUT: the pass/fail table and the zip path and size. Nothing else.
+4. (B) MISSING BOT FILES. Search this project folder first, then Jacob's user folder
+   (C:\Users\<name>\, skipping AppData, node_modules, .git, venv folders) for the files below.
+   Copy each one you find into export_for_bot\bot_files\. If there are several copies, take the
+   newest by modified date and list the paths of the others. Never invent or rewrite a file;
+   if it does not exist, write NOT FOUND.
+     - MASTER_LOG.md          the NEWEST copy. It should record Trial 02 (the copy the bot has
+                              only records Trial 01). Say which trials it records.
+     - USAGE_LOG.md
+     - trial_02*.md, prereg_02*.md   (write-ups only)
+     - PROTOCOL_v2_OPTIONS.md
+     - optionlib.py, td_ingest.py, scan.py, run_trial*.py, requirements.txt, tests for them
+     - option-chain data: *.parquet files with option chains (put them in bot_files\chains\).
+       If none exist, write NOT FOUND. Do not download chains (the free source is ~9 GB);
+       Jacob decides that.
+     - gdelt_raw.json or news_<TICKER>.csv, if they exist
+   DO NOT copy results a trial bot must not see: ledger.csv, trial_*.json, state_*.json,
+   sealed_benchmarks*, anything under sealed\. DO NOT copy secrets: .env files, API keys,
+   ThetaData credentials, tokens. Grep the copied files for "key", "token", "password",
+   "secret" and remove any file that contains a real credential.
+   Add a section to DATA_MANIFEST.md: one line per file above (FOUND path + modified date +
+   SHA-256, or NOT FOUND).
+
+5. ZIP: zip the whole export_for_bot folder (except fetch_prices.py) as for_trading_bot.zip.
+   If it is over 30 MB because of chain data, make for_trading_bot.zip without chains\ and one
+   chains_<TICKER>.zip per ticker, and say so.
+
+6. CHAT OUTPUT: the price pass/fail table, the FOUND / NOT FOUND list, and the zip names and
+   sizes. Nothing else.
 ```
 
 ## How the files go into the simulation
-1. Upload `new_tickers_2024_2026.zip` to the bot's Claude Code session, or unzip it into this
-   `trading-bot/` folder next to `simulator.py`.
+1. Upload `for_trading_bot.zip` to the bot's Claude Code session, or unzip it into this
+   `trading-bot/` folder next to `simulator.py` (the `bot_files/` docs go in `docs/`).
 2. No code change is needed. `simulator.py` finds `<TICKER>_2024_2026.csv` in its own folder
    (`DATA_DIRS` includes `.`), and `signals.py` reads the same columns.
 3. Before any trial uses a new file, the bot runs the preflight on it:
