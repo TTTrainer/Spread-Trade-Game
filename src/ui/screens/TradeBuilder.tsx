@@ -84,6 +84,12 @@ function StudyStrip() {
   );
 }
 
+/** "14:13" (New York) as "2:13 pm". */
+function clock(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
 function FreshBadge() {
   const loaded = useBuilder((s) => s.loaded);
   useTrading((s) => s.selectedCardId);
@@ -91,25 +97,51 @@ function FreshBadge() {
   const t = selectedTicker();
   if (!t) return null;
   const f = freshnessOf(t);
+  const delayed = t.delayedMinutes > 0;
   const src =
     t.source === 'schwab-live'
-      ? 'Schwab, live'
-      : t.source === 'schwab-saved'
-        ? 'saved from Schwab'
-        : 'game data';
+      ? 'Schwab, real time'
+      : t.source === 'cboe-delayed'
+        ? `Cboe, ${t.delayedMinutes} min delayed`
+        : t.source === 'schwab-saved'
+          ? 'saved from Schwab'
+          : 'game data';
+  const at = t.quoteTime ? ` · ${clock(t.quoteTime)} ET` : '';
   return (
     <div
-      className={`bld-fresh num ${f.state}`}
+      className={`bld-fresh num ${f.state}${delayed ? ' delayed' : ''}`}
       data-testid="builder-fresh"
       data-state={f.state}
+      data-delayed={t.delayedMinutes}
       data-tip-title="How current this is"
-      data-tip-body={[f.text, `Source: ${src}.`, ...t.notes].join(' ')}
+      data-tip-body={[
+        f.text,
+        delayed
+          ? `These prices are about ${t.delayedMinutes} minutes behind the market (last trade${at || ' unknown'}). REFRESH (F5) loads the latest.`
+          : t.source === 'schwab-live'
+            ? `Real time from Schwab${at}. REFRESH (F5) loads the latest.`
+            : '',
+        `Source: ${src}.`,
+        ...t.notes,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
-      <b>{f.state === 'live' ? '● LIVE' : f.state === 'current' ? '✔ CURRENT' : '⚠ OUT OF DATE'}</b>
+      <b>
+        {f.state === 'live'
+          ? delayed
+            ? `● LIVE · ${t.delayedMinutes} MIN DELAY`
+            : '● LIVE'
+          : f.state === 'current'
+            ? '✔ CURRENT'
+            : '⚠ OUT OF DATE'}
+      </b>
       <span>
         {f.state === 'stale'
           ? `data ends ${t.asOf} · ${f.daysOld} trading day${f.daysOld === 1 ? '' : 's'} old`
-          : `${t.asOf} · ${src}`}
+          : f.state === 'live'
+            ? `${t.asOf}${at} · ${delayed ? 'Cboe' : src}`
+            : `${t.asOf} · ${src}`}
       </span>
       {t.modeledChain && <span className="chip warn">MODEL CHAIN</span>}
     </div>
@@ -149,8 +181,8 @@ function BuilderTopBar() {
         onClick={() => void refresh()}
         disabled={!!loading}
         data-testid="builder-refresh"
-        data-tip-title="Refresh"
-        data-tip-body="Load this ticker again: today's prices and chain from Schwab when connected."
+        data-tip-title="Refresh (F5)"
+        data-tip-body="Load this ticker's market as of now, keeping the trade you're building: real time from Schwab when connected, otherwise Cboe's free quotes, about 15 minutes behind."
       >
         {loading ? `LOADING ${loading}…` : '⟳ REFRESH'}
       </button>
@@ -483,6 +515,10 @@ export function TradeBuilderScreen() {
       if (e.altKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault();
         document.querySelector<HTMLButtonElement>('[data-testid="builder-copy"]')?.click();
+      }
+      if (e.key === 'F5') {
+        e.preventDefault();
+        document.querySelector<HTMLButtonElement>('[data-testid="builder-refresh"]')?.click();
       }
     };
     window.addEventListener('keydown', onKey);

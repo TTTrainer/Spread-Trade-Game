@@ -21,6 +21,10 @@ export interface LoadedTicker {
   asOf: ISODate;
   source: Extract<BuilderLoadResult, { ok: true }>['source'];
   live: boolean;
+  /** 0 for Schwab's real time, 15 for Cboe's delayed quotes. */
+  delayedMinutes: number;
+  /** New York time of the last trade in the quote ("14:13"). */
+  quoteTime: string | null;
   modeledChain: boolean;
   notes: string[];
   fetchedAt: string;
@@ -168,6 +172,8 @@ export const useBuilder = create<BuilderStore>((set, get) => ({
         asOf: r.bundle.asOf,
         source: r.source,
         live: r.live,
+        delayedMinutes: r.delayedMinutes,
+        quoteTime: r.quoteTime,
         modeledChain: r.modeledChain,
         notes: r.notes,
         fetchedAt: r.fetchedAt,
@@ -193,10 +199,22 @@ export const useBuilder = create<BuilderStore>((set, get) => ({
   refresh: async () => {
     const t = selectedTicker();
     if (!t) return;
+    // The trade you're building stays: it is priced again on the fresh chain.
+    const tr = useTrading.getState();
+    const keep = {
+      builder: tr.builder,
+      rightTab: tr.rightTab,
+      drawings: tr.drawings,
+      whatIf: tr.whatIf,
+      panel: tr.panel,
+    };
     const { [t.symbol]: _drop, ...rest } = get().loaded;
     void _drop;
     set({ loaded: rest });
-    await get().open(t.symbol);
+    if (await get().open(t.symbol)) {
+      useTrading.setState(keep);
+      useTrading.getState().bump();
+    }
   },
 }));
 

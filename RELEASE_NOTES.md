@@ -1,8 +1,16 @@
-# Spread Trading Game 1.8.4
+# Spread Trading Game 1.8.5
 
 A single-player roguelite about trading options spreads on real historical market data, now with a Trade Builder for today's market. Paper trading only; not financial advice.
 
-## What's new in 1.8.4
+## What's new in 1.8.5
+
+- **REFRESH means right now.** In the Trade Builder, **⟳ REFRESH** (or **F5**) loads the ticker's market as of that moment: the option chain and today's candle so far, so you can build a trade on intraday prices.
+  - **With Schwab connected:** real time. Today's candle is the session's real open, high and low and the last trade, and the badge shows the time of that trade (● LIVE · 2:28 pm ET).
+  - **Without Schwab:** Cboe's free delayed quotes, about **15 minutes behind** the market. The badge turns amber and says so: **● LIVE · 15 MIN DELAY**, with the time of the last trade. This works for all 79 tickers, the index options too, with nothing saved on your computer (Cboe also fills in the chart's history if needed).
+  - **Your trade stays.** The structure, strikes, width and size you set are kept through a refresh and priced again on the new chain.
+- Credits list Cboe's delayed quotes.
+
+## New in 1.8.4
 
 - **Real market data in one click, kept current by itself.** The game now gets its data from the Options DB: the finished game data (prices and option chains for 79 tickers, 2018 to the latest close) that is republished every weekday after the close. Nothing has to be on your computer first: no 16 GB DoltHub download, no Schwab login, nothing saved beforehand. It's about 30 MB and takes seconds.
   - **First launch:** the game downloads it and switches from the SIM market to real data by itself.

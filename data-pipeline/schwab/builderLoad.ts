@@ -1,15 +1,16 @@
 /**
  * THE TRADE BUILDER'S DATA for one ticker, freshest first:
  *   1. Schwab, right now (read-only market data): two years of daily prices and today's option
- *      chain. During market hours the chain is today's market, so today joins the chart as a bar
- *      at the current price.
- *   2. What PULL FROM SCHWAB saved in schwab.db (prices, and the chain from each close it ran after).
- *   3. The game's own market data (game.db), for tickers it carries.
+ *      chain, real time. During market hours today joins the chart as its candle so far (the
+ *      session's real open, high and low, and the last trade).
+ *   2. Without Schwab, Cboe's free delayed quotes: the same, about 15 minutes behind (and labeled so).
+ *   3. What PULL FROM SCHWAB saved in schwab.db (prices, and the chain from each close it ran after).
+ *   4. The game's own market data (game.db), for tickers it carries.
  * When no real chain exists for the newest day, one is modeled from the stock's own volatility and
  * labeled MODEL. Nothing here places orders or reads accounts.
  */
 
-import { addDays, isTradingDay, type ISODate } from '../../src/engine/calendar';
+import { addDays, isTradingDay, prevTradingDay, type ISODate } from '../../src/engine/calendar';
 import type { MarketBundle } from '../../src/engine/market/bundleSource';
 import type { MarketDataSource } from '../../src/engine/market/source';
 import type { Bar, Chain, VixBar } from '../../src/engine/market/types';
@@ -17,19 +18,24 @@ import { BUILDER_BY_SYMBOL, BUILDER_HISTORY_DAYS, isCashIndex } from '../../src/
 import { candidateInfo } from '../dolt/tickers';
 import { constantMaturityIv, normalizeQuote, volSeries } from '../lib/derived';
 import { historyChain, HISTORY_DEPTH } from '../lib/historyModel';
-import { mapCandles, mapChain, newYorkTime } from './map';
+import { CBOE_DELAY_MINUTES, mapCboe, mapCboeHistory, type CboeApi } from '../live/cboe';
+import { mapCandles, mapChain, newYorkTime, sessionBar } from './map';
 import { fetchChain, fetchHistory, tbillToRate, type SchwabMarketApi } from './pull';
 import { TBILL_SYMBOL, VIX_SYMBOL, type SchwabStore } from './store';
 
-export type BuilderSourceKind = 'schwab-live' | 'schwab-saved' | 'game';
+export type BuilderSourceKind = 'schwab-live' | 'cboe-delayed' | 'schwab-saved' | 'game';
 
 export type BuilderLoadResult =
   | {
       ok: true;
       bundle: MarketBundle;
       source: BuilderSourceKind;
-      /** Fetched from Schwab just now. */
+      /** Fetched just now (Schwab in real time, or Cboe's delayed quotes). */
       live: boolean;
+      /** How far behind the market the prices are: 0 for Schwab's real time, 15 for Cboe's. */
+      delayedMinutes: number;
+      /** New York time of the last trade in the quote ("14:13"), when known. */
+      quoteTime: string | null;
       /** The chain is modeled (no real chain for the newest day). */
       modeledChain: boolean;
       /** Plain-language notes: why a fresher source wasn't used, what is modeled. */
@@ -71,8 +77,12 @@ export async function builderLoad(opts: {
   api: SchwabMarketApi | null;
   store: SchwabStore | null;
   game: MarketDataSource | null;
+  /** Cboe's delayed quotes, used when Schwab isn't connected or can't be reached. */
+  delayed?: CboeApi | null;
 }): Promise<BuilderLoadResult> {
   const { symbol, store, game, api } = opts;
+  let quoteTime: string | null = null;
+  let delayedMinutes = 0;
   const notes: string[] = [];
   const today = newYorkTime(opts.now).date;
   const from = addDays(today, -BUILDER_HISTORY_DAYS);
@@ -108,10 +118,16 @@ export async function builderLoad(opts: {
       const json = (await fetchChain(api, symbol, today)) as {
         underlyingPrice?: number;
       } | null;
-      const px = Number(json?.underlyingPrice);
+      const session = isTradingDay(today) ? sessionBar(json, today) : null;
+      const px = session?.bar.close ?? Number(json?.underlyingPrice);
       const last = bars[bars.length - 1];
-      // Today's session (open, or closed with no daily candle yet): today joins at the latest price.
-      if (last && isTradingDay(today) && last.date < today && px > 0)
+      if (session) {
+        // Today's candle so far, from the live quote: it replaces any partial daily candle.
+        bars = [...bars.filter((b) => b.date < today), session.bar];
+        quoteTime = session.time;
+        if (session.delayed) notes.push('Schwab marked this quote as delayed.');
+      } else if (last && isTradingDay(today) && last.date < today && px > 0)
+        // Today's session with no trade yet: today joins at the latest price.
         bars = [...bars, { date: today, open: px, high: px, low: px, close: px, volume: 0, source: 'real' }];
       const end = bars[bars.length - 1];
       if (!end) throw new Error(`no price history for ${symbol}`);
@@ -122,8 +138,8 @@ export async function builderLoad(opts: {
       notes.push(`Couldn't reach Schwab just now (${(e as Error).message}); using saved data.`);
     }
   }
-  // 2. schwab.db and 3. game.db: the newer of the two.
-  if (!found) {
+  // What's saved: schwab.db or game.db, whichever runs later.
+  const savedData = async (): Promise<Found | null> => {
     const saved = store?.candles(symbol, from) ?? [];
     let gameBars: Bar[] = [];
     if (game && inGame) gameBars = await game.bars(symbol, from, inGame.lastDate).catch(() => []);
@@ -131,12 +147,45 @@ export async function builderLoad(opts: {
     const gameLast = gameBars[gameBars.length - 1]?.date ?? '';
     if (saved.length && savedLast >= gameLast) {
       const c = store?.chains(symbol, savedLast, savedLast)[0] ?? null;
-      found = { bars: saved, chain: c ? withGreeks(c, rate) : null, source: 'schwab-saved' };
-    } else if (gameBars.length && game) {
+      return { bars: saved, chain: c ? withGreeks(c, rate) : null, source: 'schwab-saved' };
+    }
+    if (gameBars.length && game) {
       const c = await game.chain(symbol, gameLast).catch(() => null);
-      found = { bars: gameBars, chain: c, source: 'game' };
+      return { bars: gameBars, chain: c, source: 'game' };
+    }
+    return null;
+  };
+  // 2. Cboe's delayed quotes: today's chain and candle so far, on the saved history (or Cboe's own
+  //    daily candles when nothing is saved, or the saved history stops short of yesterday).
+  if (!found && opts.delayed) {
+    try {
+      const snap = mapCboe(await opts.delayed.options(symbol), symbol, rate, today);
+      if (!snap) throw new Error(`no delayed quotes for ${symbol}`);
+      let hist = (await savedData())?.bars ?? [];
+      if (!hist.length || (hist.at(-1)?.date ?? '') < prevTradingDay(snap.asOf)) {
+        try {
+          const h = mapCboeHistory(await opts.delayed.history(symbol)).filter((b) => b.date >= from);
+          if (h.length) hist = h;
+        } catch (e) {
+          notes.push(`Cboe's daily history didn't load (${(e as Error).message}).`);
+        }
+      }
+      found = {
+        bars: [...hist.filter((b) => b.date < snap.asOf), snap.bar],
+        chain: snap.chain,
+        source: 'cboe-delayed',
+      };
+      quoteTime = snap.quoteTime;
+      delayedMinutes = CBOE_DELAY_MINUTES;
+      notes.push(
+        `Prices and the option chain are Cboe's free delayed quotes, about ${CBOE_DELAY_MINUTES} minutes behind the market. Connect Schwab for real time.`,
+      );
+    } catch (e) {
+      notes.push(`Couldn't get Cboe's delayed quotes (${(e as Error).message}); using saved data.`);
     }
   }
+  // 3. schwab.db and 4. game.db: the newer of the two.
+  if (!found) found = await savedData();
   if (!found || !found.bars.length)
     return {
       ok: false,
@@ -194,7 +243,9 @@ export async function builderLoad(opts: {
     ok: true,
     bundle: { symbol, ...info, bars, chain, asOf, vol, earnings },
     source: found.source,
-    live: found.source === 'schwab-live',
+    live: found.source === 'schwab-live' || found.source === 'cboe-delayed',
+    delayedMinutes,
+    quoteTime,
     modeledChain,
     notes,
     rate,

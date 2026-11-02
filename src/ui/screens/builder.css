@@ -41,6 +41,12 @@
   color: var(--up);
   animation: bld-pulse 1.4s ease-in-out infinite;
 }
+.bld-fresh.live.delayed {
+  border-color: var(--amber);
+}
+.bld-fresh.live.delayed b {
+  color: var(--amber);
+}
 .bld-fresh.current b {
   color: var(--cyan);
 }

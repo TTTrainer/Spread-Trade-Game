@@ -191,3 +191,49 @@ export function mapChain(
   );
   return { symbol, date, spot, source: 'real', quotes };
 }
+
+interface SchwabUnderlying {
+  last?: number;
+  mark?: number;
+  openPrice?: number;
+  highPrice?: number;
+  lowPrice?: number;
+  totalVolume?: number;
+  /** Epoch ms of the last trade. */
+  tradeTime?: number;
+  quoteTime?: number;
+  delayed?: boolean;
+}
+
+/**
+ * Today's candle so far from a chain's underlying quote (asked with includeUnderlyingQuote):
+ * the session's real open, high and low, and the last trade. Null when there's no quote for `date`.
+ */
+export function sessionBar(
+  json: unknown,
+  date: ISODate,
+): { bar: Bar; time: string | null; delayed: boolean } | null {
+  const j = json as { underlying?: SchwabUnderlying; underlyingPrice?: number } | null;
+  const u = j?.underlying;
+  const px = Number(u?.last ?? u?.mark ?? j?.underlyingPrice);
+  if (!(px > 0)) return null;
+  const at = Number(u?.tradeTime ?? u?.quoteTime);
+  const when = at > 0 ? newYorkTime(new Date(at)) : null;
+  if (when && when.date !== date) return null;
+  const open = Number(u?.openPrice) > 0 ? Number(u?.openPrice) : px;
+  return {
+    bar: {
+      date,
+      open,
+      high: Math.max(Number(u?.highPrice) || 0, open, px),
+      low: Math.min(Number(u?.lowPrice) > 0 ? Number(u?.lowPrice) : px, open, px),
+      close: px,
+      volume: Math.max(0, Math.round(Number(u?.totalVolume) || 0)),
+      source: 'real',
+    },
+    time: when
+      ? `${String(Math.floor(when.minutes / 60)).padStart(2, '0')}:${String(when.minutes % 60).padStart(2, '0')}`
+      : null,
+    delayed: u?.delayed === true,
+  };
+}

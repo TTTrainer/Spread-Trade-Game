@@ -51,7 +51,8 @@ export function schwabFetchApi(accessToken: string, fetchImpl: typeof fetch = fe
         contractType: 'ALL',
         strategy: 'SINGLE',
         range: 'ALL',
-        includeUnderlyingQuote: 'false',
+        // Today's open, high, low and last trade come with it: the Trade Builder's live candle.
+        includeUnderlyingQuote: 'true',
         fromDate,
         toDate,
         ...(strikeCount ? { strikeCount: String(strikeCount) } : {}),

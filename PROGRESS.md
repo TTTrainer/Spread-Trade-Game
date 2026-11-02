@@ -4,17 +4,27 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data) **1.8.2** (the Joker Row of cartridges, the register-coin-jackpot payout, whole numbers), **1.8.3** (the shop as objects, keycap buttons that flash when they matter, beveled top bar icons, the payoff in the TRADE column, the Income desk first, Ines's cash-secured put, the LEARN OPTIONS rework) and **1.8.4** (game data downloaded from the Options DB and kept current by itself; the daily data update fixed). Version 1.8.4. Next: your playtest of 1.8.4 (PLAYTEST.md or the in-game checklist).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data) **1.8.2** (the Joker Row of cartridges, the register-coin-jackpot payout, whole numbers), **1.8.3** (the shop as objects, keycap buttons that flash when they matter, beveled top bar icons, the payoff in the TRADE column, the Income desk first, Ines's cash-secured put, the LEARN OPTIONS rework) **1.8.4** (game data downloaded from the Options DB and kept current by itself; the daily data update fixed; every ticker tradeable) and **1.8.5** (REFRESH in the Trade Builder loads the market as of now: Schwab in real time, else Cboe 15 minutes behind). Version 1.8.5. Next: your playtest of 1.8.5 (PLAYTEST.md or the in-game checklist).
 
 ## How to run (on your PC)
 
-- **Play:** download from the [1.8.4 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.4) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.4.exe`, or run `SpreadTradingGame-Portable-1.8.4.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Play:** download from the [1.8.5 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.5) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.5.exe`, or run `SpreadTradingGame-Portable-1.8.5.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
 - **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.8.5: REFRESH loads the market as of now (intraday)
+
+- **Trade Builder › ⟳ REFRESH (F5)** loads the ticker as of that moment, so a trade is built on intraday prices:
+  - **Schwab connected:** real time. The chain request now brings the underlying's quote, so today's candle is the session's real open, high and low plus the last trade (it used to be a flat bar at the last price), and the badge shows that trade's New York time.
+  - **No Schwab (or Schwab unreachable):** Cboe's free delayed quotes (`data-pipeline/live/cboe.ts`): the whole option chain with bid, ask and IV, and today's candle so far, about 15 minutes behind. The badge turns amber: **● LIVE · 15 MIN DELAY · 1:45 pm ET · Cboe**, and its hover text says it's about 15 minutes behind. Works for every ticker, index options included (SPX's PM weekly kept over its AM monthly), with nothing saved: when the saved history stops before yesterday, or there is none, Cboe's daily candles fill the chart.
+  - **The trade you're building stays** through a refresh (structure, strikes, width, size, the TRADE tab) and is priced again on the new chain.
+- Checked against Cboe's real SPY and SPX feeds today (about 5,000 and 12,700 quotes, today's candle right).
+- **What this is not:** runs, the Daily and the paper month still play day by day on end-of-day data. Publishing your Schwab data intraday to the Options DB for other players was left out (Schwab's terms and the exchanges' rules on passing on live option prices).
+- Tests: Cboe's option names, one contract per strike, today's candle and the daily history; Schwab's live candle; the loader picking Cboe without Schwab (and filling a gap from Cboe's history); and an E2E run against a local stand-in for Cboe (the amber badge, the quote time, F5, the trade kept). Screenshots checked at 1920 and 1366.
 
 ### 1.8.4: game data from the Options DB, and the daily update fixed
 

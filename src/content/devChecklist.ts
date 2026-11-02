@@ -30,7 +30,7 @@ export interface DevSetup {
   game?: Partial<Settings['game']>;
 }
 
-export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2' | '1.8.3' | '1.8.4';
+export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2' | '1.8.3' | '1.8.4' | '1.8.5';
 
 export interface DevCheck {
   id: string;
@@ -219,6 +219,14 @@ export const DEV_CHECKS: DevCheck[] = [
     title: 'Game data from the Options DB',
     look: "Settings › Data shows the published release and yours. DOWNLOAD LATEST DATA takes seconds. After a weekday's update, restart: the new day loads by itself (or LOAD NOW). QQQ opens in the Trade Builder without Schwab.",
     setup: { screen: 'settingsData' },
+  },
+  {
+    id: 'tb-refresh',
+    group: 'Trade Builder',
+    ver: '1.8.5',
+    title: 'REFRESH: the market as of now',
+    look: "Without Schwab, REFRESH (F5) loads the market as of now from Cboe: amber LIVE · 15 MIN DELAY with the quote time. With Schwab it's real time. The trade you built stays and is repriced.",
+    setup: { builder: {} },
   },
   {
     id: 'learn-wait',

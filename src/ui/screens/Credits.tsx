@@ -21,9 +21,11 @@ export function CreditsScreen() {
           <b>Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)</b>. VIX history: Cboe Global Markets
           daily VIX history. When you connect your own Schwab developer app: Charles Schwab market data
           (read-only prices and option chains), pulled on your computer for your own use and never shared.
-          Days the free data skipped, and option chains Schwab has no history for, are modeled and labeled
-          MODEL. The SIM market (fictional companies such as Helix Robotics and MemeStonk Arcade) is invented
-          and labeled SIM.
+          Without Schwab, the Trade Builder&apos;s latest prices and option chains are Cboe Global
+          Markets&apos; free delayed quotes (about 15 minutes behind the market, and labeled so). Days the
+          free data skipped, and option chains Schwab has no history for, are modeled and labeled MODEL. The
+          SIM market (fictional companies such as Helix Robotics and MemeStonk Arcade) is invented and labeled
+          SIM.
         </p>
         <h2>Charts</h2>
         <p>
