@@ -308,6 +308,37 @@ describe('expiration', () => {
   });
 });
 
+describe('cash-settled index options (SPX, XSP, NDX, RUT)', () => {
+  const cash = (over: Partial<DayContext> = {}) => ctx({ cashSettled: true, ...over });
+
+  it('settle in cash at expiration: no shares, even when the price finishes between the strikes', () => {
+    const r = endOfDay(open(), day(EXP, 92.8), cash());
+    expect(r.assignedToday).toBe(false);
+    expect(stockRatio(r.pos.legs)).toBe(0);
+    expect(r.pos.status).toBe('closed');
+    // The short 95 put pays 2.20 of intrinsic per share: 300 credit - 440 = -140 x 2 units.
+    expect(r.pos.realizedCents).toBe(30000 - 44000);
+    const csp: Leg[] = [{ kind: 'option', right: 'P', strike: 95, expiration: EXP, ratio: -1 }];
+    const itm = endOfDay(open(csp, 1, -1), day(EXP, 94.99), cash());
+    expect(itm.assignedToday).toBe(false);
+    expect(stockRatio(itm.pos.legs)).toBe(0);
+    expect(itm.pos.realizedCents).toBe(10000 - 100);
+  });
+
+  it('are European style: never assigned early, and no pin-risk warning', () => {
+    const csp: Leg[] = [{ kind: 'option', right: 'P', strike: 110, expiration: EXP, ratio: -1 }];
+    for (let i = 0; i < 100; i++)
+      expect(
+        endOfDay(
+          open(csp, 1, -3),
+          flatBook({ date: '2025-01-15', spot: 90, vol: 0.02, expirations: [EXP] }),
+          cash({ rng: new Rng(`ea${i}`) }),
+        ).assignedToday,
+      ).toBe(false);
+    expect(atClose(open(), day(EXP, 92.5), cash()).decisions.map((d) => d.kind)).not.toContain('pin_risk');
+  });
+});
+
 describe('early assignment and dividends', () => {
   it("assigns an ITM short call whose extrinsic is below tomorrow's dividend", () => {
     const call: Leg[] = [{ kind: 'option', right: 'C', strike: 90, expiration: EXP, ratio: -1 }];

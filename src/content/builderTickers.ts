@@ -50,9 +50,9 @@ export const BUILDER_TICKERS: BuilderTicker[] = [
 ];
 
 /**
- * 1.8.0's second 25, no longer listed in 1.8.1. Pulls had already saved them and the published
- * game.db carries them, so the Schwab build keeps them (named) while schwab.db holds them: the
- * daily data update never drops a ticker players already have.
+ * 1.8.0's second 25, no longer pulled for new since 1.8.1. Pulls had already saved them and the
+ * published game.db carries them, so the Schwab build keeps them (named, and tradeable like every
+ * other ticker) while schwab.db holds them: the daily data update never drops a ticker.
  */
 export const FORMER_BUILDER_TICKERS: BuilderTicker[] = [
   { symbol: 'EEM', name: 'iShares MSCI Emerging Markets', sector: 'Index ETF', kind: 'etf' },

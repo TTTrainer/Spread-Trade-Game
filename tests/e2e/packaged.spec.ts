@@ -20,7 +20,8 @@ test('packaged app boots, shows its version, and deals a Career round', async ()
   const app = await electron.launch({
     executablePath: exe,
     args: ['--no-sandbox'],
-    env: { ...process.env, STG_USER_DATA: userData } as Record<string, string>,
+    // The SIM boot is what's checked here, so no download from the Options DB.
+    env: { ...process.env, STG_USER_DATA: userData, STG_NO_DATA_UPDATE: '1' } as Record<string, string>,
   });
   const page = await app.firstWindow();
   const errors: string[] = [];

@@ -4,7 +4,7 @@ import { DEFAULT_HOTKEYS, HOTKEY_LABELS, type HotkeyAction, type Settings } from
 import type { DecisionKind } from '../../engine/lifecycle/types';
 import { sfx } from '../../audio/sfx';
 import { bridge, hasBridge } from '../bridge';
-import type { DataBuildRequest, SchwabStatus, SchwabStoreStatus } from '../../shared/rpc';
+import type { DataBuildRequest, DataUpdateStatus, SchwabStatus, SchwabStoreStatus } from '../../shared/rpc';
 import { eventToBinding } from '../hotkeys';
 import { useApp } from '../store/app';
 import { Modal } from '../components/ui';
@@ -557,7 +557,10 @@ function DataPanel() {
             {data ? (data.kind === 'synthetic' ? 'SIM (fictional companies)' : 'REAL') : '…'}
           </b>
         </div>
-        <div>{data ? `${data.symbols} tickers through ${data.lastDate}` : ''}</div>
+        <div>
+          {data ? `${data.symbols} tickers through ${data.lastDate}` : ''}
+          {data?.downloaded ? ` · downloaded from the Options DB (${data.downloaded})` : ''}
+        </div>
         <div className="dim">
           game.db: {data?.gameDbPath} {data?.gameDbExists ? '' : '(not built yet)'}
         </div>
@@ -567,15 +570,15 @@ function DataPanel() {
           </div>
         ))}
       </div>
+      <OptionsDbBlock busy={busy} setBusy={setBusy} after={refresh} />
       <p>
-        <b>Build real market data</b> downloads about 16 GB from DoltHub (free, public options data) the first
-        time, takes a few hours, and needs about 40 GB free. The game can fetch the Dolt tool by itself. You
-        can keep playing the SIM market meanwhile. <b>Or build it from Schwab</b> in a few minutes (steps 4
-        and 5 below).
+        <b>Or build it yourself.</b> <b>BUILD REAL DATA</b> downloads about 16 GB from DoltHub (free, public
+        options data, with earnings) the first time, takes a few hours, and needs about 40 GB free. Or build
+        it from Schwab in a few minutes (steps 4 and 5 below).
       </p>
       <div className="modal-actions">
         <button
-          className="pixel-btn primary"
+          className="pixel-btn"
           disabled={busy}
           onClick={() => void run('real')}
           data-testid="build-real"
@@ -667,6 +670,104 @@ function DataPanel() {
           <pre className="report-text">{report}</pre>
         </Modal>
       )}
+    </>
+  );
+}
+
+/**
+ * The Options DB: finished game data, republished every weekday after the close. One download
+ * (about 30 MB) with nothing needed beforehand; the game also checks for it at every launch.
+ */
+function OptionsDbBlock({
+  busy,
+  setBusy,
+  after,
+}: {
+  busy: boolean;
+  setBusy: (b: boolean) => void;
+  after: () => Promise<void>;
+}) {
+  const toast = useApp((s) => s.toast);
+  const [st, setSt] = useState<DataUpdateStatus | null>(null);
+  useEffect(() => {
+    if (!hasBridge()) return;
+    void bridge()
+      .invoke('data.updateStatus')
+      .then((s) => {
+        setSt(s);
+        if (!s.checkedAt && !s.busy) void bridge().invoke('data.updateStatus', true).then(setSt);
+      });
+    return bridge().on('data.updated', () => void bridge().invoke('data.updateStatus').then(setSt));
+  }, []);
+  const act = async (channel: 'data.download' | 'data.applyUpdate') => {
+    sfx('select');
+    setBusy(true);
+    const r = await bridge().invoke(channel);
+    setBusy(false);
+    sfx(r.ok ? 'fill' : 'error');
+    toast(r.message, r.ok ? 'good' : 'warn');
+    await after();
+    setSt(await bridge().invoke('data.updateStatus'));
+  };
+  const remote = st?.remote;
+  return (
+    <>
+      <div className="optdb-status num" data-testid="options-db">
+        <div>
+          Options DB (published game data):{' '}
+          <b className="amber-text">
+            {remote
+              ? `${remote.version} · through ${remote.lastDate} · ${Math.round(remote.size / 1e6)} MB`
+              : st?.plan === 'offline'
+                ? 'not reachable right now'
+                : 'checking…'}
+          </b>
+        </div>
+        {st?.staged && (
+          <div className="up-text">
+            ✔ {st.staged.version} (through {st.staged.lastDate}) is downloaded: it loads the next time you
+            start the game, or now with LOAD NOW.
+          </div>
+        )}
+        {st?.message && <div className="dim">{st.message}</div>}
+      </div>
+      <p>
+        <b>DOWNLOAD LATEST DATA</b> gets the finished real market data (prices and option chains for 79
+        tickers, updated every weekday after the close) in one small download, with nothing to install or
+        build. The game also checks for new data each time it starts, and SYNC LATEST DAYS fetches it too.
+      </p>
+      <div className="modal-actions">
+        <button
+          className="pixel-btn primary"
+          disabled={busy || !!st?.busy}
+          onClick={() => void act('data.download')}
+          data-testid="download-data"
+        >
+          DOWNLOAD LATEST DATA
+        </button>
+        {st?.staged && (
+          <button
+            className="pixel-btn primary nudge"
+            disabled={busy || st.busy}
+            onClick={() => void act('data.applyUpdate')}
+            data-testid="apply-data"
+          >
+            LOAD NOW
+          </button>
+        )}
+        <button
+          className="pixel-btn"
+          disabled={busy || !!st?.busy}
+          onClick={() => {
+            sfx('click');
+            setSt((cur) => (cur ? { ...cur, message: 'Checking…' } : cur));
+            void bridge().invoke('data.updateStatus', true).then(setSt);
+          }}
+          data-testid="check-data"
+        >
+          CHECK AGAIN
+        </button>
+      </div>
     </>
   );
 }

@@ -4,17 +4,33 @@ Plain-language status for Jacob. Newest phase at the top of "Done".
 
 ## Where we are
 
-**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data) **1.8.2** (the Joker Row of cartridges, the register-coin-jackpot payout, whole numbers) and **1.8.3** (the shop as objects, keycap buttons that flash when they matter, beveled top bar icons, the payoff in the TRADE column, the Income desk first, Ines's cash-secured put, the LEARN OPTIONS rework). Version 1.8.3. Next: your playtest of 1.8.3 (PLAYTEST.md or the in-game checklist).
+**Current phase:** All phases (0–11) are done, plus playtest rounds 1–4, a Mac version, the read-only Schwab connection, 1.4.2 through 1.6.1, **1.7.0** (your boss checklist and playtest notes, and the Trade Builder), **1.8.0** (the Trade Builder's second version: a LEARN OPTIONS course) **1.8.1** (back to 50 tickers in all, index options, a new test checklist, and a fix to the Schwab-built game data) **1.8.2** (the Joker Row of cartridges, the register-coin-jackpot payout, whole numbers), **1.8.3** (the shop as objects, keycap buttons that flash when they matter, beveled top bar icons, the payoff in the TRADE column, the Income desk first, Ines's cash-secured put, the LEARN OPTIONS rework) and **1.8.4** (game data downloaded from the Options DB and kept current by itself; the daily data update fixed). Version 1.8.4. Next: your playtest of 1.8.4 (PLAYTEST.md or the in-game checklist).
 
 ## How to run (on your PC)
 
-- **Play:** download from the [1.8.3 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.3) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.3.exe`, or run `SpreadTradingGame-Portable-1.8.3.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
+- **Play:** download from the [1.8.4 release](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.8.4) (or [1.7.0](https://github.com/TTTrainer/Spread-Trade-Game/releases/tag/v1.7.0), the Trade Builder's first version) and see `README_PLAY.md`. Install with `SpreadTradingGame-Setup-1.8.4.exe`, or run `SpreadTradingGame-Portable-1.8.4.exe` directly. Macs: the `mac-arm64` (Apple chip) or `mac-x64` (Intel) zip.
 - **Publish a new version:** bump the version in `package.json` and edit `RELEASE_NOTES.md`; the push builds Windows and Mac on GitHub's machines and publishes the release (`.github/workflows/release.yml`).
 - **Play on a Mac:** see "On a Mac" in `README_PLAY.md` (Apple chip or Intel; `join-mac.sh` puts the game in Applications).
 - **Rebuild the installer:** `npm run build:win` writes both files to `release/`. `npm run build:mac` builds the two Mac versions.
 - **From source:** install Node.js LTS once (`winget install OpenJS.NodeJS.LTS`), then in this folder `npm install` and `npm run dev`.
 
 ## Done
+
+### 1.8.4: game data from the Options DB, and the daily update fixed
+
+- **The game downloads its data from the Options DB** (the public releases at TTTrainer/Options-DB-data, which the daily update republishes every weekday after the close). Nothing is needed on the computer first. About 30 MB, a couple of seconds, checked against the published size and SHA-256 before it replaces anything; a cut connection is retried and never leaves a broken file.
+  - First launch with no real data: it downloads and loads straight away (a message says so).
+  - Real data already there: newer data downloads in the background into `game.db.next` and loads at the next launch, or now with **LOAD NOW**, so the market never changes in the middle of a round.
+  - **Settings › Data** has a new top block: the published release, yours, **DOWNLOAD LATEST DATA**, **LOAD NOW** (when one is waiting) and **CHECK AGAIN**. **SYNC LATEST DAYS** and the paper month's **CHECK FOR NEW DAYS** download too when your data came from the Options DB (or there's none yet).
+  - It never goes backwards: data built on the PC that runs later stays, and a DoltHub build (it has earnings) is kept unless you press DOWNLOAD LATEST DATA.
+  - It uses GitHub's plain download links, not the GitHub API, so there's no hourly limit and no token to go stale. Offline, the check fails quietly.
+  - `npm run data:download` does the same from the command line.
+- **The daily data update was failing every run** (Options-DB's workflow, since 28 October): it builds game.db with this repo's Schwab code, which kept only the game's 25 tickers since 1.8.1, and it refuses to publish a build that drops tickers the published file has (79). **BUILD GAME DATA FROM SCHWAB** now keeps every ticker schwab.db holds. Index options are marked index-like, and 1.8.0's second 25 keep their names. Checked by running the Options-DB update script against the real published data: 79 tickers in, nothing dropped.
+- **Every ticker in the data is tradeable (your request):** all 79 get windows, so Career, the Daily, Contracts and the paper month can deal any of them, and the Trade Builder's ALL list shows all 79. This undoes 1.8.1's "only the game's 25 in runs". The added tickers have about two years of history and no earnings.
+- **Index options settle in cash** (SPX, XSP, NDX, RUT, now that runs can deal them): never assigned early, an in-the-money option pays its intrinsic value at expiration, no shares, no pin-risk warning, and EXERCISE is refused (European style). Before, the engine would have turned an in-the-money SPX option into 100 "shares" of the index.
+- **For the daily update to use this:** the Options-DB repo variable `GAME_REF` must be `claude/friendly-darwin-olwvy5` (this branch). This branch also carries everything from `claude/game-build-phases-dkpsed` (1.8.3).
+- Tests: the download (manifest checks, retries, a bad checksum, a short download, the swap, when to update and when not), the Schwab build keeping and dealing every ticker, cash settlement for index options, and two E2E runs against a local stand-in for the release (first launch installs by itself; a newer release waits for LOAD NOW or the next launch). Screenshots checked at 1920 and 1366.
+- **Known issue (older than this):** a Career run saved in the middle of a round refers to its cards by position in the market data, so loading new data (any update, a sync or a rebuild) can change the cards of a round that was already dealt. Background downloads wait for the next launch to keep this rare.
 
 ### 1.8.3: the shop as objects, keycaps, flash cues, payoff in the column, Income first, the course rework
 

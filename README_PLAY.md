@@ -43,7 +43,16 @@ Good first steps:
 
 Music starts after your first click or key press; the browser engine inside the app requires that. Volume, music style, screen shake, CRT scanlines and the colorblind palette are all in **Settings**.
 
-## 3. Real market data (optional, a few hours once)
+## 3. Real market data (automatic)
+
+The game gets real market data by itself from the **Options DB**: the finished game data (prices and option chains for 79 tickers, from 2018 to the latest close), republished every weekday after the close. It's about 30 MB, needs nothing on your computer first, and takes seconds.
+
+- **First launch:** it downloads and the game switches from the SIM market to real data on its own (a message says so).
+- **After that:** each launch checks for newer data. New data downloads quietly and loads the next time you start the game; **Settings → Data → LOAD NOW** loads it right away.
+- **Settings → Data → DOWNLOAD LATEST DATA** fetches it on demand. If the internet is down, the game plays on what it has.
+- What it is: real daily prices, real option chains on the closes they were recorded after, and **modeled chains** (labeled **MODEL**) on every other day. It has no earnings events; the DoltHub build below does.
+
+### Building it yourself instead (optional, a few hours once)
 
 **Quicker alternative:** with a Schwab developer app you can build a real market in minutes instead (see *Schwab* in section 4). It has real prices, but mostly modeled option chains and no earnings events; DoltHub has real option chains every day back to 2019 and the earnings history.
 
@@ -63,7 +72,7 @@ When it finishes, **VIEW DATA REPORT** lists the tickers, the dates covered and 
 
 ## 4. Keeping data current, the Trade Builder, and the paper month
 
-- **Settings → Data → SYNC LATEST DAYS** pulls the newest trading days, usually a few minutes.
+- **Settings → Data → SYNC LATEST DAYS** pulls the newest trading days: from the Options DB in seconds when that's where your data came from, otherwise from DoltHub (and Schwab, if connected) in a few minutes.
 - **The Trade Builder** (title screen) is for building a real trade on today's market. Type a ticker under OPEN A TICKER (or press ALL), read it with the studies in the tray, build any strategy with the sliders or leg by leg (LEGS, on the TRADE tab), study it full size under ⟋ PAYOFF, and press **COPY ORDER** (Alt+C) to copy it as thinkorswim-style text. Index options (SPX, XSP, NDX, RUT) are under ALL; type `SPX` or `$SPX`. They settle in cash, and the ticket says so. New to options? **✎ LEARN OPTIONS** runs a 13-lesson course on the chart you have open. You enter the order at your broker yourself; nothing is ever sent. With Schwab connected (below), each ticker loads live: today's prices and option chain. Without it, the builder uses your newest saved data and the badge at the top says how out of date it is.
 - **The paper month** (Trade Builder → PAPER MONTH, the old Live) plays the most recent month: you start 20 trading days back with a dealt lineup (the market plus a few stocks), trade like any desk, and press Space to play each day. At the latest close the clock waits. **⟳ CHECK FOR NEW DAYS** fetches newer days and the month plays on from there, so it never runs out. The aim: finish ahead of simply holding the market. **NEW MONTH** starts over (closed trades stay in Stats).
 - On the SIM market there's nothing new to download, so CHECK FOR NEW DAYS moves a simulated calendar forward one week instead, and the screen says so.

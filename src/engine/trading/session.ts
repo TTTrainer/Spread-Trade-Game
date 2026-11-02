@@ -21,6 +21,7 @@ import {
   type OrderType,
 } from '../orders/fill';
 import { feesFor, pdtAllows } from '../orders/rules';
+import { isCashIndex } from '../../content/builderTickers';
 import { Rng } from '../rng';
 import { STRUCTURES } from '../strategies/structures';
 import type { BuildParams, Leg, OptionLeg, StructureId } from '../strategies/types';
@@ -466,6 +467,10 @@ export class TradingSession {
       }
       case 'exercise': {
         const p = this.mustOpen(a.positionId);
+        if (this.cashSettled(p.cardId))
+          throw new Error(
+            'Index options are European style: they settle in cash at expiration, never before.',
+          );
         const book = this.bookFor(p.cardId);
         this.replace(exerciseAction(p, a.leg, book.date, book));
         return null;
@@ -812,7 +817,14 @@ export class TradingSession {
       autoBrackets: this.config.autoBrackets,
       suppressOnGap: this.config.suppressOnGap,
       rng: this.rng.fork(`day:${this.dayIndex}:${cardId}`),
+      cashSettled: this.cashSettled(cardId),
     };
+  }
+
+  /** SPX, XSP, NDX and RUT options: European style, settled in cash (no shares, no early exercise). */
+  cashSettled(cardId: string): boolean {
+    const c = this.cards.find((x) => x.id === cardId);
+    return !!c && isCashIndex(c.realSymbol);
   }
 
   private actionEnv(cardId: string): ActionEnv {
@@ -1136,7 +1148,8 @@ export class TradingSession {
       }
       case 'exercise': {
         const leg = optionLegsOf(p.legs).find((l) => l.ratio > 0);
-        if (leg) this.replace(exerciseAction(p, leg, this.bookFor(p.cardId).date, this.bookFor(p.cardId)));
+        if (leg && !this.cashSettled(p.cardId))
+          this.replace(exerciseAction(p, leg, this.bookFor(p.cardId).date, this.bookFor(p.cardId)));
         break;
       }
       case 'adjust':

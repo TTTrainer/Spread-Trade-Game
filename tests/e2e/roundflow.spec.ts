@@ -142,7 +142,7 @@ test('developer test checklist: what changed since 1.6, one click to each spot, 
   // Only what changed since 1.6, each tagged with its release; the 1.6 checks are gone.
   await expect(page.getByTestId('check-tb-badge')).toContainText('1.7.0');
   await expect(page.getByTestId('check-learn-picture')).toContainText('1.8.3');
-  await expect(page.getByTestId('check-tb-tickers')).toContainText('1.8.1');
+  await expect(page.getByTestId('check-tb-tickers')).toContainText('1.8.4');
   await expect(page.getByTestId('check-menu-basics')).toHaveCount(0);
   await page.getByTestId('check-ok-menu-emblems').click();
   await page.getByTestId('check-issue-run-rules').click();

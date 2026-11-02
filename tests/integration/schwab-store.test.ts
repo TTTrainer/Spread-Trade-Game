@@ -110,8 +110,7 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
 
   beforeAll(async () => {
     const fake = fakeSchwab(src, () => last);
-    // QQQ is a Trade Builder ticker, and RDDT one it used to list: built for the Trade Builder,
-    // never dealt.
+    // QQQ is a Trade Builder ticker, and RDDT one it used to list: both built, both dealt.
     await schwabPull({
       storePath,
       api: fake.api,
@@ -134,8 +133,8 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
     expect(syms.find((s) => s.symbol === 'RDDT')).toMatchObject({ name: 'Reddit', isEtf: false });
     const windows = await game.windows({});
     expect(windows.length).toBeGreaterThan(50);
-    expect([...new Set(windows.map((w) => w.symbol))].sort()).toEqual(['AAPL', 'SPY']);
-    // The Trade Builder reads every ticker from game.db.
+    expect([...new Set(windows.map((w) => w.symbol))].sort()).toEqual(['AAPL', 'QQQ', 'RDDT', 'SPY']);
+    // The Trade Builder reads every ticker from game.db too.
     expect((await game.bars('QQQ', last, last)).length).toBe(1);
     expect((await game.chain('RDDT', last))?.source).toBe('real');
     expect(await game.earnings('AAPL', '2018-01-01', last)).toEqual([]);

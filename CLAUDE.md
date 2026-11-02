@@ -60,6 +60,7 @@ A single-player Windows desktop roguelite about trading options spreads on real 
 | `npm run data:build` | Clone or refresh the Dolt sources and build `game.db` |
 | `npm run data:sync` | Pull the latest trading days (Live mode) |
 | `npm run data:report` | Write `data/REPORT.md` (tickers, ranges, row counts, gaps) |
+| `npm run data:download` | Download the finished `game.db` from the Options DB's latest release (`--force` replaces newer or DoltHub data) |
 | `npm run sim -- --runs 2000` | Headless balance simulation; writes `sim/REPORT.md` |
 | `npm run build:win` | Build the Windows installer and portable exe into `release/` |
 | `npm run build:mac` | Build, ad-hoc sign and zip the Mac apps (Apple chip and Intel) into `release/`, plus chat-sized parts and `join-mac.sh` in `release/mac-download/` (needs `rcodesign` on Linux) |

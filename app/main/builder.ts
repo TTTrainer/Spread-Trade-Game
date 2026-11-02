@@ -51,7 +51,8 @@ async function list(): Promise<BuilderList> {
         savedThrough: savedThrough(c.symbol),
       });
     }
-    // The practice (SIM) market's own tickers, so the builder works with no real data at all.
+    // Every other ticker in the market data: 1.8.0's second 25 that game.db still carries, and the
+    // practice (SIM) market's own, so the builder works with no real data at all.
     for (const s of syms)
       if (!items.has(s.symbol))
         items.set(s.symbol, {

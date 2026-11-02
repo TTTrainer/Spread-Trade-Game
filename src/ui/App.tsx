@@ -6,6 +6,7 @@ import { TooltipLayer } from './components/Tooltip';
 import { useHotkeys } from './hotkeys';
 import { useMusicDirector } from './musicDirector';
 import { useApp, type Screen } from './store/app';
+import { bridge, hasBridge } from './bridge';
 import { TitleScreen } from './screens/TitleScreen';
 import { SandboxSetup, SandboxTrading } from './screens/Sandbox';
 import { HelpModal } from './trading/TradingScreen';
@@ -56,6 +57,12 @@ export function App() {
   useEffect(() => {
     void loadSettings();
     void refreshData();
+    if (!hasBridge()) return;
+    // The launch check found new data in the Options DB: show what changed.
+    return bridge().on('data.updated', (u) => {
+      void refreshData();
+      useApp.getState().toast(u.message, u.ok ? 'good' : 'warn');
+    });
   }, []);
 
   useMusicDirector();

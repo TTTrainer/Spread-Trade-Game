@@ -11,6 +11,8 @@ import { addHandlers, emit } from './ipc';
 import { log } from './log';
 import { defaultGameDbPath, doltRootDir, schwabStorePath, userDataDir } from './paths';
 import { schwabAccessToken } from './schwab';
+import { applyNow, downloadNow, isDownloadedData, isDownloading, recheck, updateStatus } from './dataUpdate';
+import { readSidecar } from '../../data-pipeline/download';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +30,8 @@ export function setGameDbPath(p: string | null): void {
   resetSource();
 }
 
-function resetSource(): void {
+/** Close game.db so it can be replaced; the next market call opens whatever is there then. */
+export function resetSource(): void {
   if (source instanceof SqliteSource) source.close();
   source = null;
 }
@@ -67,6 +70,7 @@ async function status(): Promise<DataStatus> {
     notes: meta.notes,
     busy,
     fromSchwab: meta.chainModel === 'history',
+    downloaded: usingBuiltDb ? (readSidecar(gameDbPath())?.version ?? null) : null,
   };
 }
 
@@ -131,7 +135,17 @@ export function registerDataHandlers(): void {
     },
     'data.status': () => status(),
     'data.build': async (req: DataBuildRequest) => {
-      if (busy) return { ok: false, message: 'A data build is already running.' };
+      if (busy || isDownloading()) return { ok: false, message: 'A data build is already running.' };
+      // Data downloaded from the Options DB (or none yet, with no Schwab): syncing means fetching
+      // the newest published release, with nothing needed on this computer beforehand.
+      if (req.mode === 'sync' && (isDownloadedData() || !existsSync(gameDbPath()))) {
+        busy = true;
+        try {
+          return await downloadNow();
+        } finally {
+          busy = false;
+        }
+      }
       busy = true;
       try {
         resetSource();
@@ -150,6 +164,20 @@ export function registerDataHandlers(): void {
         busy = false;
         resetSource();
       }
+    },
+    'data.updateStatus': (refresh?: boolean) => (refresh ? recheck() : updateStatus()),
+    'data.download': async () => {
+      if (busy) return { ok: false, message: 'A data build is already running.' };
+      busy = true;
+      try {
+        return await downloadNow();
+      } finally {
+        busy = false;
+      }
+    },
+    'data.applyUpdate': async () => {
+      if (busy) return { ok: false, message: 'A data build is already running.' };
+      return applyNow();
     },
     'data.report': () => {
       const p = join(userDataDir(), 'data', 'REPORT.md');

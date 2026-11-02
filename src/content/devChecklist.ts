@@ -30,7 +30,7 @@ export interface DevSetup {
   game?: Partial<Settings['game']>;
 }
 
-export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2' | '1.8.3';
+export type DevVersion = '1.7.0' | '1.8.0' | '1.8.1' | '1.8.2' | '1.8.3' | '1.8.4';
 
 export interface DevCheck {
   id: string;
@@ -175,9 +175,9 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'tb-tickers',
     group: 'Trade Builder',
-    ver: '1.8.1',
-    title: 'The ticker list: 50 in all',
-    look: "ALL lists the game's 25, the 25 added for the builder (QQQ to SHOP) and the four index options. 1.8.0's second 25 (EEM to RDDT) are gone.",
+    ver: '1.8.4',
+    title: 'The ticker list: all 79',
+    look: "ALL lists every ticker in the market data: the game's 25, the builder's 25 (QQQ to SHOP), 1.8.0's second 25 (EEM to RDDT) and the four index options.",
     setup: { builder: { tickers: true } },
   },
   {
@@ -207,9 +207,17 @@ export const DEV_CHECKS: DevCheck[] = [
   {
     id: 'tb-game-data',
     group: 'Trade Builder',
-    ver: '1.8.1',
-    title: 'Game data built from Schwab',
-    look: "Only if you use it: BUILD GAME DATA FROM SCHWAB, then start a Career run. The lineups deal only the game's 25 tickers (no QQQ, SOFI or SPX).",
+    ver: '1.8.4',
+    title: 'Every ticker is tradeable',
+    look: 'Start a few Career runs and a paper month: any of the 79 can be dealt (QQQ, SOFI, SPX too). An index option that ends in the money settles in cash: no shares.',
+    setup: { screen: 'settingsData' },
+  },
+  {
+    id: 'data-download',
+    group: 'Trade Builder',
+    ver: '1.8.4',
+    title: 'Game data from the Options DB',
+    look: "Settings › Data shows the published release and yours. DOWNLOAD LATEST DATA takes seconds. After a weekday's update, restart: the new day loads by itself (or LOAD NOW). QQQ opens in the Trade Builder without Schwab.",
     setup: { screen: 'settingsData' },
   },
   {

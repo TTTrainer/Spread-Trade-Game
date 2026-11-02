@@ -1,6 +1,6 @@
 # Playtest checklist
 
-What changed since 1.6 (1.7.0 through 1.8.3). The earlier checks are done and gone.
+What changed since 1.6 (1.7.0 through 1.8.4). The earlier checks are done and gone.
 
 **The quickest way is in the game.** Turn on Settings → Game → **Developer mode**, press the **DEV** button (or Ctrl+Shift+D) and open **TEST CHECKLIST**. It lists the same checks as below, and for each one:
 
@@ -39,47 +39,48 @@ What changed since 1.6 (1.7.0 through 1.8.3). The earlier checks are done and go
 | 15 | **The full-size payoff** | 1.7.0 | Hover across prices; slide DATE and IV. Can you read breakevens, max profit and loss, today vs expiration and the expected move at a glance? What's missing? |
 | 16 | **Studies on and off** | 1.7.0 | Toggle BB, EM, 2σ, S/R, SMA, EMA, Keltner, RSI, MACD, ATR and volume in the tray. Are these the studies you use? |
 | 17 | **COPY ORDER** | 1.7.0 | Press COPY ORDER (Alt+C) and paste it into a note: does it read like thinkorswim's order line, every leg right? Nothing is ever sent. |
-| 18 | **The ticker list: 50 in all** | 1.8.1 | ALL lists the game's 25, the 25 added for the builder (QQQ to SHOP) and the four index options. 1.8.0's second 25 (EEM to RDDT) are gone. |
+| 18 | **The ticker list: all 79** | 1.8.4 | ALL lists every ticker in the market data: the game's 25, the builder's 25 (QQQ to SHOP), 1.8.0's second 25 (EEM to RDDT) and the four index options. |
 | 19 | **Index options** | 1.8.1 | With Schwab connected, SPX (and XSP, NDX, RUT) load like any ticker, marked CASH-SETTLED. Do strikes and credits match thinkorswim's SPX weeklies? Without Schwab it says so plainly. |
 | 20 | **The paper month** | 1.7.0 | The old Live month, now Trade Builder › PAPER MONTH: it starts 20 trading days back and plays to the latest close. |
 | 21 | **PULL FROM SCHWAB** | 1.7.0 | Run PULL FROM SCHWAB: it saves two years for the builder's tickers and the latest close's chains. Then open a few in the Trade Builder. Any that fail? |
-| 22 | **Game data built from Schwab** | 1.8.1 | Only if you use it: BUILD GAME DATA FROM SCHWAB, then start a Career run. The lineups deal only the game's 25 tickers (no QQQ, SOFI or SPX). |
+| 22 | **Every ticker is tradeable** | 1.8.4 | Start a few Career runs and a paper month: any of the 79 can be dealt (QQQ, SOFI, SPX too). An index option that ends in the money settles in cash: no shares. |
+| 23 | **Game data from the Options DB** | 1.8.4 | Settings › Data shows the published release and yours. DOWNLOAD LATEST DATA takes seconds. After a weekday's update, restart: the new day loads by itself (or LOAD NOW). QQQ opens in the Trade Builder without Schwab. |
 
 ### Learn Options
 
 | # | Check | Since | What to look for |
 |---|---|---|---|
-| 23 | **Get paid to wait (the replay)** | 1.8.3 | Drag your line under the floor, SELL, then PLAY the month: a coin for every day no candle touches the line. Fun, or homework? Try another month too. |
-| 24 | **The same trade as a picture** | 1.8.3 | Today's put on the P/L chart, and one question on where it starts losing. Does the picture click after the replay? |
-| 25 | **Pick a safer line** | 1.8.3 | EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and under a floor? |
-| 26 | **The covered call replay** | 1.8.3 | The same game upside down: your call line over the ceiling, and the month plays out. Clear why it is safe when you own the shares? |
-| 27 | **Your first trade, coached** | 1.8.3 | Build a put on today's chart: each checklist step ticks as you do it, then PLAY tests the setup on last month. Does the badge feel earned? |
-| 28 | **More lessons** | 1.8.3 | After the vertical: delta, time decay, IV, the expected move, condors, managing and events. The call and put buying lessons are gone. |
+| 24 | **Get paid to wait (the replay)** | 1.8.3 | Drag your line under the floor, SELL, then PLAY the month: a coin for every day no candle touches the line. Fun, or homework? Try another month too. |
+| 25 | **The same trade as a picture** | 1.8.3 | Today's put on the P/L chart, and one question on where it starts losing. Does the picture click after the replay? |
+| 26 | **Pick a safer line** | 1.8.3 | EM and S/R are on. Move the short strike until POP reads 75–85%: is it past the expected move and under a floor? |
+| 27 | **The covered call replay** | 1.8.3 | The same game upside down: your call line over the ceiling, and the month plays out. Clear why it is safe when you own the shares? |
+| 28 | **Your first trade, coached** | 1.8.3 | Build a put on today's chart: each checklist step ticks as you do it, then PLAY tests the setup on last month. Does the badge feel earned? |
+| 29 | **More lessons** | 1.8.3 | After the vertical: delta, time decay, IV, the expected move, condors, managing and events. The call and put buying lessons are gone. |
 
 ### Bosses
 
 | # | Check | Since | What to look for |
 |---|---|---|---|
-| 29 | **The Collector's interest notice** | 1.7.0 | Leave a losing trade at or past a strike you sold through a close: an INTEREST NOTICE takes 5% of its risk off your score each day. Costly enough to make you close it? |
-| 30 | **Margin Clerk: the width cap** | 1.7.0 | The Width slider stops at the widest spread whose one contract fits your risk cap. |
-| 31 | **Tax Man: the first week** | 1.7.0 | A win closed within its first 5 trading days scores 25% less; the trade card counts the days down. |
-| 32 | **Underwriter trophy: 5%** | 1.7.0 | The Review is cleared for you: the bounty pays, and the trophy screen shows the Underwriter's trophy at 5%. A prize worth having? |
-| 33 | **Shell Company trophy: $2 off rerolls** | 1.7.0 | The Review is cleared for you: the trophy takes $2 off every reroll, and the shop prices show it. |
-| 34 | **Rebalancer: the bigger race chart** | 1.7.0 | The YOU vs SPY race on the chart is bigger and easy to read while you trade. |
-| 35 | **Early Retiree: the bigger duel** | 1.7.0 | The YOU vs CHAD race and Chad's trades are bigger and easy to follow. |
+| 30 | **The Collector's interest notice** | 1.7.0 | Leave a losing trade at or past a strike you sold through a close: an INTEREST NOTICE takes 5% of its risk off your score each day. Costly enough to make you close it? |
+| 31 | **Margin Clerk: the width cap** | 1.7.0 | The Width slider stops at the widest spread whose one contract fits your risk cap. |
+| 32 | **Tax Man: the first week** | 1.7.0 | A win closed within its first 5 trading days scores 25% less; the trade card counts the days down. |
+| 33 | **Underwriter trophy: 5%** | 1.7.0 | The Review is cleared for you: the bounty pays, and the trophy screen shows the Underwriter's trophy at 5%. A prize worth having? |
+| 34 | **Shell Company trophy: $2 off rerolls** | 1.7.0 | The Review is cleared for you: the trophy takes $2 off every reroll, and the shop prices show it. |
+| 35 | **Rebalancer: the bigger race chart** | 1.7.0 | The YOU vs SPY race on the chart is bigger and easy to read while you trade. |
+| 36 | **Early Retiree: the bigger duel** | 1.7.0 | The YOU vs CHAD race and Chad's trades are bigger and easy to follow. |
 
 ### Month menu
 
 | # | Check | Since | What to look for |
 |---|---|---|---|
-| 36 | **Emblems and the deal-in** | 1.7.0 | Each round has an emblem and a name, dealt in like cards. Flashier, and still quick? |
-| 37 | **The exit plan, shown** | 1.7.0 | Slide Take profit and Stop: the sample spread under YOUR BUILD shows what the plan does. After a few closes, the scorecard shows how your exits went. |
-| 38 | **How each trade closed** | 1.7.0 | Close one at its target, take a planned stop, close one by hand: each payout is stamped TARGET BANKED, STOP TAKEN · saved $X or CLOSED BY HAND. Different enough? |
+| 37 | **Emblems and the deal-in** | 1.7.0 | Each round has an emblem and a name, dealt in like cards. Flashier, and still quick? |
+| 38 | **The exit plan, shown** | 1.7.0 | Slide Take profit and Stop: the sample spread under YOUR BUILD shows what the plan does. After a few closes, the scorecard shows how your exits went. |
+| 39 | **How each trade closed** | 1.7.0 | Close one at its target, take a planned stop, close one by hand: each payout is stamped TARGET BANKED, STOP TAKEN · saved $X or CLOSED BY HAND. Different enough? |
 
 ### Tutorial
 
 | # | Check | Since | What to look for |
 |---|---|---|---|
-| 39 | **Ines teaches a cash-secured put** | 1.8.3 | The tutorial runs on the Income desk: Ines marks a floor and sells a put under it, then you sell your own. Is it clear what happens if it ends under the strike? |
+| 40 | **Ines teaches a cash-secured put** | 1.8.3 | The tutorial runs on the Income desk: Ines marks a floor and sells a put under it, then you sell your own. Is it clear what happens if it ends under the strike? |
 
 **Anything else:** ideas, annoyances, things you'd pay for in a real game. Add them as playtest notes in the DEV panel (with a screenshot if it helps) and they go into the same file.

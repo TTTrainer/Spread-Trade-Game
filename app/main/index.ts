@@ -5,6 +5,7 @@ import { configurePaths } from './paths';
 import { log } from './log';
 import { registerIpc } from './ipc';
 import { registerDataHandlers } from './dataService';
+import { applyStagedAtLaunch, autoUpdate } from './dataUpdate';
 import { registerSchwabHandlers } from './schwab';
 import { registerBuilderHandlers } from './builder';
 import { registerUserHandlers } from './userDb';
@@ -95,11 +96,15 @@ function createWindow(): void {
 app.whenReady().then(() => {
   log('info', `app start v${app.getVersion()} electron ${process.versions.electron}`);
   registerIpc(() => mainWindow);
+  // A data download that finished last session loads before anything opens game.db.
+  applyStagedAtLaunch();
   registerDataHandlers();
   registerSchwabHandlers();
   registerBuilderHandlers();
   registerUserHandlers();
   createWindow();
+  // Then a quiet check for newer published data (offline is fine).
+  setTimeout(autoUpdate, 1500);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

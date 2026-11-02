@@ -6,7 +6,8 @@ import { existsSync, renameSync, rmSync } from 'node:fs';
 import { addDays, type ISODate } from '../../src/engine/calendar';
 import type { DataBuildRequest, DataBuildResult } from '../../src/shared/rpc';
 import { buildRealDb, LowDiskError } from '../../data-pipeline/dolt/extract';
-import { get, openDb } from '../../data-pipeline/lib/sqlite';
+import { dbInfo } from '../../data-pipeline/lib/dbInfo';
+import { sidecarPath } from '../../data-pipeline/download';
 import { writeReport } from '../../data-pipeline/report';
 import { buildSyntheticDb } from '../../data-pipeline/synthetic';
 import { CANDIDATES } from '../../data-pipeline/dolt/tickers';
@@ -28,35 +29,6 @@ interface Job {
   schwabToken?: string | null;
 }
 
-interface DbInfo {
-  kind: string | null;
-  lastDate: string | null;
-  /** Built from schwab.db (chains modeled from price history). */
-  fromSchwab: boolean;
-  tickers: string[];
-}
-
-function dbInfo(path: string): DbInfo {
-  if (!existsSync(path)) return { kind: null, lastDate: null, fromSchwab: false, tickers: [] };
-  const db = openDb(path, { readOnly: true });
-  try {
-    const meta = JSON.parse(
-      get<{ value: string }>(db.prepare("SELECT value FROM meta WHERE key='dataset'"))?.value ?? '{}',
-    ) as { kind?: string; lastDate?: string; chainModel?: string };
-    const tickers = (db.prepare('SELECT symbol FROM symbols').all() as { symbol: string }[]).map(
-      (r) => r.symbol,
-    );
-    return {
-      kind: meta.kind ?? null,
-      lastDate: meta.lastDate ?? null,
-      fromSchwab: meta.chainModel === 'history',
-      tickers,
-    };
-  } finally {
-    db.close();
-  }
-}
-
 interface ParentPort {
   on(event: 'message', cb: (e: { data: Job }) => void): void;
   postMessage(msg: unknown): void;
@@ -71,6 +43,8 @@ function progress(stage: string, fraction: number, message = ''): void {
 function swapIn(tmp: string, target: string): void {
   for (const s of ['', '-wal', '-shm']) if (existsSync(target + s)) rmSync(target + s);
   renameSync(tmp, target);
+  // Built here, not downloaded: the update check must not mistake it for a published release.
+  rmSync(sidecarPath(target), { force: true });
   for (const s of ['-wal', '-shm']) if (existsSync(tmp + s)) rmSync(tmp + s);
 }
 

@@ -32,6 +32,29 @@ export interface DataStatus {
   busy: boolean;
   /** Built from schwab.db alone (option chains modeled except the closes Schwab was pulled after). */
   fromSchwab?: boolean;
+  /** The Options DB release game.db was downloaded from (null when built on this computer). */
+  downloaded?: string | null;
+}
+
+export interface DataReleaseInfo {
+  version: string;
+  firstDate: string;
+  lastDate: string;
+  size: number;
+}
+
+/** The Options DB's published game data, against what's on this computer. */
+export interface DataUpdateStatus {
+  /** The latest release, once the game has reached the Options DB this session. */
+  remote: DataReleaseInfo | null;
+  /** The release game.db was downloaded from (null when built here or absent). */
+  installed: DataReleaseInfo | null;
+  /** Downloaded in the background, loading at the next launch (or LOAD NOW). */
+  staged: DataReleaseInfo | null;
+  plan: 'install' | 'update' | 'keep' | 'offline' | 'unknown';
+  message: string;
+  checkedAt: string | null;
+  busy: boolean;
 }
 
 export interface DataBuildRequest {
@@ -122,6 +145,12 @@ export interface RpcMap {
   'market.call': (method: string, args: unknown[], asOf: string | null) => unknown;
   'data.status': () => DataStatus;
   'data.build': (req: DataBuildRequest) => DataBuildResult;
+  /** The Options DB's latest release against this computer's data (`refresh` asks it again). */
+  'data.updateStatus': (refresh?: boolean) => DataUpdateStatus;
+  /** Download the latest published game.db and load it now (no DoltHub, Schwab or saved data needed). */
+  'data.download': () => DataBuildResult;
+  /** Load a release downloaded in the background without waiting for the next launch. */
+  'data.applyUpdate': () => DataBuildResult;
   'data.report': () => string;
   /** Read-only Schwab market data. Keys and tokens stay in the user-data folder, encrypted. */
   'schwab.status': () => SchwabStatus;
@@ -160,6 +189,8 @@ export type RpcResult<C extends RpcChannel> = Awaited<ReturnType<RpcMap[C]>>;
 
 export interface EventMap {
   'data.progress': { stage: string; message: string; fraction: number };
+  /** The launch check downloaded new market data (loaded now, or `staged` for the next launch). */
+  'data.updated': { ok: boolean; message: string; staged: boolean };
 }
 export type EventChannel = keyof EventMap;
 

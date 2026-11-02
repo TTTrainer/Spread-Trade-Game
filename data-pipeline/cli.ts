@@ -2,6 +2,8 @@
  * npm run data:build   -- builds game.db from DoltHub (or --synthetic for the SIM market)
  * npm run data:sync    -- pulls the latest trading days into an existing real game.db
  * npm run data:report  -- writes data/REPORT.md
+ * npm run data:download -- the finished game.db from the Options DB's latest release (--force: even
+ *                          if the data here is newer or a DoltHub build)
  *
  * Flags: --db <path>  --dolt-root <path>  --synthetic  --chain-days <n>  --yes (download Dolt, accept low disk)
  *        --tickers AAPL,MSFT  --skip-clone
@@ -10,6 +12,8 @@ import { existsSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { addDays } from '../src/engine/calendar';
 import { buildRealDb, LowDiskError } from './dolt/extract';
+import { downloadGameDb, fetchManifest, installDownloaded, planUpdate, readSidecar } from './download';
+import { dbInfo } from './lib/dbInfo';
 import { get, openDb } from './lib/sqlite';
 import { defaultPaths } from './paths';
 import { writeReport } from './report';
@@ -108,6 +112,36 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === 'download') {
+    const manifest = await fetchManifest();
+    log(`Options DB: ${manifest.version}, ${manifest.dateRange.first} to ${manifest.dateRange.last}`);
+    const i = dbInfo(dbPath);
+    const plan = planUpdate(
+      { kind: i.kind, lastDate: i.lastDate, fromSchwab: i.fromSchwab, downloaded: readSidecar(dbPath) },
+      manifest,
+      { manual: true },
+    );
+    if (plan.action === 'keep' && !flag('force')) {
+      log(plan.reason);
+      return;
+    }
+    const staged = `${dbPath}.next`;
+    let shown = -10;
+    await downloadGameDb({
+      dest: staged,
+      manifest,
+      progress: (f) => {
+        if (f * 100 - shown < 10 && f < 1) return;
+        shown = Math.floor(f * 100);
+        log(`  ${shown}%`);
+      },
+    });
+    installDownloaded(staged, dbPath);
+    writeReport(dbPath, REPORT_PATH);
+    log(`Saved and verified ${dbPath} (${manifest.size} bytes, sha256 ${manifest.sha256}).`);
+    return;
+  }
+
   if (cmd === 'report') {
     if (!existsSync(dbPath)) throw new Error(`No game.db at ${dbPath}. Run npm run data:build first.`);
     writeReport(dbPath, REPORT_PATH);
@@ -115,7 +149,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log('Usage: tsx data-pipeline/cli.ts <build|sync|report> [--synthetic] [--db path]');
+  console.log('Usage: tsx data-pipeline/cli.ts <build|sync|report|download> [--synthetic] [--db path]');
   process.exit(1);
 }
 

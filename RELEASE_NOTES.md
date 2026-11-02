@@ -1,8 +1,20 @@
-# Spread Trading Game 1.8.3
+# Spread Trading Game 1.8.4
 
 A single-player roguelite about trading options spreads on real historical market data, now with a Trade Builder for today's market. Paper trading only; not financial advice.
 
-## What's new in 1.8.3
+## What's new in 1.8.4
+
+- **Real market data in one click, kept current by itself.** The game now gets its data from the Options DB: the finished game data (prices and option chains for 79 tickers, 2018 to the latest close) that is republished every weekday after the close. Nothing has to be on your computer first: no 16 GB DoltHub download, no Schwab login, nothing saved beforehand. It's about 30 MB and takes seconds.
+  - **First launch:** the game downloads it and switches from the SIM market to real data by itself.
+  - **Every launch after:** the game checks for newer data. If there is some, it downloads quietly and loads the next time you start the game, so the market never changes in the middle of a round. Settings › Data › **LOAD NOW** loads it straight away.
+  - **Settings › Data** shows the latest published data and yours, with **DOWNLOAD LATEST DATA** and **CHECK AGAIN**. **SYNC LATEST DAYS** and the paper month's **CHECK FOR NEW DAYS** fetch it too.
+  - Every download is checked byte for byte against the published checksum before it replaces anything, and a dropped connection is retried. Offline is fine: the game plays on what it has.
+  - It never goes backwards: data you built yourself that runs later stays, and a DoltHub build (which has earnings) is kept unless you press DOWNLOAD LATEST DATA.
+- **Every ticker in the data is tradeable: all 79.** Career, the Daily, Contracts, the paper month and the Trade Builder can all use the game's 25, the Trade Builder's 25 (QQQ to SHOP), 1.8.0's second 25 (EEM to RDDT) and the index options SPX, XSP, NDX and RUT. The added tickers have about two years of history and no earnings events. In the Trade Builder they open without a Schwab connection too (from the latest close).
+- **Index options settle like the real thing everywhere:** European style, so never assigned early, and at expiration an in-the-money option pays its value in cash. No shares change hands, and there's no pin-risk warning (there's nothing to be assigned).
+- **Fix: the daily data update publishes again.** It had stopped since the 27th of October because the game's Schwab build kept only the game's 25 tickers. BUILD GAME DATA FROM SCHWAB now keeps every ticker it has saved (79).
+
+## New in 1.8.3
 
 - **The shop as objects, not boxes:** each item is a thing you'd pick up, with its text underneath: cartridges are game cartridges (now a little wider, with a proper arrow point), memos are clipped office memos, vouchers are coupons, playbook pages are game manuals and analysts are ID badges. The price hangs on a tag; BUY is a big key. The spoils screen and YOUR DESK use the same objects.
 - **Keycap buttons:** the buttons that matter (SELL and BUY on the ticket, ▶ PLAY, NEXT ROUND, BUY, REROLL, TAKE, CASH OUT) are chunky keys that press down when you click them or use their hotkey.

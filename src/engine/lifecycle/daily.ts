@@ -62,6 +62,11 @@ export interface DayContext {
   /** Gap Risk review: no decision points on gap days. */
   suppressOnGap: boolean;
   rng: Rng;
+  /**
+   * A cash-settled, European-style index option (SPX, XSP, NDX, RUT): never assigned early, and at
+   * expiration an in-the-money leg pays its intrinsic value in cash. No shares ever change hands.
+   */
+  cashSettled?: boolean;
 }
 
 export const ALL_DECISIONS: DecisionKind[] = [
@@ -264,7 +269,8 @@ export function atClose(input: Position, book: DayBook, ctx: DayContext): CloseS
     }
   }
 
-  if (!pos.flags.pinWarned && dte === 0) {
+  // Pin risk is about being assigned shares; a cash-settled index just pays the difference.
+  if (!pos.flags.pinWarned && dte === 0 && !ctx.cashSettled) {
     const pinned = shorts.find((s) => {
       const longOther = optionLegsOf(pos.legs).find(
         (l) => l.ratio > 0 && l.right === s.right && l.expiration === s.expiration,
@@ -303,7 +309,7 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
   if (pos.status !== 'open') return { pos, assignedToday: false };
   let assignedToday = false;
 
-  if (ctx.realism.earlyAssignment) {
+  if (ctx.realism.earlyAssignment && !ctx.cashSettled) {
     for (const leg of optionLegsOf(pos.legs).filter((l) => l.ratio < 0 && l.expiration > book.date)) {
       const snap = book.quote(leg);
       const mid = snap ? (snap.bid + snap.ask) / 2 : intrinsic(leg, book.spot);
@@ -331,7 +337,7 @@ export function endOfDay(input: Position, book: DayBook, ctx: DayContext): EndOf
 
   const expiring = optionLegsOf(pos.legs).filter((l) => l.expiration <= book.date);
   if (expiring.length > 0) {
-    if (!ctx.realism.expirationMechanics) {
+    if (!ctx.realism.expirationMechanics || ctx.cashSettled) {
       for (const leg of expiring) pos = settleLegAtIntrinsic(pos, leg, book.spot);
     } else {
       // Exercise by exception, as at a real broker: in the money by a cent or more is exercised

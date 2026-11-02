@@ -16,7 +16,7 @@ import { macroCalendar } from '../../src/engine/market/macroCalendar';
 import type { Chain, RatePoint, SymbolInfo, VixBar } from '../../src/engine/market/types';
 import { buildSymbolWindows, finalizeWindows, type RawWindow } from '../../src/engine/market/windows';
 import { BUILDER_BY_SYMBOL, FORMER_BUILDER_BY_SYMBOL } from '../../src/content/builderTickers';
-import { CANDIDATES, candidateInfo } from '../dolt/tickers';
+import { candidateInfo } from '../dolt/tickers';
 import {
   constantMaturityIv,
   liquidityScore,
@@ -88,14 +88,11 @@ export async function buildFromSchwab(opts: {
   const progress = opts.progress ?? (() => undefined);
   const store = new SchwabStore(opts.storePath, { readOnly: true });
   try {
-    // Every ticker schwab.db holds goes in, so the Trade Builder has all of them without Schwab and
-    // a daily rebuild never drops one the published game.db carries. Only the game's own tickers
-    // get windows: lineups, the Daily and Contracts never deal the Trade Builder's (two years of
-    // history, no earnings, cash-settled indexes) or the ones it used to list.
-    const dealt = new Set(CANDIDATES.filter((c) => c.group !== 'builder').map((c) => c.symbol));
+    // Every ticker schwab.db holds goes in and can be dealt: the game's own, the Trade Builder's
+    // (two years of history, no earnings; the index options settle in cash) and any it used to list.
+    // A daily rebuild therefore never drops a ticker the published game.db carries.
     const tickers = store.symbols().filter((s) => store.candles(s).length > CHAIN_WARMUP_BARS + 20);
-    if (!tickers.some((t) => dealt.has(t)))
-      throw new Error('schwab.db has no price history yet. Pull from Schwab first.');
+    if (!tickers.length) throw new Error('schwab.db has no price history yet. Pull from Schwab first.');
     const barsBy = new Map(tickers.map((t) => [t, store.candles(t).filter((b) => isTradingDay(b.date))]));
     const lastOf = (t: string) => barsBy.get(t)?.at(-1)?.date as ISODate;
     // The market's last day: the benchmark's, so every ticker is on the same calendar.
@@ -238,7 +235,6 @@ export async function buildFromSchwab(opts: {
           liquidity: median([...spread.values()].slice(-252)),
           ivLevel: median(ivs),
         });
-        if (!dealt.has(t)) continue;
         rawWindows.push(
           ...buildSymbolWindows({
             symbol: t,
@@ -280,7 +276,7 @@ export async function buildFromSchwab(opts: {
       lastDate,
       realChains,
       windows: windowsCount,
-      message: `Game data built from schwab.db: ${tickers.length} tickers (${tickers.filter((t) => dealt.has(t)).length} dealt in runs, the rest for the Trade Builder), ${firstDate} to ${lastDate}, ${realChains} real option chain${realChains === 1 ? '' : 's'} (other days modeled, labeled MODEL).`,
+      message: `Game data built from schwab.db: ${tickers.length} tickers, ${firstDate} to ${lastDate}, ${realChains} real option chain${realChains === 1 ? '' : 's'} (other days modeled, labeled MODEL).`,
     };
   } finally {
     store.close();
