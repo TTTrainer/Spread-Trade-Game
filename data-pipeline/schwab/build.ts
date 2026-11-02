@@ -15,6 +15,7 @@ import { addDays, diffDays, isTradingDay, type ISODate } from '../../src/engine/
 import { macroCalendar } from '../../src/engine/market/macroCalendar';
 import type { Chain, RatePoint, SymbolInfo, VixBar } from '../../src/engine/market/types';
 import { buildSymbolWindows, finalizeWindows, type RawWindow } from '../../src/engine/market/windows';
+import { BUILDER_BY_SYMBOL, FORMER_BUILDER_BY_SYMBOL } from '../../src/content/builderTickers';
 import { CANDIDATES, candidateInfo } from '../dolt/tickers';
 import {
   constantMaturityIv,
@@ -49,6 +50,32 @@ export const SCHWAB_BUILD_NOTES = [
   "Schwab's market data has no earnings or dividend history, so this market has no earnings events or ex-dividend days (the DoltHub build has them).",
 ];
 
+/** Name, sector and kind for any ticker schwab.db may hold. */
+function tickerInfo(t: string): {
+  name: string;
+  sector: string;
+  isEtf: boolean;
+  sizeTier: SymbolInfo['sizeTier'];
+} {
+  const b = BUILDER_BY_SYMBOL[t] ?? FORMER_BUILDER_BY_SYMBOL[t];
+  // An index moves like a broad ETF, so its modeled chain uses the same volatility rules.
+  if (b)
+    return {
+      name: b.name,
+      sector: b.sector,
+      isEtf: b.kind !== 'stock',
+      sizeTier: b.kind === 'stock' ? 'large' : 'etf',
+    };
+  const info = candidateInfo(t);
+  const isEtf = info?.group === 'context' || /ETF/i.test(info?.sector ?? '');
+  return {
+    name: info?.name ?? t,
+    sector: info?.sector ?? 'Unknown',
+    isEtf,
+    sizeTier: isEtf ? 'etf' : info?.group === 'mag7' ? 'mega' : 'large',
+  };
+}
+
 export async function buildFromSchwab(opts: {
   storePath: string;
   gameDbPath: string;
@@ -61,13 +88,14 @@ export async function buildFromSchwab(opts: {
   const progress = opts.progress ?? (() => undefined);
   const store = new SchwabStore(opts.storePath, { readOnly: true });
   try {
-    // The game's own tickers only: schwab.db also holds the Trade Builder's (and any it used to
-    // list), which the lineups never deal (two years of history, no earnings, cash-settled indexes).
-    const game = new Set(CANDIDATES.filter((c) => c.group !== 'builder').map((c) => c.symbol));
-    const tickers = store
-      .symbols()
-      .filter((s) => game.has(s) && store.candles(s).length > CHAIN_WARMUP_BARS + 20);
-    if (!tickers.length) throw new Error('schwab.db has no price history yet. Pull from Schwab first.');
+    // Every ticker schwab.db holds goes in, so the Trade Builder has all of them without Schwab and
+    // a daily rebuild never drops one the published game.db carries. Only the game's own tickers
+    // get windows: lineups, the Daily and Contracts never deal the Trade Builder's (two years of
+    // history, no earnings, cash-settled indexes) or the ones it used to list.
+    const dealt = new Set(CANDIDATES.filter((c) => c.group !== 'builder').map((c) => c.symbol));
+    const tickers = store.symbols().filter((s) => store.candles(s).length > CHAIN_WARMUP_BARS + 20);
+    if (!tickers.some((t) => dealt.has(t)))
+      throw new Error('schwab.db has no price history yet. Pull from Schwab first.');
     const barsBy = new Map(tickers.map((t) => [t, store.candles(t).filter((b) => isTradingDay(b.date))]));
     const lastOf = (t: string) => barsBy.get(t)?.at(-1)?.date as ISODate;
     // The market's last day: the benchmark's, so every ticker is on the same calendar.
@@ -127,8 +155,8 @@ export async function buildFromSchwab(opts: {
       const rawWindows: RawWindow[] = [];
       for (const [ti, t] of tickers.entries()) {
         progress('Building game data from schwab.db', ti / tickers.length);
-        const info = candidateInfo(t);
-        const isEtf = info?.group === 'context' || /ETF/i.test(info?.sector ?? '');
+        const info = tickerInfo(t);
+        const isEtf = info.isEtf;
         const bars = (barsBy.get(t) ?? []).filter((b) => b.date <= lastDate);
         writer.putBars(t, bars);
         const closes = bars.map((b) => b.close);
@@ -197,9 +225,9 @@ export async function buildFromSchwab(opts: {
         const ivs = [...iv30.values()].slice(-252);
         symbols.push({
           symbol: t,
-          name: info?.name ?? t,
-          sector: info?.sector ?? 'Unknown',
-          sizeTier: isEtf ? 'etf' : info?.group === 'mag7' ? 'mega' : 'large',
+          name: info.name,
+          sector: info.sector,
+          sizeTier: info.sizeTier,
           kind: 'real',
           isEtf,
           weeklies: true,
@@ -210,6 +238,7 @@ export async function buildFromSchwab(opts: {
           liquidity: median([...spread.values()].slice(-252)),
           ivLevel: median(ivs),
         });
+        if (!dealt.has(t)) continue;
         rawWindows.push(
           ...buildSymbolWindows({
             symbol: t,
@@ -251,7 +280,7 @@ export async function buildFromSchwab(opts: {
       lastDate,
       realChains,
       windows: windowsCount,
-      message: `Game data built from schwab.db: ${tickers.length} tickers, ${firstDate} to ${lastDate}, ${realChains} real option chain${realChains === 1 ? '' : 's'} (other days modeled, labeled MODEL).`,
+      message: `Game data built from schwab.db: ${tickers.length} tickers (${tickers.filter((t) => dealt.has(t)).length} dealt in runs, the rest for the Trade Builder), ${firstDate} to ${lastDate}, ${realChains} real option chain${realChains === 1 ? '' : 's'} (other days modeled, labeled MODEL).`,
     };
   } finally {
     store.close();

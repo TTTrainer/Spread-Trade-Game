@@ -49,6 +49,43 @@ export const BUILDER_TICKERS: BuilderTicker[] = [
   { symbol: 'RUT', name: 'Russell 2000 Index', sector: 'Index', kind: 'index' },
 ];
 
+/**
+ * 1.8.0's second 25, no longer listed in 1.8.1. Pulls had already saved them and the published
+ * game.db carries them, so the Schwab build keeps them (named) while schwab.db holds them: the
+ * daily data update never drops a ticker players already have.
+ */
+export const FORMER_BUILDER_TICKERS: BuilderTicker[] = [
+  { symbol: 'EEM', name: 'iShares MSCI Emerging Markets', sector: 'Index ETF', kind: 'etf' },
+  { symbol: 'KRE', name: 'SPDR S&P Regional Banking', sector: 'Sector ETF', kind: 'etf' },
+  { symbol: 'XBI', name: 'SPDR S&P Biotech', sector: 'Sector ETF', kind: 'etf' },
+  { symbol: 'USO', name: 'United States Oil Fund', sector: 'Commodity ETF', kind: 'etf' },
+  { symbol: 'FXI', name: 'iShares China Large-Cap', sector: 'Index ETF', kind: 'etf' },
+  { symbol: 'LLY', name: 'Eli Lilly', sector: 'Health Care', kind: 'stock' },
+  { symbol: 'V', name: 'Visa', sector: 'Financials', kind: 'stock' },
+  { symbol: 'MA', name: 'Mastercard', sector: 'Financials', kind: 'stock' },
+  { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Health Care', kind: 'stock' },
+  { symbol: 'PFE', name: 'Pfizer', sector: 'Health Care', kind: 'stock' },
+  { symbol: 'MRNA', name: 'Moderna', sector: 'Health Care', kind: 'stock' },
+  { symbol: 'KO', name: 'Coca-Cola', sector: 'Consumer Staples', kind: 'stock' },
+  { symbol: 'PEP', name: 'PepsiCo', sector: 'Consumer Staples', kind: 'stock' },
+  { symbol: 'MCD', name: "McDonald's", sector: 'Consumer Discretionary', kind: 'stock' },
+  { symbol: 'NKE', name: 'Nike', sector: 'Consumer Discretionary', kind: 'stock' },
+  { symbol: 'SBUX', name: 'Starbucks', sector: 'Consumer Discretionary', kind: 'stock' },
+  { symbol: 'T', name: 'AT&T', sector: 'Communication', kind: 'stock' },
+  { symbol: 'VZ', name: 'Verizon', sector: 'Communication', kind: 'stock' },
+  { symbol: 'CSCO', name: 'Cisco Systems', sector: 'Technology', kind: 'stock' },
+  { symbol: 'QCOM', name: 'Qualcomm', sector: 'Semiconductors', kind: 'stock' },
+  { symbol: 'CVX', name: 'Chevron', sector: 'Energy', kind: 'stock' },
+  { symbol: 'DAL', name: 'Delta Air Lines', sector: 'Industrials', kind: 'stock' },
+  { symbol: 'CCL', name: 'Carnival', sector: 'Consumer Discretionary', kind: 'stock' },
+  { symbol: 'DKNG', name: 'DraftKings', sector: 'Consumer Discretionary', kind: 'stock' },
+  { symbol: 'RDDT', name: 'Reddit', sector: 'Communication', kind: 'stock' },
+];
+
+export const FORMER_BUILDER_BY_SYMBOL: Record<string, BuilderTicker> = Object.fromEntries(
+  FORMER_BUILDER_TICKERS.map((t) => [t.symbol, t]),
+);
+
 /** How far back PULL FROM SCHWAB reaches for these tickers' daily prices. */
 export const BUILDER_HISTORY_DAYS = 730;
 

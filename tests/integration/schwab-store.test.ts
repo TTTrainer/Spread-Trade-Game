@@ -110,7 +110,8 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
 
   beforeAll(async () => {
     const fake = fakeSchwab(src, () => last);
-    // QQQ is a Trade Builder ticker, and RDDT one it used to list: saved by a pull, never dealt.
+    // QQQ is a Trade Builder ticker, and RDDT one it used to list: built for the Trade Builder,
+    // never dealt.
     await schwabPull({
       storePath,
       api: fake.api,
@@ -118,7 +119,7 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
       now: afterClose(last),
     });
     const r = await buildFromSchwab({ storePath, gameDbPath });
-    expect(r.realChains).toBe(2);
+    expect(r.realChains).toBe(4);
     game = new SqliteSource(gameDbPath);
   });
 
@@ -127,8 +128,16 @@ describe('BUILD GAME DATA FROM SCHWAB: a playable market from schwab.db alone', 
     expect(meta).toMatchObject({ kind: 'real', lastDate: last, benchmark: 'SPY', chainModel: 'history' });
     expect(meta.notes.join(' ')).toContain('modeled');
     expect(meta.notes.join(' ')).toContain('no earnings');
-    expect((await game.symbols()).map((s) => s.symbol)).toEqual(['AAPL', 'SPY']);
-    expect((await game.windows({})).length).toBeGreaterThan(50);
+    const syms = await game.symbols();
+    expect(syms.map((s) => s.symbol)).toEqual(['AAPL', 'QQQ', 'RDDT', 'SPY']);
+    expect(syms.find((s) => s.symbol === 'QQQ')).toMatchObject({ isEtf: true, sizeTier: 'etf' });
+    expect(syms.find((s) => s.symbol === 'RDDT')).toMatchObject({ name: 'Reddit', isEtf: false });
+    const windows = await game.windows({});
+    expect(windows.length).toBeGreaterThan(50);
+    expect([...new Set(windows.map((w) => w.symbol))].sort()).toEqual(['AAPL', 'SPY']);
+    // The Trade Builder reads every ticker from game.db.
+    expect((await game.bars('QQQ', last, last)).length).toBe(1);
+    expect((await game.chain('RDDT', last))?.source).toBe('real');
     expect(await game.earnings('AAPL', '2018-01-01', last)).toEqual([]);
     expect((await game.vol('AAPL', '2020-06-01', '2020-06-30'))[0]?.iv30).toBeGreaterThan(0.05);
     expect((await game.vix('2020-03-01', '2020-03-31')).length).toBeGreaterThan(10);
