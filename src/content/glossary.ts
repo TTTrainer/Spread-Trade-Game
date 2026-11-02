@@ -61,8 +61,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     body: 'DAY BY DAY waits for you after every candle. 1×, 2× and 4× play on their own, but still stop for real decisions and once when price tests your short strike.',
   },
   tug_meter: {
-    title: 'Stop vs target',
-    body: "Where today's P/L sits between your stop (left) and your profit target (right). The dot glows as it nears either one.",
+    title: 'P/L vs max',
+    body: "Where today's P/L sits on everything the trade can do: the most it can lose on the left, the most it can make on the right. The ticks are your stop and target; the dot glows as it nears either one.",
+  },
+  pl_range: {
+    title: 'vs max',
+    body: "How much of the trade's best case (or worst case) today's P/L already is. A credit spread at 60% of max has made most of what it ever can.",
   },
   cartridge_rail: {
     title: 'Cartridges',
@@ -238,7 +242,12 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   max_profit: { title: 'Max profit', body: 'The most this trade can make, at expiration.' },
   max_loss_trade: {
     title: 'Max loss',
-    body: 'The most this trade can lose. Defined risk: it can never lose more.',
+    body: 'The most this trade can lose; defined risk never loses more. A covered call shows its loss at its automatic stop plus 25% for a gap (a big gap can still cost more). A cash-secured put can lose the strike minus the credit.',
+  },
+  auto_stop: {
+    title: 'Automatic stop (covered calls)',
+    body: 'A covered call always has a stop: it buys the call back, without asking, once the loss hits that many times the premium. The risk cap measures it there (+25% for gaps), so a tighter stop fits a pricier stock. Pick 1×–3× on the ticket.',
+    real: 'A stop order to buy the call back; real stops can fill worse on a gap too.',
   },
   breakeven: {
     title: 'Breakeven',
@@ -283,6 +292,40 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     title: 'Payoff',
     body: 'P/L at expiration (solid) and today (dashed) across stock prices. Shaded: the expected move.',
     real: 'The Risk Profile on thinkorswim.',
+  },
+  your_view: {
+    title: 'Your view',
+    body: 'The call this trade makes, read from the structure and strikes: a bull put says "up", a condor "flat". It is graded like any call. Straddles: click to pick up or down.',
+  },
+  conviction: {
+    title: 'Conviction (Shift+1-5, - and =)',
+    body: 'How sure you are, and how much you bet on it: 50% uses a fifth of the per-trade risk cap, 90% all of it. Right at high conviction scores more; calibration checks you are right that often.',
+  },
+  plan_set: {
+    title: 'Your plan',
+    body: 'Take profit and stop, set once in Settings or when you start a run, and applied to every trade. Closing at plan scores +1 mult.',
+  },
+  gamma: {
+    title: 'Gamma (Γ)',
+    body: 'How fast delta changes as the stock moves. Big near the strike and close to expiration: that is when a short strike turns on you quickly.',
+  },
+  iv: {
+    title: 'IV (implied volatility)',
+    body: 'How much movement the option price assumes, per year. Higher IV: richer premium to sell, pricier options to buy.',
+  },
+  bid: { title: 'Bid', body: 'What buyers pay right now: where you sell.' },
+  ask: { title: 'Ask', body: 'What sellers want right now: where you buy.' },
+  premium_bar: {
+    title: 'Premium vs width',
+    body: "How much of the spread's width you collect as credit. Around a third or more is the classic target; less means you risk a lot to make a little.",
+  },
+  cushion: {
+    title: 'Cushion',
+    body: "How far today's price is from your nearest short strike. Red under 2%: the stock needs only a small move to test you.",
+  },
+  credit_view: {
+    title: 'Credit in hand',
+    body: 'A credit spread pays you up front. "If closed now" is what buying it back today would leave you; nothing is won or lost until the trade closes or expires.',
   },
   pl_open: { title: 'Open P/L', body: "What the trade would make or lose if closed at today's mid." },
   pct_risk: { title: '% of risk', body: 'Open P/L as a share of the max loss.' },
@@ -343,7 +386,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   },
   risk_tier: {
     title: 'Risk Tier',
-    body: "Harder stakes, stacked like Balatro's. Clearing a year at your top tier unlocks the next.",
+    body: "Harder stakes, stacked like Balatro's: each tier adds its rule and +10% targets. Clearing a year at your top tier unlocks the next. Finding it easy? Climb.",
   },
   shop_reroll: {
     title: 'Reroll the shop (R)',

@@ -1,0 +1,884 @@
+/* The Trade Builder: the trading desk, with a ticker picker, study toggles, a leg editor, a copy-
+ * order ticket and the full-size payoff. */
+
+.bld-wrap {
+  display: contents;
+}
+.bld-top {
+  gap: 10px;
+}
+.bld-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+.bld-title b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--cyan);
+  text-shadow: 2px 2px 0 #000;
+}
+.bld-title span {
+  font-size: 14px;
+}
+.bld-fresh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px;
+  font-size: 16px;
+  border: 2px solid var(--line-bright);
+  background: rgba(0, 0, 0, 0.35);
+}
+.bld-fresh b {
+  font-weight: 400;
+}
+.bld-fresh.live {
+  border-color: var(--up);
+}
+.bld-fresh.live b {
+  color: var(--up);
+  animation: bld-pulse 1.4s ease-in-out infinite;
+}
+.bld-fresh.current b {
+  color: var(--cyan);
+}
+.bld-fresh.stale {
+  border-color: var(--amber);
+  background: rgba(255, 191, 62, 0.12);
+}
+.bld-fresh.stale b {
+  color: var(--amber);
+}
+@keyframes bld-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Study toggles, in the tray's tab row. */
+.bld-studies {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 14px;
+}
+.bld-studies > .dim {
+  margin-right: 4px;
+}
+.bld-chip {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 0 6px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.bld-chip.on {
+  color: #000;
+  background: var(--violet);
+  border-color: var(--violet);
+}
+
+/* Ticker picker (pinned under the open tickers). */
+.bld-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 4px;
+}
+.bld-search {
+  display: flex;
+  gap: 4px;
+}
+.bld-search input {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  padding: 2px 6px;
+  color: var(--text);
+  background: var(--bg-0);
+  border: 2px solid var(--line-bright);
+}
+.bld-search input:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+.bld-hits {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-bright);
+  background: var(--bg-1);
+}
+.bld-hits button {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 2px 6px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bld-hits button:hover {
+  background: rgba(62, 242, 255, 0.12);
+}
+.bld-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.bld-empty .bld-picker {
+  max-width: 420px;
+}
+
+/* The leg editor, on the TRADE tab under the payoff. */
+.bld-legs {
+  margin: 6px 0;
+}
+.bld-legs table {
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.bld-legs td {
+  padding: 1px 4px;
+  white-space: nowrap;
+}
+.bld-legs select {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg-0);
+  border: 1px solid var(--line-bright);
+}
+.bld-side,
+.bld-right {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  min-width: 58px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+.bld-side.sell {
+  color: var(--magenta);
+}
+.bld-side.buy {
+  color: var(--cyan);
+}
+.bld-right {
+  color: var(--text);
+  min-width: 46px;
+}
+.bld-reset {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--amber);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* The ticket: copy, never send. */
+.bld-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bld-net {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.bld-net b {
+  font-size: 26px;
+  font-weight: 400;
+}
+.bld-net.credit b {
+  color: var(--up);
+}
+.bld-net.debit b {
+  color: var(--amber);
+}
+.bld-kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 10px;
+  font-size: 15px;
+}
+.bld-kv b {
+  font-weight: 400;
+}
+.bld-settle {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--amber);
+  cursor: help;
+}
+
+.bld-order,
+.ps-order code {
+  display: block;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.2;
+  padding: 3px 6px;
+  color: var(--amber);
+  background: #05031a;
+  border: 1px dashed var(--line-bright);
+  word-break: break-word;
+  user-select: text;
+}
+.bld-actions {
+  display: flex;
+  gap: 6px;
+}
+.bld-actions .primary {
+  flex: 1;
+}
+
+/* ---- The payoff, full size ---- */
+.payoff-studio {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 10px;
+  padding: 30px 10px 8px;
+  background: rgba(11, 8, 38, 0.98);
+  border: 2px solid var(--line-bright);
+}
+.payoff-studio.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.ps-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.ps-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 17px;
+}
+.ps-head b {
+  font-weight: 400;
+  color: var(--cyan);
+  font-size: 20px;
+}
+.ps-legend {
+  display: inline-flex;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 15px;
+}
+.violet-text {
+  color: var(--violet);
+}
+.ps-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.ps-plot svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.ps-grid {
+  stroke: rgba(91, 75, 196, 0.22);
+}
+.ps-zero {
+  stroke: var(--line-bright);
+  stroke-width: 1.5;
+}
+.ps-win {
+  fill: rgba(77, 255, 154, 0.2);
+}
+.ps-loss {
+  fill: rgba(255, 79, 109, 0.2);
+}
+.ps-exp {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2.5;
+}
+.ps-now {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 4;
+}
+.ps-at {
+  fill: none;
+  stroke: var(--violet);
+  stroke-width: 2.2;
+}
+.ps-em {
+  fill: rgba(157, 107, 255, 0.09);
+}
+.ps-em2 {
+  stroke: rgba(157, 107, 255, 0.55);
+  stroke-dasharray: 2 4;
+}
+.ps-dens {
+  fill: rgba(157, 107, 255, 0.22);
+  stroke: rgba(157, 107, 255, 0.55);
+}
+.ps-max {
+  stroke-dasharray: 6 4;
+  stroke-width: 1.2;
+}
+.ps-max.up {
+  stroke: var(--up);
+}
+.ps-max.down {
+  stroke: var(--down);
+}
+.ps-be {
+  stroke: var(--amber);
+  stroke-dasharray: 1 3;
+}
+.ps-be-dot {
+  fill: var(--amber);
+}
+.ps-spot {
+  stroke: var(--magenta);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.ps-k {
+  stroke-width: 3;
+}
+.ps-k.s {
+  stroke: var(--magenta);
+}
+.ps-k.l {
+  stroke: var(--cyan);
+}
+.ps-cross {
+  stroke: rgba(236, 233, 255, 0.45);
+}
+.ps-dot.exp {
+  fill: var(--cyan);
+}
+.ps-dot.at {
+  fill: var(--violet);
+}
+.ps-t {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: #0b0826;
+  stroke-width: 3px;
+}
+.ps-t.axis {
+  fill: var(--text-dim);
+  font-size: 14px;
+}
+.ps-t.up {
+  fill: var(--up);
+}
+.ps-t.down {
+  fill: var(--down);
+}
+.ps-t.be {
+  fill: var(--amber);
+}
+.ps-t.spot {
+  fill: var(--magenta);
+}
+.ps-t.em {
+  fill: var(--violet);
+  font-size: 14px;
+}
+.ps-t.k.s {
+  fill: var(--magenta);
+}
+.ps-t.k.l {
+  fill: var(--cyan);
+}
+.ps-tip {
+  position: absolute;
+  z-index: 2;
+  width: 220px;
+  padding: 6px 8px;
+  font-size: 15px;
+  line-height: 1.3;
+  pointer-events: none;
+  background: rgba(5, 3, 26, 0.95);
+  border: 2px solid var(--line-bright);
+  box-shadow: 3px 3px 0 #000;
+}
+.ps-tip b {
+  font-weight: 400;
+}
+.ps-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 6px;
+  font-size: 16px;
+}
+.ps-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.ps-controls input[type='range'] {
+  flex: 1;
+  accent-color: var(--violet);
+}
+.ps-controls b {
+  font-weight: 400;
+  min-width: 90px;
+  color: var(--violet);
+}
+.ps-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  font-size: 15px;
+}
+.ps-net {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 2px solid var(--line-bright);
+}
+.ps-net b {
+  font-size: 30px;
+  font-weight: 400;
+}
+.ps-net.credit {
+  border-color: var(--up);
+}
+.ps-net.credit b {
+  color: var(--up);
+}
+.ps-net.debit {
+  border-color: var(--amber);
+}
+.ps-net.debit b {
+  color: var(--amber);
+}
+.ps-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.ps-grid2 > div {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+}
+.ps-grid2 .dim {
+  font-size: 13px;
+}
+.ps-grid2 b {
+  font-weight: 400;
+  font-size: 18px;
+}
+.ps-greeks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--text-dim);
+}
+.ps-say {
+  margin: 0;
+  line-height: 1.3;
+  color: var(--text);
+}
+.ps-legs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+  border-left: 2px solid var(--line-bright);
+}
+.ps-order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (max-width: 1500px) {
+  .payoff-studio {
+    grid-template-columns: 1fr 240px;
+  }
+  .ps-net b {
+    font-size: 24px;
+  }
+  .ps-grid2 b {
+    font-size: 16px;
+  }
+  .bld-chip {
+    font-size: 13px;
+    padding: 0 4px;
+  }
+  .bld-title span {
+    display: none;
+  }
+}
+
+/* Fourteen strategies: a narrow scrolling column, so the ticket keeps its room. */
+.bld-wrap .tray-section.structures {
+  flex: 0 1 230px;
+}
+.bld-wrap .tray-section.ticket {
+  flex: 0 0 300px;
+  min-width: 280px;
+}
+@media (max-width: 1500px) {
+  .bld-wrap .tray-section.structures {
+    flex-basis: 120px;
+  }
+  .bld-wrap .structure-row {
+    grid-template-columns: 1fr;
+  }
+  .bld-wrap .tray-section.ticket {
+    flex-basis: 270px;
+    min-width: 260px;
+  }
+  .bld-net b {
+    font-size: 22px;
+  }
+  .bld-kv {
+    font-size: 14px;
+  }
+}
+
+/* LEARN OPTIONS: the course on the right-hand LEARN tab. */
+.bld-learn {
+  color: #000;
+  background: var(--amber);
+  border-color: var(--amber);
+}
+.course {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 16px;
+}
+.course-kicker {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+}
+.course h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--cyan);
+  text-shadow: 2px 2px 0 #000;
+}
+.course-text {
+  margin: 0;
+  line-height: 1.35;
+  color: var(--text);
+}
+.course-task {
+  padding: 6px 8px;
+  border: 1px dashed var(--amber);
+  color: var(--amber);
+  line-height: 1.3;
+}
+.course-task.ok {
+  border-style: solid;
+  border-color: var(--up);
+  color: var(--up);
+}
+.course-quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cq-q {
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.cq-opt {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 3px 8px;
+  color: var(--text);
+  background: var(--bg-1);
+  border: 1px solid var(--line-bright);
+  cursor: pointer;
+}
+.cq-opt:hover:not(:disabled) {
+  border-color: var(--cyan);
+}
+.cq-opt.right {
+  border-color: var(--up);
+  color: var(--up);
+}
+.cq-opt.wrong {
+  border-color: var(--down);
+  color: var(--down);
+}
+.cq-why {
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+.cq-why.right {
+  color: var(--up);
+}
+.cq-why.wrong {
+  color: var(--amber);
+}
+.course-actions {
+  display: flex;
+  gap: 6px;
+}
+.course-actions .primary {
+  flex: 1;
+}
+.course-dots {
+  display: flex;
+  gap: 3px;
+}
+.course-dots i {
+  flex: 1;
+  height: 4px;
+  background: var(--line);
+}
+.course-dots i.done {
+  background: var(--cyan);
+}
+.course-dots i.now {
+  background: var(--amber);
+}
+
+/* The course's replay: last month's candles, your strike line, a coin per safe day. */
+.course-replay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+.cr-fig {
+  width: 100%;
+  height: auto;
+  background: #0a0820;
+  border: 2px solid var(--line);
+  touch-action: none;
+}
+.cr-fig.aim {
+  cursor: ns-resize;
+}
+.cr-future {
+  fill: rgba(62, 242, 255, 0.04);
+}
+.cr-entry {
+  stroke: var(--line-bright);
+  stroke-dasharray: 3 3;
+}
+.cr-small {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 10px;
+  fill: var(--text-faint);
+}
+.cr-danger {
+  fill: rgba(255, 45, 85, 0.08);
+}
+.cr-level line {
+  stroke: var(--amber);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.cr-level text {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 12px;
+  fill: var(--amber);
+}
+.cr-bar line {
+  stroke-width: 1;
+}
+.cr-bar.up line,
+.cr-bar.up rect {
+  stroke: #3ddc84;
+  fill: #3ddc84;
+}
+.cr-bar.down line,
+.cr-bar.down rect {
+  stroke: #ff4d6d;
+  fill: #ff4d6d;
+}
+.cr-bar.touch rect {
+  fill: #fff;
+  stroke: #ff2d55;
+  stroke-width: 1.5;
+}
+.cr-coin {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 11px;
+  fill: var(--amber);
+  animation: cr-coin 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes cr-coin {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.cr-strike line {
+  stroke: var(--magenta);
+  stroke-width: 2;
+}
+.cr-strike rect {
+  fill: var(--magenta);
+}
+.cr-strike text {
+  font-family: var(--font-num, 'VT323', monospace);
+  font-size: 13px;
+  fill: #fff;
+}
+.cr-strike.ok line {
+  stroke: #3ddc84;
+}
+.cr-strike.ok rect {
+  fill: #1f9d5c;
+}
+.cr-bar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+}
+.cr-safe b {
+  font-size: 20px;
+  color: var(--amber);
+}
+.cr-nudge {
+  display: flex;
+  gap: 4px;
+}
+.cr-actions {
+  display: flex;
+  gap: 6px;
+}
+.cr-actions .pixel-btn {
+  flex: 1;
+}
+.cr-result {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: 1px solid var(--line-bright);
+  background: var(--bg-2);
+}
+.cr-result.win {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.cr-result.lose {
+  border-color: var(--down);
+}
+.cr-empty {
+  padding: 10px;
+  border: 1px dashed var(--line);
+}
+.course-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+}
+.course-checks li {
+  color: var(--text-dim);
+}
+.course-checks li.ok {
+  color: #3ddc84;
+}
+.course-badge {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.course-badge.won {
+  color: var(--amber);
+}
+.course-dots i.more {
+  opacity: 0.55;
+}
+
+/* The full payoff inside the TRADE column: one column, the graph on top, the numbers under it. */
+.ps-in-col .payoff-studio {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
+  border-width: 1px;
+}
+.ps-in-col .payoff-studio.empty {
+  padding: 16px 8px;
+  text-align: center;
+}
+.ps-in-col .ps-plot {
+  flex: none;
+  height: 250px;
+}
+.ps-in-col .ps-head {
+  font-size: 14px;
+}
+.ps-in-col .ps-head b {
+  font-size: 17px;
+}
+.ps-in-col .ps-legend {
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-left: 0;
+  font-size: 13px;
+}
+.ps-in-col .ps-controls b {
+  min-width: 74px;
+}
+.ps-in-col .ps-side {
+  overflow: visible;
+}
+.ps-in-col .ps-net b {
+  font-size: 22px;
+}
+.ps-in-col .ps-grid2 b {
+  font-size: 15px;
+}

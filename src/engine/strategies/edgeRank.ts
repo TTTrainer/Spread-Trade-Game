@@ -40,7 +40,7 @@ export function edgeRatio(id: StructureId, legs: Leg[], chain: Chain): number | 
     case 'covered_call':
     case 'cash_secured_put': {
       const s = shortLegs(legs)[0];
-      const credit = s ? -net + (id === 'covered_call' ? chain.spot : 0) : 0;
+      const credit = s ? -net : 0;
       return s && s.strike > 0 ? credit / s.strike : null;
     }
     default:

@@ -1,8 +1,10 @@
 import { app, type BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { writeFileSync } from 'node:fs';
-import type { EventChannel, EventMap, RpcChannel, RpcMap } from '../../src/shared/rpc';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { EventChannel, EventMap, RpcChannel, RpcMap, ScreenWhere } from '../../src/shared/rpc';
 import { defaultGameDbPath, logDir, userDataDir } from './paths';
 import { log } from './log';
+import { heartbeat, reloadScreen, takeRecovered, trackCall } from './watchdog';
 
 type Handlers = {
   [C in RpcChannel]: (
@@ -35,6 +37,11 @@ function systemHandlers(): Pick<Handlers, `system.${string}` & RpcChannel> {
       isE2E: process.env.STG_E2E === '1',
     }),
     'system.quit': () => app.quit(),
+    'system.log': (level: 'info' | 'warn' | 'error', message: string, detail?: unknown) =>
+      log(level, `[screen] ${message}`, detail),
+    'system.heartbeat': (beat: { trail: string[]; visible: boolean; where?: ScreenWhere }) => heartbeat(beat),
+    'system.recovered': () => takeRecovered(),
+    'system.reloadScreen': (why: string) => reloadScreen(why),
     'system.toggleFullscreen': () => {
       const w = getWindow();
       if (!w) return false;
@@ -43,6 +50,16 @@ function systemHandlers(): Pick<Handlers, `system.${string}` & RpcChannel> {
     },
     'system.openPath': (path: string) => {
       void shell.openPath(path);
+    },
+    'system.screenshot': async (name: string) => {
+      const w = getWindow();
+      if (!w) return null;
+      const dir = join(userDataDir(), 'playtest');
+      mkdirSync(dir, { recursive: true });
+      const file = join(dir, `${name.replace(/[^\w.-]+/g, '_')}.png`);
+      const img = await w.webContents.capturePage();
+      writeFileSync(file, img.toPNG());
+      return file;
     },
     'system.saveTextFile': (suggestedName: string, content: string) => {
       const w = getWindow();
@@ -68,11 +85,14 @@ export function registerIpc(windowGetter: () => BrowserWindow | null): void {
     const handler = (extraHandlers[channel] ?? (base as Partial<Handlers>)[channel]) as
       ((...a: unknown[]) => unknown) | undefined;
     if (!handler) throw new Error(`Unknown channel ${channel}`);
+    const done = channel === 'system.heartbeat' ? null : trackCall(channel, args);
     try {
       return await handler(...args);
     } catch (err) {
       log('error', `rpc ${channel} failed`, err);
       throw err;
+    } finally {
+      done?.();
     }
   });
 }

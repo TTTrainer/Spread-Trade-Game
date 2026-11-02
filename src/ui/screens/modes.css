@@ -118,3 +118,129 @@
     bottom: 240px;
   }
 }
+
+/* Live: the month card, the how-to steps and the ticker picker */
+.live-month {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 2px solid var(--cyan);
+  background: linear-gradient(180deg, rgba(62, 242, 255, 0.1), rgba(62, 242, 255, 0.02));
+  padding: 8px 10px;
+}
+.live-month.caught {
+  border-color: var(--up);
+}
+.lm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.lm-head .section-title {
+  margin: 0;
+}
+.lm-day {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+}
+.live-month.caught .lm-day {
+  color: var(--up);
+  text-shadow: none;
+}
+.lm-bar {
+  height: 10px;
+  background: var(--bg-0);
+  border: 1px solid var(--line-bright);
+  position: relative;
+}
+.lm-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--cyan);
+}
+.lm-vs {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 18px;
+}
+.lm-verdict {
+  font-size: 17px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.lm-verdict.ahead {
+  color: var(--up);
+}
+.lm-verdict.behind {
+  color: var(--down);
+}
+.lm-note {
+  margin: 0;
+}
+.live-month.compact .lm-day {
+  font-size: 24px;
+}
+.live-month.compact .lm-vs {
+  font-size: 15px;
+}
+.live-month.compact .lm-verdict {
+  font-size: 14px;
+}
+.live-month.compact .lm-head .num {
+  display: none;
+}
+.live-howto ol {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.live-howto {
+  align-items: flex-start;
+}
+.live-actions .live-go {
+  font-size: 20px;
+  padding: 8px 18px;
+}
+.live-steps {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.live-steps li {
+  margin-bottom: 6px;
+}
+.live-filter {
+  font: inherit;
+  font-size: 16px;
+  background: var(--bg-0);
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  padding: 4px 8px;
+}
+.live-symbols {
+  max-height: 320px;
+  overflow-y: auto;
+}
+/* Laptop screens: both columns stay side by side and only the ticker list scrolls. */
+@media (max-width: 1500px) {
+  .screen.live .live-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .screen.live .live-steps {
+    font-size: 14px;
+  }
+  .screen.live .live-symbols {
+    max-height: calc(100vh - 530px);
+    min-height: 120px;
+  }
+  .screen.live .mode-card {
+    padding: 10px 12px;
+  }
+}

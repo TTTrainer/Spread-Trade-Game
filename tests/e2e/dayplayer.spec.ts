@@ -38,7 +38,7 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
   await expect(page.getByTestId('trading-screen')).toBeVisible();
   await page.keyboard.press('4');
   await page.keyboard.press('Shift+3');
-  await page.getByTestId('order-market').click();
+  // Orders are market by default.
   await page.keyboard.press('Alt+S');
   await expect(page.getByTestId('toasts')).toContainText('Filled');
 
@@ -61,8 +61,13 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
   await expect.poll(async () => (await state(page)).day, { timeout: 10_000 }).toBe(2);
   await expect.poll(async () => (await state(page)).ff, { timeout: 10_000 }).toBe('paused');
 
-  // The trade card shows the stop-vs-target meter and a close button while waiting.
-  await expect(page.locator('.tug')).toBeVisible();
+  // Each day ends with a recap: the trade's candles, its status and a way to close it.
+  await expect(page.getByTestId('day-recap')).toBeVisible();
+  await expect(page.locator('.recap-trade .mini-candles')).toBeVisible();
+  await shot(page, '14-day-recap-1920');
+  // Hiding the recap shows the trade card with its stop-vs-target meter and a close button.
+  await page.locator('.dr-x').click();
+  await expect(page.getByTestId('pos-hud').locator('.tug')).toBeVisible();
   await expect(page.getByTestId('hud-close')).toBeVisible();
   await page.setViewportSize({ width: 1366, height: 768 });
   await shot(page, '12-day-settled-1366');
@@ -80,8 +85,12 @@ test('day player: candles form day by day, the trade card tracks P/L, pace and c
     .poll(async () => ['paused', 'done', 'decision'].includes((await state(page)).ff), { timeout: 10_000 })
     .toBe(true);
 
-  // Closing from the trade card ends the session (the only trade).
+  // Closing from the trade card ends the session (the only trade). A pause mid-candle lets the
+  // candle finish and then shows the day's recap over the card: wait for it, and set it aside.
   if ((await state(page)).ff === 'paused') {
+    await expect.poll(async () => (await state(page)).anim, { timeout: 10_000 }).toBe(false);
+    const x = page.locator('.dr-x');
+    if (await x.isVisible().catch(() => false)) await x.click();
     await page.getByTestId('hud-close').click();
     await expect(page.getByTestId('toasts')).toContainText(/Closed|closed/);
   }

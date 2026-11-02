@@ -285,14 +285,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'big_score',
     name: 'Receipt Printer',
-    text: 'Score 2,000+ points on a single trade.',
+    text: 'Score 20,000+ points on a single trade.',
     bonus: 20,
     progress: (c) => flag(c.runs.some((r) => (statsOf(r).maxPoints ?? 0) >= 2000)),
   },
   {
     id: 'career_points',
     name: 'Six Figures (of Points)',
-    text: 'Score 100,000 points across your career.',
+    text: 'Score 1,000,000 points across your career.',
     bonus: 50,
     progress: (c) => count(Math.max(0, sum(c.runs.map((r) => r.score))), 100_000),
   },

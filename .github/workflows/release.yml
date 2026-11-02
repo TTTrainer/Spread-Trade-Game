@@ -1,0 +1,87 @@
+# Builds the Windows and Mac games on GitHub's own machines and publishes them as a release,
+# with RELEASE_NOTES.md as its text. It runs when a push changes RELEASE_NOTES.md (or pushes a
+# version tag): the version comes from package.json (tag v1.6.1, ...), and a version that already
+# has a release is skipped, so editing the notes later never publishes twice.
+name: Release
+
+on:
+  push:
+    branches: ['**']
+    paths: ['RELEASE_NOTES.md']
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      exists: ${{ steps.v.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: version
+    if: needs.version.outputs.exists != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+            files: |
+              release/SpreadTradingGame-Setup-*.exe
+              release/SpreadTradingGame-Portable-*.exe
+          - os: macos-latest
+            script: build:mac
+            files: |
+              release/SpreadTradingGame-mac-*.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npm run ${{ matrix.script }}
+        env:
+          # No paid certificates: the Mac apps are signed ad hoc by tools/build-mac.mjs instead.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-${{ matrix.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Spread Trading Game ${{ needs.version.outputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*

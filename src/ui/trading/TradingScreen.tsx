@@ -6,18 +6,15 @@ import { money } from '../format';
 import { Kbd, Modal, Pnl } from '../components/ui';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
-import { useTrading, type Panel, type StudyId } from '../store/trading';
+import { tradeOpen, useTrading, type Panel, type StudyId } from '../store/trading';
 import { BUCKET_NAMES, CONFIDENCES } from '../../engine/scoring/calls';
 import { ChartPanel } from './ChartPanel';
 import { NewsTicker } from './NewsTicker';
-import {
-  CallCards,
-  ExpiryChips,
-  OrderTicket,
-  SetupPresets,
-  SizeControls,
-  StructureCards,
-} from './BuilderTray';
+import { OrderTicket, StructureCards } from './BuilderTray';
+import { SetupSliders } from './SetupPanel';
+import { ChainScreen } from './ChainScreen';
+import { PayoffStudio } from './PayoffStudio';
+import { CashDeposit, CashReadout } from './CashDeposit';
 import {
   AnalyzePanel,
   DecisionModal,
@@ -31,13 +28,16 @@ import { NewsBriefPanel } from './NewsBrief';
 import type { BriefAccess } from '../../engine/news/brief';
 import { DebriefStrip } from './Debrief';
 import './trading.css';
+import { LockStamp } from './BossBanner';
+import { useSealed } from '../boss';
 
-const STUDY_LABELS: Record<StudyId, string> = {
+export const STUDY_LABELS: Record<StudyId, string> = {
   bb: 'Bollinger Bands',
   rsi: 'RSI (14)',
   macd: 'MACD',
   vol: 'Volume',
   em: 'Expected-move band',
+  em2: 'Expected move ×2 (2σ)',
   sma20: 'SMA 20',
   sma50: 'SMA 50',
   sma200: 'SMA 200',
@@ -170,23 +170,14 @@ export function HelpModal() {
                 'analyze',
                 'lineup',
                 'studies',
+                'chain',
                 'timeframe',
                 'home',
                 'back',
                 'help',
                 'settings',
               ],
-              [
-                'sell',
-                'buy',
-                'flatten',
-                'reverse',
-                'autoSend',
-                'playPause',
-                'confirm',
-                'ladderIn',
-                'ladderOut',
-              ],
+              ['sell', 'buy', 'flatten', 'reverse', 'autoSend', 'playPause', 'confirm'],
             ] as const
           ).map((group, gi) => (
             <div key={gi} className="hotkey-list">
@@ -198,8 +189,8 @@ export function HelpModal() {
             </div>
           ))}
           <p>
-            <Kbd>1-5</Kbd> call bucket ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd> confidence{' '}
-            {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
+            <Kbd>1-5</Kbd> pick a structure by view ({BUCKET_NAMES.join(', ')}) · <Kbd>Shift+1-5</Kbd>{' '}
+            conviction {CONFIDENCES.map((c) => `${c * 100}%`).join('/')}
           </p>
         </div>
       </div>
@@ -218,6 +209,7 @@ export function TradingTopBar({ left, right }: { left?: ReactNode; right?: React
       <div className="tb-item num">
         <span className="dim">EQUITY</span> <span data-testid="equity">{money(marked)}</span>
       </div>
+      <CashReadout />
       <div className="tb-item num">
         <span className="dim">REALIZED</span> <Pnl cents={session.realizedCents} testId="realized" />
       </div>
@@ -236,18 +228,42 @@ export function TradingLayout({
   allowedStructures,
   onDone,
   leftExtra,
+  leftPinned,
   rightExtra,
   badges,
   levels,
   briefAccess,
+  payoffTab = false,
+  ticket,
+  builderExtra,
+  tabs: tabList,
+  trayExtra,
+  tradeTabExtra,
+  learnTab,
 }: {
   top: ReactNode;
+  /** A full-size PAYOFF view beside CHART and CHAIN (the Trade Builder). */
+  payoffTab?: boolean;
+  /** Replaces the order ticket (the Trade Builder copies the order instead of placing it). */
+  ticket?: ReactNode;
+  /** Goes after the setup sliders in the builder row (the Trade Builder's leg editor). */
+  builderExtra?: ReactNode;
+  /** The tray's tabs (default: builder, positions, analyze). */
+  tabs?: Panel[];
+  /** Goes at the end of the tray's tab row (the Trade Builder's study toggles). */
+  trayExtra?: ReactNode;
+  /** Goes under the payoff on the TRADE tab (the Trade Builder's leg editor). */
+  tradeTabExtra?: ReactNode;
+  /** A third right-hand tab, LEARN (the Trade Builder's options course). */
+  learnTab?: ReactNode;
   /** What the news brief may show (Career unlocks detail through analysts). */
   briefAccess?: BriefAccess;
   levels?: Partial<Record<StructureId, number>>;
   allowedStructures?: StructureId[];
   onDone?: ReactNode;
   leftExtra?: ReactNode;
+  /** Stays in view at the bottom of the lineup column however far it scrolls. */
+  leftPinned?: ReactNode;
   rightExtra?: ReactNode;
   badges?: (cardId: string) => CardBadges;
 }) {
@@ -265,11 +281,19 @@ export function TradingLayout({
   const setRightTab = useTrading((s) => s.setRightTab);
   // Only this yes/no is watched, so the layout doesn't re-render on every tick.
   const engaged = useTrading((s) => {
-    const card = s.session && s.selectedCardId ? s.session.card(s.selectedCardId) : null;
-    return !!card && (!!card.call || s.session!.openPositions().some((p) => p.cardId === card.id));
+    // A reroll or a new round can leave the selection on a card that is gone: never throw here
+    // (a selector that throws takes the whole screen down with it).
+    const card = s.session?.cards.find((c) => c.id === s.selectedCardId) ?? null;
+    return !!card && (s.touched || s.session!.openPositions().some((p) => p.cardId === card.id));
   });
   const controls = useAnimationControls();
   const [studiesOpen, setStudiesOpen] = useStudyPicker();
+  const studiesSealed = useSealed('studies');
+  const chainOpen = useTrading((s) => s.chainOpen);
+  const setChainOpen = useTrading((s) => s.setChainOpen);
+  const chainKey = useApp((s) => s.settings.hotkeys.chain);
+  const payoffOpen = useTrading((s) => s.payoffOpen);
+  const setPayoffOpen = useTrading((s) => s.setPayoffOpen);
 
   useEffect(() => {
     if (shake > 0)
@@ -280,7 +304,7 @@ export function TradingLayout({
       });
   }, [shake]);
 
-  const tabs: Panel[] = ['builder', 'positions', 'analyze'];
+  const tabs: Panel[] = tabList ?? ['builder', 'positions', 'analyze'];
   useHotkeys({
     positions: () => setPanel('positions'),
     builder: () => setPanel('builder'),
@@ -288,7 +312,8 @@ export function TradingLayout({
     nextPanel: () => setPanel(tabs[(tabs.indexOf(panel) + 1) % tabs.length]),
     prevPanel: () => setPanel(tabs[(tabs.indexOf(panel) + tabs.length - 1) % tabs.length]),
     reverse: () => reverse(),
-    studies: () => setStudiesOpen(true),
+    studies: () => !studiesSealed && setStudiesOpen(true),
+    chain: () => setChainOpen(!chainOpen),
     timeframe: () => useTrading.getState().setTimeframe(useTrading.getState().timeframe === 'D' ? 'W' : 'D'),
     help: () => setHelp(true),
     bucket1: () => void setCall(0),
@@ -306,12 +331,14 @@ export function TradingLayout({
     expNext: () => useTrading.getState().nudgeExpiration(1),
     expPrev: () => useTrading.getState().nudgeExpiration(-1),
     qtyUp: () => {
-      const b = useTrading.getState().builder;
-      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.min(50, b.qty + 1) });
+      const c = useTrading.getState().confidence;
+      if (tradeOpen(useTrading.getState()))
+        void setConfidence(Math.min(0.9, Math.round((c + 0.1) * 10) / 10));
     },
     qtyDown: () => {
-      const b = useTrading.getState().builder;
-      if (ff === 'idle') useTrading.getState().setBuilder({ qty: Math.max(1, b.qty - 1) });
+      const c = useTrading.getState().confidence;
+      if (tradeOpen(useTrading.getState()))
+        void setConfidence(Math.max(0.5, Math.round((c - 0.1) * 10) / 10));
     },
     presetWeekly: () => useTrading.getState().applyPreset('weekly'),
     presetSwing: () => useTrading.getState().applyPreset('swing'),
@@ -339,9 +366,54 @@ export function TradingLayout({
       <div className="t-top">{top}</div>
       <div className="t-left">
         <LineupColumn extra={leftExtra} badges={badges} briefAccess={briefAccess} />
+        {leftPinned && <div className="t-left-pin">{leftPinned}</div>}
       </div>
       <div className="t-center">
         <ChartPanel />
+        <div className="center-tabs num" role="tablist">
+          <button
+            className={chainOpen || payoffOpen ? '' : 'sel'}
+            onClick={() => (setChainOpen(false), setPayoffOpen(false))}
+            role="tab"
+            aria-selected={!chainOpen && !payoffOpen}
+            data-testid="ctab-chart"
+          >
+            ◲ CHART
+          </button>
+          <button
+            className={chainOpen ? 'sel' : ''}
+            onClick={() => setChainOpen(true)}
+            role="tab"
+            aria-selected={chainOpen}
+            data-testid="ctab-chain"
+            data-tip-title="Option chain"
+            data-tip-body="Every strike and expiration with bid, ask, IV and the Greeks. Click a bid to sell there."
+          >
+            ⊞ CHAIN <span className="kbd">{chainKey}</span>
+          </button>
+          {payoffTab && (
+            <button
+              className={payoffOpen ? 'sel' : ''}
+              onClick={() => {
+                // The payoff opens in the TRADE column beside the chart (the chart stays); during a
+                // LEARN lesson it opens over the chart so the lesson stays in view.
+                setPayoffOpen(!payoffOpen);
+                if (!payoffOpen && tab !== 'learn') setRightTab('trade');
+              }}
+              role="tab"
+              aria-selected={payoffOpen}
+              data-testid="ctab-payoff"
+              data-tip-title="Payoff, full size"
+              data-tip-body="What the trade makes or loses at every price, at expiration and on any day before it, with the expected move and where the price is likely to end."
+            >
+              ⟋ PAYOFF
+            </button>
+          )}
+        </div>
+        {chainOpen && <ChainScreen onClose={() => setChainOpen(false)} />}
+        {payoffTab && payoffOpen && !chainOpen && tab !== 'trade' && (
+          <PayoffStudio onClose={() => setPayoffOpen(false)} />
+        )}
         <NewsTicker />
       </div>
       <div className="t-right panel">
@@ -366,12 +438,34 @@ export function TradingLayout({
           >
             TRADE
           </button>
+          {learnTab && (
+            <button
+              className={tab === 'learn' ? 'sel' : ''}
+              onClick={() => setRightTab('learn')}
+              data-testid="rtab-learn"
+              data-tip-title="Learn options"
+              data-tip-body="A short course on this chart: one idea at a time, from a single call to the credit spreads and condors you build here."
+              role="tab"
+              aria-selected={tab === 'learn'}
+            >
+              LEARN
+            </button>
+          )}
         </div>
-        {tab === 'brief' ? (
+        {tab === 'learn' && learnTab ? (
+          learnTab
+        ) : tab === 'brief' ? (
           <NewsBriefPanel access={briefAccess} />
         ) : (
           <>
-            <PayoffChart />
+            {payoffTab && payoffOpen ? (
+              <div className="ps-in-col">
+                <PayoffStudio onClose={() => setPayoffOpen(false)} />
+              </div>
+            ) : (
+              <PayoffChart />
+            )}
+            {tradeTabExtra}
             <StatsBlock />
           </>
         )}
@@ -390,24 +484,25 @@ export function TradingLayout({
               <span className="kbd">Ctrl+{t === 'positions' ? 1 : t === 'builder' ? 2 : 3}</span>
             </button>
           ))}
-          <button onClick={() => setStudiesOpen(true)}>
-            STUDIES <span className="kbd">Ctrl+E</span>
-          </button>
+          {studiesSealed ? (
+            <LockStamp text="STUDIES SEALED" by={studiesSealed} />
+          ) : (
+            <button onClick={() => setStudiesOpen(true)}>
+              STUDIES <span className="kbd">Ctrl+E</span>
+            </button>
+          )}
           <button onClick={() => setHelp(true)}>
             HELP <span className="kbd">Ctrl+8</span>
           </button>
+          {trayExtra}
         </div>
         <div className="tray-body">
           {panel === 'builder' && (
             <div className="builder-row">
-              <CallCards />
               <StructureCards allowed={allowedStructures} levels={levels} />
-              <div className="tray-col">
-                <SetupPresets />
-                <ExpiryChips />
-                <SizeControls />
-              </div>
-              <OrderTicket />
+              <SetupSliders />
+              {builderExtra}
+              {ticket ?? <OrderTicket />}
             </div>
           )}
           {panel === 'positions' && <PositionsDock />}
@@ -415,7 +510,8 @@ export function TradingLayout({
         </div>
       </div>
       <DecisionModal />
-      {studiesOpen && <StudyPicker onClose={() => setStudiesOpen(false)} />}
+      <CashDeposit />
+      {studiesOpen && !studiesSealed && <StudyPicker onClose={() => setStudiesOpen(false)} />}
     </motion.div>
   );
 }

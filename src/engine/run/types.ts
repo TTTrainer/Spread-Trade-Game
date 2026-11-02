@@ -1,3 +1,4 @@
+import type { BossId } from '../../content/bosses';
 /**
  * Run state: everything about a Career run that is not market data. It is plain JSON, so it
  * autosaves, and together with the action log it replays the run exactly.
@@ -13,6 +14,7 @@ import type { SessionAction } from '../trading/session';
 import type { TradeDebrief } from '../trading/debrief';
 import type { Line } from '../../content/characters';
 import type { PadPerk } from '../../content/meta';
+import type { ExitLog } from './exits';
 
 export type RunPhase = 'round' | 'tally' | 'shop' | 'review_intro' | 'victory' | 'defeat';
 
@@ -64,6 +66,15 @@ export interface TradeTally {
   steps: ScoreStep[];
   trace: TraceRow[];
   closedOn: string;
+  /** The round's score after this trade, and its target (the payout shows the climb). */
+  meterAfter?: number;
+  target?: number;
+  /** How it closed (target, stop, expired...). */
+  exitReason?: string | null;
+  /** Target or stop when the exit plan closed it. */
+  planExit?: 'target' | 'stop' | null;
+  /** The most the trade could have lost (a stop's payout shows what it saved). */
+  maxLossCents?: number;
 }
 
 export interface RoundCard {
@@ -72,10 +83,39 @@ export interface RoundCard {
   timeSkip: number;
 }
 
+/** Where new trades take profit and stop out, for the whole run. */
+export interface ExitPlan {
+  /** Credit trades: take profit at this share of the credit. */
+  creditTargetPct: number;
+  /** Credit trades: stop out when the loss reaches this many times the credit. */
+  creditStopMult: number;
+  /** Debit trades: take profit at this gain on the debit. */
+  debitTargetPct: number;
+  /** Debit trades: stop out at this share of the debit lost. */
+  debitStopPct: number;
+}
+
 export interface RoundState {
   quarter: number;
   index: number; // 0 = Month 1, 1 = Month 2, 2 = Review
   reviewId: ReviewId | null;
+  /** The boss running this Review (its market is `reviewId`); none on Month rounds. */
+  bossId?: BossId | null;
+  /** The month menu (target, build, plan, the quarter's boss) has been seen for this round. */
+  boardSeen?: boolean;
+  /** A boss round's showdown tier: 0 in the first year, harsher each Endless year after. */
+  showdown?: number;
+  /** The Rebalancer's race at each day's close: the round's trades vs SPY on the same capital. */
+  race?: { you: number; spy: number }[];
+  /** The duel at each day's close: your P/L and Chad's. */
+  duelRace?: { you: number; rival: number }[];
+  /** The Collector: points of interest charged so far this round, and days charged per trade. */
+  interest?: number;
+  interestDays?: Record<string, number>;
+  /** The duel's result, when the round settles. */
+  duel?: { you: number; rival: number; won: boolean };
+  /** The boss's style bonus was earned (set when the round settles). */
+  styleMet?: boolean;
   target: number;
   meter: number;
   startEquityCents: number;
@@ -117,6 +157,14 @@ export interface RoundState {
   filterRelaxed: boolean;
   scored: string[]; // position ids already tallied
   client: { id: string; status: 'open' | 'filled' | 'missed' } | null;
+  /** Sitting the round out (a skip): no trades until the days run out, then the Tag pays. */
+  sitOut?: { days: number } | null;
+  /** Points carried in from the last round's surplus (already on the meter). */
+  carriedIn?: number;
+  /** Points added because the round finished with a profit (negative: taken for a loss). */
+  greenBonus?: number;
+  /** The round's realized P/L (set when it settles). */
+  realizedCents?: number;
 }
 
 export type ShopItem =
@@ -130,12 +178,18 @@ export interface ShopState {
   items: ShopItem[];
   rerolls: number;
   freeRerolls: number;
+  /**
+   * After a boss: three free cartridges, take one (the others go when you leave), and the trophy
+   * it just handed over (null when you already held it and it paid cash instead).
+   */
+  spoils?: { ids: string[]; taken: string | null; trophy?: BossId | null };
 }
 
 export interface RoundSummary {
   quarter: number;
   index: number;
   reviewId: ReviewId | null;
+  bossId?: BossId | null;
   target: number;
   meter: number;
   status: RoundState['status'];
@@ -160,6 +214,8 @@ export interface RunResult {
 export interface RunState {
   version: 1;
   id: string;
+  /** Developer mode touched this run (its levers were used). */
+  dev?: boolean;
   config: RunConfig;
   phase: RunPhase;
   quarter: number;
@@ -185,6 +241,18 @@ export interface RunState {
   };
   reviewsSeen: ReviewId[];
   nextReview: ReviewId | null;
+  /** Each quarter's boss, picked when the quarter starts (so it can be shown a quarter ahead). */
+  bosses?: { quarter: number; id: BossId }[];
+  /** Quarters whose boss has been rerolled (once per boss). */
+  bossRerolled?: number[];
+  /** Bosses beaten this run whose trophy (a permanent buff) you hold. */
+  trophies?: BossId[];
+  /** A boss was just beaten: the next shop opens with its spoils. */
+  spoilsDue?: boolean;
+  /** The trophy that boss handed over, shown when its spoils open (null: it paid cash). */
+  spoilsTrophy?: BossId | null;
+  /** The run's exit plan for new trades, set from the month menu (else the desk's defaults). */
+  plan?: ExitPlan;
   round: RoundState;
   shop: ShopState | null;
   history: RoundSummary[];
@@ -199,6 +267,10 @@ export interface RunState {
   };
   patienceStacks: number;
   parachuteUsed: boolean;
+  /** Quarters with a written-up (missed) Month target; a second miss in one ends the run. */
+  writeUps?: number[];
+  /** Surplus points waiting to start the next round's meter. */
+  carry?: number;
   burnoutNext: boolean;
   usedWindows: number[];
   result: RunResult | null;
@@ -217,6 +289,7 @@ export interface RunStats {
   burnouts: number;
   skips: number;
   reviewsPassed: string[];
+  bossesBeaten?: string[];
   maxMult: number;
   maxPoints: number;
   maxCartridges: number;
@@ -237,6 +310,12 @@ export interface RunStats {
   ownedAt: Record<string, number>;
   /** The year reached (2+ only in Endless). */
   year?: number;
+  /** Coworker tips already given (first-time tips speak once a run; struggling once a round). */
+  tipsSeen?: string[];
+  /** Losing trades in a row. */
+  lossRun?: number;
+  /** How every trade this run closed: the exit plan's scorecard. */
+  exits?: ExitLog;
 }
 
 export type RunAction =
@@ -253,15 +332,57 @@ export type RunAction =
   | { t: 'rerollShop' }
   | { t: 'leaveShop' }
   | { t: 'startReview' }
+  | { t: 'boardDone' }
+  | { t: 'rerollBoss' }
+  | { t: 'setPlan'; plan: Partial<ExitPlan> }
+  | { t: 'takeSpoil'; id: string }
+  /** Which decision points stop the clock, for the rest of this run (the month menu's switches). */
+  | { t: 'setPause'; kind: DecisionKind; on: boolean }
   | { t: 'endless' }
-  | { t: 'forfeit' };
+  | { t: 'forfeit' }
+  | { t: 'dev'; op: DevOp };
+
+/**
+ * Developer mode's test levers. They go through the action log like every other action, so a
+ * resumed run replays them exactly. They touch the game layer only (cash, stress, meter, items),
+ * never the market.
+ */
+export type DevOp =
+  | { k: 'cash'; delta: number }
+  | { k: 'stress'; delta: number }
+  | { k: 'tickets'; delta: number }
+  | { k: 'rerolls'; delta: number }
+  | { k: 'meter'; delta: number }
+  | { k: 'cartridge'; id: string }
+  | { k: 'analyst'; id: AnalystId }
+  | { k: 'memo'; id: MemoId }
+  | { k: 'voucher'; id: VoucherId }
+  /** Straight to this quarter's Review with this boss (from a Month before its clock starts). */
+  | { k: 'boss'; id: BossId };
+
+/** One trade's interest on a Collector day. */
+export interface InterestItem {
+  positionId: string;
+  symbol: string;
+  /** The sold strike the price is at or past, and which side. */
+  strike: number;
+  right: 'C' | 'P';
+  spot: number;
+  plCents: number;
+  riskCents: number;
+  /** Points taken off the score today, and the days this trade has been charged so far. */
+  points: number;
+  days: number;
+}
 
 export interface RunEvent {
-  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say';
+  kind: 'info' | 'good' | 'bad' | 'warn' | 'score' | 'stress' | 'breach' | 'phase' | 'say' | 'interest';
   text: string;
   points?: number;
   /** For 'say': who speaks and how they look. */
   line?: Line;
+  /** For 'interest': the Collector's bill for the day. */
+  interest?: { items: InterestItem[]; rate: number; day: number };
 }
 
 export interface RunSave {

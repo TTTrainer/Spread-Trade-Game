@@ -29,6 +29,7 @@ test('packaged app boots, shows its version, and deals a Career round', async ()
   await expect(page.getByTestId('data-status')).toContainText('SIM');
   await expect(page.locator('.title-foot')).toContainText(`v${pkgVersion}`);
   await page.getByTestId('menu-career').click();
+  await page.getByTestId('desk-verticals').click();
   await page.getByTestId('start-run').click();
   await expect(page.getByTestId('round-meter')).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: join(process.cwd(), 'test-results', 'screens', '11-packaged-round.png') });

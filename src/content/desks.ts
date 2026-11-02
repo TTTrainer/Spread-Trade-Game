@@ -21,13 +21,16 @@ export const DESKS: Record<DeskId, DeskDef> = {
   income: {
     id: 'income',
     name: 'Income',
-    blurb: 'Covered calls, cash-secured puts and the wheel. Get paid to own stocks you like.',
+    blurb:
+      'Covered calls and cash-secured puts on 500 shares you own of each stock (off the books: only the options count). Get paid to wait.',
     structures: ['cash_secured_put', 'covered_call'],
-    passiveText: 'Assignment is not a loss event (no stress). Dividends pay +25 chips each.',
+    passiveText: 'Assignment is not a loss event (no stress). Dividends pay +250 chips each.',
     startingAnalysts: [],
     startingCartridges: ['dividend_radar'],
-    unlockCost: 100,
+    unlockCost: 0,
     priceRange: [6, 18],
+    recommendedCapitalCents: 5_000_000,
+    targetMult: 1.1,
     passive: (f) =>
       f.win && f.dividendsCollected > 0
         ? [
@@ -51,6 +54,9 @@ export const DESKS: Record<DeskId, DeskDef> = {
     unlockCost: 150,
     ticketsAdd: 1,
     lineupAdd: 1,
+    // Two credits a trade score about 2.5x a vertical's, and a flat chart is always dealt (1.6):
+    // targets scale to match.
+    targetMult: 3.4,
     passive: (f) =>
       f.win && f.callFlat && f.callExact && f.callBonus > 0
         ? [{ label: 'Condor desk (flat call x2)', kind: 'desk', op: 'add', value: f.callBonus }]
@@ -62,12 +68,13 @@ export const DESKS: Record<DeskId, DeskDef> = {
     blurb: 'Long straddles and strangles. Buy movement before the market prices it.',
     structures: ['long_straddle', 'long_strangle'],
     passiveText:
-      'Earnings events show the implied move. Long premium held through an event: +50 chips. +3 tickets and +2 cards every round.',
+      'Earnings events show the implied move. Long premium held through an event: +500 chips. +3 tickets and +2 cards every round.',
     startingAnalysts: ['earnings_whisperer'],
     startingCartridges: [],
     unlockCost: 200,
     ticketsAdd: 3,
     lineupAdd: 2,
+    targetMult: 1.7,
     priceRange: [10, 50],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
     passive: (f) =>
@@ -80,15 +87,20 @@ export const DESKS: Record<DeskId, DeskDef> = {
     name: 'Calendar',
     blurb: 'Calendars, diagonals and double calendars. Trade time and the volatility term structure.',
     structures: ['calendar', 'diagonal', 'double_calendar'],
-    passiveText: 'The IV term-structure panel is always on. +1 ticket and +1 card every round.',
+    passiveText: 'The IV term-structure panel is always on. +2 tickets and +1 card every round.',
     startingAnalysts: [],
     startingCartridges: ['term_structure_tap'],
     unlockCost: 250,
-    ticketsAdd: 1,
+    ticketsAdd: 2,
     lineupAdd: 1,
+    // Calendars make steady small money, and a flat chart is always dealt (1.6).
+    targetMult: 1.36,
     priceRange: [10, 60],
     brackets: { debitTargetPct: 0.15, debitStopPct: 0.45 },
   },
 };
 
-export const DESK_ORDER: DeskId[] = ['verticals', 'income', 'condor', 'volatility', 'calendar'];
+// Income first: cash-secured puts and covered calls are where a new options trader starts (the
+// LEARN OPTIONS course and the tutorial teach them first). Verticals stays free too: most client
+// contracts ask for spreads, so a new player needs it.
+export const DESK_ORDER: DeskId[] = ['income', 'verticals', 'condor', 'volatility', 'calendar'];

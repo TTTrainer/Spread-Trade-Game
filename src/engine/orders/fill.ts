@@ -43,6 +43,11 @@ export interface FillAttempt {
   isRoll?: boolean;
   /** Roll Voucher memo: this roll fills at mid. */
   atMid?: boolean;
+  /**
+   * A limit priced at the natural (crossing the spread): how an exit is worked when market orders
+   * are off. It always fills, at the same price a market order would.
+   */
+  marketable?: boolean;
 }
 
 export interface FillResult {
@@ -84,6 +89,7 @@ export function attemptFill(
   mods: ExecutionMods = BASE_EXECUTION,
 ): FillResult {
   if (a.atMid) return { filled: true, price: q.mid, probability: 1 };
+  if (a.marketable) return { filled: true, price: marketPrice(q, mods, a.isRoll), probability: 1 };
   if (a.type === 'market') {
     if (mods.marketOrdersDisabled)
       return {

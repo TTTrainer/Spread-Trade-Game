@@ -94,7 +94,24 @@ test('settings toggles persist across restarts and apply', async () => {
   await shot(first.page, '05-settings-hotkeys-1920');
   await first.page.getByTestId('set-data').click();
   await expect(first.page.getByTestId('build-real')).toBeVisible();
-  await shot(first.page, '05-settings-data-1920');
+  // Schwab (read-only market data): keys are saved locally; the secret never shows again.
+  const p1 = first.page;
+  await expect(p1.getByTestId('schwab-status')).toContainText('NOT SET UP');
+  await p1.getByTestId('schwab-key').fill('TESTKEY1234');
+  await p1.getByTestId('schwab-secret').fill('TESTSECRET');
+  await p1.getByTestId('schwab-save').click();
+  await expect(p1.getByTestId('schwab-status')).toContainText('KEYS SAVED');
+  await expect(p1.getByTestId('schwab-secret')).toHaveValue('');
+  await expect(p1.getByTestId('schwab-key')).toHaveAttribute('placeholder', /1234/);
+  await p1.getByTestId('schwab-paste').fill('https://127.0.0.1/?error=access_denied');
+  await p1.getByTestId('schwab-finish').click();
+  await expect(p1.getByTestId('toasts')).toContainText('No login code');
+  await p1.getByTestId('schwab-panel').scrollIntoViewIfNeeded();
+  await shot(p1, '05-settings-data-1920');
+  await shot(p1, '05-settings-data-1366', { width: 1366, height: 768 });
+  await p1.setViewportSize({ width: 1920, height: 1080 });
+  await p1.getByTestId('schwab-forget').click();
+  await expect(p1.getByTestId('schwab-status')).toContainText('NOT SET UP');
   await first.app.close();
   const second = await launchGame({ userData: first.userData });
   await expect(second.page.locator('html')).toHaveAttribute('data-palette', 'colorblind');

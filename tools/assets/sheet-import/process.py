@@ -2,8 +2,20 @@
 import sys
 from collections import deque
 from PIL import Image
-from tiles import SECTIONS
-from mapping import MAP
+import importlib
+
+# Which sheet's layout to use: sheet 1 lives in tiles.py + mapping.py, later sheets in sheetN.py.
+SPEC = sys.argv[3] if len(sys.argv) > 3 else 'sheet1'
+SLOT_SIZES, SLOT_MODES = {}, {}
+if SPEC == 'sheet1':
+    from tiles import SECTIONS
+    from mapping import MAP
+else:
+    _m = importlib.import_module(SPEC)
+    SECTIONS, MAP = _m.SECTIONS, _m.MAP
+    # Later sheets may size each slot on its own (The Pad's pieces differ in shape).
+    SLOT_SIZES = getattr(_m, 'SIZES', {})
+    SLOT_MODES = getattr(_m, 'MODES', {})
 
 OUT = sys.argv[1]
 SIZE = {'cartridge': (64, 64), 'memo': (64, 64), 'voucher': (64, 64), 'analyst': (64, 64), 'tag': (64, 64),
@@ -67,6 +79,21 @@ def fit(img: Image.Image, size, margin=0.06) -> Image.Image:
     return canvas
 
 
+def stand(img: Image.Image, size, margin=0.04) -> Image.Image:
+    """Trim to the content and scale it to fit, standing on the bottom edge (a Pad piece sits on
+    the floor or the desk), centered left to right."""
+    bbox = img.getchannel('A').getbbox() or (0, 0, *img.size)
+    img = img.crop(bbox)
+    tw, th = size
+    w, h = img.size
+    scale = min(tw * (1 - 2 * margin) / w, th * (1 - margin) / h)
+    nw, nh = max(1, round(w * scale)), max(1, round(h * scale))
+    img = img.convert('RGBa').resize((nw, nh), Image.LANCZOS).convert('RGBA')
+    canvas = Image.new('RGBA', size, (0, 0, 0, 0))
+    canvas.alpha_composite(img, ((tw - nw) // 2, th - nh))
+    return canvas
+
+
 def cover(img: Image.Image, size) -> Image.Image:
     """Center-crop a scene to the slot's aspect, then scale."""
     tw, th = size
@@ -109,10 +136,16 @@ for cat, slots in MAP.items():
         else:
             l, t, r, b = frame_inner(x - 3, y - 3, x + w + 3, y + h + 3)
             tile = sheet.crop((l + 2, t + 2, r - 2, b - 2))
-        if cat in CUTOUT:
-            img = fit(cutout(tile), SIZE[cat])
+        size = SLOT_SIZES.get(sid, SIZE.get(cat))
+        mode = SLOT_MODES.get(sid)
+        if mode == 'stand':
+            img = stand(cutout(tile), size)
+        elif mode == 'cover':
+            img = cover(tile, size)
+        elif cat in CUTOUT:
+            img = fit(cutout(tile), size)
         else:
-            img = cover(tile, SIZE[cat])
+            img = cover(tile, size)
         name = f'{cat}-{sid}.png'
         img.save(f'{OUT}/{name}', optimize=True)
         written.append(name)

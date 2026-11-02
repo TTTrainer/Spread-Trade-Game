@@ -45,6 +45,8 @@ export interface BuildParams {
   width: number;
   /** Optional explicit anchor strike (the short strike for credit spreads); overrides delta. */
   anchor?: number;
+  /** A condor's short call strike (its short put is `anchor`); overrides delta on the call side. */
+  callAnchor?: number;
   /** Extra steps on the far wing (broken-wing condor). */
   skip?: number;
 }

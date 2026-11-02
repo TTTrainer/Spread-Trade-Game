@@ -2,38 +2,38 @@ import { motion, useAnimationControls } from 'motion/react';
 import { burstAt, fx } from '../../fx/overlay';
 import { ArtIcon, artUrl } from '../art';
 import { useEffect, useMemo, useState } from 'react';
-import { ANALYSTS } from '../../content/analysts';
-import { CARTRIDGE_BY_ID } from '../../content/cartridges';
-import { DESKS } from '../../content/desks';
-import { MEMOS, VOUCHERS } from '../../content/items';
 import { REVIEWS } from '../../content/reviews';
-import { ROUND_NAMES, computeTarget, quarterLabel, sellPrice, type RunEngine } from '../../engine/run/engine';
-import type { ShopItem, TradeTally } from '../../engine/run/types';
+import { BOSSES, showdownLabel, showdownTier, twistLine } from '../../content/bosses';
+import { STYLE_TEXT } from '../../engine/run/style';
+import { BALANCE } from '../../content/balance';
+import { ROUND_NAMES, quarterLabel, type RunEngine } from '../../engine/run/engine';
+import type { TradeTally } from '../../engine/run/types';
 import type { TraceRow } from '../../engine/scoring/mult';
 import { STRUCTURES } from '../../engine/strategies/structures';
 import { sfx } from '../../audio/sfx';
-import { CountUp, Kbd, Meter, Pnl, Stamp, TiltCard } from '../components/ui';
-import { money } from '../format';
+import { CountUp, Kbd, Meter, Pnl, Stamp } from '../components/ui';
+import { SCORE_SCALE, chipsText, money, multText, pts, ptsSigned } from '../format';
 import { useHotkeys } from '../hotkeys';
 import { useApp } from '../store/app';
 import { useRun, type DailyGhost } from '../store/run';
 import { DebriefStrip } from '../trading/Debrief';
-import { CartridgeRail } from './RunParts';
 import './run.css';
 
+export { ShopView } from './Shop';
+
 function opText(t: TraceRow): string {
-  const v = Math.round(t.value * 100) / 100;
+  const v = multText(t.value);
   switch (t.op) {
     case 'chips':
-      return `${v >= 0 ? '+' : ''}${Math.round(v)} chips`;
+      return `${t.value >= 0 ? '+' : '−'}${chipsText(Math.abs(t.value))} chips`;
     case 'chipsMul':
       return `×${v} chips`;
     case 'add':
-      return `${v >= 0 ? '+' : ''}${v} mult`;
+      return `${t.value >= 0 ? '+' : ''}${v} mult`;
     case 'mul':
       return `×${v} mult`;
     case 'meter':
-      return `meter ×${v}`;
+      return `score ×${v}`;
   }
 }
 
@@ -66,8 +66,8 @@ function Receipt({ t, shown, index }: { t: TradeTally; shown: number; index: num
         ))}
       </div>
       <div className="rc-foot num">
-        <span className="chips-text">{Math.round(last?.chips ?? 0)}</span> ×{' '}
-        <span className="mult-text">{(last?.mult ?? 1).toFixed(2)}</span>
+        <span className="chips-text">{chipsText(last?.chips ?? 0)}</span> ×{' '}
+        <span className="mult-text">{multText(t.winner ? (last?.mult ?? 1) : 1)}</span>
         {done && (
           <motion.b
             className={t.points >= 0 ? 'up-text' : 'down-text'}
@@ -75,8 +75,7 @@ function Receipt({ t, shown, index }: { t: TradeTally; shown: number; index: num
             animate={{ scale: 1 }}
           >
             {' '}
-            = {t.points >= 0 ? '+' : ''}
-            {t.points.toLocaleString()}
+            = {ptsSigned(t.points)}
           </motion.b>
         )}
       </div>
@@ -92,7 +91,9 @@ export function TallyView({ e }: { e: RunEngine }) {
   const r = e.state.round;
   const tallies = r.tallies;
   const totalSteps = tallies.reduce((a, t) => a + t.trace.length + 1, 0);
-  const [step, setStep] = useState(reduced ? totalSteps : 0);
+  // Each trade already played its payout when it closed, so the tally opens as the summary.
+  const played = useApp((s) => s.settings.game.payoutSpeed !== 'instant');
+  const [step, setStep] = useState(reduced || played ? totalSteps : 0);
   useEffect(() => {
     if (step >= totalSteps) return;
     const id = setTimeout(() => {
@@ -138,8 +139,12 @@ export function TallyView({ e }: { e: RunEngine }) {
       left -= t.trace.length + 1;
     }
   }, [step]);
-  const meterNow = tallies.reduce((a, t, i) => a + (shownFor[i] > t.trace.length ? t.points : 0), 0);
   const finished = step >= totalSteps;
+  // The meter starts at what carried in from last round and ends with the green/red-round change.
+  const meterNow =
+    (r.carriedIn ?? 0) +
+    tallies.reduce((a, t, i) => a + (shownFor[i] > t.trace.length ? t.points : 0), 0) +
+    (finished ? (r.greenBonus ?? 0) : 0);
   useHotkeys({ confirm: () => (finished ? void act({ t: 'finishTally' }) : setStep(totalSteps)) });
   useEffect(() => {
     if (!finished) return;
@@ -161,7 +166,7 @@ export function TallyView({ e }: { e: RunEngine }) {
             tone={meterNow >= r.target ? 'cyan' : 'magenta'}
             label={
               <>
-                {<CountUp value={meterNow} />} / {r.target.toLocaleString()}
+                {<CountUp value={Math.round(meterNow * SCORE_SCALE)} />} / {pts(r.target)}
               </>
             }
             testId="tally-meter"
@@ -184,10 +189,26 @@ export function TallyView({ e }: { e: RunEngine }) {
       </div>
       {finished && (
         <>
-          {r.debriefs.length > 0 && <DebriefStrip debriefs={r.debriefs} blind />}
+          {/* One thing at a time: the verdict, then why, then the trade-by-trade detail. */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: reduced ? 0 : 0.5, duration: 0.35 }}
+          >
+            <RoundWhy e={e} />
+          </motion.div>
+          {r.debriefs.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduced ? 0 : 1.2, duration: 0.35 }}
+            >
+              <DebriefStrip debriefs={r.debriefs} blind />
+            </motion.div>
+          )}
           <div className="modal-actions">
             <button
-              className="pixel-btn primary"
+              className="pixel-btn key k-next nudge"
               onClick={() => void act({ t: 'finishTally' })}
               data-testid="tally-continue"
             >
@@ -205,280 +226,78 @@ export function TallyView({ e }: { e: RunEngine }) {
   );
 }
 
-function itemTitle(it: ShopItem): string {
-  switch (it.kind) {
-    case 'cartridge':
-      return CARTRIDGE_BY_ID[it.id].name;
-    case 'analyst':
-      return `${ANALYSTS[it.id].name}${it.level > 1 ? ' (level 2)' : ''}`;
-    case 'memo':
-      return MEMOS[it.id].name;
-    case 'page':
-      return `Playbook: ${STRUCTURES[it.id].name}`;
-    case 'voucher':
-      return VOUCHERS[it.id].name;
-  }
-}
-
-function ItemCard({ e, it, index }: { e: RunEngine; it: ShopItem; index: number }) {
-  const act = useRun((s) => s.act);
-  const cash = e.state.cash;
-  const rarity =
-    it.kind === 'cartridge'
-      ? CARTRIDGE_BY_ID[it.id].rarity
-      : it.kind === 'voucher'
-        ? 'L'
-        : it.kind === 'analyst'
-          ? 'U'
-          : undefined;
-  let body: React.ReactNode;
-  switch (it.kind) {
-    case 'cartridge': {
-      const c = CARTRIDGE_BY_ID[it.id];
-      body = (
-        <>
-          <div className="item-kind num">
-            CARTRIDGE · {c.families.join('·')} ·{' '}
-            <span className={c.tag.includes('REAL') ? 'cyan-text' : 'magenta-text'}>{c.tag}</span>
-          </div>
-          <div className="item-text">{c.text}</div>
-          <div className="item-syn dim">
-            Pairs with: {c.synergies.map((s) => CARTRIDGE_BY_ID[s]?.name ?? s).join(', ')}
-          </div>
-        </>
-      );
-      break;
-    }
-    case 'analyst':
-      body = (
-        <>
-          <div className="item-kind num">ANALYST</div>
-          <div className="item-text">{it.level > 1 ? ANALYSTS[it.id].level2 : ANALYSTS[it.id].reveals}</div>
-        </>
-      );
-      break;
-    case 'memo':
-      body = (
-        <>
-          <div className="item-kind num">MEMO (one use)</div>
-          <div className="item-text">{MEMOS[it.id].text}</div>
-        </>
-      );
-      break;
-    case 'page': {
-      const lv = e.state.levels[it.id] ?? 1;
-      body = (
-        <>
-          <div className="item-kind num">PLAYBOOK PAGE</div>
-          <div className="item-text">
-            {STRUCTURES[it.id].name}: level {lv} → {lv + 1}. +10 base chips and +0.5 mult on its winners.
-          </div>
-        </>
-      );
-      break;
-    }
-    case 'voucher':
-      body = (
-        <>
-          <div className="item-kind num">VOUCHER (whole run)</div>
-          <div className="item-text">{VOUCHERS[it.id].text}</div>
-        </>
-      );
-      break;
-  }
+/**
+ * Why the round scored what it did, in money first and points second: what the trades made and
+ * lost, what the build added, what the losses cost, and the round's green/red and carry-over.
+ */
+function RoundWhy({ e }: { e: RunEngine }) {
+  const r = e.state.round;
+  const wins = r.tallies.filter((t) => t.winner);
+  const losses = r.tallies.filter((t) => !t.winner);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  const made = sum(wins.map((t) => t.realizedCents));
+  const lost = sum(losses.map((t) => t.realizedCents));
+  const net = r.realizedCents ?? made + lost;
+  const winPts = sum(wins.map((t) => t.points));
+  const lossPts = sum(losses.map((t) => t.points));
+  const avgMult = wins.length ? sum(wins.map((t) => t.mult)) / wins.length : 0;
+  const passed = r.status === 'passed';
+  const verdict =
+    passed && net < 0
+      ? "You passed while losing money: your build's multipliers on the winners outweighed the losses. The red round cost you, and the Max-Loss Line doesn't care about points."
+      : !passed && net > 0
+        ? 'You made money, but not enough points: bigger winners, more of them, or a build that multiplies them.'
+        : passed
+          ? 'Points and money agree: a good round.'
+          : r.breached
+            ? 'The account crossed the Max-Loss Line: the risk desk closed everything.'
+            : 'Points and money agree: a round to learn from. The debrief below shows where it went.';
+  if (!r.tallies.length && !r.carriedIn && !r.interest) return null;
   return (
-    <TiltCard
-      className={`shop-item ${it.sold ? 'sold' : ''}`}
-      rarity={rarity}
-      disabled={it.sold}
-      testId={`shop-item-${index}`}
-      tip={
-        it.kind === 'cartridge'
-          ? `cart:${it.id}`
-          : it.kind === 'page'
-            ? `struct:${it.id}`
-            : `${it.kind}:${it.id}`
-      }
-    >
-      <div className="item-top">
-        <ArtIcon
-          category={it.kind === 'page' ? 'page' : it.kind}
-          id={it.id}
-          name={itemTitle(it)}
-          tone={rarity}
-          className="item-art"
-        />
-        <div className="item-name">{itemTitle(it)}</div>
-      </div>
-      {body}
-      <div className="item-buy">
-        {it.sold ? (
-          <span className="dim">SOLD</span>
-        ) : (
-          <span
-            role="button"
-            className={`pixel-btn ${cash >= it.price ? 'primary' : ''}`}
-            onClick={(ev) => {
-              ev.stopPropagation();
-              sfx(cash >= it.price ? 'buy' : 'error');
-              if (cash >= it.price)
-                burstAt(ev.currentTarget, rarity === 'L' ? 'sparkle' : 'coins', rarity === 'L' ? 50 : 14);
-              void act({ t: 'buy', index });
-            }}
-            data-testid={`buy-${index}`}
-          >
-            {it.price === 0 ? 'FREE' : `BUY $${it.price}`}
-          </span>
-        )}
-      </div>
-    </TiltCard>
-  );
-}
-
-export function ShopView({ e }: { e: RunEngine }) {
-  const act = useRun((s) => s.act);
-  useRun((s) => s.version);
-  const st = e.state;
-  const shop = st.shop;
-  const r = st.round;
-  useHotkeys({ reroll: () => void act({ t: 'rerollShop' }), confirm: () => void act({ t: 'leaveShop' }) });
-  if (!shop) return null;
-  const nextIndex = (st.roundIndex + 1) % 3;
-  const nextQ = st.roundIndex === 2 ? st.quarter + 1 : st.quarter;
-  const nextName = nextIndex === 2 ? 'the Review' : `${quarterLabel(nextQ)} ${ROUND_NAMES[nextIndex]}`;
-  const annual = st.endless ? nextQ % 4 === 0 : nextQ >= st.config.quarters;
-  const nextTarget = computeTarget(
-    nextQ,
-    nextIndex,
-    nextIndex === 2 && annual ? 'annual_review' : null,
-    st.config,
-  );
-  const payout = r.payouts.reduce((a, p) => a + p.cash, 0);
-  const cost = e.shopRerollCost();
-  return (
-    <div className="screen run-shop" data-testid="shop-screen">
-      <div className="shop-head">
-        <h1 className="screen-title">THE SHOP</h1>
-        <div className="tb-item num">
-          <span className="dim">CASH</span>{' '}
-          <span className="amber-text big-cash" data-testid="shop-cash">
-            ${st.cash}
-          </span>
+    <div className="panel round-why num" data-testid="tally-why">
+      <div className="section-title">Why this score</div>
+      <div className="rw-grid">
+        <div>
+          <span className="dim">MONEY</span>{' '}
+          {wins.length > 0 && (
+            <span className="up-text">
+              ▲ {money(made)} on {wins.length} winner{wins.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {wins.length > 0 && losses.length > 0 && ' · '}
+          {losses.length > 0 && (
+            <span className="down-text">
+              ▼ {money(-lost)} on {losses.length} loser{losses.length > 1 ? 's' : ''}
+            </span>
+          )}{' '}
+          · round <Pnl cents={net} />
         </div>
-        <div className="tb-item num">
-          <span className="dim">EQUITY</span> {money(st.equityCents)}
+        <div>
+          <span className="dim">POINTS</span>{' '}
+          {wins.length > 0 && (
+            <span className="up-text">
+              winners {ptsSigned(winPts)} (your build: ×{avgMult.toFixed(1)} on average)
+            </span>
+          )}
+          {wins.length > 0 && losses.length > 0 && ' · '}
+          {losses.length > 0 && (
+            <span className="down-text">losers {ptsSigned(lossPts)} (losses count in full)</span>
+          )}
+          {!!r.greenBonus && (
+            <span className={r.greenBonus > 0 ? 'up-text' : 'down-text'}>
+              {' '}
+              · {r.greenBonus > 0 ? 'green round' : 'red round'} {ptsSigned(r.greenBonus)}
+            </span>
+          )}
+          {!!r.carriedIn && <span className="cyan-text"> · carried in {ptsSigned(r.carriedIn)}</span>}
+          {!!r.interest && (
+            <span className="down-text" data-testid="tally-interest">
+              {' '}
+              · the Collector&apos;s interest −{pts(r.interest)}
+            </span>
+          )}
         </div>
-        <div className="tb-item num">
-          <span className="dim">STRESS</span> {st.stress}
-        </div>
-      </div>
-      <div className="shop-grid">
-        <div className="panel shop-summary">
-          <div className="section-title">
-            Last round:{' '}
-            {r.status === 'passed' ? (
-              <span className="up-text">TARGET MET</span>
-            ) : (
-              <span className="down-text">MISSED (saved)</span>
-            )}{' '}
-            {r.meter.toLocaleString()} / {r.target.toLocaleString()}
-          </div>
-          {r.payouts.map((p, i) => (
-            <div key={i} className="payout num">
-              <span>{p.label}</span>
-              <span className={p.cash >= 0 ? 'amber-text' : 'down-text'}>
-                {p.cash >= 0 ? '+' : '−'}${Math.abs(p.cash)}
-              </span>
-            </div>
-          ))}
-          <div className="payout num total">
-            <span>Total</span>
-            <span className="amber-text">${payout}</span>
-          </div>
-          {r.taxCents > 0 && <div className="dim">Taxes set aside: {money(r.taxCents)}</div>}
-        </div>
-        <div className="shop-offers">
-          <div className="offer-row">
-            {shop.items.map((it, i) => (
-              <ItemCard key={`${it.kind}-${it.id}-${i}-${shop.rerolls}`} e={e} it={it} index={i} />
-            ))}
-          </div>
-          <div className="modal-actions">
-            <button
-              className="pixel-btn"
-              onClick={() => (sfx('deal'), void act({ t: 'rerollShop' }))}
-              disabled={st.cash < cost}
-              data-testid="shop-reroll"
-              data-tip="g:shop_reroll"
-            >
-              REROLL {cost === 0 ? 'FREE' : `$${cost}`} <Kbd>R</Kbd>
-            </button>
-            <button
-              className="pixel-btn primary"
-              onClick={() => (sfx('whoosh'), void act({ t: 'leaveShop' }))}
-              data-testid="leave-shop"
-            >
-              NEXT: {nextName.toUpperCase()} (target {nextTarget.toLocaleString()}
-              {nextIndex === 2 && nextQ < st.config.quarters ? '+' : ''}) ▶ <Kbd>Enter</Kbd>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="panel loadout">
-        <div className="section-title">Your cartridges (slot order matters: effects apply left to right)</div>
-        <CartridgeRail e={e} editable />
-        <div className="sell-row">
-          {st.cartridges.map((id) => (
-            <button
-              key={id}
-              className="pixel-btn"
-              onClick={() => void act({ t: 'sell', cartridgeId: id })}
-              data-testid={`sell-${id}`}
-            >
-              SELL {CARTRIDGE_BY_ID[id].name} +${sellPrice(CARTRIDGE_BY_ID[id])}
-            </button>
-          ))}
-        </div>
-        <div className="loadout-grid">
-          <div>
-            <div className="section-title">
-              Analysts {st.analysts.length}/{e.analystSeats()}
-            </div>
-            {st.analysts.map((a) => (
-              <div key={a.id} className="seat">
-                {ANALYSTS[a.id].name} {a.level > 1 && <span className="chip">L2</span>}
-                <button className="link-btn" onClick={() => void act({ t: 'fire', analyst: a.id })}>
-                  let go
-                </button>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="section-title">Memos {st.memos.length}/2</div>
-            {st.memos.map((m, i) => (
-              <div key={i} className="seat" title={MEMOS[m].text}>
-                {MEMOS[m].name}
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="section-title">Playbook</div>
-            {DESKS[st.config.deskId].structures.map((s) => (
-              <div key={s} className="seat num">
-                {STRUCTURES[s].short} <span className="amber-text">LV {st.levels[s] ?? 1}</span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="section-title">Vouchers</div>
-            {st.vouchers.length === 0 && <div className="dim">none</div>}
-            {st.vouchers.map((v) => (
-              <div key={v} className="seat" title={VOUCHERS[v].text}>
-                {VOUCHERS[v].name}
-              </div>
-            ))}
-          </div>
-        </div>
+        <div className="rw-verdict">{verdict}</div>
       </div>
     </div>
   );
@@ -495,12 +314,104 @@ function Typed({ text }: { text: string }) {
   return <span>{text.slice(0, n)}</span>;
 }
 
+/**
+ * A boss's case file: who it is, which pillar it plays on, the market it brings (with its logo),
+ * its one twist and what it takes away, then the target. Full screen, in the boss's colors.
+ */
+function BossCaseFile({ e }: { e: RunEngine }) {
+  const act = useRun((s) => s.act);
+  const st = e.state;
+  const boss = BOSSES[st.round.bossId!];
+  const market = REVIEWS[boss.market];
+  const accept = () => (sfx('stamp'), void act({ t: 'startReview' }));
+  return (
+    <div className="screen run-review boss-file" data-testid="review-intro" data-boss-file={boss.id}>
+      <motion.div
+        className="bf-card panel"
+        initial={{ scale: 1.15, opacity: 0, rotate: -1.5 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      >
+        <div className="bf-top num">
+          <span>
+            CASE FILE · {quarterLabel(st.quarter)} REVIEW
+            {showdownLabel(showdownTier(st.quarter)) && (
+              <b className="bf-showdown" data-testid="boss-showdown">
+                {' '}
+                · {showdownLabel(showdownTier(st.quarter))}
+              </b>
+            )}
+          </span>
+          <span className="bf-pillar">
+            PILLAR {boss.pillar} · {boss.pillarName.toUpperCase()}
+          </span>
+        </div>
+        <div className="bf-head">
+          <div className="bf-emblem" data-tip={`review:${boss.market}`}>
+            <ArtIcon category="review" id={boss.market} name={market.name} scale={1.5} />
+          </div>
+          <div>
+            <h1 className="bf-name" data-testid="boss-name">
+              {boss.name.toUpperCase()}
+            </h1>
+            <div className="bf-person num">
+              {boss.person} · {boss.role}
+            </div>
+            <p className="bf-intro">
+              “<Typed text={boss.intro} />”
+            </p>
+          </div>
+        </div>
+        <div className="bf-rows">
+          <div className="bf-row twist">
+            <span className="bf-k num">THE TWIST</span>
+            <span className="bf-v" data-testid="boss-twist">
+              {twistLine(boss.id, showdownTier(st.quarter))}
+            </span>
+          </div>
+          <div className="bf-row blocked">
+            <span className="bf-k num">🔒 BLOCKED</span>
+            <span className="bf-v">{boss.blocks}</span>
+          </div>
+          <div className="bf-row">
+            <span className="bf-k num">MARKET</span>
+            <span className="bf-v">
+              {market.name}: {market.filterText}
+            </span>
+          </div>
+          <div className="bf-row">
+            <span className="bf-k num">TARGET</span>
+            <span className="bf-v num">{pts(st.round.target)} points</span>
+          </div>
+          <div className="bf-row style" data-testid="boss-style-row">
+            <span className="bf-k num">★ STYLE</span>
+            <span className="bf-v">
+              {STYLE_TEXT[boss.style]}: <span className="amber-text">+${BALANCE.run.styleCash}</span>
+            </span>
+          </div>
+        </div>
+        {BALANCE.run.bossFailEndsRun && (
+          <div className="bf-warn num">
+            Miss the target and the run ends.
+            {boss.twist.kind === 'variety' ? ' Miss the second goal and it ends too.' : ''}
+            {boss.twist.kind === 'annual' ? ' Trail SPY and you only survive.' : ''}
+          </div>
+        )}
+        <button className="pixel-btn primary bf-go" onClick={accept} data-testid="review-accept">
+          TAKE THE REVIEW <Kbd>Enter</Kbd>
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
 export function ReviewIntro({ e }: { e: RunEngine }) {
   const act = useRun((s) => s.act);
   const st = e.state;
   const id = st.nextReview;
   useHotkeys({ confirm: () => void act({ t: 'startReview' }) });
   if (!id) return null;
+  if (st.round.bossId) return <BossCaseFile e={e} />;
   const rv = REVIEWS[id];
   return (
     <div className="screen run-review" data-testid="review-intro">
@@ -528,7 +439,7 @@ export function ReviewIntro({ e }: { e: RunEngine }) {
               <span className="dim">RULE:</span> {rv.ruleText}
             </div>
             <div>
-              <span className="dim">TARGET:</span> {st.round.target.toLocaleString()} points
+              <span className="dim">TARGET:</span> {pts(st.round.target)} points
             </div>
             <div className="dim">Reviews cannot be skipped. Entering one added stress.</div>
           </div>
@@ -596,7 +507,7 @@ export function RunEnd({
           className={`end-reason ${res.points > ghost.total ? 'up-text' : 'down-text'}`}
           data-testid="ghost-result"
         >
-          Bradley scored {ghost.total.toLocaleString()} on this seed.{' '}
+          Bradley scored {pts(ghost.total)} on this seed.{' '}
           {res.points > ghost.total ? 'You beat his ghost.' : 'His ghost wins today.'}
         </p>
       )}
@@ -606,7 +517,7 @@ export function RunEnd({
           {endless ? e.state.history.length : e.state.config.quarters * 3}
         </div>
         <div>
-          <span className="dim">Points</span> {res.points.toLocaleString()}
+          <span className="dim">Points</span> {pts(res.points)}
         </div>
         <div>
           <span className="dim">Real P/L</span> <Pnl cents={res.realizedCents} />
@@ -641,8 +552,8 @@ export function RunEnd({
               <td>
                 {yearRound(i)} {h.reviewId ? `· ${REVIEWS[h.reviewId].name}` : ''}
               </td>
-              <td>{h.target.toLocaleString()}</td>
-              <td>{h.meter.toLocaleString()}</td>
+              <td>{pts(h.target)}</td>
+              <td>{pts(h.meter)}</td>
               <td
                 className={h.status === 'passed' ? 'up-text' : h.status === 'skipped' ? 'dim' : 'down-text'}
               >

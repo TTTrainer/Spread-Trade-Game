@@ -3,6 +3,7 @@
  * summary for the balance report, including every action it took (for the run-time estimate).
  */
 
+import { DESKS } from '../../src/content/desks';
 import type { DeskId } from '../../src/content/types';
 import { DEFAULT_REALISM, defaultPause } from '../../src/engine/lifecycle/daily';
 import type { MarketDataSource } from '../../src/engine/market/source';
@@ -42,7 +43,15 @@ export interface SimResult {
   ownedAt: Record<string, number>;
   actions: Record<string, number>;
   days: number;
-  rounds: { index: number; quarter: number; target: number; meter: number; status: string }[];
+  rounds: {
+    index: number;
+    quarter: number;
+    target: number;
+    meter: number;
+    status: string;
+    realizedCents: number;
+    bossId: string | null;
+  }[];
   ms: number;
   error?: string;
 }
@@ -59,7 +68,8 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
     deskId: spec.desk,
     mode: 'sim',
     tier: spec.tier,
-    startEquityCents: 500_000,
+    // Desks that tie up whole share prices play at the capital the Career screen recommends.
+    startEquityCents: DESKS[spec.desk].recommendedCapitalCents ?? 500_000,
     pureMarket: false,
     realism: { ...DEFAULT_REALISM },
     pause: defaultPause(),
@@ -92,8 +102,9 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
   }
   const st = engine.state;
   const r = st.result;
-  const failed = st.history.findIndex((h) => h.status === 'failed');
   const lastFail = [...st.history].reverse().find((h) => h.status === 'failed');
+  // The round that ended the run (a written-up Month earlier in the quarter didn't).
+  const failed = lastFail ? st.history.lastIndexOf(lastFail) : -1;
   const completed = !!r && (r.outcome === 'victory' || r.outcome === 'survived');
   return {
     spec,
@@ -122,6 +133,8 @@ export async function simulateRun(source: MarketDataSource, spec: SimSpec): Prom
       target: h.target,
       meter: h.meter,
       status: h.status,
+      realizedCents: h.realizedCents,
+      bossId: h.bossId ?? null,
     })),
     ms: Date.now() - t0,
     error,

@@ -45,11 +45,17 @@ describe('day playback', () => {
   });
 
   it('rates how close the day came to a short strike', () => {
-    expect(strikeTension([100], { open: 103, high: 104, low: 99, close: 102 })).toBe(1);
-    expect(strikeTension([100], { open: 110, high: 111, low: 109, close: 110 })).toBe(0);
-    const near = strikeTension([100], { open: 102, high: 103, low: 101, close: 102 });
-    expect(near).toBeGreaterThan(0.4);
+    const put = [{ strike: 100, right: 'P' as const }];
+    const call = [{ strike: 100, right: 'C' as const }];
+    expect(strikeTension(put, { open: 103, high: 104, low: 99, close: 102 })).toBe(1);
+    expect(strikeTension(put, { open: 110, high: 111, low: 109, close: 110 })).toBe(0);
+    const near = strikeTension(put, { open: 102, high: 103, low: 101, close: 102 });
+    expect(near).toBeGreaterThan(0);
     expect(near).toBeLessThan(1);
+    // Past the strike on the wrong side is the worst case, however far away the candle is.
+    expect(strikeTension(put, { open: 95, high: 96, low: 94, close: 95 })).toBe(1);
+    expect(strikeTension(call, { open: 106, high: 107, low: 105, close: 106 })).toBe(1);
+    expect(strikeTension(call, { open: 90, high: 91, low: 89, close: 90 })).toBe(0);
     expect(strikeTension([], { open: 1, high: 1, low: 1, close: 1 })).toBe(0);
   });
 

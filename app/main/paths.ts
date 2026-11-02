@@ -24,6 +24,11 @@ export function defaultGameDbPath(): string {
   return join(userDataDir(), 'data', 'game.db');
 }
 
+/** schwab.db: what PULL FROM SCHWAB saves, kept apart from game.db so rebuilding never loses it. */
+export function schwabStorePath(): string {
+  return join(userDataDir(), 'data', 'schwab.db');
+}
+
 export function userDbPath(): string {
   return join(userDataDir(), 'user.db');
 }

@@ -42,7 +42,17 @@ export type SfxName =
   | 'boom'
   | 'reveal'
   | 'buy'
-  | 'heartbeat';
+  | 'heartbeat'
+  | 'chip'
+  | 'multAdd'
+  | 'multX'
+  | 'slam'
+  | 'fire'
+  | 'fanfare'
+  | 'jackpot'
+  | 'cartSlam'
+  | 'print'
+  | 'dud';
 
 const DEFS: Record<SfxName, SfxDef> = {
   click: { wave: 'square', freq: 900, sustain: 0.012, decay: 0.03, volume: 0.25, duty: 0.3 },
@@ -168,6 +178,150 @@ const DEFS: Record<SfxName, SfxDef> = {
     volume: 0.6,
     layer: { wave: 'noise', freq: 150, sustain: 0.01, decay: 0.06, volume: 0.2, lowpass: 0.1 },
   },
+  // The payout's voices (played with a rising pitch, one semitone per trigger): a bright blip for
+  // chips, a plucked fifth for +mult, a metallic double strike for x mult, a bass slam for the
+  // total, and a rushing flare when a trade clears the round.
+  chip: {
+    wave: 'square',
+    freq: 784,
+    sustain: 0.025,
+    decay: 0.07,
+    volume: 0.26,
+    duty: 0.25,
+    layer: { wave: 'triangle', freq: 1568, sustain: 0.01, decay: 0.05, volume: 0.12 },
+  },
+  multAdd: {
+    wave: 'triangle',
+    freq: 523,
+    sustain: 0.04,
+    decay: 0.16,
+    volume: 0.4,
+    arp: [{ at: 0.035, mult: 1.498 }],
+    layer: { wave: 'square', freq: 1046, sustain: 0.015, decay: 0.08, volume: 0.1, duty: 0.2 },
+  },
+  multX: {
+    wave: 'square',
+    freq: 1046,
+    sustain: 0.05,
+    decay: 0.28,
+    volume: 0.3,
+    duty: 0.15,
+    arp: [
+      { at: 0.05, mult: 1.335 },
+      { at: 0.1, mult: 1.498 },
+    ],
+    vibratoDepth: 0.015,
+    vibratoSpeed: 40,
+    layer: {
+      wave: 'noise',
+      freq: 9000,
+      sustain: 0.01,
+      decay: 0.12,
+      volume: 0.18,
+      lowpass: 0.9,
+      layer: { wave: 'sine', freq: 2093, sustain: 0.02, decay: 0.3, volume: 0.14 },
+    },
+  },
+  slam: {
+    wave: 'sine',
+    freq: 110,
+    slide: 0.4,
+    sustain: 0.08,
+    decay: 0.45,
+    volume: 0.7,
+    layer: {
+      wave: 'noise',
+      freq: 600,
+      sustain: 0.03,
+      decay: 0.25,
+      volume: 0.35,
+      lowpass: 0.2,
+      layer: { wave: 'square', freq: 220, slide: 0.5, sustain: 0.04, decay: 0.2, volume: 0.18, duty: 0.5 },
+    },
+  },
+  fire: {
+    wave: 'noise',
+    freq: 1200,
+    attack: 0.12,
+    sustain: 0.25,
+    decay: 0.5,
+    volume: 0.35,
+    lowpass: 0.3,
+    layer: {
+      wave: 'saw',
+      freq: 220,
+      slide: 2.5,
+      attack: 0.05,
+      sustain: 0.2,
+      decay: 0.3,
+      volume: 0.12,
+      lowpass: 0.4,
+    },
+  },
+  // A trophy: a rising major arpeggio that lands on a held octave, with a bright shimmer on top.
+  fanfare: {
+    wave: 'square',
+    freq: 392,
+    sustain: 0.7,
+    decay: 0.6,
+    volume: 0.26,
+    duty: 0.3,
+    arp: [
+      { at: 0.1, mult: 1.26 },
+      { at: 0.2, mult: 1.19 },
+      { at: 0.3, mult: 1.335 },
+    ],
+    vibratoDepth: 0.012,
+    vibratoSpeed: 7,
+    layer: {
+      wave: 'triangle',
+      freq: 196,
+      sustain: 0.8,
+      decay: 0.5,
+      volume: 0.3,
+      arp: [{ at: 0.3, mult: 2 }],
+      layer: { wave: 'sine', freq: 3136, attack: 0.3, sustain: 0.3, decay: 0.6, volume: 0.06 },
+    },
+  },
+  // The payout's total: a pinball jackpot (two notes trading places over a bass drop and a crash).
+  jackpot: {
+    wave: 'square',
+    freq: 660,
+    sustain: 0.48,
+    decay: 0.14,
+    volume: 0.2,
+    duty: 0.35,
+    arp: [
+      { at: 0.09, mult: 1.3333 },
+      { at: 0.18, mult: 0.75 },
+      { at: 0.27, mult: 1.3333 },
+      { at: 0.36, mult: 0.75 },
+      { at: 0.45, mult: 1.3333 },
+    ],
+    layer: {
+      wave: 'sine',
+      freq: 95,
+      slide: 0.4,
+      sustain: 0.1,
+      decay: 0.45,
+      volume: 0.55,
+      layer: { wave: 'noise', freq: 900, sustain: 0.04, decay: 0.3, volume: 0.28, lowpass: 0.2 },
+    },
+  },
+  // A cartridge pushed home in its slot: a short plastic chunk.
+  cartSlam: {
+    wave: 'noise',
+    freq: 1400,
+    sustain: 0.012,
+    decay: 0.06,
+    volume: 0.3,
+    lowpass: 0.15,
+    layer: { wave: 'sine', freq: 130, slide: 0.45, sustain: 0.03, decay: 0.15, volume: 0.5 },
+  },
+  // The coin passing a cartridge that doesn't apply: flat, low, short.
+  dud: { wave: 'square', freq: 160, slide: 0.72, sustain: 0.03, decay: 0.1, volume: 0.16, duty: 0.5 },
+  // The register printing a line.
+  print: { wave: 'noise', freq: 7000, sustain: 0.004, decay: 0.014, volume: 0.13, lowpass: 0.95 },
   buy: {
     wave: 'square',
     freq: 392,

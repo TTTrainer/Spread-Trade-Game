@@ -19,8 +19,11 @@ export function CreditsScreen() {
           Options, stock, earnings and rates data: DoltHub databases <b>post-no-preference/options</b>,{' '}
           <b>/stocks</b>, <b>/earnings</b> and <b>/rates</b>. The options data is licensed under{' '}
           <b>Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)</b>. VIX history: Cboe Global Markets
-          daily VIX history. Days the free data skipped are modeled and labeled MODEL. The SIM market
-          (fictional companies such as Helix Robotics and MemeStonk Arcade) is invented and labeled SIM.
+          daily VIX history. When you connect your own Schwab developer app: Charles Schwab market data
+          (read-only prices and option chains), pulled on your computer for your own use and never shared.
+          Days the free data skipped, and option chains Schwab has no history for, are modeled and labeled
+          MODEL. The SIM market (fictional companies such as Helix Robotics and MemeStonk Arcade) is invented
+          and labeled SIM.
         </p>
         <h2>Charts</h2>
         <p>
@@ -34,10 +37,10 @@ export function CreditsScreen() {
         </p>
         <h2>Art, music and sound</h2>
         <p>
-          All pixel art (portraits, The Pad, icons, the backdrop) is drawn in code for this game; no art packs
-          are used. Music is composed and played live with <b>Tone.js</b> (MIT). Particles and the backdrop
-          render with <b>PixiJS</b> (MIT). Sound effects are synthesized in code, sfxr-style, with no sample
-          packs.
+          All art is original to this game: most pixel art (portraits, The Pad, icons, the backdrop) is drawn
+          in code, and the cartridge, memo and coupon shells were generated for it in Figma; no art packs are
+          used. Music is composed and played live with <b>Tone.js</b> (MIT). Particles and the backdrop render
+          with <b>PixiJS</b> (MIT). Sound effects are synthesized in code, sfxr-style, with no sample packs.
         </p>
         <h2>Software</h2>
         <p>

@@ -61,6 +61,12 @@ describe('fill model', () => {
     ).toBe(false);
     expect(attemptFill(q, { type: 'limit', limit: -1.0 }, rng).price).toBeCloseTo(-1.1, 12);
     expect(attemptFill(q, { type: 'limit', atMid: true }, rng).price).toBe(-1.2);
+    // A marketable limit (how exits go when market orders are off) always fills at the market price.
+    const off = { ...BASE_EXECUTION, marketOrdersDisabled: true };
+    expect(attemptFill(q, { type: 'limit', marketable: true }, rng, off)).toMatchObject({
+      filled: true,
+      price: -1.1,
+    });
   });
 
   it('limit boosts and tier penalties shift probability', () => {

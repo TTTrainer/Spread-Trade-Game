@@ -181,4 +181,9 @@ export interface DatasetMeta {
   benchmark: string; // SPY in real data
   context: string[]; // SPY, DIA
   notes: string[];
+  /**
+   * 'history': only real chains are stored; every other day's chain is modeled from the trailing
+   * closes when read (data built from Schwab prices, which come with no option history).
+   */
+  chainModel?: 'history';
 }

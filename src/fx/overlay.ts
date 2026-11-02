@@ -7,7 +7,7 @@
 
 // The app's content security policy forbids eval; this module swaps in eval-free shaders.
 import 'pixi.js/unsafe-eval';
-import { Application, Container, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Sprite, Texture, UPDATE_PRIORITY } from 'pixi.js';
 
 export type BurstKind = 'confetti' | 'coins' | 'sparkle' | 'firework' | 'embers';
 
@@ -63,6 +63,11 @@ class Overlay {
         document.body.appendChild(app.canvas);
         app.stage.addChild(this.layer);
         app.ticker.add((t) => this.update(t.deltaMS / 1000));
+        // Draw through a guard: without a graphics card Pixi falls back to its canvas renderer,
+        // which can fail on a frame. Effects are decoration, so a bad frame is skipped, and
+        // repeated failures switch them off rather than raising errors on the screen.
+        app.ticker.remove(app.render, app);
+        app.ticker.add(() => this.draw(), null, UPDATE_PRIORITY.LOW);
         this.app = app;
       })().catch((err) => {
         console.warn('fx overlay unavailable', err);
@@ -180,8 +185,27 @@ class Overlay {
     }
     if (!this.live.length && this.app) {
       // One last frame to clear the canvas, then sleep until the next burst.
-      this.app.render();
-      this.app.ticker.stop();
+      this.draw();
+      this.app?.ticker.stop();
+    }
+  }
+
+  private failures = 0;
+
+  private draw(): void {
+    const app = this.app;
+    if (!app) return;
+    try {
+      app.render();
+      this.failures = 0;
+    } catch (err) {
+      if (++this.failures < 3) return;
+      console.warn('fx overlay switched off after repeated draw errors', err);
+      this.enabled = false;
+      for (const p of this.live) p.s.visible = false;
+      this.live = [];
+      app.ticker.stop();
+      app.canvas.style.display = 'none';
     }
   }
 }

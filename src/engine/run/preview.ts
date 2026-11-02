@@ -59,6 +59,7 @@ export function previewFacts(
         ? -(plan.mid ?? 0) / plan.metrics.width
         : null,
     pctOfMaxProfit: 1,
+    returnOnRisk: null,
     closedAtPlan: null,
     exitReason: 'expired',
     expiredWorthless: def.credit,
@@ -138,6 +139,8 @@ export function previewScore(
     goodRR: plan.goodRR,
     edgeTier: plan.edge?.tier ?? null,
     reviewId: r.reviewId,
+    bossId: r.bossId,
+    showdown: r.showdown ?? 0,
     families: engine.families(),
     cartridges: engine.activeCartridges(),
     // Previews never mutate cartridge state.
@@ -168,7 +171,7 @@ export function previewScore(
     }),
   );
   return {
-    chips: Math.round(res.chips),
+    chips: res.chips,
     mult: res.mult,
     points: res.points,
     steps,

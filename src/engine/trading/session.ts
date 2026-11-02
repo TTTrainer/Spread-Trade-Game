@@ -12,7 +12,14 @@ import { blindTransform, codename, openTransform, type BlindTransform } from '..
 import type { Chain, WindowDef } from '../market/types';
 import { MarketView } from '../market/view';
 import type { Cents } from '../money';
-import { BASE_EXECUTION, attemptFill, restingFill, type ExecutionMods, type OrderType } from '../orders/fill';
+import {
+  BASE_EXECUTION,
+  attemptFill,
+  restingFill,
+  type ExecutionMods,
+  type FillAttempt,
+  type OrderType,
+} from '../orders/fill';
 import { feesFor, pdtAllows } from '../orders/rules';
 import { Rng } from '../rng';
 import { STRUCTURES } from '../strategies/structures';
@@ -53,7 +60,7 @@ import {
   type HeadlineEvent,
   type HeadlineProvider,
 } from '../../content/headlines';
-import { planTrade, type TradePlan } from './plan';
+import { coveredStopMult, planTrade, type TradePlan } from './plan';
 
 export interface SessionConfig {
   seed: string;
@@ -82,11 +89,18 @@ export interface SessionConfig {
    * the next sync, which moves the edge forward.
    */
   liveEdge: ISODate | null;
+  /** How much chart a live card loads behind its day (the Trade Builder shows two years). */
+  liveHistoryDays?: number;
   /**
    * The player's "holding through earnings on purpose" tick also means "don't ask me the night
    * before". Off for the balance bots, which tick it only to be allowed to trade over a report.
    */
   trustEarningsAck: boolean;
+  /**
+   * Cards nobody has traded yet move with the clock too (with a fresh chain each day), so a trade
+   * can start on a later day. Off in the sandbox and the balance simulator.
+   */
+  advanceIdle?: boolean;
 }
 
 export function defaultSessionConfig(over: Partial<SessionConfig> = {}): SessionConfig {
@@ -214,6 +228,8 @@ export class TradingSession {
   lastEvents: SessionEvent[] = [];
   dayIndex = 0;
   clockStarted = false;
+  /** Set by the run while the round still has days to trade: the session is not done yet. */
+  holdOpen = false;
   inDay = false;
   realizedCents: Cents = 0;
   dayTrades: ISODate[] = [];
@@ -282,6 +298,14 @@ export class TradingSession {
     return this.config.startEquityCents + this.realizedCents;
   }
 
+  /**
+   * Cash in the account: closed P/L plus the premium every open trade collected (or paid). A
+   * credit spread puts cash in right away; equity only moves as the spread's value changes.
+   */
+  cashCents(): Cents {
+    return this.equityCents() + this.openPositions().reduce((a, p) => a + p.cashCents - p.feesCents, 0);
+  }
+
   /** Mark-to-market equity at the last close (for the Max-Loss Line). */
   markedEquityCents(): Cents {
     const open = this.openPositions().reduce((a, p) => a + (lastMark(p)?.plCents ?? 0), 0);
@@ -296,9 +320,37 @@ export class TradingSession {
       .map((c) => c.id);
   }
 
+  /** Cards still waiting for their first trade (they only move with the clock when advanceIdle). */
+  idleCardIds(): string[] {
+    if (!this.config.advanceIdle) return [];
+    return this.cards.filter((c) => c.positionIds.length === 0 && c.orderIds.length === 0).map((c) => c.id);
+  }
+
+  /**
+   * Cards whose trade has already closed. They keep moving with the clock (when advanceIdle) so
+   * their charts stay current while the round runs on; before, they froze on the closing day.
+   */
+  settledCardIds(): string[] {
+    if (!this.config.advanceIdle) return [];
+    return this.cards
+      .filter(
+        (c) =>
+          c.positionIds.length > 0 &&
+          c.orderIds.length === 0 &&
+          c.positionIds.every((id) => this.position(id)?.status !== 'open'),
+      )
+      .map((c) => c.id);
+  }
+
+  /** Every card the next day moves: running trades plus, when enabled, untraded and settled cards. */
+  advancingCardIds(): string[] {
+    return [...this.runningCardIds(), ...this.idleCardIds(), ...this.settledCardIds()];
+  }
+
   isDone(): boolean {
     return (
       this.clockStarted &&
+      !this.holdOpen &&
       this.openPositions().length === 0 &&
       this.orders.length === 0 &&
       this.decisions.length === 0 &&
@@ -312,6 +364,8 @@ export class TradingSession {
     params: BuildParams,
     qty: number,
     legs?: Leg[],
+    /** A covered call's automatic stop multiple (the desk default when absent). */
+    stopMult?: number,
   ): TradePlan {
     const chain = this.chains.get(cardId);
     const ctx = this.contexts.get(cardId);
@@ -327,6 +381,8 @@ export class TradingSession {
       reservedCents: this.reservedCents(),
       rate: this.view(cardId).rate(),
       legs,
+      stopMult:
+        structureId === 'covered_call' ? (stopMult ?? this.config.bracketDefaults.creditStopMult) : undefined,
     });
   }
 
@@ -387,7 +443,7 @@ export class TradingSession {
       }
       case 'roll': {
         const p = this.mustOpen(a.positionId);
-        const r = rollAction(p, a.legs, a.order, this.actionEnv(p.cardId));
+        const r = rollAction(p, a.legs, this.exitAttempt(p, a.order), this.actionEnv(p.cardId));
         this.replace(r.pos);
         this.pushEvent(
           p,
@@ -416,7 +472,12 @@ export class TradingSession {
       }
       case 'brackets': {
         const p = this.mustOpen(a.positionId);
-        this.replace({ ...p, brackets: a.brackets });
+        // A covered call's automatic stop sized its risk: it can tighten, never loosen or go.
+        const stopPl =
+          p.structureId === 'covered_call' && p.brackets.stopPl !== null
+            ? Math.min(a.brackets.stopPl ?? Infinity, p.brackets.stopPl)
+            : a.brackets.stopPl;
+        this.replace({ ...p, brackets: { ...a.brackets, stopPl } });
         return null;
       }
     }
@@ -429,12 +490,12 @@ export class TradingSession {
     return iv * Math.sqrt(30 / 365) * 0.8;
   }
 
-  /** Live mode: is every running card at the latest day with data? */
+  /** Live mode: is every card the clock moves at the latest day with data? */
   atLiveEdge(): boolean {
     const edge = this.config.liveEdge;
     if (!edge) return false;
-    const running = this.runningCardIds();
-    return running.length > 0 && running.every((id) => this.view(id).now >= edge);
+    const moving = this.advancingCardIds();
+    return moving.length > 0 && moving.every((id) => this.view(id).now >= edge);
   }
 
   private async addLiveCard(cardId: string, symbol: string, entryDate: ISODate): Promise<void> {
@@ -443,7 +504,7 @@ export class TradingSession {
     const w: WindowDef = {
       id: -1 - this.cards.length,
       symbol,
-      historyStart: addDays(entryDate, -420),
+      historyStart: addDays(entryDate, -(this.config.liveHistoryDays ?? 420)),
       entryDate,
       endDate: edge,
       forwardDays: 0,
@@ -547,6 +608,49 @@ export class TradingSession {
     return `${prefix}${this.counter}`;
   }
 
+  /**
+   * Why the realism rules (approval levels, liquidity limits) refuse this order, in plain words, or
+   * null. The ticket asks before you press SELL, and placing checks again.
+   */
+  realismBlock(cardId: string, legs: Leg[], qty: number): string | null {
+    const realism = this.config.realism;
+    if (realism.approvalLevels && isSpread(legs) && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS)
+      return 'Approval levels: your broker requires a Level 3 margin account with at least $2,000 for spreads.';
+    if (!realism.liquidityLimits) return null;
+    if (qty > LIQUIDITY_MAX_CONTRACTS)
+      return `Liquidity limits: at most ${LIQUIDITY_MAX_CONTRACTS} contracts per order.`;
+    const chain = this.chains.get(cardId);
+    const wide = optionLegsOf(legs).some((l) => {
+      const q = chain?.quotes.find(
+        (x) => x.right === l.right && x.strike === l.strike && x.expiration === l.expiration,
+      );
+      const mid = q ? (q.bid + q.ask) / 2 : 0;
+      return !q || mid <= 0 || (q.ask - q.bid) / mid > LIQUIDITY_MAX_SPREAD;
+    });
+    return wide
+      ? "Liquidity limits: a leg's market is too wide to trade (bid/ask over 50% of mid). Pick another strike or expiration."
+      : null;
+  }
+
+  /** Approval levels with too little equity: no spread can be opened, so the builder hides them. */
+  spreadsBlocked(): boolean {
+    return !!this.config.realism.approvalLevels && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS;
+  }
+
+  /** The most contracts one order may have under the realism rules. */
+  maxOrderQty(): number {
+    return this.config.realism.liquidityLimits ? LIQUIDITY_MAX_CONTRACTS : Number.POSITIVE_INFINITY;
+  }
+
+  /** A covered call always carries its automatic stop, whatever else the order asked for. */
+  private bracketsFor(structureId: StructureId, openNet: number, override?: Brackets | null): Brackets {
+    const b = this.brackets(openNet, override);
+    if (structureId !== 'covered_call' || openNet >= 0) return b;
+    const mult = coveredStopMult(override?.stopMult ?? this.config.bracketDefaults.creditStopMult);
+    const stopPl = -openNet * mult;
+    return { ...b, stopPl: b.stopPl === null ? stopPl : Math.min(b.stopPl, stopPl), stopMult: mult };
+  }
+
   private brackets(openNet: number, override?: Brackets | null): Brackets {
     if (override) return override;
     if (override === null) return { targetPl: null, stopPl: null, targetPct: null, stopMult: null };
@@ -557,7 +661,14 @@ export class TradingSession {
   private async place(a: Extract<SessionAction, { t: 'place' }>): Promise<PlaceResult> {
     const card = this.card(a.cardId);
     const view = this.view(a.cardId);
-    const plan = this.planFor(a.cardId, a.structureId, a.params, a.qty, a.legs);
+    const plan = this.planFor(
+      a.cardId,
+      a.structureId,
+      a.params,
+      a.qty,
+      a.legs,
+      a.brackets?.stopMult ?? undefined,
+    );
     const fail = (reason: string): PlaceResult => {
       this.lastEvents.push({ kind: 'reject', cardId: a.cardId, text: reason });
       return {
@@ -572,27 +683,8 @@ export class TradingSession {
     };
     if (!plan.ok || plan.mid === null || plan.natural === null || !plan.entry)
       return fail(plan.reason ?? 'This trade cannot be placed.');
-    const realism = this.config.realism;
-    if (realism.approvalLevels && isSpread(plan.legs) && this.equityCents() < SPREAD_APPROVAL_MIN_CENTS)
-      return fail(
-        'Approval levels: your broker requires a Level 3 margin account with at least $2,000 for spreads.',
-      );
-    if (realism.liquidityLimits) {
-      if (a.qty > LIQUIDITY_MAX_CONTRACTS)
-        return fail(`Liquidity limits: at most ${LIQUIDITY_MAX_CONTRACTS} contracts per order.`);
-      const chain = this.chains.get(a.cardId);
-      const wide = optionLegsOf(plan.legs).some((l) => {
-        const q = chain?.quotes.find(
-          (x) => x.right === l.right && x.strike === l.strike && x.expiration === l.expiration,
-        );
-        const mid = q ? (q.bid + q.ask) / 2 : 0;
-        return !q || mid <= 0 || (q.ask - q.bid) / mid > LIQUIDITY_MAX_SPREAD;
-      });
-      if (wide)
-        return fail(
-          'Liquidity limits: one of the legs has a market too wide to trade (bid/ask over 50% of mid).',
-        );
-    }
+    const rules = this.realismBlock(a.cardId, plan.legs, a.qty);
+    if (rules) return fail(rules);
     const bidAsk = this.config.realism.bidAsk;
     const q = { mid: plan.mid, natural: bidAsk ? plan.natural : plan.mid };
     const fill = attemptFill(
@@ -687,7 +779,7 @@ export class TradingSession {
       midNet: plan.mid as number,
       feesCents: feesFor(plan.legs, qty, this.config.realism.fees),
       collateralCents: plan.collateralCents,
-      brackets: this.brackets(price, br),
+      brackets: this.bracketsFor(structureId, price, br),
       entry: { ...entry, fillVsMidCents: Math.round(((plan.mid as number) - price) * 10000 * qty) },
       book: this.bookFor(cardId),
     });
@@ -759,6 +851,18 @@ export class TradingSession {
     );
   }
 
+  /**
+   * How an exit (a close or a roll) goes to the market. With market orders off, a market exit is
+   * sent as a limit at the natural price instead: a trade must always be closable.
+   */
+  private exitAttempt(p: Position, order: OrderSpec): FillAttempt {
+    if (order.type === 'market' && this.config.execution.marketOrdersDisabled) {
+      this.pushEvent(p, 'alert', 'Market orders are off: sent as a limit at the natural price.');
+      return { type: 'limit', marketable: true };
+    }
+    return { type: order.type, limit: order.limit, atMid: order.atMid };
+  }
+
   private applyClose(p: Position, order: OrderSpec, reason: Position['exitReason']): boolean {
     if (order.forceNatural) {
       const env = this.actionEnv(p.cardId);
@@ -785,12 +889,7 @@ export class TradingSession {
         return false;
       }
     }
-    const r = closeAction(
-      p,
-      { type: order.type, limit: order.limit, atMid: order.atMid },
-      this.actionEnv(p.cardId),
-      reason ?? 'manual',
-    );
+    const r = closeAction(p, this.exitAttempt(p, order), this.actionEnv(p.cardId), reason ?? 'manual');
     if (!r.fill.filled) {
       this.pushEvent(
         p,
@@ -811,6 +910,8 @@ export class TradingSession {
     this.clockStarted = true;
     this.dayIndex++;
     this.inDay = true;
+    // Cards that aren't trading today; read before the running cards, whose trades may close today.
+    const idle = [...this.idleCardIds(), ...this.settledCardIds()];
     for (const cardId of this.runningCardIds()) {
       const view = this.view(cardId);
       const moved = await view.advance();
@@ -872,6 +973,16 @@ export class TradingSession {
         const acked = this.config.trustEarningsAck && this.card(cardId).earningsAck;
         this.decisions.push(...r.decisions.filter((d) => !(acked && d.kind === 'earnings_tomorrow')));
       }
+    }
+    // Untraded and settled cards move too: a new day of bars, today's chain (so a trade can start
+    // today) and today's news. Nothing past today is read.
+    for (const cardId of idle) {
+      const view = this.view(cardId);
+      if (!(await view.advance())) continue;
+      this.chains.set(cardId, await view.loadChain());
+      this.contexts.set(cardId, this.buildCtx(view));
+      for (const h of this.headlinesFor(cardId, this.bookFor(cardId)))
+        this.lastEvents.push({ kind: 'headline', cardId, text: h });
     }
   }
 
@@ -1001,14 +1112,20 @@ export class TradingSession {
       }
       case 'close': {
         const reason = dp.kind === 'target_hit' ? 'target' : dp.kind === 'stop_hit' ? 'stop' : 'decision';
-        this.applyClose(p, order, reason);
+        // A close that can't go through (a limit that missed, the day-trade rule) leaves the
+        // question open: the day must not move on as if it had been answered.
+        if (!this.applyClose(p, order, reason)) this.reopen(dp);
         break;
       }
       case 'roll':
         if (a.legs) {
-          const r = rollAction(p, a.legs, order, this.actionEnv(p.cardId));
+          const r = rollAction(p, a.legs, this.exitAttempt(p, order), this.actionEnv(p.cardId));
           this.replace(r.pos);
           if (r.fill.filled) await this.view(p.cardId).track(a.legs);
+          else {
+            this.pushEvent(p, 'reject', r.fill.reason ?? 'Roll did not fill.');
+            this.reopen(dp);
+          }
         }
         break;
       case 'sell_shares': {
@@ -1025,6 +1142,12 @@ export class TradingSession {
       case 'adjust':
         break;
     }
+  }
+
+  /** Put an answered decision back at the front: its answer didn't go through. */
+  private reopen(dp: DecisionPoint): void {
+    this.decisionHistory.pop();
+    this.decisions = [dp, ...this.decisions.filter((d) => d.id !== dp.id)];
   }
 
   private async endDay(): Promise<void> {
@@ -1049,7 +1172,7 @@ function closeText(p: Position): string {
   const sign = pl >= 0 ? '▲ +' : '▼ −';
   const amt = `$${(Math.abs(pl) / 100).toFixed(2)}`;
   const why: Record<string, string> = {
-    target: 'Target filled',
+    target: 'Profit taken',
     stop: 'Stopped out',
     manual: 'Closed',
     decision: 'Closed',
@@ -1058,7 +1181,7 @@ function closeText(p: Position): string {
     window_end: 'Closed at window end',
     liquidated: 'Liquidated by the risk desk',
   };
-  return `${why[p.exitReason ?? 'manual']}: ${sign}${amt}`;
+  return `${p.symbol} · ${why[p.exitReason ?? 'manual']}: ${sign}${amt}`;
 }
 
 function isSpread(legs: Leg[]): boolean {

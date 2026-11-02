@@ -22,6 +22,7 @@ import {
   type VolPoint,
   type WindowDef,
 } from '../../src/engine/market/types';
+import { HISTORY_DEPTH, historyChain, historyQuote, type HistoryChainParams } from './historyModel';
 import { all, get, openDb, type Db, type Stmt } from './sqlite';
 import { decDate, decodeQuote, encDate, srcName, type ChainRowEnc } from './schema';
 
@@ -84,6 +85,7 @@ export class SqliteSource implements MarketDataSource {
   readonly db: Db;
   private stmts = new Map<string, Stmt>();
   private windowCache: WindowDef[] | null = null;
+  private historyModel: boolean | null = null;
 
   constructor(path: string) {
     this.db = openDb(path, { readOnly: true });
@@ -100,6 +102,46 @@ export class SqliteSource implements MarketDataSource {
 
   close(): void {
     this.db.close();
+  }
+
+  /**
+   * Data built from Schwab prices stores real chains only; every other day's chain is modeled
+   * from the trailing closes when asked for (DatasetMeta.chainModel), which keeps the file small.
+   */
+  private modelsChains(): boolean {
+    if (this.historyModel === null) {
+      const row = get<{ value: string }>(this.st("SELECT value FROM meta WHERE key = 'dataset'"));
+      this.historyModel = !!row && (JSON.parse(row.value) as DatasetMeta).chainModel === 'history';
+    }
+    return this.historyModel;
+  }
+
+  private modelParams(symbol: string, date: ISODate): HistoryChainParams | null {
+    const rows = all<{ date: number; close: number }>(
+      this.st('SELECT date, close FROM bars WHERE symbol = ? AND date <= ? ORDER BY date DESC LIMIT ?'),
+      symbol,
+      encDate(date),
+      HISTORY_DEPTH + 1,
+    );
+    if (!rows.length || decDate(rows[0].date) !== date) return null;
+    const rate = get<{ r: number }>(
+      this.st('SELECT r3m AS r FROM rates WHERE date <= ? ORDER BY date DESC LIMIT 1'),
+      date,
+    );
+    const vix = get<{ c: number }>(
+      this.st('SELECT close AS c FROM vix WHERE date <= ? ORDER BY date DESC LIMIT 1'),
+      date,
+    );
+    const etf = get<{ e: number }>(this.st('SELECT is_etf AS e FROM symbols WHERE symbol = ?'), symbol);
+    return {
+      symbol,
+      date,
+      closes: rows.map((r) => r.close).reverse(),
+      rate: rate?.r ?? 0.03,
+      divYield: 0,
+      vix: vix?.c ?? null,
+      isEtf: etf?.e === 1,
+    };
   }
 
   async meta(): Promise<DatasetMeta> {
@@ -169,6 +211,10 @@ export class SqliteSource implements MarketDataSource {
       symbol,
       encDate(date),
     );
+    if (rows.length === 0 && this.modelsChains()) {
+      const params = this.modelParams(symbol, date);
+      return params ? historyChain(params) : null;
+    }
     return { symbol, date, spot: day.spot, source: srcName(day.src), quotes: rows.map(decodeQuote) };
   }
 
@@ -197,6 +243,31 @@ export class SqliteSource implements MarketDataSource {
         k.right,
       );
       for (const r of rows) out.push({ ...decodeQuote(r), date: decDate(r.date) });
+    }
+    if (this.modelsChains()) {
+      // Days without stored rows are modeled, one contract at a time.
+      const stored = all<{ date: number }>(
+        this.st('SELECT DISTINCT date FROM chains WHERE symbol = ? AND date BETWEEN ? AND ?'),
+        symbol,
+        encDate(from),
+        encDate(to),
+      );
+      const real = new Set(stored.map((r) => decDate(r.date)));
+      const days = all<{ date: number }>(
+        this.st('SELECT date FROM chain_days WHERE symbol = ? AND date BETWEEN ? AND ? ORDER BY date'),
+        symbol,
+        encDate(from),
+        encDate(to),
+      ).map((r) => decDate(r.date));
+      for (const d of days) {
+        if (real.has(d)) continue;
+        const params = this.modelParams(symbol, d);
+        if (!params) continue;
+        for (const k of keys) {
+          if (k.expiration < d) continue;
+          out.push({ ...historyQuote(params, k), date: d });
+        }
+      }
     }
     return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   }

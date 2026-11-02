@@ -110,3 +110,69 @@
   vertical-align: -3px;
   border-width: 1px;
 }
+
+/* Schwab (read-only market data) */
+.schwab-panel {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line-bright);
+}
+.schwab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.schwab-head h3 {
+  margin: 0;
+  font-weight: 400;
+  color: var(--cyan);
+}
+.schwab-step {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.schwab-step > b {
+  font-size: 22px;
+  color: var(--amber);
+  width: 18px;
+}
+.schwab-step label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.schwab-step input {
+  font: inherit;
+  font-size: 15px;
+  background: var(--bg-0);
+  color: var(--text);
+  border: 1px solid var(--line-bright);
+  padding: 4px 8px;
+  min-width: 200px;
+}
+.schwab-step .schwab-paste {
+  flex: 1;
+  min-width: 320px;
+}
+.schwab-note {
+  margin: 0 0 4px 28px;
+}
+.schwab-step > span.small {
+  flex: 1;
+  min-width: 280px;
+  align-self: center;
+}
+.schwab-store {
+  margin: 0 0 4px 28px;
+  padding: 4px 8px;
+  font-size: 15px;
+  color: var(--cyan);
+  border-left: 2px solid var(--cyan);
+}

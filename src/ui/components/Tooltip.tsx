@@ -141,7 +141,11 @@ export function resolveTip(key: string): TipContent | null {
         ? {
             title: `${d.name} desk`,
             body: d.blurb,
-            meta: `Passive: ${d.passiveText}`,
+            meta: `Passive: ${d.passiveText}${
+              d.targetMult && d.targetMult !== 1
+                ? ` Targets x${d.targetMult}: this desk scores more per trade than Verticals.`
+                : ''
+            }`,
             art: { category: 'desk', id },
             tone: 'info',
           }
